@@ -15,6 +15,23 @@ export interface PostgresHarness {
   connectionString: string;
 }
 
+/**
+ * Harness PostgreSQL double-rôle pour les tests RLS (DB-002).
+ *
+ * - `migrationConnectionString` : connexion owner/migrateur (BYPASSRLS), pour les migrations et fixtures.
+ * - `appConnectionString` : connexion applicative `sigfa_app` (sans BYPASSRLS), pour les tests RLS.
+ * - `query()` : connexion migrateur (pour les vérifications pg_roles, pg_policies, fixtures).
+ * - `appQuery()` : connexion applicative (pour les tests d'isolation).
+ */
+export interface DualConnectionHarness extends PostgresHarness {
+  /** URL de connexion migrateur (owner, BYPASSRLS) */
+  migrationConnectionString: string;
+  /** URL de connexion applicative (sigfa_app, sans BYPASSRLS) */
+  appConnectionString: string;
+  /** Exécute une requête via la connexion applicative (sigfa_app) */
+  appQuery: (sql: string) => Promise<QueryResult>;
+}
+
 /** Harness Redis éphémère (Testcontainers) */
 export interface RedisHarness {
   /** Envoie PING et retourne la réponse */
@@ -109,6 +126,79 @@ export async function startPostgresContainer(): Promise<PostgresHarness> {
     },
     stop: async (): Promise<void> => {
       await client.end();
+      await container.stop();
+    },
+  };
+}
+
+/**
+ * Démarre un conteneur PostgreSQL 16 éphémère avec double rôle pour les tests RLS.
+ * - Rôle migrateur (`sigfa_migrator`) : owner, BYPASSRLS (utilisé par drizzle-kit et fixtures).
+ * - Rôle applicatif (`sigfa_app`) : non-owner, sans BYPASSRLS (utilisé par les tests RLS).
+ *
+ * Le rôle initial `sigfa` devient `sigfa_migrator` ; `sigfa_app` est créé avec GRANT CRUD.
+ * L'initialisation SQL des rôles est exécutée après démarrage du conteneur.
+ *
+ * @returns DualConnectionHarness avec query() (migrateur) et appQuery() (applicatif)
+ */
+export async function startPostgresContainerWithRoles(): Promise<DualConnectionHarness> {
+  const container: StartedTestContainer = await new GenericContainer("postgres:16")
+    .withEnvironment({
+      POSTGRES_USER: "sigfa",
+      POSTGRES_PASSWORD: "sigfa_test",
+      POSTGRES_DB: "sigfa_test",
+    })
+    .withExposedPorts(5432)
+    .withWaitStrategy(Wait.forLogMessage(/database system is ready to accept connections/, 2))
+    .start();
+
+  const host = container.getHost();
+  const port = container.getMappedPort(5432);
+  const migrationConnectionString = `postgresql://sigfa:sigfa_test@${host}:${port}/sigfa_test`;
+  const appConnectionString = `postgresql://sigfa_app:sigfa_app_test@${host}:${port}/sigfa_test`;
+
+  const { default: pg } = await import("pg");
+
+  // Connexion migrateur (owner, sigfa = futur sigfa_migrator)
+  const migClient = new pg.Client({ connectionString: migrationConnectionString });
+  await migClient.connect();
+
+  // Provisionner les rôles DB-002
+  await migClient.query(`
+    DO $$
+    BEGIN
+      -- Rôle migrateur (owner, BYPASSRLS) - c'est l'utilisateur courant 'sigfa'
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigfa_migrator') THEN
+        CREATE ROLE sigfa_migrator WITH LOGIN PASSWORD 'sigfa_migrator_test' BYPASSRLS SUPERUSER;
+      END IF;
+
+      -- Rôle applicatif (non-owner, sans BYPASSRLS)
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigfa_app') THEN
+        CREATE ROLE sigfa_app WITH LOGIN PASSWORD 'sigfa_app_test' NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+      END IF;
+    END
+    $$;
+  `);
+
+  // Connexion applicative (sigfa_app)
+  const appClient = new pg.Client({ connectionString: appConnectionString });
+  await appClient.connect();
+
+  return {
+    connectionString: migrationConnectionString,
+    migrationConnectionString,
+    appConnectionString,
+    query: async (sql: string): Promise<QueryResult> => {
+      const res = await migClient.query(sql);
+      return { rows: res.rows as Array<Record<string, unknown>> };
+    },
+    appQuery: async (sql: string): Promise<QueryResult> => {
+      const res = await appClient.query(sql);
+      return { rows: res.rows as Array<Record<string, unknown>> };
+    },
+    stop: async (): Promise<void> => {
+      await migClient.end();
+      await appClient.end();
       await container.stop();
     },
   };
