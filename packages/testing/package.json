@@ -4,13 +4,23 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./tenant-isolation": "./dist/tenant-isolation/index.js",
+    "./realtime-guarantees": "./dist/realtime-guarantees/index.js",
+    "./sla-engine": "./dist/sla-engine/index.js",
+    "./offline-resilience": "./dist/offline-resilience/index.js",
+    "./contract": "./dist/contract/index.js"
   },
   "scripts": {
     "build": "tsc",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --reporter=verbose"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.0",
+    "socket.io-client": "^4.8.0",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@sigfa/config": "workspace:*",
@@ -20,6 +30,8 @@
     "eslint": "^9.0.0",
     "typescript-eslint": "^8.0.0",
     "@eslint/js": "^9.0.0",
-    "eslint-plugin-import": "^2.29.0"
+    "eslint-plugin-import": "^2.29.0",
+    "testcontainers": "^10.24.0",
+    "@types/pg": "^8.11.0"
   }
 }
