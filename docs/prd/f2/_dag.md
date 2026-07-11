@@ -4,7 +4,7 @@
 > Statuts : `TODO → IN_PROGRESS → REVIEW → DONE | BLOCKED`
 
 ```
-CONTRACT-001..010 (DONE) ──► CONTRACT-011 (amendement TicketPriority/Service.code — docs/prd/f1/) 
+CONTRACT-001..010 (DONE) ──► CONTRACT-011 (DONE) 
    └──► DB-001 (schéma cœur) ──► DB-002 (RLS + tenant-isolation) ──► DB-003 (migrations+seed)
                 └──► DB-004 (audit) ─► DB-005 (notifications) ─► DB-006 (reporting) ─► DB-008 (chiffrement+purge) ─► DB-007 (IA)
 ```
@@ -13,8 +13,8 @@ CONTRACT-001..010 (DONE) ──► CONTRACT-011 (amendement TicketPriority/Servi
 
 | ID | Story | Dépend de | Statut |
 |---|---|---|---|
-| DB-001 | Schéma cœur Drizzle : Bank, Agency, Service, Queue, Counter, **Kiosk**, Ticket, User, AgencyUser + enums alignés LA LOI | F1 DONE | TODO |
-| DB-002 | Policies RLS toutes tables + helper SQL `app.current_bank_id` + suite tenant-isolation initiale | DB-001 | TODO |
+| DB-001 | Schéma cœur Drizzle : Bank, Agency, Service, Queue, Counter, **Kiosk**, Ticket, User, AgencyUser + enums alignés LA LOI | F1 DONE | DONE |
+| DB-002 | Policies RLS toutes tables + helper SQL `app.current_bank_id` + suite tenant-isolation initiale | DB-001 | DONE |
 | DB-003 | Migrations initiales + seed : 8 services défaut avec SLA, rôles, jours fériés CI | DB-002 | TODO |
 | DB-004 | Table audit_log immuable (rétention 24 mois) + triggers | DB-003 | TODO |
 | DB-005 | Tables notifications : templates par banque, opt-in/consent, journal d'envoi, devices push | DB-004 | TODO |
