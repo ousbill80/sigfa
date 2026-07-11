@@ -13,6 +13,10 @@
       "outputs": []
     },
     "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@sigfa/kiosk#typecheck": {
       "dependsOn": ["^build", "build"],
       "outputs": []
     },

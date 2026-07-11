@@ -49,6 +49,18 @@ describe("Root configuration inspection", () => {
     expect(deps).not.toContain("build");
   });
 
+  it("INFRA-002: turbo.json @sigfa/kiosk#typecheck override includes both ^build and build", () => {
+    const turbo = JSON.parse(readFileSync(resolve(ROOT, "turbo.json"), "utf-8")) as {
+      tasks: Record<string, { dependsOn?: string[] }>;
+    };
+    const kioskOverride = turbo.tasks["@sigfa/kiosk#typecheck"];
+    expect(kioskOverride).toBeDefined();
+    const deps = kioskOverride?.dependsOn ?? [];
+    // Le kiosk Next.js a besoin que son propre build soit fait avant le typecheck (.next/types)
+    expect(deps).toContain("^build");
+    expect(deps).toContain("build");
+  });
+
   it("INFRA-001: .env.example contient l'en-tête de sécurité et NODE_ENV", () => {
     const envExample = readFileSync(resolve(ROOT, ".env.example"), "utf-8");
     // Doit contenir l'en-tête indiquant de ne pas committer .env
