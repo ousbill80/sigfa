@@ -128,6 +128,22 @@ describe("useTvSimulation — TV-002 effects", () => {
   });
 });
 
+describe("useTvSimulation — défauts navigateur (jsdom)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("TV-002: sans audioFactory/speech injectés — utilise les défauts sans crash", () => {
+    // jsdom n'a ni AudioContext ni speechSynthesis → factories retournent null,
+    // le flash reste déclenché, aucun crash.
+    const { result } = renderHook(() => useTvSimulation({ seed: initialTvState }));
+    act(() => {
+      result.current.callTicket(simulatedTicketCalled("A053", "Guichet 5"));
+    });
+    expect(result.current.celebration).toBe(true);
+    expect(result.current.state.hero?.ticketNumber).toBe("A053");
+  });
+});
+
 describe("useTvSimulation — resync & connection", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());

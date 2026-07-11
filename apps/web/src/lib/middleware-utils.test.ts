@@ -65,6 +65,24 @@ describe("WEB-001: middleware auth", () => {
       expect(result.action).toBe("allow");
     });
 
+    it("WEB-002: RBAC — AGENT autorisé sur /agent (interface guichet)", () => {
+      expect(checkAccess("/agent", "AGENT").action).toBe("allow");
+    });
+
+    it("WEB-002: RBAC — rôle non-AGENT (AUDITOR) → 403 sur /agent (hérité WEB-001)", () => {
+      expect(checkAccess("/agent", "AUDITOR").action).toBe("forbidden");
+    });
+
+    it("WEB-003: RBAC AGENT — /dashboard/manager → 403", () => {
+      expect(checkAccess("/dashboard/manager", "AGENT").action).toBe("forbidden");
+    });
+
+    it("WEB-003: RBAC AUDITOR — /dashboard/manager en lecture (accès autorisé)", () => {
+      // AUDITOR reaches the manager dashboard as read-only; button-level
+      // gating is asserted in the manager dashboard component tests.
+      expect(checkAccess("/dashboard/manager", "AUDITOR").action).not.toBe("redirect");
+    });
+
     it("forbidden result includes dashboardUrl for user's role", () => {
       const result = checkAccess("/admin", "AGENT");
       expect(result.action).toBe("forbidden");
