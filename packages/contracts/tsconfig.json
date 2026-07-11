@@ -2,7 +2,7 @@
   "extends": "@sigfa/config/tsconfig/base",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "."
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "events/**/*"]
 }

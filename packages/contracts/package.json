@@ -13,6 +13,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@sigfa/schemas": "workspace:*",
+    "zod": "^3"
+  },
   "devDependencies": {
     "@sigfa/config": "workspace:*",
     "typescript": "^5.0.0",

@@ -169,6 +169,13 @@ importers:
         version: 3.2.7(@types/node@26.1.1)(jiti@2.6.1)(yaml@2.9.0)
 
   packages/contracts:
+    dependencies:
+      '@sigfa/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      zod:
+        specifier: ^3
+        version: 3.25.76
     devDependencies:
       '@eslint/js':
         specifier: ^9.0.0
