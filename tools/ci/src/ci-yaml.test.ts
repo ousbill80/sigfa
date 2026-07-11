@@ -130,6 +130,54 @@ describe("ci.yml — INFRA-007: sécurité et épinglage", () => {
   });
 });
 
+// ─── INFRA-007: build précède dist ───────────────────────────────────────────
+
+describe("ci.yml — INFRA-007: build tools/ci avant ratchet", () => {
+  it(
+    "INFRA-007: dans le job test, une étape 'Build tools/ci' (pnpm --filter @sigfa/ci run build) " +
+      "précède toute étape dont le run référence tools/ci/dist/",
+    () => {
+      const rawYml = fs.readFileSync(CI_YML_PATH, "utf-8");
+      const ci = loadCiYml();
+      const jobs = ci["jobs"] as Record<
+        string,
+        { steps?: Array<{ name?: string; run?: string }> }
+      >;
+      const testJob = jobs["test"];
+      expect(testJob, 'job "test" manquant dans ci.yml').toBeDefined();
+
+      const steps = testJob?.steps ?? [];
+
+      // Trouve l'index de la première étape référençant tools/ci/dist/
+      const distStepIdx = steps.findIndex(
+        (s) => typeof s.run === "string" && s.run.includes("tools/ci/dist/")
+      );
+      expect(
+        distStepIdx,
+        "Aucune étape dans le job test ne référence tools/ci/dist/"
+      ).toBeGreaterThanOrEqual(0);
+
+      // Trouve l'index d'une étape de build @sigfa/ci qui précède distStepIdx
+      const buildStepIdx = steps.findIndex(
+        (s, idx) =>
+          idx < distStepIdx &&
+          typeof s.run === "string" &&
+          s.run.includes("--filter @sigfa/ci") &&
+          s.run.includes("build")
+      );
+
+      expect(
+        buildStepIdx,
+        `Aucune étape 'pnpm --filter @sigfa/ci run build' ne précède l'étape qui importe tools/ci/dist/ (étape à l'index ${distStepIdx}). ` +
+          "Ajouter une étape 'Build tools/ci' avant le ratchet."
+      ).toBeGreaterThanOrEqual(0);
+
+      // Sanity-check textuel : la commande exacte est présente dans le YAML brut
+      expect(rawYml).toMatch(/--filter @sigfa\/ci.*build|--filter=@sigfa\/ci.*build/);
+    }
+  );
+});
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

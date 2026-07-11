@@ -126,6 +126,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm test -- --coverage
 
+      - name: Build tools/ci
+        run: pnpm --filter @sigfa/ci run build
+
       - name: Run coverage ratchet
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
