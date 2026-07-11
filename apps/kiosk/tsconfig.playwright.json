@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "module": "commonjs"
+  },
+  "include": [
+    "playwright.config.ts",
+    "src/__tests__/visual/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

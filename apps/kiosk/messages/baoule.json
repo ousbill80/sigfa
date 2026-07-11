@@ -18,5 +18,50 @@
   "error": {
     "offline": "Borne su kpli",
     "contactStaff": "Kɔ mɔgɔ kun dɔ dɛmɛ"
+  },
+  "home002": {
+    "title": "Mian su",
+    "chooseLanguage": "Klɛ n'gban su nun",
+    "languageFr": "Français",
+    "languageDioula": "Dioula",
+    "languageBaoule": "Baoulé",
+    "languageEn": "English",
+    "queueStatus": "File: {count} — lododon: {minutes} min",
+    "queueUnavailable": "File klɛ aman",
+    "offlineBanner": "Mode hors connexion — tikɛ'n kpli",
+    "loading": "An bla..."
+  },
+  "services003": {
+    "title": "Sɛ bo nun a klɛ?",
+    "backButton": "Wɔ sin",
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "Sɛ wɛlɛ yɛ",
+    "closedService": "Kpli — {schedule}",
+    "accessibilityButton": "♿ Klo tafue",
+    "emptyTitle": "Sɛ klɛ aman",
+    "emptyMessage": "Kɔ accueil — mɔgɔ dɔ a su.",
+    "offlineBanner": "Mode hors connexion"
+  },
+  "confirmation004": {
+    "title": "Wɔ telefɔn nimɛro (a kpli)",
+    "phonePrefix": "+225",
+    "phonePlaceholder": "07 __ __ __ __ __",
+    "smsConsent": "N klɛ ka min tikɛ'n sɔ SMS nun (a kpli)",
+    "ctaButton": "MIN TIKƐ'N NUN",
+    "skipButton": "Wɔ sin (telefɔn aman)",
+    "errorPhone": "Wɔ nimɛro klɛ aman — annzɛ dili Wɔ sin",
+    "loadingMessage": "Wɔ tikɛ'n bla...",
+    "offlineBanner": "Mode hors connexion — tikɛ local kɛli"
+  },
+  "ticket005": {
+    "position": "Wɔ sigi file nun: {position}",
+    "waitEstimate": "Lododon: {minutes} min",
+    "printing": "Wɔ tikɛ'n bla printi...",
+    "smsSent": "SMS kɔ {maskedPhone}",
+    "returning": "Wɔ sin bɛ {seconds} sigandin nun",
+    "voiceAnnounce": "Wɔ nimɛro yɛ {displayNumber}. Wɔ sigi {position} nun. Lododon: {minutes} miniti.",
+    "offlineBanner": "Mode hors connexion — tikɛ sɔgɔsɔgɔ",
+    "offlineInfo": "Tikɛ local — sync reconnexion ma",
+    "printerError": "Printi aman — mɔgɔ dɔ a su tikɛ'n man"
   }
 }

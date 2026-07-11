@@ -61,7 +61,7 @@ export default defineConfig({
       "src/**/*.spec.{ts,tsx}",
       "electron/**/*.test.ts",
     ],
-    exclude: ["node_modules", "dist", ".next"],
+    exclude: ["node_modules", "dist", ".next", "src/__tests__/visual/**"],
   },
   resolve: {
     alias: {

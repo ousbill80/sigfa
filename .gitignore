@@ -1,15 +1,17 @@
-node_modules
+
+# artefacts next.js
+# artefacts playwright
+# artefacts runtime mock prism
+*.tsbuildinfo
+.DS_Store
 .env
+.next/
+.prism-pids/
 .turbo
 coverage
 dist
-.DS_Store
-
-# artefacts runtime mock prism
-.prism-pids/
-
-# artefacts next.js
-.next/
+node_modules
 out/
-
-*.tsbuildinfo
+playwright-report/
+test-results/
+tsconfig.tsbuildinfo
