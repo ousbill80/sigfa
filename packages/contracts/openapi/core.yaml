@@ -1808,9 +1808,16 @@ components:
       in: header
       required: true
       description: |
-        Clé d'idempotence. Voir `components/headers/IdempotencyKey` pour la sémantique complète.
+        Clé d'idempotence pour les mutations critiques (émission, clôture, sync).
+        **Format** : chaîne de 1 à 255 caractères (UUID v4 recommandé, non imposé).
+        **TTL** : 24 heures. Même clé + même payload → même réponse.
+        Même clé + payload différent → 409 `IDEMPOTENCY_CONFLICT`.
+        Absent → 400 `IDEMPOTENCY_KEY_REQUIRED`.
       schema:
-        $ref: "#/components/headers/IdempotencyKey/schema"
+        type: string
+        minLength: 1
+        maxLength: 255
+        description: "UUID v4 recommandé (ex: 550e8400-e29b-41d4-a716-446655440000)"
 
   # ── Schemas ───────────────────────────────────────────────────────────────────
   schemas:

@@ -183,18 +183,32 @@ describe("CONTRACT-001", () => {
     }
   });
 
-  // ─── Critère 4 : mutations critiques → IdempotencyKey ─────────────────────
-  it("CONTRACT-001: les 3 mutations critiques référencent components/headers/IdempotencyKey (test)", () => {
-    // Vérifier que components/headers/IdempotencyKey est défini
+  // ─── Critère 4 : mutations critiques → IdempotencyKeyParam ────────────────
+  it("CONTRACT-001: les 3 mutations critiques référencent components/parameters/IdempotencyKeyParam avec schema inline (test)", () => {
+    // Vérifier que components/parameters/IdempotencyKeyParam est défini avec un schema inline valide
+    const parameters = (openapi.components as Record<string, unknown>)?.["parameters"] as Record<string, unknown> | undefined;
+    expect(parameters, "components/parameters doit être défini").toBeDefined();
+    const idemParam = parameters?.["IdempotencyKeyParam"] as Record<string, unknown> | undefined;
+    expect(idemParam, "components/parameters/IdempotencyKeyParam doit être défini").toBeDefined();
+    expect(idemParam?.["in"]).toBe("header");
+    expect(idemParam?.["name"]).toBe("X-Idempotency-Key");
+    expect(idemParam?.["required"]).toBe(true);
+
+    // Le schema doit être inline (string, minLength 1, maxLength 255) — pas un $ref sous-chemin non-standard
+    const idemSchema = idemParam?.["schema"] as Record<string, unknown> | undefined;
+    expect(idemSchema, "IdempotencyKeyParam doit avoir un schema inline").toBeDefined();
+    expect(idemSchema?.["type"]).toBe("string");
+    expect(idemSchema?.["minLength"]).toBe(1);
+    expect(idemSchema?.["maxLength"]).toBe(255);
+    // Garantir l'absence du $ref sous-chemin non-standard qui cassait openapi-typescript
+    expect(idemSchema?.["$ref"]).toBeUndefined();
+
+    // Vérifier que components/headers/IdempotencyKey reste défini (réponses + docs sémantiques)
     const headers = openapi.components?.headers;
     expect(headers).toBeDefined();
     expect((headers as Record<string, unknown>)["IdempotencyKey"]).toBeDefined();
 
-    const idemHeader = (headers as Record<string, unknown>)["IdempotencyKey"] as Record<string, unknown>;
-    const idemSchema = idemHeader?.schema as Record<string, unknown> | undefined;
-    expect(idemSchema?.type).toBe("string");
-
-    // Vérifier que chaque mutation critique référence ce header
+    // Vérifier que chaque mutation critique référence IdempotencyKeyParam via $ref standard
     for (const { path, method } of CRITICAL_MUTATIONS) {
       const pathItem = getPath(path);
       expect(pathItem, `Path ${path} devrait exister`).toBeDefined();
@@ -205,12 +219,12 @@ describe("CONTRACT-001", () => {
       const hasIdempKey = params.some(
         (p: ParameterObject) => p.in === "header" && (p.name === "X-Idempotency-Key" || JSON.stringify(p).includes("IdempotencyKey")),
       );
-      // Également vérifier dans requestBody ou via $ref dans parameters
+      // Également vérifier via $ref dans parameters
       const opStr = JSON.stringify(op);
-      const hasIdempRef = opStr.includes("IdempotencyKey") || opStr.includes("X-Idempotency-Key");
+      const hasIdempRef = opStr.includes("IdempotencyKeyParam") || opStr.includes("X-Idempotency-Key");
       expect(
         hasIdempKey || hasIdempRef,
-        `${method.toUpperCase()} ${path} doit référencer IdempotencyKey`,
+        `${method.toUpperCase()} ${path} doit référencer IdempotencyKeyParam`,
       ).toBe(true);
     }
   });

@@ -12,7 +12,7 @@
  * l'auto-découverte du .redocly.yaml racine (qui déclenche le mode multi-API).
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, existsSync, writeFileSync, readFileSync, unlinkSync } from "node:fs";
+import { mkdirSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -70,13 +70,6 @@ try {
           },
         }
       );
-      // Post-traitement : ajouter // @ts-nocheck en tête du fichier généré
-      // pour éviter les erreurs TypeScript dues aux $ref non-standard dans les YAML
-      // (ex: $ref vers #/components/headers/IdempotencyKey/schema — sous-chemin non standard)
-      const generated = readFileSync(outputPath, "utf-8");
-      if (!generated.startsWith("// @ts-nocheck")) {
-        writeFileSync(outputPath, `// @ts-nocheck\n${generated}`);
-      }
       console.log(`✔ types ${module} → generated/types/${module}.ts`);
     } catch (err) {
       console.error(`❌ Erreur lors de la génération des types de ${module}:`);
