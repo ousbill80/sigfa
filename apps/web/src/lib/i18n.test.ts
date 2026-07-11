@@ -20,21 +20,21 @@ describe("WEB-001: i18n — labels de navigation en FR (base), extensible 4 lang
     expect(t("auth.login", "en")).toBe("Login");
   });
 
-  it("supports Arabic locale", () => {
-    expect(t("nav.dashboard", "ar")).toBe("لوحة التحكم");
-    expect(t("auth.login", "ar")).toBe("تسجيل الدخول");
+  it("supports Dioula locale", () => {
+    expect(t("nav.dashboard", "dioula")).toBe("Tableau de bord");
+    expect(t("auth.login", "dioula")).toBe("Dòmini");
   });
 
-  it("supports Malagasy locale", () => {
-    expect(t("nav.logout", "mg")).toBe("Hiala");
+  it("supports Baoulé locale", () => {
+    expect(t("nav.logout", "baoule")).toBe("Fite");
   });
 
   it("supports exactly 4 locales", () => {
     expect(SUPPORTED_LOCALES).toHaveLength(4);
     expect(SUPPORTED_LOCALES).toContain("fr");
     expect(SUPPORTED_LOCALES).toContain("en");
-    expect(SUPPORTED_LOCALES).toContain("ar");
-    expect(SUPPORTED_LOCALES).toContain("mg");
+    expect(SUPPORTED_LOCALES).toContain("dioula");
+    expect(SUPPORTED_LOCALES).toContain("baoule");
   });
 
   it("all locales have same keys as FR (base)", () => {

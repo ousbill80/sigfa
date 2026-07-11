@@ -4,7 +4,7 @@
  */
 
 /** Supported locales */
-export const SUPPORTED_LOCALES = ["fr", "en", "ar", "mg"] as const;
+export const SUPPORTED_LOCALES = ["fr", "dioula", "baoule", "en"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 /** Navigation label keys */
@@ -79,56 +79,56 @@ export const EN: TranslationDict = {
   loading: "Loading…",
 };
 
-/** Arabic translations (RTL) */
-export const AR: TranslationDict = {
-  "nav.dashboard": "لوحة التحكم",
-  "nav.admin": "الإدارة",
-  "nav.agent": "الشباك",
-  "nav.audit": "التدقيق",
-  "nav.logout": "تسجيل الخروج",
-  "nav.manager": "الإدارة",
-  "nav.home": "الرئيسية",
-  "auth.login": "تسجيل الدخول",
-  "auth.email": "البريد الإلكتروني",
-  "auth.password": "كلمة المرور",
-  "auth.submit": "دخول",
-  "auth.error": "بيانات الاعتماد غير صالحة",
-  "error.service_unavailable": "الخدمة غير متاحة",
-  "error.403": "وصول مرفوض",
-  "error.403_message": "ليس لديك إذن للوصول إلى هذه الصفحة.",
-  "error.go_to_dashboard": "العودة إلى لوحة التحكم",
-  "offline.banner": "وضع عدم الاتصال — البيانات من ذاكرة التخزين المؤقت",
-  loading: "جارٍ التحميل…",
+/** Dioula translations (Mandé language, Burkina Faso / Côte d'Ivoire) */
+export const DIOULA: TranslationDict = {
+  "nav.dashboard": "Tableau de bord",
+  "nav.admin": "Kalanden",
+  "nav.agent": "Guichet",
+  "nav.audit": "Lajɛ",
+  "nav.logout": "Bɔ",
+  "nav.manager": "Talikɛla",
+  "nav.home": "So",
+  "auth.login": "Dòmini",
+  "auth.email": "Email",
+  "auth.password": "Gundo",
+  "auth.submit": "Dòmini",
+  "auth.error": "Tɔgɔ walima gundo tɛ ɲɛ",
+  "error.service_unavailable": "Baara tɛ sɔrɔ",
+  "error.403": "Sɔrɔ tɛ",
+  "error.403_message": "I tɛ se ka don nin faan in na.",
+  "error.go_to_dashboard": "Segin tableau de bord la",
+  "offline.banner": "Internet tɛ sɔrɔ — kunnafoni bɔra cache la",
+  loading: "A bɛ nɛgɛn…",
 };
 
-/** Malagasy translations */
-export const MG: TranslationDict = {
+/** Baoulé translations (Akan language, Côte d'Ivoire) */
+export const BAOULE: TranslationDict = {
   "nav.dashboard": "Tableau de bord",
-  "nav.admin": "Fitantanana",
+  "nav.admin": "Nzuɛ'n",
   "nav.agent": "Guichet",
-  "nav.audit": "Audit",
-  "nav.logout": "Hiala",
-  "nav.manager": "Fitantanana",
-  "nav.home": "Fandraisana",
-  "auth.login": "Fidirana",
-  "auth.email": "Adiresy email",
-  "auth.password": "Tenimiafina",
-  "auth.submit": "Hiditra",
-  "auth.error": "Tsy mety ny fanamarinana",
-  "error.service_unavailable": "Tsy misy ny serivisy",
-  "error.403": "Tsy avela miditra",
-  "error.403_message": "Tsy manana alalana ianao hidiitra ity pejy ity.",
-  "error.go_to_dashboard": "Hiverina amin'ny tableau de bord",
-  "offline.banner": "Mode tsy misy internet — angona avy amin'ny cache",
-  loading: "Miandry…",
+  "nav.audit": "Nian",
+  "nav.logout": "Fite",
+  "nav.manager": "Nzuɛ'n",
+  "nav.home": "Fie",
+  "auth.login": "Wlu",
+  "auth.email": "Email",
+  "auth.password": "Nzɔnzɔn",
+  "auth.submit": "Wlu",
+  "auth.error": "Ɲanmiɛn su gua'n timan",
+  "error.service_unavailable": "Sɛɛvisi'n nianman",
+  "error.403": "Wlu kpɛ'n nianman",
+  "error.403_message": "Amun wunman ase ka fie sɔ'n nun.",
+  "error.go_to_dashboard": "Sɛ kɔ tableau de bord'n su",
+  "offline.banner": "Internet nianman — ɔ fa cache su ninnge'n",
+  loading: "Ɔ nian…",
 };
 
 /** All locales map */
 export const LOCALES: Record<Locale, TranslationDict> = {
   fr: FR,
+  dioula: DIOULA,
+  baoule: BAOULE,
   en: EN,
-  ar: AR,
-  mg: MG,
 };
 
 /**
