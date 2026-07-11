@@ -5,11 +5,12 @@
  * PostgreSQL réelle via Testcontainers (double rôle sigfa_app / sigfa_migrator) —
  * aucun mock (LA LOI T5).
  *
- * ## Helper phone_hash (DB-005)
- * La canonicalisation HMAC-SHA256 des numéros de téléphone est implémentée dans
- * DB-008 (chiffrement AES-256 + HMAC). Ici, on utilise un FAKE HMAC déterministe
- * (préfixe `fake-hmac:` + SHA256 hex) pour les tests — le hash réel sera fourni
- * par DB-008. Ce fake est documenté ici et NON utilisable en production.
+ * ## Helper phone_hash / phone_encrypted (DB-005 → DB-008)
+ * La canonicalisation HMAC-SHA256 et le chiffrement AES-256-GCM des numéros de
+ * téléphone sont désormais fournis par le module CANONIQUE de DB-008
+ * (`src/crypto/phone-cipher.ts`). Ce test importe directement `hashPhone`/`encryptPhone`
+ * — les anciens helpers FAKE `fakePhoneHash`/`fakePhoneEncrypted` ont été supprimés
+ * (DB-008). Les clés de test sont fournies via `process.env` avant l'import du module.
  *
  * ## Décision d'audit (documentée, DB-005)
  * `notification_templates` est incluse dans AUDITED_TABLES car c'est une entité
@@ -32,39 +33,22 @@
  * @module
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createHmac } from "node:crypto";
 import { startPostgresContainerWithRoles } from "@sigfa/testing/tenant-isolation";
 import type { DualConnectionHarness } from "@sigfa/testing/tenant-isolation";
 import { applyMigrations } from "src/test-support/migrate.js";
 import { withTenant } from "src/tenant.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper phone_hash (FAKE — DB-008 fournira l'implémentation canonique)
-// ─────────────────────────────────────────────────────────────────────────────
+// Clés de test pour le module de chiffrement canonique (DB-008) — définies AVANT l'import.
+process.env.PHONE_ENCRYPTION_KEY ??= "0".repeat(64);
+process.env.PHONE_HASH_KEY ??= "sigfa-test-hmac-key-db008";
 
-/**
- * Calcule un HMAC-SHA256 déterministe pour les tests.
- *
- * **ATTENTION** : implémentation FAKE, uniquement pour les tests DB-005.
- * La clé est une constante de test, pas une clé d'environnement.
- * La version de production sera fournie par DB-008 (chiffrement AES-256).
- *
- * @param phone - Numéro de téléphone E.164 (ex. "+2250700000047")
- * @returns Hash HMAC-SHA256 hex (64 caractères)
- */
-function fakePhoneHash(phone: string): string {
-  return createHmac("sha256", "test-db005-fake-key").update(phone).digest("hex");
-}
+// Module CANONIQUE DB-008 (remplace les anciens helpers FAKE de DB-005).
+const { hashPhone, encryptPhone } = await import("src/crypto/phone-cipher.js");
 
-/**
- * Encode un "chiffrement" opaque pour les tests.
- * La vraie implémentation (AES-256-GCM format `v1:iv:tag:ct`) est fournie par DB-008.
- * @param phone - Numéro de téléphone E.164
- * @returns Valeur opaque de test (préfixe `test:`)
- */
-function fakePhoneEncrypted(phone: string): string {
-  return `test:${Buffer.from(phone).toString("base64")}`;
-}
+/** Alias historique DB-005 → module canonique DB-008 (hash HMAC-SHA256). */
+const fakePhoneHash = hashPhone;
+/** Alias historique DB-005 → module canonique DB-008 (chiffrement AES-256-GCM). */
+const fakePhoneEncrypted = encryptPhone;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fixtures
