@@ -18,5 +18,50 @@
   "error": {
     "offline": "Borne tɛ segin",
     "contactStaff": "Tɔgɔ mɔgɔ dɔ dɛmɛ don"
+  },
+  "home002": {
+    "title": "Bisimila",
+    "chooseLanguage": "I kan kan ka sɛbɛn i ka kan",
+    "languageFr": "Français",
+    "languageDioula": "Dioula",
+    "languageBaoule": "Baoulé",
+    "languageEn": "English",
+    "queueStatus": "File: mɔgɔ {count} — lododon: {minutes} min",
+    "queueUnavailable": "File tɛ sigi",
+    "offlineBanner": "Mode hors connexion — i ka tikɛ ka kɔrɔ",
+    "loading": "A bɛ kɛ..."
+  },
+  "services003": {
+    "title": "Baara min ye i fe?",
+    "backButton": "Segin",
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "Baara wɛrɛw ye",
+    "closedService": "Kɛnɛ tɛ — {schedule}",
+    "accessibilityButton": "♿ Tɔgɔ Segin",
+    "emptyTitle": "Baara si tɛ yen",
+    "emptyMessage": "Taa accueil la — mɔgɔ dɔ bena i dɛmɛ.",
+    "offlineBanner": "Mode hors connexion"
+  },
+  "confirmation004": {
+    "title": "I ka wolofɔn nimɔrɔ (a ka kan)",
+    "phonePrefix": "+225",
+    "phonePlaceholder": "07 __ __ __ __ __",
+    "smsConsent": "Ne b'a fɛ ka ne ka tikɛ sɔrɔ SMS la (a ka kan)",
+    "ctaButton": "NE KA TIKƐ SƆRƆ",
+    "skipButton": "Tɛmɛ (wolofɔn tɛ)",
+    "errorPhone": "I ka wolofɔn tɛ yen — walima dili Tɛmɛ",
+    "loadingMessage": "I ka tikɛ bɛ kɛ...",
+    "offlineBanner": "Mode hors connexion — tikɛ local kɛra"
+  },
+  "ticket005": {
+    "position": "I sigi ka file kɔnɔ: {position}",
+    "waitEstimate": "Lododon: {minutes} min",
+    "printing": "I ka tikɛ bɛ printi...",
+    "smsSent": "SMS tɛmɛna {maskedPhone} ma",
+    "returning": "Segin bɛ kɛ {seconds} sigandin kɔnɔ",
+    "voiceAnnounce": "I ka nimɔrɔ ye {displayNumber}. I bɛ position {position} la. Lododon: {minutes} miniti.",
+    "offlineBanner": "Mode hors connexion — tikɛ sɔgɔsɔgɔ",
+    "offlineInfo": "Tikɛ local — sync bɛna kɛ reconnexion ma",
+    "printerError": "Imprimante tɛ baara kɛ — mɔgɔ dɔ bena i ka tikɛ d'i ma"
   }
 }
