@@ -20,9 +20,15 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+/**
+ * En mode test visuel Playwright, on désactive output:"export" et trailingSlash
+ * pour que le middleware next-intl fonctionne correctement.
+ * Invoquer avec SIGFA_PLAYWRIGHT=1 pnpm dev (ou via playwright.config.ts webServer).
+ */
+const isPlaywrightMode = process.env.SIGFA_PLAYWRIGHT === "1";
+
 const nextConfig: NextConfig = {
-  output: "export",
-  trailingSlash: true,
+  ...(isPlaywrightMode ? {} : { output: "export", trailingSlash: true }),
   images: {
     unoptimized: true,
   },

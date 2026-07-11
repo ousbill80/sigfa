@@ -11,3 +11,8 @@ dist
 # artefacts next.js
 .next/
 out/
+
+# artefacts playwright
+playwright-report/
+test-results/
+tsconfig.tsbuildinfo

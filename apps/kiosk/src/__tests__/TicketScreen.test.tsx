@@ -315,8 +315,5 @@ describe("KIOSK-005: TicketScreen", () => {
     expect(animatedEls.length).toBe(0);
   });
 
-  it.skip("KIOSK-005: screenshot reference committed ×4 languages (visual regression Playwright)", () => {
-    // Visual regression tests are handled by Playwright
-    // Placeholder screenshots are committed as 1x1 PNGs
-  });
+  // KIOSK-005: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)
 });

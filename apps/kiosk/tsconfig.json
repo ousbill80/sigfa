@@ -30,5 +30,5 @@
     "**/*.tsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "playwright.config.ts", "next.config.playwright.ts", "src/__tests__/visual/**"]
 }

@@ -258,8 +258,5 @@ describe("KIOSK-003: ServicesScreen", () => {
     });
   });
 
-  it.skip("KIOSK-003: screenshot reference committed in 4 languages", () => {
-    // Visual regression tests are handled by Playwright
-    // Placeholder screenshots are committed as 1x1 PNGs
-  });
+  // KIOSK-003: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)
 });

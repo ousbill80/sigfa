@@ -244,8 +244,5 @@ describe("KIOSK-002: HomeScreen", () => {
     });
   });
 
-  it.skip("KIOSK-002: screenshot reference committed in 4 languages (visual regression)", () => {
-    // Visual regression tests are handled by Playwright
-    // Placeholder screenshots are committed as 1x1 PNGs
-  });
+  // KIOSK-002: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)
 });
