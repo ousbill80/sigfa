@@ -115,8 +115,14 @@ for module in "${MODULES[@]}"; do
   fi
 
   # Démarrer Prism mock en arrière-plan
-  echo "  ▶ Démarrage Prism mock ${module} sur port ${port}…"
-  "${PRISM_BIN}" mock --port "${port}" --host 127.0.0.1 "${bundle}" &>/dev/null &
+  # --host 0.0.0.0 : nécessaire pour que Schemathesis (conteneur Docker) puisse joindre ce mock
+  # via host.docker.internal sur Linux CI. Sur Linux, host.docker.internal est résolu par
+  # --add-host=host-gateway (IP du bridge Docker, ex. 172.17.0.1), pas la loopback 127.0.0.1.
+  # Prism sur 127.0.0.1 refuse les connexions depuis cette IP → Connection refused en CI.
+  # PRISM_HOST peut être surchargé à 127.0.0.1 si on veut limiter l'exposition en dev.
+  PRISM_BIND_HOST="${PRISM_HOST:-0.0.0.0}"
+  echo "  ▶ Démarrage Prism mock ${module} sur port ${port} (host=${PRISM_BIND_HOST})…"
+  "${PRISM_BIN}" mock --port "${port}" --host "${PRISM_BIND_HOST}" "${bundle}" &>/dev/null &
   prism_pid=$!
   PRISM_PIDS+=("${prism_pid}")
 

@@ -73,13 +73,30 @@ async function waitForPort(port: number, timeoutMs = 20_000): Promise<void> {
   throw new Error(`Port ${port} not ready after ${timeoutMs}ms`);
 }
 
+/**
+ * CONTRACT-009b — fix host bind pour Schemathesis sur Linux CI
+ *
+ * Prism démarre par défaut en écoute sur 127.0.0.1 (loopback uniquement).
+ * En CI Linux, Schemathesis tourne dans un conteneur Docker qui atteint l'hôte
+ * via `host.docker.internal` (résolu par --add-host=host-gateway = IP du bridge Docker).
+ * Sur macOS Docker Desktop, host.docker.internal atteint la loopback de l'hôte → ça passait.
+ * Sur runner Linux, host-gateway pointe vers l'IP bridge (172.17.x.1), pas 127.0.0.1 :
+ * Prism refuse les connexions provenant de cette IP → Connection refused.
+ * Fix : bind Prism sur 0.0.0.0 dans le contexte schemathesis uniquement, pour que toutes
+ * les interfaces soient écoutées. Le script dev (mock.mjs) utilise PRISM_HOST=127.0.0.1
+ * par défaut pour ne pas exposer le mock sur le LAN des postes de développement.
+ */
+const PRISM_SCHEMATHESIS_HOST = process.env.PRISM_HOST ?? "0.0.0.0";
+
 /** Démarre un mock Prism sur un port donné, retourne le processus */
 function startPrismMock(
   module: string,
   port: number
 ): ReturnType<typeof spawn> {
   const bundlePath = resolve(BUNDLED_DIR, `${module}.yaml`);
-  const proc = spawn(PRISM_BIN, ["mock", "--port", String(port), bundlePath], {
+  // --host 0.0.0.0 : nécessaire pour que le conteneur Schemathesis puisse joindre
+  // ce mock via host.docker.internal (= bridge Docker, pas la loopback) sur Linux CI.
+  const proc = spawn(PRISM_BIN, ["mock", "--port", String(port), "--host", PRISM_SCHEMATHESIS_HOST, bundlePath], {
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
   });
@@ -98,6 +115,27 @@ function stopPrism(proc: ReturnType<typeof spawn>): void {
 // ─── Critère 5 : Prism démarre et répond 2xx sur les 7 modules ────────────────
 
 describe("CONTRACT-009: mock Prism démarre sur les 7 bundles (critère 5)", () => {
+  it(
+    "CONTRACT-009b: assertion structurelle — startPrismMock utilise --host 0.0.0.0 (joignable depuis conteneur Docker sur Linux CI)",
+    () => {
+      // Vérification structurelle : la commande Prism du contexte schemathesis doit
+      // binder sur 0.0.0.0 (ou valeur de PRISM_HOST si forcée).
+      // Sur Linux CI, host.docker.internal = IP du bridge Docker (172.17.x.1), pas 127.0.0.1.
+      // Prism sur 127.0.0.1 refuse les connexions depuis cette IP → Connection refused.
+      // Fix : --host 0.0.0.0 permet à toutes les interfaces d'être écoutées.
+      const expectedHost = process.env.PRISM_HOST ?? "0.0.0.0";
+      expect(
+        PRISM_SCHEMATHESIS_HOST,
+        `PRISM_SCHEMATHESIS_HOST doit être '0.0.0.0' (ou PRISM_HOST env), reçu '${PRISM_SCHEMATHESIS_HOST}'`
+      ).toBe(expectedHost);
+      // Vérifier que 127.0.0.1 n'est pas codé en dur (régression guard)
+      expect(
+        PRISM_SCHEMATHESIS_HOST,
+        "PRISM_SCHEMATHESIS_HOST ne doit PAS être 127.0.0.1 : Schemathesis conteneur ne peut pas le joindre sur Linux CI"
+      ).not.toBe("127.0.0.1");
+    }
+  );
+
   it("CONTRACT-009: @stoplight/prism-cli est installé dans node_modules", () => {
     expect(
       existsSync(PRISM_BIN),

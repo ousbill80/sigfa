@@ -21,6 +21,15 @@ const BUNDLED_DIR = resolve(ROOT, "generated/bundled");
 const PRISM_BIN = resolve(ROOT, "node_modules/.bin/prism");
 const PID_DIR = resolve(ROOT, ".prism-pids");
 
+/**
+ * Hôte d'écoute Prism — par défaut 127.0.0.1 pour ne pas exposer le mock sur le LAN des
+ * postes dev. Peut être surchargé via PRISM_HOST=0.0.0.0 dans les contextes où Prism doit
+ * être joignable depuis un conteneur Docker (ex. CI Schemathesis sur Linux).
+ * Note : dans le test Schemathesis (mock-prism.test.ts), PRISM_HOST est forcé à 0.0.0.0 car
+ * host.docker.internal = IP du bridge Docker sur Linux CI, pas 127.0.0.1.
+ */
+const PRISM_HOST = process.env.PRISM_HOST ?? "127.0.0.1";
+
 /** Ports par défaut — documentés dans .env.example */
 const MODULE_PORTS = {
   core: Number(process.env.MOCK_CORE_PORT ?? 4010),
@@ -51,11 +60,11 @@ for (const [module, port] of Object.entries(MODULE_PORTS)) {
     process.exit(1);
   }
 
-  console.log(`▶  Prism mock ${module.padEnd(14)} → http://127.0.0.1:${port}`);
+  console.log(`▶  Prism mock ${module.padEnd(14)} → http://${PRISM_HOST}:${port}`);
 
   const proc = spawn(
     PRISM_BIN,
-    ["mock", "--port", String(port), "--host", "127.0.0.1", bundlePath],
+    ["mock", "--port", String(port), "--host", PRISM_HOST, bundlePath],
     {
       stdio: ["ignore", "pipe", "pipe"],
       detached: false,
