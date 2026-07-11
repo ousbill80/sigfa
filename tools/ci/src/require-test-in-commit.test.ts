@@ -151,8 +151,6 @@ function stageRename(
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("INFRA-004: require-test-in-commit.sh", () => {
-  let repo: string;
-
   beforeAll(() => {
     // Verify the script exists before running tests
     if (!fs.existsSync(SCRIPT_PATH)) {
