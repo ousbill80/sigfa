@@ -337,10 +337,29 @@ describe("CONTRACT-001", () => {
 
 // ─── Tests additionnels : schémas transverses ──────────────────────────────
 describe("CONTRACT-001 — Schémas transverses", () => {
-  it("CONTRACT-001: schémas transverses Role et NotificationType sont définis dans components/schemas", () => {
+  it("CONTRACT-001: schémas transverses Role, NotificationChannel et NotificationType sont définis dans components/schemas", () => {
     const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
     expect(schemas?.["Role"], "Role doit être dans components/schemas").toBeDefined();
+
+    // NotificationChannel : canaux de livraison (SMS, WhatsApp, email, push)
+    expect(schemas?.["NotificationChannel"], "NotificationChannel doit être dans components/schemas").toBeDefined();
+    const channel = schemas?.["NotificationChannel"] as Record<string, unknown> | undefined;
+    const channelEnum = channel?.enum as string[] | undefined;
+    expect(Array.isArray(channelEnum), "NotificationChannel doit avoir un enum").toBe(true);
+    const expectedChannels = ["SMS", "WHATSAPP", "EMAIL", "PUSH"];
+    for (const c of expectedChannels) {
+      expect(channelEnum, `NotificationChannel enum doit contenir ${c}`).toContain(c);
+    }
+
+    // NotificationType : types de messages du parcours client
     expect(schemas?.["NotificationType"], "NotificationType doit être dans components/schemas").toBeDefined();
+    const notifType = schemas?.["NotificationType"] as Record<string, unknown> | undefined;
+    const notifTypeEnum = notifType?.enum as string[] | undefined;
+    expect(Array.isArray(notifTypeEnum), "NotificationType doit avoir un enum").toBe(true);
+    const expectedTypes = ["TICKET_CONFIRMATION", "POSITION_UPDATE", "YOUR_TURN", "DAILY_REPORT"];
+    for (const t of expectedTypes) {
+      expect(notifTypeEnum, `NotificationType enum doit contenir ${t}`).toContain(t);
+    }
 
     // Role : 6 rôles + NONE
     const role = schemas?.["Role"] as Record<string, unknown> | undefined;

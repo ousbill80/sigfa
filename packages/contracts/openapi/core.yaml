@@ -1858,16 +1858,35 @@ components:
         - AUDITOR
         - NONE
 
-    NotificationType:
+    NotificationChannel:
       type: string
       description: |
-        Types de notifications SIGFA (SMS, WhatsApp, email, push).
-        Schéma transverse référencé par CONTRACT-007.
+        Canaux de livraison des notifications SIGFA.
+        Schéma transverse référencé par CONTRACT-007 (journal par canal, opt-in par canal).
+        - SMS : message texte via opérateur mobile
+        - WHATSAPP : message via l'API WhatsApp Business
+        - EMAIL : courriel via fournisseur transactionnel
+        - PUSH : notification push mobile/web (prérequis : device enregistré)
       enum:
         - SMS
         - WHATSAPP
         - EMAIL
         - PUSH
+
+    NotificationType:
+      type: string
+      description: |
+        Types de messages du parcours client SIGFA.
+        Schéma transverse référencé par CONTRACT-005 (templates par type) et CONTRACT-007 (variables par type).
+        - TICKET_CONFIRMATION : confirmation d'émission d'un ticket (numéro, position, estimation)
+        - POSITION_UPDATE : mise à jour de la position dans la file (ex. « vous êtes 3e »)
+        - YOUR_TURN : alerte d'appel imminent (ex. « vous êtes le suivant, préparez vos documents »)
+        - DAILY_REPORT : rapport quotidien de l'agence à destination du directeur
+      enum:
+        - TICKET_CONFIRMATION
+        - POSITION_UPDATE
+        - YOUR_TURN
+        - DAILY_REPORT
 
     TicketChannel:
       type: string
