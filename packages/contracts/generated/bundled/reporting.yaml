@@ -1,0 +1,1381 @@
+openapi: 3.1.0
+info:
+  title: SIGFA Reporting & Supervision API
+  version: 1.0.0
+  description: |
+    Contrat reporting & supervision SIGFA : KPIs, rapports journaliers,
+    benchmark inter-agences, exports asynchrones et supervision des bornes.
+    Servi sous /api/v1.
+
+    **Périmètre** : CONTRACT-006 — dépend de CONTRACT-001 (core.yaml).
+
+    **Anonymisation** : toutes les réponses de scope `network` utilisent
+    `AnonymizedNetworkAggregate` — aucune donnée personnelle, conformité UEMOA.
+
+    **Exports asynchrones** : POST/GET /reports/export retourne 202 + jobId,
+    suivi via GET /reports/export/{jobId} avec URL signée et expiration.
+servers:
+  - url: /api/v1
+    description: SIGFA v1
+security:
+  - BearerAuth: []
+tags:
+  - name: KPIs
+    description: Indicateurs de performance (TMA, TMT, TTS, abandon, SLA, NPS, occupation)
+  - name: Reports
+    description: Rapports journaliers et benchmark inter-agences
+  - name: Exports
+    description: Export asynchrone (PDF / XLSX / JSON) — 202 + jobId + polling
+  - name: Supervision
+    description: Supervision des bornes kiosques et santé de l'API
+  - name: Network
+    description: Vue réseau cross-tenant (SUPER_ADMIN, agrégats anonymisés)
+paths:
+  /health:
+    get:
+      tags:
+        - Supervision
+      summary: Santé de l'API (public, sans authentification)
+      description: |
+        Endpoint public de health-check. Aucune authentification requise.
+        Retourne le statut global du service (UP / DEGRADED / DOWN) et
+        la version déployée. Utilisé par les load balancers et les outils
+        de supervision (Uptime Robot, Datadog, etc.).
+      x-tenant-scope: public
+      x-required-role: NONE
+      security: []
+      responses:
+        '200':
+          description: Service opérationnel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: UP
+                version: 1.0.0
+                timestamp: '2026-07-11T09:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: Service indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: Le service est temporairement indisponible.
+                  details:
+                    status: DOWN
+  /reports/kpis:
+    get:
+      tags:
+        - KPIs
+      summary: KPIs de performance (agence ou réseau)
+      description: |
+        Retourne les 7 KPIs de performance pour le scope et la période donnés.
+
+        - `scope=agency` : KPIs d'une agence spécifique (claim JWT `agencyId`)
+        - `scope=network` : agrégats cross-tenant — réponse exclusivement basée
+          sur `AnonymizedNetworkAggregate`, zéro donnée personnelle (UEMOA).
+
+        **KPIs définis** (glossaire SIGFA v5 §5) :
+        - **TMA** (Temps Moyen d'Attente, minutes) : durée moyenne entre l'émission
+          du ticket et l'appel au guichet. Source : champ `waitTime` des tickets DONE.
+        - **TMT** (Temps Moyen de Traitement, minutes) : durée moyenne de la prise
+          en charge (SERVING → DONE). Source : champ `serviceTime`.
+        - **TTS** (Temps Total de Service, minutes) : TMA + TMT. Durée bout-en-bout.
+        - **tauxAbandon** (%, 0–100) : proportion de tickets passés en ABANDONED
+          ou NO_SHOW sur le total émis. Indicateur de surcharge ou d'insatisfaction.
+        - **tauxSLA** (%, 0–100) : proportion de tickets traités dans le délai SLA
+          configuré par service. Cible recommandée UEMOA : ≥ 80%.
+        - **NPS** (Net Promoter Score, –100–100, **nullable**) : calculé à partir
+          des feedbacks clients (CONTRACT-003). `null` si aucun feedback sur la période.
+        - **occupation** (%, 0–100) : taux d'utilisation moyen des guichets
+          (temps en état SERVING / temps total d'ouverture).
+
+        **Matrice RBAC** : AUDITOR et AGENCY_DIRECTOR+ peuvent lire les KPIs agency.
+        Scope network : SUPER_ADMIN uniquement.
+      x-tenant-scope: agency
+      x-required-role: AUDITOR
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          description: Périmètre des KPIs (`agency` pour l'agence courante, `network` pour les agrégats cross-tenant anonymisés)
+          schema:
+            type: string
+            enum:
+              - agency
+              - network
+        - name: period
+          in: query
+          required: true
+          description: 'Période d''analyse ISO 8601 (ex: 2026-07, 2026-Q1, 2026)'
+          schema:
+            type: string
+            pattern: ^\d{4}(-\d{2}(-\d{2})?|-Q[1-4])?$
+            example: 2026-07
+        - name: agencyId
+          in: query
+          required: false
+          description: Identifiant de l'agence (UUID). Requis si scope=agency et l'appelant n'est pas lié à une agence par son JWT.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: KPIs de performance
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/KpiResponse'
+                  - $ref: '#/components/schemas/NetworkKpiResponse'
+              examples:
+                agency_kpis:
+                  summary: KPIs d'agence
+                  value:
+                    scope: agency
+                    period: 2026-07
+                    agencyId: agency_01
+                    kpis:
+                      tma:
+                        value: 12.5
+                        unit: minutes
+                      tmt:
+                        value: 8.3
+                        unit: minutes
+                      tts:
+                        value: 20.8
+                        unit: minutes
+                      tauxAbandon:
+                        value: 4.2
+                        unit: percent
+                      tauxSLA:
+                        value: 87.5
+                        unit: percent
+                      nps: 42
+                      occupation:
+                        value: 73.1
+                        unit: percent
+                network_kpis:
+                  summary: KPIs réseau anonymisés
+                  value:
+                    scope: network
+                    period: 2026-07
+                    aggregate:
+                      totalTickets: 45230
+                      avgTma: 11.2
+                      avgTmt: 7.8
+                      avgTts: 19
+                      avgTauxAbandon: 5.1
+                      avgTauxSLA: 84.3
+                      avgOccupation: 69.7
+                      agencyCount: 42
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /reports/daily/{agencyId}:
+    get:
+      tags:
+        - Reports
+      summary: Rapport journalier d'une agence
+      description: |
+        Retourne le rapport journalier complet d'une agence pour la date donnée.
+        Inclut : KPIs du jour, répartition par service, pics d'activité,
+        top/flop agents et alertes SLA.
+
+        **Matrice RBAC** : AGENCY_DIRECTOR minimum pour l'agence concernée.
+        AUDITOR peut lire tout.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: agencyId
+          in: path
+          required: true
+          description: Identifiant de l'agence (UUID)
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          required: false
+          description: 'Date du rapport (YYYY-MM-DD). Défaut : hier.'
+          schema:
+            type: string
+            format: date
+            example: '2026-07-10'
+      responses:
+        '200':
+          description: Rapport journalier de l'agence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReportResponse'
+              example:
+                agencyId: agency_01
+                agencyName: Agence Plateau
+                date: '2026-07-10'
+                kpis:
+                  tma:
+                    value: 11
+                    unit: minutes
+                  tmt:
+                    value: 7.5
+                    unit: minutes
+                  tts:
+                    value: 18.5
+                    unit: minutes
+                  tauxAbandon:
+                    value: 3.8
+                    unit: percent
+                  tauxSLA:
+                    value: 89.2
+                    unit: percent
+                  nps: 45
+                  occupation:
+                    value: 75
+                    unit: percent
+                totalTickets: 320
+                peakHour: '10:00'
+                slaAlerts: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /reports/benchmark:
+    get:
+      tags:
+        - Reports
+      summary: Benchmark inter-agences (classement vert/orange/rouge)
+      description: |
+        Retourne le classement des agences de la banque selon leurs KPIs,
+        avec un statut coloré basé sur des seuils documentés :
+
+        - **VERT** : tauxSLA ≥ 80% ET TMA ≤ 15 min
+        - **ORANGE** : tauxSLA entre 60% et 80% OU TMA entre 15 et 25 min
+        - **ROUGE** : tauxSLA < 60% OU TMA > 25 min
+
+        Les seuils sont configurables par la banque (défauts UEMOA ci-dessus).
+        **Matrice RBAC** : BANK_ADMIN ou AUDITOR.
+      x-tenant-scope: bank
+      x-required-role: AUDITOR
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: 'Période de benchmark (YYYY-MM). Défaut : mois courant.'
+          schema:
+            type: string
+            pattern: ^\d{4}-\d{2}$
+            example: 2026-07
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Classement des agences avec statut vert/orange/rouge
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BenchmarkResponse'
+              example:
+                period: 2026-07
+                thresholds:
+                  sla:
+                    vert: 80
+                    orange: 60
+                  tma:
+                    vert: 15
+                    orange: 25
+                data:
+                  - rank: 1
+                    agencyId: agency_01
+                    agencyName: Agence Plateau
+                    status: VERT
+                    tauxSLA: 92.1
+                    tma: 9.3
+                  - rank: 2
+                    agencyId: agency_03
+                    agencyName: Agence Cocody
+                    status: ORANGE
+                    tauxSLA: 71.5
+                    tma: 18.2
+                  - rank: 3
+                    agencyId: agency_02
+                    agencyName: Agence Yopougon
+                    status: ROUGE
+                    tauxSLA: 52
+                    tma: 28.7
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /reports/export:
+    get:
+      tags:
+        - Exports
+      summary: Déclencher un export asynchrone (PDF / XLSX / JSON)
+      description: |
+        Lance la génération asynchrone d'un rapport d'export dans le format demandé.
+        Retourne immédiatement **202 Accepted** avec un `jobId` pour le suivi.
+
+        **Formats supportés** :
+        - `pdf` : rapport mis en page pour impression (Content-Type: application/pdf)
+        - `xlsx` : classeur Excel multi-feuilles (Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
+        - `json` : données brutes JSON (Content-Type: application/json)
+
+        **Génération asynchrone** : la réponse 202 inclut un `jobId`. Le client
+        interroge `GET /reports/export/{jobId}` pour vérifier l'état (PENDING →
+        PROCESSING → READY) et récupérer l'URL signée de téléchargement (expiration
+        configurée, défaut 1 heure).
+
+        **Anonymisation** : les rapports de scope `network` sont exclusivement
+        basés sur des agrégats anonymisés (UEMOA).
+
+        **Matrice RBAC** : AGENCY_DIRECTOR ou AUDITOR pour scope agency.
+        SUPER_ADMIN pour scope network.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: format
+          in: query
+          required: true
+          description: Format d'export
+          schema:
+            type: string
+            enum:
+              - pdf
+              - xlsx
+              - json
+        - name: scope
+          in: query
+          required: true
+          description: Périmètre de l'export (agency ou network)
+          schema:
+            type: string
+            enum:
+              - agency
+              - network
+        - name: period
+          in: query
+          required: true
+          description: 'Période d''export ISO 8601 (ex: 2026-07)'
+          schema:
+            type: string
+            pattern: ^\d{4}(-\d{2}(-\d{2})?|-Q[1-4])?$
+            example: 2026-07
+        - name: agencyId
+          in: query
+          required: false
+          description: Identifiant agence (UUID, requis si scope=agency)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Export accepté — génération asynchrone démarrée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJobAccepted'
+              example:
+                jobId: job_export_01
+                status: PENDING
+                format: pdf
+                scope: agency
+                period: 2026-07
+                createdAt: '2026-07-11T09:00:00Z'
+                pollingUrl: /api/v1/reports/export/job_export_01
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /reports/export/{jobId}:
+    get:
+      tags:
+        - Exports
+      summary: Suivi d'un job d'export (polling + URL signée)
+      description: |
+        Retourne le statut d'un job d'export et, lorsqu'il est terminé (READY),
+        l'URL signée de téléchargement avec sa date d'expiration.
+
+        **Cycle de vie** :
+        - `PENDING` : en file d'attente de génération
+        - `PROCESSING` : génération en cours
+        - `READY` : fichier disponible — `downloadUrl` et `expiresAt` présents
+        - `FAILED` : échec de génération — `error` présent
+
+        L'URL signée expire après la durée configurée (défaut : 1 heure).
+        Après expiration, relancer via `GET /reports/export`.
+
+        **Matrice RBAC** : le requérant doit être le créateur du job ou AUDITOR.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Identifiant du job d'export
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Statut du job d'export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJobPollingResponse'
+              examples:
+                pending:
+                  summary: Job en attente
+                  value:
+                    jobId: job_export_01
+                    status: PENDING
+                    format: pdf
+                    createdAt: '2026-07-11T09:00:00Z'
+                ready:
+                  summary: Export prêt à télécharger
+                  value:
+                    jobId: job_export_01
+                    status: READY
+                    format: pdf
+                    createdAt: '2026-07-11T09:00:00Z'
+                    completedAt: '2026-07-11T09:00:45Z'
+                    downloadUrl: https://storage.sigfa.ci/exports/job_export_01.pdf?sig=abc&expires=1752228045
+                    expiresAt: '2026-07-11T10:00:45Z'
+                failed:
+                  summary: Échec de génération
+                  value:
+                    jobId: job_export_02
+                    status: FAILED
+                    format: xlsx
+                    createdAt: '2026-07-11T09:01:00Z'
+                    error:
+                      code: EXPORT_GENERATION_FAILED
+                      message: Erreur lors de la génération du fichier XLSX.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Job d'export introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: EXPORT_JOB_NOT_FOUND
+                  message: Aucun job d'export trouvé avec cet identifiant.
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /kiosks/status:
+    get:
+      tags:
+        - Supervision
+      summary: Statut des bornes kiosques par agence
+      description: |
+        Retourne le statut de toutes les bornes kiosques de l'agence courante.
+        Les champs `lastSeen` et `printerStatus` sont alimentés par le heartbeat
+        borne défini dans CONTRACT-003.
+
+        **Champs** :
+        - `kioskId` : identifiant unique de la borne
+        - `agencyId` : agence à laquelle la borne est rattachée
+        - `status` : ONLINE | OFFLINE | DEGRADED
+        - `lastSeen` : horodatage UTC du dernier heartbeat (datetime ISO 8601)
+        - `printerStatus` : statut de l'imprimante — OK | PAPER_LOW | ERROR | OFFLINE
+
+        **Matrice RBAC** : MANAGER ou AUDITOR pour l'agence courante.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - name: agencyId
+          in: query
+          required: false
+          description: 'Filtrer par agence (UUID). Défaut : agence du JWT.'
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Liste des statuts de bornes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KiosksStatusResponse'
+              example:
+                kiosks:
+                  - kioskId: kiosk_01
+                    agencyId: agency_01
+                    status: ONLINE
+                    lastSeen: '2026-07-11T08:58:00Z'
+                    printerStatus: OK
+                  - kioskId: kiosk_02
+                    agencyId: agency_01
+                    status: DEGRADED
+                    lastSeen: '2026-07-11T08:45:00Z'
+                    printerStatus: PAPER_LOW
+                  - kioskId: kiosk_03
+                    agencyId: agency_01
+                    status: OFFLINE
+                    lastSeen: '2026-07-11T06:00:00Z'
+                    printerStatus: OFFLINE
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /admin/network-overview:
+    get:
+      tags:
+        - Network
+      summary: Vue réseau cross-tenant (agrégats anonymisés, SUPER_ADMIN)
+      description: |
+        Retourne les agrégats cross-tenant anonymisés du réseau SIGFA.
+        Scope **platform** — accessible uniquement au SUPER_ADMIN.
+
+        **Cross-tenant** : cette route lit des données issues de toutes les banques
+        du réseau SIGFA. L'accès multi-tenant est explicitement documenté et limité
+        au SUPER_ADMIN.
+
+        **Anonymisation** : conformément aux exigences UEMOA, la réponse ne contient
+        aucune donnée personnelle. Toutes les métriques sont des agrégats statistiques
+        basés sur le schéma `AnonymizedNetworkAggregate` (défini dans ce fichier,
+        référencé par CONTRACT-008/ai.yaml).
+
+        Les identifiants des banques individuelles ne sont pas exposés dans cette vue.
+      x-tenant-scope: platform
+      x-required-role: SUPER_ADMIN
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: 'Période d''analyse (YYYY-MM). Défaut : mois courant.'
+          schema:
+            type: string
+            pattern: ^\d{4}-\d{2}$
+            example: 2026-07
+      responses:
+        '200':
+          description: Vue réseau agrégée et anonymisée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkOverviewResponse'
+              example:
+                period: 2026-07
+                generatedAt: '2026-07-11T09:00:00Z'
+                aggregate:
+                  totalTickets: 284560
+                  avgTma: 13.4
+                  avgTmt: 9.1
+                  avgTts: 22.5
+                  avgTauxAbandon: 6.2
+                  avgTauxSLA: 79.8
+                  avgOccupation: 66.3
+                  agencyCount: 187
+                  bankCount: 12
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token (durée de vie : **15 minutes**).
+        Obtenu via POST /auth/login ou POST /auth/refresh.
+        Format : `Authorization: Bearer <accessToken>`
+  schemas:
+    AnonymizedNetworkAggregate:
+      type: object
+      description: |
+        Agrégat réseau anonymisé — schéma canonique SIGFA pour les données cross-tenant.
+        Défini dans reporting.yaml (CONTRACT-006), référencé par ai.yaml (CONTRACT-008).
+
+        **Anonymisation UEMOA** : ce schéma ne contient aucune donnée personnelle identifiable.
+        Toutes les métriques sont des agrégats statistiques (moyennes, comptages, ratios).
+        Les identifiants de banques ou d'agences individuelles ne sont jamais exposés.
+        Conçu pour la conformité aux directives BCEAO/UEMOA sur la protection des données.
+      required:
+        - totalTickets
+        - avgTma
+        - avgTmt
+        - avgTts
+        - avgTauxAbandon
+        - avgTauxSLA
+        - avgOccupation
+        - agencyCount
+      properties:
+        totalTickets:
+          type: integer
+          minimum: 0
+          description: Nombre total de tickets traités sur la période (agrégé réseau)
+          example: 284560
+        avgTma:
+          type: number
+          format: float
+          minimum: 0
+          description: Temps Moyen d'Attente réseau en minutes (moyenne pondérée par volume)
+          example: 13.4
+        avgTmt:
+          type: number
+          format: float
+          minimum: 0
+          description: Temps Moyen de Traitement réseau en minutes (moyenne pondérée par volume)
+          example: 9.1
+        avgTts:
+          type: number
+          format: float
+          minimum: 0
+          description: Temps Total de Service réseau en minutes = avgTma + avgTmt
+          example: 22.5
+        avgTauxAbandon:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Taux d'abandon réseau moyen en % (ABANDONED + NO_SHOW / total émis)
+          example: 6.2
+        avgTauxSLA:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Taux SLA réseau moyen en % (tickets dans délai / total traités)
+          example: 79.8
+        avgOccupation:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Taux d'occupation moyen des guichets en % sur le réseau
+          example: 66.3
+        agencyCount:
+          type: integer
+          minimum: 0
+          description: Nombre d'agences contribuant à cet agrégat (sans identifiants)
+          example: 187
+        bankCount:
+          type: integer
+          minimum: 0
+          description: Nombre de banques contribuant à cet agrégat (sans identifiants)
+          example: 12
+    KpiValue:
+      type: object
+      required:
+        - unit
+      properties:
+        value:
+          type:
+            - number
+            - 'null'
+          description: Valeur du KPI (null si non calculable sur la période — ex. NPS sans feedback)
+          example: 12.5
+        unit:
+          type: string
+          description: Unité du KPI (minutes, percent, score)
+          enum:
+            - minutes
+            - percent
+            - score
+    KpiSet:
+      type: object
+      description: |
+        Ensemble des 7 KPIs de performance SIGFA (glossaire v5 §5).
+        Chaque KPI inclut sa valeur et son unité.
+      required:
+        - tma
+        - tmt
+        - tts
+        - tauxAbandon
+        - tauxSLA
+        - nps
+        - occupation
+      properties:
+        tma:
+          allOf:
+            - $ref: '#/components/schemas/KpiValue'
+          description: |
+            **TMA — Temps Moyen d'Attente** (unité : minutes).
+            Durée moyenne entre l'émission du ticket (WAITING) et l'appel au guichet (CALLED).
+            Calculé sur les tickets à l'état DONE. Cible UEMOA : ≤ 15 min.
+          example:
+            value: 12.5
+            unit: minutes
+        tmt:
+          allOf:
+            - $ref: '#/components/schemas/KpiValue'
+          description: |
+            **TMT — Temps Moyen de Traitement** (unité : minutes).
+            Durée moyenne de prise en charge au guichet (SERVING → DONE).
+            Source : champ `serviceTime` des tickets clôturés.
+          example:
+            value: 8.3
+            unit: minutes
+        tts:
+          allOf:
+            - $ref: '#/components/schemas/KpiValue'
+          description: |
+            **TTS — Temps Total de Service** (unité : minutes).
+            Durée bout-en-bout = TMA + TMT. Indicateur de l'expérience client globale.
+          example:
+            value: 20.8
+            unit: minutes
+        tauxAbandon:
+          allOf:
+            - $ref: '#/components/schemas/KpiValue'
+          description: |
+            **Taux d'abandon** (unité : %, 0–100).
+            Proportion de tickets passés en ABANDONED ou NO_SHOW sur le total émis.
+            Un taux élevé indique une surcharge ou une mauvaise gestion de l'attente.
+          example:
+            value: 4.2
+            unit: percent
+        tauxSLA:
+          allOf:
+            - $ref: '#/components/schemas/KpiValue'
+          description: |
+            **Taux SLA** (unité : %, 0–100).
+            Proportion de tickets traités dans le délai SLA configuré par service
+            (champ `slaMinutes` du Service). Cible UEMOA recommandée : ≥ 80%.
+          example:
+            value: 87.5
+            unit: percent
+        nps:
+          type:
+            - number
+            - 'null'
+          minimum: -100
+          maximum: 100
+          description: |
+            **NPS — Net Promoter Score** (unité : score, plage –100 à 100).
+            Calculé à partir des feedbacks clients collectés via CONTRACT-003.
+            **Nullable** : valeur `null` si aucun feedback n'a été collecté sur la période.
+          example: 42
+        occupation:
+          allOf:
+            - $ref: '#/components/schemas/KpiValue'
+          description: |
+            **Taux d'occupation** (unité : %, 0–100).
+            Ratio temps en état SERVING / temps total d'ouverture des guichets.
+            Un taux > 85% indique une surcharge potentielle.
+          example:
+            value: 73.1
+            unit: percent
+    KpiResponse:
+      type: object
+      required:
+        - scope
+        - period
+        - kpis
+      properties:
+        scope:
+          type: string
+          enum:
+            - agency
+        period:
+          type: string
+          description: Période analysée
+          example: 2026-07
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence
+          example: agency_01
+        kpis:
+          $ref: '#/components/schemas/KpiSet'
+    NetworkKpiResponse:
+      type: object
+      required:
+        - scope
+        - period
+        - aggregate
+      properties:
+        scope:
+          type: string
+          enum:
+            - network
+        period:
+          type: string
+          example: 2026-07
+        aggregate:
+          $ref: '#/components/schemas/AnonymizedNetworkAggregate'
+    BenchmarkStatus:
+      type: string
+      description: |
+        Statut de performance d'une agence dans le benchmark inter-agences.
+        - **VERT** : tauxSLA ≥ 80% ET TMA ≤ 15 min — performance optimale
+        - **ORANGE** : tauxSLA entre 60–80% OU TMA entre 15–25 min — à surveiller
+        - **ROUGE** : tauxSLA < 60% OU TMA > 25 min — intervention requise
+      enum:
+        - VERT
+        - ORANGE
+        - ROUGE
+    BenchmarkEntry:
+      type: object
+      required:
+        - rank
+        - agencyId
+        - agencyName
+        - status
+        - tauxSLA
+        - tma
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+          description: Rang dans le classement
+        agencyId:
+          type: string
+          format: uuid
+        agencyName:
+          type: string
+        status:
+          $ref: '#/components/schemas/BenchmarkStatus'
+        tauxSLA:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Taux SLA de l'agence en %
+        tma:
+          type: number
+          format: float
+          minimum: 0
+          description: TMA de l'agence en minutes
+    BenchmarkThresholds:
+      type: object
+      description: Seuils de classification vert/orange/rouge (configurables par banque)
+      properties:
+        sla:
+          type: object
+          properties:
+            vert:
+              type: number
+              description: Seuil SLA pour statut VERT (%, valeur minimale)
+              example: 80
+            orange:
+              type: number
+              description: Seuil SLA pour statut ORANGE (%, valeur minimale)
+              example: 60
+        tma:
+          type: object
+          properties:
+            vert:
+              type: number
+              description: Seuil TMA pour statut VERT (minutes, valeur maximale)
+              example: 15
+            orange:
+              type: number
+              description: Seuil TMA pour statut ORANGE (minutes, valeur maximale)
+              example: 25
+    BenchmarkResponse:
+      type: object
+      required:
+        - period
+        - data
+        - meta
+      properties:
+        period:
+          type: string
+          example: 2026-07
+        thresholds:
+          $ref: '#/components/schemas/BenchmarkThresholds'
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BenchmarkEntry'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    DailyReportResponse:
+      type: object
+      required:
+        - agencyId
+        - date
+        - kpis
+        - totalTickets
+      properties:
+        agencyId:
+          type: string
+          format: uuid
+        agencyName:
+          type: string
+        date:
+          type: string
+          format: date
+        kpis:
+          $ref: '#/components/schemas/KpiSet'
+        totalTickets:
+          type: integer
+          minimum: 0
+          description: Nombre total de tickets émis sur la journée
+        peakHour:
+          type:
+            - string
+            - 'null'
+          description: Heure de pointe (format HH:MM). null si insuffisamment de données.
+          example: '10:00'
+        slaAlerts:
+          type: array
+          description: Liste des alertes SLA dépassé sur la journée
+          items:
+            type: object
+            properties:
+              serviceId:
+                type: string
+                format: uuid
+              serviceName:
+                type: string
+              violationCount:
+                type: integer
+    ExportFormat:
+      type: string
+      description: Format d'export disponible
+      enum:
+        - pdf
+        - xlsx
+        - json
+    ExportJobStatus:
+      type: string
+      description: |
+        État du job d'export asynchrone.
+        - **PENDING** : en file d'attente
+        - **PROCESSING** : génération en cours
+        - **READY** : fichier disponible (downloadUrl présent)
+        - **FAILED** : erreur de génération
+      enum:
+        - PENDING
+        - PROCESSING
+        - READY
+        - FAILED
+    ExportJobAccepted:
+      type: object
+      required:
+        - jobId
+        - status
+        - format
+        - scope
+        - period
+        - createdAt
+        - pollingUrl
+      properties:
+        jobId:
+          type: string
+          description: Identifiant unique du job d'export
+          example: job_export_01
+        status:
+          type: string
+          enum:
+            - PENDING
+          description: État initial du job (toujours PENDING au moment de la création)
+        format:
+          $ref: '#/components/schemas/ExportFormat'
+        scope:
+          type: string
+          enum:
+            - agency
+            - network
+        period:
+          type: string
+          example: 2026-07
+        createdAt:
+          type: string
+          format: date-time
+        pollingUrl:
+          type: string
+          description: URL relative pour interroger l'état du job
+          example: /api/v1/reports/export/job_export_01
+    ExportJobPollingResponse:
+      type: object
+      required:
+        - jobId
+        - status
+        - format
+        - createdAt
+      properties:
+        jobId:
+          type: string
+          example: job_export_01
+        status:
+          $ref: '#/components/schemas/ExportJobStatus'
+        format:
+          $ref: '#/components/schemas/ExportFormat'
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Horodatage de fin de génération (null si pas encore terminé)
+        downloadUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+          description: URL signée de téléchargement (présente si status=READY). Expires après `expiresAt`.
+          example: https://storage.sigfa.ci/exports/job_export_01.pdf?sig=abc
+        expiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Date d'expiration de l'URL signée (présente si status=READY)
+          example: '2026-07-11T10:00:45Z'
+        error:
+          type:
+            - object
+            - 'null'
+          description: Détail de l'erreur si status=FAILED
+          properties:
+            code:
+              type: string
+              pattern: ^[A-Z][A-Z0-9_]*$
+            message:
+              type: string
+    KioskOnlineStatus:
+      type: string
+      description: Statut de connexion de la borne
+      enum:
+        - ONLINE
+        - OFFLINE
+        - DEGRADED
+    PrinterStatus:
+      type: string
+      description: Statut de l'imprimante de tickets de la borne
+      enum:
+        - OK
+        - PAPER_LOW
+        - ERROR
+        - OFFLINE
+    KioskStatusEntry:
+      type: object
+      required:
+        - kioskId
+        - agencyId
+        - status
+        - lastSeen
+        - printerStatus
+      properties:
+        kioskId:
+          type: string
+          description: Identifiant unique de la borne kiosque
+          example: kiosk_01
+        agencyId:
+          type: string
+          format: uuid
+          description: Agence à laquelle la borne est rattachée
+          example: agency_01
+        status:
+          $ref: '#/components/schemas/KioskOnlineStatus'
+        lastSeen:
+          type: string
+          format: date-time
+          description: Horodatage UTC du dernier heartbeat reçu (CONTRACT-003)
+          example: '2026-07-11T08:58:00Z'
+        printerStatus:
+          $ref: '#/components/schemas/PrinterStatus'
+    KiosksStatusResponse:
+      type: object
+      required:
+        - kiosks
+      properties:
+        kiosks:
+          type: array
+          items:
+            $ref: '#/components/schemas/KioskStatusEntry'
+    HealthStatus:
+      type: string
+      description: Statut global du service
+      enum:
+        - UP
+        - DEGRADED
+        - DOWN
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - timestamp
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        version:
+          type: string
+          description: Version déployée du service
+          example: 1.0.0
+        timestamp:
+          type: string
+          format: date-time
+          description: Horodatage UTC de la réponse
+          example: '2026-07-11T09:00:00Z'
+    NetworkOverviewResponse:
+      type: object
+      required:
+        - period
+        - generatedAt
+        - aggregate
+      properties:
+        period:
+          type: string
+          example: 2026-07
+        generatedAt:
+          type: string
+          format: date-time
+        aggregate:
+          $ref: '#/components/schemas/AnonymizedNetworkAggregate'
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              pattern: ^[A-Z][A-Z0-9_]*$
+              description: Code d'erreur UPPER_SNAKE_CASE commençant par une lettre
+              example: ILLEGAL_TRANSITION
+            message:
+              type: string
+              minLength: 1
+              description: Message d'erreur humain
+              example: Transition illégale depuis l'état actuel.
+            details:
+              type: object
+              additionalProperties: true
+              description: Informations complémentaires (champ optionnel)
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Numéro de page courant
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Taille de page
+        total:
+          type: integer
+          minimum: 0
+          description: Nombre total d'éléments
+  responses:
+    BadRequest:
+      description: Requête invalide (validation échouée ou en-tête obligatoire absent)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: BAD_REQUEST
+              message: Le corps de la requête est invalide.
+              details:
+                field: email
+                issue: Format d'email invalide.
+    Unauthorized:
+      description: Token JWT absent, expiré ou invalide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Token d'accès absent ou expiré.
+    Forbidden:
+      description: Permissions insuffisantes pour cette opération
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Vous n'avez pas les permissions nécessaires.
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: La ressource demandée est introuvable.
+    Conflict:
+      description: Conflit (ressource existante ou transition illégale)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: CONFLICT
+              message: Un conflit a été détecté.
+    UnprocessableEntity:
+      description: Entité non traitable (données sémantiquement invalides)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: Les données fournies sont sémantiquement invalides.
+    TooManyRequests:
+      description: Trop de requêtes — limite de débit atteinte
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: TOO_MANY_REQUESTS
+              message: Limite de débit atteinte. Réessayez ultérieurement.
+    InternalServerError:
+      description: Erreur interne du serveur
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: Une erreur interne s'est produite.
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Numéro de page (≥1, défaut 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Taille de page (1–100, défaut 20)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20

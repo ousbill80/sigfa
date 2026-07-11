@@ -1,0 +1,40 @@
+# .redocly.yaml — CONTRACT-009a
+# Déclare les 7 APIs SIGFA pour la résolution de $ref inter-fichiers (redocly bundle)
+# et la génération de types TypeScript (openapi-typescript).
+#
+# Pour redocly bundle : les entrées apis déclarent les 7 APIs.
+# Pour openapi-typescript : x-openapi-ts.output indique le fichier de sortie des types.
+
+apis:
+  core:
+    root: openapi/core.yaml
+    x-openapi-ts:
+      output: generated/types/core.ts
+  public:
+    root: openapi/public.yaml
+    x-openapi-ts:
+      output: generated/types/public.ts
+  agents:
+    root: openapi/agents.yaml
+    x-openapi-ts:
+      output: generated/types/agents.ts
+  admin:
+    root: openapi/admin.yaml
+    x-openapi-ts:
+      output: generated/types/admin.ts
+  reporting:
+    root: openapi/reporting.yaml
+    x-openapi-ts:
+      output: generated/types/reporting.ts
+  notifications:
+    root: openapi/notifications.yaml
+    x-openapi-ts:
+      output: generated/types/notifications.ts
+  ai:
+    root: openapi/ai.yaml
+    x-openapi-ts:
+      output: generated/types/ai.ts
+
+# Désactiver le suivi d'usage Redocly
+analytics:
+  enabled: false

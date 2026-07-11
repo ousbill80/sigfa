@@ -1,0 +1,853 @@
+openapi: 3.1.0
+info:
+  title: SIGFA Agents API
+  version: 1.0.0
+  description: |
+    Contrat agents & compétences SIGFA : profils agents, machine à états de disponibilité,
+    statistiques et import CSV. Servi sous /api/v1.
+
+    **Dépend de** : CONTRACT-001 (core.yaml) — tous les schémas transverses ($ref core.yaml).
+
+    **Lien routage de file** : les compétences (services traitables) et langues de l'agent
+    sont les données d'entrée du moteur de routage intelligent (API-004). Ce contrat expose
+    les données ; la logique de routage est hors contrat.
+servers:
+  - url: /api/v1
+    description: SIGFA v1
+security:
+  - BearerAuth: []
+tags:
+  - name: Agents
+    description: Profils, statuts temps réel, statistiques et import des agents de guichet
+paths:
+  /agents/{id}:
+    get:
+      tags:
+        - Agents
+      summary: Obtenir le profil d'un agent
+      description: |
+        Retourne le profil complet d'un agent : services traitables (multi-sélection,
+        ids du catalogue), langues parlées (FR | DIOULA | BAOULE | EN), agences
+        d'affectation et horaires de travail.
+
+        Scope **agency** — AGENCY_DIRECTOR ou MANAGER minimum.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Profil de l'agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentProfile'
+              example:
+                id: user_01
+                email: kofi@banque-ci.com
+                firstName: Kofi
+                lastName: Asante
+                role: AGENT
+                bankId: bank_01
+                agencyId: agency_01
+                status: AVAILABLE
+                languages:
+                  - FR
+                  - DIOULA
+                serviceIds:
+                  - svc_01
+                  - svc_02
+                agencyIds:
+                  - agency_01
+                workSchedule:
+                  monday:
+                    start: '08:00'
+                    end: '17:00'
+                  tuesday:
+                    start: '08:00'
+                    end: '17:00'
+                createdAt: '2025-06-01T00:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags:
+        - Agents
+      summary: Mettre à jour le profil d'un agent
+      description: |
+        Mise à jour partielle du profil agent : services traitables (serviceIds),
+        langues parlées (FR | DIOULA | BAOULE | EN), agences d'affectation (agencyIds)
+        et horaires de travail (workSchedule).
+
+        Scope **agency** — AGENCY_DIRECTOR minimum pour modifier les compétences.
+        L'agent lui-même (self) peut mettre à jour ses préférences de langue.
+
+        **Lien API-004** : la mise à jour des serviceIds et languages est propagée au
+        moteur de routage de file (API-004) pour le matching compétence + langue.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAgentProfileRequest'
+            example:
+              languages:
+                - FR
+                - BAOULE
+                - EN
+              serviceIds:
+                - svc_01
+                - svc_03
+              workSchedule:
+                monday:
+                  start: '09:00'
+                  end: '18:00'
+      responses:
+        '200':
+          description: Profil agent mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentProfile'
+              example:
+                id: user_01
+                email: kofi@banque-ci.com
+                firstName: Kofi
+                lastName: Asante
+                role: AGENT
+                bankId: bank_01
+                agencyId: agency_01
+                status: AVAILABLE
+                languages:
+                  - FR
+                  - BAOULE
+                  - EN
+                serviceIds:
+                  - svc_01
+                  - svc_03
+                agencyIds:
+                  - agency_01
+                createdAt: '2025-06-01T00:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agents/{id}/status:
+    post:
+      tags:
+        - Agents
+      summary: Changer le statut temps réel d'un agent
+      description: |
+        Met à jour le statut de disponibilité de l'agent selon la machine à états :
+
+        **Transitions légales** :
+        - AVAILABLE → SERVING (prise en charge d'un ticket)
+        - SERVING → AVAILABLE (ticket clôturé)
+        - AVAILABLE → PAUSED (pause)
+        - PAUSED → AVAILABLE (retour de pause)
+        - AVAILABLE → ABSENT (absence planifiée)
+        - ABSENT → AVAILABLE (retour d'absence)
+        - AVAILABLE → OFFLINE (fin de session)
+        - OFFLINE → AVAILABLE (début de session)
+
+        **Transition illégale** : si la transition demandée n'est pas légale (ex.
+        SERVING → ABSENT avec ticket ouvert sans transfert préalable), la réponse
+        est **409 `ILLEGAL_AGENT_TRANSITION`** avec le statut actuel et la transition
+        demandée dans `details`.
+
+        Scope **agency** — l'agent lui-même (self) ou MANAGER+.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAgentStatusRequest'
+            example:
+              status: PAUSED
+              reason: Pause déjeuner
+      responses:
+        '200':
+          description: Statut agent mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatusResponse'
+              example:
+                id: user_01
+                status: PAUSED
+                previousStatus: AVAILABLE
+                updatedAt: '2026-07-11T12:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Transition illégale — la transition demandée n'est pas autorisée depuis
+            le statut actuel (ex. SERVING → ABSENT avec ticket ouvert).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: ILLEGAL_AGENT_TRANSITION
+                  message: 'Transition illégale : un ticket est en cours de traitement. Transférez ou clôturez le ticket avant de passer en ABSENT.'
+                  details:
+                    currentStatus: SERVING
+                    requestedStatus: ABSENT
+                    activeTicketId: ticket_42
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agents/{id}/stats:
+    get:
+      tags:
+        - Agents
+      summary: Statistiques de performance d'un agent
+      description: |
+        Retourne les statistiques de l'agent pour la période demandée :
+        - **ticketsHandled** : nombre de tickets traités sur la période
+        - **avgHandlingTime** : temps moyen de traitement (TMT moyen) en secondes sur le jour
+        - **currentTicket** : ticket en cours de traitement (numéro + durée en secondes)
+
+        Ces schémas sont conçus pour être réutilisés par le reporting (CONTRACT-006).
+
+        **Règle "self"** : l'agent peut consulter ses propres statistiques (self).
+        Les MANAGER+ peuvent consulter les stats de n'importe quel agent de leur agence.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: period
+          in: query
+          required: false
+          description: 'Période d''agrégation des statistiques (day | week | month). Défaut : day.'
+          schema:
+            type: string
+            enum:
+              - day
+              - week
+              - month
+            default: day
+      responses:
+        '200':
+          description: Statistiques de l'agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStats'
+              example:
+                agentId: user_01
+                period: day
+                ticketsHandled: 24
+                avgHandlingTime: 480
+                currentTicket:
+                  ticketId: ticket_42
+                  number: A042
+                  durationSeconds: 120
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agents/import:
+    post:
+      tags:
+        - Agents
+      summary: Importer des agents depuis un fichier CSV
+      description: |
+        Importe des agents en lot depuis un fichier CSV (multipart/form-data, champ `file`).
+
+        **Format CSV** :
+        - Encodage : UTF-8 sans BOM
+        - Séparateur : virgule (`,`)
+        - Colonnes **obligatoires** : `email`, `firstName`, `lastName`, `role`
+        - Colonnes **optionnelles** : `agencyCode`, `languages`, `phone`
+        - Limite : **max 500 lignes** (hors en-tête) — au-delà : 422 `IMPORT_TOO_LARGE`
+
+        **Exemple CSV** :
+        ```csv
+        email,firstName,lastName,role,agencyCode,languages,phone
+        kofi@banque-ci.com,Kofi,Asante,AGENT,AG001,"FR,DIOULA",+2250700000001
+        aminata@banque-ci.com,Aminata,Coulibaly,AGENT,AG001,"FR,BAOULE",+2250700000002
+        ```
+
+        **Réponse** : rapport détaillé avec le nombre de lignes créées, ignorées et les
+        erreurs par ligne `{ line, field, code, message }`.
+
+        Scope **bank** — AGENCY_DIRECTOR minimum.
+      x-tenant-scope: bank
+      x-required-role: AGENCY_DIRECTOR
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: |
+                    Fichier CSV UTF-8 sans BOM, séparateur virgule.
+                    Colonnes obligatoires : email, firstName, lastName, role.
+                    Colonnes optionnelles : agencyCode, languages, phone.
+                    Maximum 500 lignes (hors en-tête).
+            example:
+              file: (fichier CSV binaire)
+      responses:
+        '200':
+          description: Import terminé — rapport de traitement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReport'
+              example:
+                created: 48
+                skipped: 2
+                errors:
+                  - line: 12
+                    field: email
+                    code: DUPLICATE_EMAIL
+                    message: L'adresse email 'duplicate@banque-ci.com' est déjà enregistrée.
+                  - line: 35
+                    field: role
+                    code: INVALID_ROLE
+                    message: La valeur 'SUPERVISOR' n'est pas un rôle valide.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: |
+            Fichier CSV invalide ou trop grand (> 500 lignes hors en-tête).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                too_large:
+                  summary: Fichier trop grand
+                  value:
+                    error:
+                      code: IMPORT_TOO_LARGE
+                      message: Le fichier CSV dépasse la limite de 500 lignes.
+                      details:
+                        maxLines: 500
+                        receivedLines: 742
+                invalid_format:
+                  summary: Format invalide
+                  value:
+                    error:
+                      code: INVALID_CSV_FORMAT
+                      message: 'Le fichier CSV est invalide : encodage non UTF-8 ou séparateur incorrect.'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token (durée de vie : 15 minutes).
+        Obtenu via POST /auth/login ou POST /auth/refresh (core.yaml).
+  schemas:
+    AgentLanguage:
+      type: string
+      description: |
+        Langues parlées par un agent de guichet SIGFA.
+        Utilisées par le moteur de routage de file (API-004) pour le matching
+        compétence + langue lors de l'attribution des tickets.
+        - FR : Français
+        - DIOULA : Dioula (langue véhiculaire Côte d'Ivoire)
+        - BAOULE : Baoulé (langue locale Côte d'Ivoire)
+        - EN : Anglais
+      enum:
+        - FR
+        - DIOULA
+        - BAOULE
+        - EN
+    AgentStatus:
+      type: string
+      description: |
+        États de disponibilité de l'agent dans la machine à états SIGFA.
+
+        **Transitions légales** :
+        - AVAILABLE → SERVING (ticket pris en charge)
+        - SERVING → AVAILABLE (ticket clôturé ou transféré)
+        - AVAILABLE → PAUSED (pause)
+        - PAUSED → AVAILABLE (retour de pause)
+        - AVAILABLE → ABSENT (absence planifiée)
+        - ABSENT → AVAILABLE (retour d'absence)
+        - AVAILABLE → OFFLINE (fin de session)
+        - OFFLINE → AVAILABLE (début de session)
+
+        Toute autre transition → 409 `ILLEGAL_AGENT_TRANSITION`.
+      enum:
+        - AVAILABLE
+        - SERVING
+        - PAUSED
+        - ABSENT
+        - OFFLINE
+    DaySchedule:
+      type: object
+      description: Horaires d'ouverture pour un jour de la semaine
+      properties:
+        start:
+          type: string
+          pattern: ^[0-2][0-9]:[0-5][0-9]$
+          description: Heure de début (HH:MM)
+          example: '08:00'
+        end:
+          type: string
+          pattern: ^[0-2][09]:[0-5][0-9]$
+          description: Heure de fin (HH:MM)
+          example: '17:00'
+    WorkSchedule:
+      type: object
+      description: Horaires de travail hebdomadaires de l'agent
+      properties:
+        monday:
+          $ref: '#/components/schemas/DaySchedule'
+        tuesday:
+          $ref: '#/components/schemas/DaySchedule'
+        wednesday:
+          $ref: '#/components/schemas/DaySchedule'
+        thursday:
+          $ref: '#/components/schemas/DaySchedule'
+        friday:
+          $ref: '#/components/schemas/DaySchedule'
+        saturday:
+          $ref: '#/components/schemas/DaySchedule'
+        sunday:
+          $ref: '#/components/schemas/DaySchedule'
+    AgentProfile:
+      type: object
+      description: |
+        Profil complet d'un agent de guichet : identité, compétences (services
+        traitables), langues parlées, agences d'affectation et horaires.
+        Les serviceIds et languages sont transmis au moteur de routage (API-004).
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - role
+        - bankId
+        - agencyId
+        - status
+        - languages
+        - serviceIds
+        - agencyIds
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identifiant unique de l'agent
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+          minLength: 1
+        lastName:
+          type: string
+          minLength: 1
+        role:
+          $ref: '#/components/schemas/Role'
+        bankId:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+          description: Agence principale d'affectation
+        status:
+          $ref: '#/components/schemas/AgentStatus'
+        languages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentLanguage'
+          minItems: 1
+          description: Langues parlées par l'agent (au moins une)
+          example:
+            - FR
+            - DIOULA
+        serviceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Services traitables (ids du catalogue, multi-sélection)
+        agencyIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Agences d'affectation (principale + secondaires)
+        workSchedule:
+          $ref: '#/components/schemas/WorkSchedule'
+        phone:
+          type: string
+          description: Numéro de téléphone de l'agent
+        createdAt:
+          type: string
+          format: date-time
+    UpdateAgentProfileRequest:
+      type: object
+      description: Mise à jour partielle du profil agent
+      properties:
+        languages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentLanguage'
+          minItems: 1
+          description: Langues parlées (au moins une)
+        serviceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Services traitables (ids du catalogue)
+        agencyIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Agences d'affectation
+        workSchedule:
+          $ref: '#/components/schemas/WorkSchedule'
+        phone:
+          type: string
+    UpdateAgentStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/AgentStatus'
+        reason:
+          type:
+            - string
+            - 'null'
+          maxLength: 255
+          description: Raison optionnelle du changement de statut (ex. "Pause déjeuner")
+          example: Pause déjeuner
+    AgentStatusResponse:
+      type: object
+      required:
+        - id
+        - status
+        - previousStatus
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AgentStatus'
+        previousStatus:
+          $ref: '#/components/schemas/AgentStatus'
+        updatedAt:
+          type: string
+          format: date-time
+    CurrentTicketSummary:
+      type:
+        - object
+        - 'null'
+      description: Ticket en cours de traitement par l'agent (null si aucun)
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        number:
+          type: string
+          description: Numéro affiché du ticket
+          example: A042
+        durationSeconds:
+          type: integer
+          minimum: 0
+          description: Durée de traitement en cours en secondes
+    AgentStats:
+      type: object
+      description: |
+        Statistiques de performance de l'agent pour la période demandée.
+        Schémas réutilisables par le reporting (CONTRACT-006 les référencera).
+      required:
+        - agentId
+        - period
+        - ticketsHandled
+        - avgHandlingTime
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        period:
+          type: string
+          enum:
+            - day
+            - week
+            - month
+          description: Période d'agrégation
+        ticketsHandled:
+          type: integer
+          minimum: 0
+          description: Nombre de tickets traités sur la période
+        avgHandlingTime:
+          type: integer
+          minimum: 0
+          description: Temps moyen de traitement (TMT moyen) en secondes sur le jour
+        currentTicket:
+          $ref: '#/components/schemas/CurrentTicketSummary'
+    ImportError:
+      type: object
+      required:
+        - line
+        - field
+        - code
+        - message
+      properties:
+        line:
+          type: integer
+          minimum: 1
+          description: Numéro de ligne dans le CSV (en-tête = 1, données à partir de 2)
+        field:
+          type: string
+          description: Nom de la colonne en erreur
+          example: email
+        code:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]*$
+          description: Code d'erreur UPPER_SNAKE_CASE
+          example: DUPLICATE_EMAIL
+        message:
+          type: string
+          minLength: 1
+          description: Message d'erreur humain
+          example: L'adresse email est déjà enregistrée.
+    ImportReport:
+      type: object
+      description: |
+        Rapport d'import CSV : lignes créées, ignorées et erreurs détaillées.
+        Colonnes obligatoires : email, firstName, lastName, role.
+        Colonnes optionnelles : agencyCode, languages, phone.
+        Max 500 lignes (hors en-tête) — 422 IMPORT_TOO_LARGE au-delà.
+      required:
+        - created
+        - skipped
+        - errors
+      properties:
+        created:
+          type: integer
+          minimum: 0
+          description: Nombre d'agents créés avec succès
+        skipped:
+          type: integer
+          minimum: 0
+          description: Nombre de lignes ignorées (doublons, déjà existants)
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportError'
+          description: Erreurs de validation par ligne { line, field, code, message }
+    Role:
+      type: string
+      description: |
+        Rôles utilisateur SIGFA (matrice RBAC v5 §MODULE 4).
+        - SUPER_ADMIN : accès platform complet
+        - BANK_ADMIN : admin de la banque
+        - AGENCY_DIRECTOR : directeur d'agence
+        - MANAGER : manager d'agence
+        - AGENT : agent de guichet
+        - AUDITOR : lecture seule, audit
+        - NONE : accès sans authentification (routes publiques)
+      enum:
+        - SUPER_ADMIN
+        - BANK_ADMIN
+        - AGENCY_DIRECTOR
+        - MANAGER
+        - AGENT
+        - AUDITOR
+        - NONE
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              pattern: ^[A-Z][A-Z0-9_]*$
+              description: Code d'erreur UPPER_SNAKE_CASE commençant par une lettre
+              example: ILLEGAL_TRANSITION
+            message:
+              type: string
+              minLength: 1
+              description: Message d'erreur humain
+              example: Transition illégale depuis l'état actuel.
+            details:
+              type: object
+              additionalProperties: true
+              description: Informations complémentaires (champ optionnel)
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: Identifiant unique de la ressource (UUID v4)
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Requête invalide (validation échouée ou en-tête obligatoire absent)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: BAD_REQUEST
+              message: Le corps de la requête est invalide.
+              details:
+                field: email
+                issue: Format d'email invalide.
+    Unauthorized:
+      description: Token JWT absent, expiré ou invalide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Token d'accès absent ou expiré.
+    Forbidden:
+      description: Permissions insuffisantes pour cette opération
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Vous n'avez pas les permissions nécessaires.
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: La ressource demandée est introuvable.
+    Conflict:
+      description: Conflit (ressource existante ou transition illégale)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: CONFLICT
+              message: Un conflit a été détecté.
+    UnprocessableEntity:
+      description: Entité non traitable (données sémantiquement invalides)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: Les données fournies sont sémantiquement invalides.
+    TooManyRequests:
+      description: Trop de requêtes — limite de débit atteinte
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: TOO_MANY_REQUESTS
+              message: Limite de débit atteinte. Réessayez ultérieurement.
+    InternalServerError:
+      description: Erreur interne du serveur
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: Une erreur interne s'est produite.

@@ -6,6 +6,8 @@ export default defineConfig({
       provider: "v8",
       reporter: ["json"],
       reportsDirectory: "./coverage",
+      // Exclure generated/ des métriques de couverture — CONTRACT-009a
+      exclude: ["generated/**"],
     },
   },
 });

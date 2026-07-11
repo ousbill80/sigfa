@@ -1,0 +1,1072 @@
+openapi: 3.1.0
+info:
+  title: SIGFA Notifications API
+  version: 1.0.0
+  description: |
+    Contrat notifications SIGFA : SMS, WhatsApp, email, push multicanal.
+    Gestion opt-in/opt-out (UEMOA), devices push, journal d'envoi et webhooks fournisseurs.
+    Servi sous /api/v1. $ref vers core.yaml pour les schémas transverses.
+
+    **Règle UEMOA** : aucun envoi SMS/WhatsApp sans opt-in explicite préalable.
+    **Masquage téléphone** : les numéros apparaissent UNIQUEMENT via phoneNumberMasked
+    (2 premiers + 2 derniers chiffres visibles, groupes intermédiaires remplacés par ••).
+servers:
+  - url: /api/v1
+    description: SIGFA v1
+security:
+  - BearerAuth: []
+tags:
+  - name: Notifications
+    description: Journal d'envoi, test d'envoi et gestion des notifications multicanal
+  - name: Devices
+    description: Enregistrement et suppression des devices push (prérequis MOB-004)
+  - name: Consent
+    description: Opt-in/opt-out UEMOA par téléphone et canal + consultation du consentement
+  - name: Webhooks
+    description: Accusés de livraison entrants des fournisseurs (africastalking, whatsapp, resend)
+paths:
+  /notifications/log:
+    get:
+      tags:
+        - Notifications
+      summary: Journal d'envoi des notifications
+      description: |
+        Retourne la liste paginée des notifications envoyées, filtrable par ticket,
+        canal et statut. Les numéros de téléphone apparaissent UNIQUEMENT via le champ
+        `phoneNumberMasked` (calculé côté serveur : 2 premiers + 2 derniers chiffres
+        visibles, groupes intermédiaires remplacés par `••`, ex. `07 •• •• •• 47`).
+
+        **Canaux** : SMS | WHATSAPP | EMAIL | PUSH.
+        **Statuts** : QUEUED | SENT | DELIVERED | FAILED (avec `failureReason` si FAILED).
+      x-tenant-scope: bank
+      x-required-role: MANAGER
+      parameters:
+        - name: ticketId
+          in: query
+          required: false
+          description: Filtrer par identifiant de ticket
+          schema:
+            type: string
+            format: uuid
+          example: ticket_42
+        - name: channel
+          in: query
+          required: false
+          description: Filtrer par canal de notification
+          schema:
+            $ref: '#/components/schemas/NotificationChannel'
+          example: SMS
+        - name: status
+          in: query
+          required: false
+          description: Filtrer par statut de livraison
+          schema:
+            $ref: '#/components/schemas/NotificationStatus'
+          example: DELIVERED
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Journal d'envoi paginé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationLogResponse'
+              example:
+                data:
+                  - id: notif_01
+                    ticketId: ticket_42
+                    channel: SMS
+                    type: TICKET_CONFIRMATION
+                    status: DELIVERED
+                    phoneNumberMasked: 07 •• •• •• 47
+                    sentAt: '2026-07-11T09:00:05Z'
+                    deliveredAt: '2026-07-11T09:00:07Z'
+                  - id: notif_02
+                    ticketId: ticket_43
+                    channel: WHATSAPP
+                    type: YOUR_TURN
+                    status: FAILED
+                    phoneNumberMasked: 07 •• •• •• 12
+                    sentAt: '2026-07-11T09:01:00Z'
+                    failureReason: PROVIDER_UNREACHABLE
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 42
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/test:
+    post:
+      tags:
+        - Notifications
+      summary: Envoyer une notification de test (liste restreinte)
+      description: |
+        Envoie une notification de test à un destinataire de la liste de test de la banque.
+        Réservé au BANK_ADMIN. Si le destinataire n'est pas dans la liste de test
+        configurée pour la banque, la requête est rejetée avec 422
+        `TEST_RECIPIENT_NOT_ALLOWED`.
+
+        **Canal + template + destinataire** sont requis. Le payload de variables est
+        optionnel (utilise les valeurs par défaut du template).
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationTestRequest'
+            example:
+              channel: SMS
+              templateId: tpl_ticket_confirmation
+              recipientPhone: '+2250700000047'
+              variables:
+                ticketNumber: A042
+                position: 3
+                estimatedMinutes: 6
+      responses:
+        '200':
+          description: Notification de test envoyée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTestResponse'
+              example:
+                notificationId: notif_test_01
+                channel: SMS
+                status: SENT
+                sentAt: '2026-07-11T09:05:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: Destinataire hors liste de test ou données invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                recipient_not_allowed:
+                  summary: Destinataire non autorisé pour les tests
+                  value:
+                    error:
+                      code: TEST_RECIPIENT_NOT_ALLOWED
+                      message: Le numéro +2250700000099 n'est pas dans la liste de test de cette banque.
+                      details:
+                        recipientPhone: '+2250700000099'
+                invalid_template:
+                  summary: Template introuvable
+                  value:
+                    error:
+                      code: TEMPLATE_NOT_FOUND
+                      message: Le template 'tpl_inconnu' n'existe pas pour ce canal.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/devices:
+    post:
+      tags:
+        - Devices
+      summary: † Enregistrer un device push (idempotent — même token → même deviceId)
+      description: |
+        Enregistre un device push pour recevoir des notifications PUSH.
+        **Idempotent** : si le `deviceToken` existe déjà, retourne 200 avec le même
+        `deviceId` (pas de doublon). Si le token est nouveau, retourne 201 avec
+        le nouveau `deviceId`.
+
+        Plateformes supportées : `IOS` | `ANDROID` | `EXPO`.
+        Prérequis contractuel de MOB-004.
+      x-tenant-scope: bank
+      x-required-role: NONE
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - deviceToken
+                - platform
+              properties:
+                deviceToken:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+                  description: Token push fourni par APNs (iOS), FCM (Android) ou Expo
+                  example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+                platform:
+                  type: string
+                  description: Plateforme du device push (IOS | ANDROID | EXPO)
+                  enum:
+                    - IOS
+                    - ANDROID
+                    - EXPO
+                  example: EXPO
+            example:
+              deviceToken: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+              platform: EXPO
+      responses:
+        '200':
+          description: Device déjà enregistré (idempotent — même token → même deviceId)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegistration'
+              example:
+                deviceId: device_01
+                deviceToken: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+                platform: EXPO
+                registeredAt: '2026-07-10T08:00:00Z'
+        '201':
+          description: Device enregistré (nouveau token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegistration'
+              example:
+                deviceId: device_01
+                deviceToken: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+                platform: EXPO
+                registeredAt: '2026-07-11T09:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/devices/{deviceId}:
+    delete:
+      tags:
+        - Devices
+      summary: Supprimer un device push
+      description: |
+        Supprime un device push enregistré. Après suppression, le device ne recevra
+        plus de notifications PUSH. Scope **bank** — l'utilisateur doit être
+        propriétaire du device (ou BANK_ADMIN).
+      x-tenant-scope: bank
+      x-required-role: NONE
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          description: Identifiant du device push
+          schema:
+            type: string
+            format: uuid
+          example: device_01
+      responses:
+        '200':
+          description: Device supprimé avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+              example:
+                success: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Device introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: DEVICE_NOT_FOUND
+                  message: Le device 'device_01' est introuvable.
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/opt-in:
+    post:
+      tags:
+        - Consent
+      summary: Enregistrer un consentement opt-in (UEMOA)
+      description: |
+        Enregistre le consentement explicite d'un abonné à recevoir des notifications
+        sur un canal donné. **Obligatoire avant tout envoi SMS/WhatsApp** (UEMOA).
+        Idempotent : un opt-in existant est confirmé sans erreur.
+
+        Champs requis : `phone` (numéro E.164) + `channel` (SMS | WHATSAPP | EMAIL | PUSH).
+        Le numéro n'est jamais retourné en clair dans les réponses.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentRequest'
+            example:
+              phone: '+2250700000047'
+              channel: SMS
+      responses:
+        '200':
+          description: Consentement opt-in enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentStatusResponse'
+              example:
+                channel: SMS
+                optIn: true
+                registeredAt: '2026-07-11T09:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/opt-out:
+    post:
+      tags:
+        - Consent
+      summary: Enregistrer un refus opt-out (UEMOA)
+      description: |
+        Enregistre le retrait de consentement d'un abonné pour un canal donné.
+        Après opt-out, aucune notification SMS/WhatsApp ne sera envoyée à ce numéro
+        sur ce canal. Conforme UEMOA.
+
+        Champs requis : `phone` (numéro E.164) + `channel`.
+        Idempotent : un opt-out existant est confirmé sans erreur.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentRequest'
+            example:
+              phone: '+2250700000047'
+              channel: SMS
+      responses:
+        '200':
+          description: Consentement opt-out enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentStatusResponse'
+              example:
+                channel: SMS
+                optIn: false
+                revokedAt: '2026-07-11T10:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/consent:
+    get:
+      tags:
+        - Consent
+      summary: Consulter le statut de consentement d'un abonné (MANAGER+)
+      description: |
+        Retourne le statut opt-in/opt-out par canal pour un numéro de téléphone donné.
+        Accessible aux MANAGER et rôles supérieurs. Réponse minimale : canal + statut.
+        Le numéro n'est jamais retourné en clair dans la réponse.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - name: phone
+          in: query
+          required: true
+          description: Numéro de téléphone E.164 à consulter
+          schema:
+            type: string
+            pattern: ^\+[1-9]\d{6,14}$
+          example: '+2250700000047'
+      responses:
+        '200':
+          description: Statut de consentement par canal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentStatusListResponse'
+              example:
+                consents:
+                  - channel: SMS
+                    optIn: true
+                    registeredAt: '2026-07-01T08:00:00Z'
+                  - channel: WHATSAPP
+                    optIn: false
+                    registeredAt: '2026-07-01T08:00:00Z'
+                    revokedAt: '2026-07-10T10:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /webhooks/notifications/{provider}/delivery:
+    post:
+      tags:
+        - Webhooks
+      summary: Accusé de livraison fournisseur (webhook entrant)
+      description: |
+        Reçoit un accusé de livraison d'un fournisseur de notification
+        (`africastalking` | `whatsapp` | `resend`). Met à jour le statut du journal.
+
+        **Sécurité** : la signature du fournisseur est vérifiée par chaque provider
+        (HMAC ou header propriétaire). Si la signature est invalide ou absente →
+        401 `INVALID_WEBHOOK_SIGNATURE`.
+
+        Ce webhook est public (pas d'auth JWT) mais signature obligatoire.
+
+        **Note** : les messages WhatsApp ENTRANTS (clients) sont dans CONTRACT-003
+        `/webhooks/whatsapp/inbound/{bankSlug}`.
+      x-tenant-scope: public
+      x-required-role: NONE
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: Fournisseur de notification
+          schema:
+            type: string
+            enum:
+              - africastalking
+              - whatsapp
+              - resend
+          example: africastalking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookDeliveryPayload'
+            example:
+              messageId: msg_ext_001
+              status: DELIVERED
+              deliveredAt: '2026-07-11T09:00:10Z'
+      responses:
+        '200':
+          description: Accusé de livraison traité — journal mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  acknowledged:
+                    type: boolean
+              example:
+                acknowledged: true
+        '400':
+          description: Payload invalide (champs manquants ou format incorrect)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: BAD_REQUEST
+                  message: Le champ 'messageId' est obligatoire.
+        '401':
+          description: Signature provider invalide ou absente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_signature:
+                  summary: Signature HMAC invalide
+                  value:
+                    error:
+                      code: INVALID_WEBHOOK_SIGNATURE
+                      message: La signature du webhook africastalking est invalide.
+                      details:
+                        provider: africastalking
+                        expectedHeader: X-AT-Signature
+                missing_signature:
+                  summary: Signature absente
+                  value:
+                    error:
+                      code: INVALID_WEBHOOK_SIGNATURE
+                      message: L'en-tête de signature provider est absent.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Message introuvable dans le journal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: NOTIFICATION_NOT_FOUND
+                  message: Aucune notification avec l'id 'msg_ext_xxx' n'a été trouvée.
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token (durée de vie : **15 minutes**).
+        Obtenu via POST /auth/login ou POST /auth/refresh.
+        Format : `Authorization: Bearer <accessToken>`
+  schemas:
+    NotificationStatus:
+      type: string
+      description: |
+        Statut de livraison d'une notification dans le journal SIGFA.
+        - QUEUED : en attente d'envoi dans la file BullMQ
+        - SENT : soumis au fournisseur (accusé d'envoi reçu)
+        - DELIVERED : accusé de livraison final du fournisseur
+        - FAILED : échec définitif (voir failureReason)
+      enum:
+        - QUEUED
+        - SENT
+        - DELIVERED
+        - FAILED
+    NotificationFailureReason:
+      type: string
+      description: |
+        Raison d'échec d'une notification. Énumération fermée.
+        - PROVIDER_UNREACHABLE : fournisseur inaccessible (timeout réseau)
+        - INVALID_NUMBER : numéro de téléphone invalide ou inexistant
+        - OPT_OUT : abonné a fait opt-out sur ce canal
+        - TEMPLATE_REJECTED : template rejeté par le fournisseur (contenu)
+        - QUOTA_EXCEEDED : quota fournisseur dépassé
+        - UNKNOWN : erreur non classifiée (voir logs)
+      enum:
+        - PROVIDER_UNREACHABLE
+        - INVALID_NUMBER
+        - OPT_OUT
+        - TEMPLATE_REJECTED
+        - QUOTA_EXCEEDED
+        - UNKNOWN
+    PushPlatform:
+      type: string
+      description: Plateforme du device push.
+      enum:
+        - IOS
+        - ANDROID
+        - EXPO
+    NotificationLogEntry:
+      type: object
+      description: |
+        Entrée du journal d'envoi d'une notification.
+        Le numéro de téléphone est UNIQUEMENT exposé via `phoneNumberMasked`
+        (calculé côté serveur : 2 premiers + 2 derniers chiffres visibles,
+        groupes intermédiaires remplacés par `••`).
+      required:
+        - id
+        - channel
+        - type
+        - status
+        - sentAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identifiant unique de la notification
+          example: notif_01
+        ticketId:
+          type: string
+          format: uuid
+          description: Identifiant du ticket associé (optionnel si notification admin)
+          example: ticket_42
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        status:
+          $ref: '#/components/schemas/NotificationStatus'
+        phoneNumberMasked:
+          type: string
+          description: |
+            Numéro de téléphone masqué (calculé côté serveur).
+            **Règle** : 2 premiers + 2 derniers chiffres visibles,
+            groupes intermédiaires remplacés par `••`.
+            Exemple : `07 •• •• •• 47` pour le numéro +2250700000047.
+            Ce champ est `null` pour les canaux EMAIL et PUSH.
+          example: 07 •• •• •• 47
+        sentAt:
+          type: string
+          format: date-time
+          description: Horodatage d'envoi au fournisseur
+          example: '2026-07-11T09:00:05Z'
+        deliveredAt:
+          type: string
+          format: date-time
+          description: Horodatage de livraison finale (null si non encore livré)
+          example: '2026-07-11T09:00:07Z'
+        failureReason:
+          description: Raison d'échec (null si livraison réussie ou en cours)
+          type: string
+          enum:
+            - PROVIDER_UNREACHABLE
+            - INVALID_NUMBER
+            - OPT_OUT
+            - TEMPLATE_REJECTED
+            - QUOTA_EXCEEDED
+            - UNKNOWN
+    NotificationLogResponse:
+      type: object
+      description: Réponse paginée du journal d'envoi
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationLogEntry'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    RegisterDeviceRequest:
+      type: object
+      description: Corps de la requête d'enregistrement d'un device push
+      required:
+        - deviceToken
+        - platform
+      properties:
+        deviceToken:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Token push fourni par APNs (iOS), FCM (Android) ou Expo
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+        platform:
+          type: string
+          description: Plateforme du device push (IOS | ANDROID | EXPO)
+          enum:
+            - IOS
+            - ANDROID
+            - EXPO
+          example: EXPO
+    DeviceRegistration:
+      type: object
+      description: |
+        Device push enregistré. Le token ne doit pas être re-exposé en clair
+        dans les autres endpoints — seul `deviceId` est utilisé.
+      required:
+        - deviceId
+        - platform
+        - registeredAt
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+          description: Identifiant unique du device (à utiliser pour le DELETE)
+          example: device_01
+        deviceToken:
+          type: string
+          description: Token push (retourné uniquement lors de l'enregistrement)
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+        platform:
+          $ref: '#/components/schemas/PushPlatform'
+        registeredAt:
+          type: string
+          format: date-time
+          description: Date d'enregistrement
+          example: '2026-07-11T09:00:00Z'
+    ConsentRequest:
+      type: object
+      description: |
+        Corps de la requête opt-in ou opt-out.
+        `phone` est en E.164 — jamais retourné en clair dans les réponses.
+      required:
+        - phone
+        - channel
+      properties:
+        phone:
+          type: string
+          pattern: ^\+[1-9]\d{6,14}$
+          description: Numéro E.164 de l'abonné (ex. +2250700000047)
+          example: '+2250700000047'
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+    ConsentStatusResponse:
+      type: object
+      description: Réponse minimale au opt-in / opt-out
+      required:
+        - channel
+        - optIn
+      properties:
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        optIn:
+          type: boolean
+          description: true = opt-in actif, false = opt-out
+          example: true
+        registeredAt:
+          type: string
+          format: date-time
+          description: Date de l'opt-in (null si opt-out sans opt-in préalable)
+          example: '2026-07-11T09:00:00Z'
+        revokedAt:
+          type: string
+          format: date-time
+          description: Date de l'opt-out (null si opt-in actif)
+          example: '2026-07-10T10:00:00Z'
+    ConsentStatusEntry:
+      type: object
+      description: Statut opt-in/opt-out pour un canal donné
+      required:
+        - channel
+        - optIn
+      properties:
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        optIn:
+          type: boolean
+          example: true
+        registeredAt:
+          type: string
+          format: date-time
+          example: '2026-07-01T08:00:00Z'
+        revokedAt:
+          type: string
+          format: date-time
+          example: '2026-07-10T10:00:00Z'
+    ConsentStatusListResponse:
+      type: object
+      description: Liste des statuts de consentement par canal pour un abonné
+      required:
+        - consents
+      properties:
+        consents:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsentStatusEntry'
+    NotificationTestRequest:
+      type: object
+      description: Corps de la requête de test d'envoi
+      required:
+        - channel
+        - templateId
+        - recipientPhone
+      properties:
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        templateId:
+          type: string
+          description: Identifiant du template à utiliser (voir CONTRACT-005)
+          example: tpl_ticket_confirmation
+        recipientPhone:
+          type: string
+          pattern: ^\+[1-9]\d{6,14}$
+          description: |
+            Numéro du destinataire — DOIT appartenir à la liste de test de la banque.
+            Sinon 422 TEST_RECIPIENT_NOT_ALLOWED.
+          example: '+2250700000047'
+        variables:
+          type: object
+          additionalProperties: true
+          description: Variables de template (optionnel — valeurs par défaut si absent)
+          example:
+            ticketNumber: A042
+            position: 3
+            estimatedMinutes: 6
+    NotificationTestResponse:
+      type: object
+      description: Résultat d'un envoi de test
+      required:
+        - notificationId
+        - channel
+        - status
+        - sentAt
+      properties:
+        notificationId:
+          type: string
+          format: uuid
+          description: Identifiant de la notification de test dans le journal
+          example: notif_test_01
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        status:
+          $ref: '#/components/schemas/NotificationStatus'
+        sentAt:
+          type: string
+          format: date-time
+          example: '2026-07-11T09:05:00Z'
+    WebhookDeliveryPayload:
+      type: object
+      description: |
+        Payload d'accusé de livraison envoyé par un fournisseur de notification.
+        La structure exacte varie par provider — les champs communs sont extraits.
+        Le payload complet est conservé pour audit.
+      required:
+        - messageId
+        - status
+      properties:
+        messageId:
+          type: string
+          description: Identifiant du message côté fournisseur (externe)
+          example: msg_ext_001
+        status:
+          $ref: '#/components/schemas/NotificationStatus'
+        deliveredAt:
+          type: string
+          format: date-time
+          description: Horodatage de livraison rapporté par le fournisseur
+          example: '2026-07-11T09:00:10Z'
+        failureReason:
+          type: string
+          description: Raison d'échec rapportée par le fournisseur (texte libre du provider)
+          example: '2026-07-10T10:00:00Z'
+    NotificationChannel:
+      type: string
+      description: |
+        Canaux de livraison des notifications SIGFA.
+        Schéma transverse référencé par CONTRACT-007 (journal par canal, opt-in par canal).
+        - SMS : message texte via opérateur mobile
+        - WHATSAPP : message via l'API WhatsApp Business
+        - EMAIL : courriel via fournisseur transactionnel
+        - PUSH : notification push mobile/web (prérequis : device enregistré)
+      enum:
+        - SMS
+        - WHATSAPP
+        - EMAIL
+        - PUSH
+    NotificationType:
+      type: string
+      description: |
+        Types de messages du parcours client SIGFA.
+        Schéma transverse référencé par CONTRACT-005 (templates par type) et CONTRACT-007 (variables par type).
+        - TICKET_CONFIRMATION : confirmation d'émission d'un ticket (numéro, position, estimation)
+        - POSITION_UPDATE : mise à jour de la position dans la file (ex. « vous êtes 3e »)
+        - YOUR_TURN : alerte d'appel imminent (ex. « vous êtes le suivant, préparez vos documents »)
+        - DAILY_REPORT : rapport quotidien de l'agence à destination du directeur
+      enum:
+        - TICKET_CONFIRMATION
+        - POSITION_UPDATE
+        - YOUR_TURN
+        - DAILY_REPORT
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Numéro de page courant
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Taille de page
+        total:
+          type: integer
+          minimum: 0
+          description: Nombre total d'éléments
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              pattern: ^[A-Z][A-Z0-9_]*$
+              description: Code d'erreur UPPER_SNAKE_CASE commençant par une lettre
+              example: ILLEGAL_TRANSITION
+            message:
+              type: string
+              minLength: 1
+              description: Message d'erreur humain
+              example: Transition illégale depuis l'état actuel.
+            details:
+              type: object
+              additionalProperties: true
+              description: Informations complémentaires (champ optionnel)
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Numéro de page (≥1, défaut 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Taille de page (1–100, défaut 20)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    BadRequest:
+      description: Requête invalide (validation échouée ou en-tête obligatoire absent)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: BAD_REQUEST
+              message: Le corps de la requête est invalide.
+              details:
+                field: email
+                issue: Format d'email invalide.
+    Unauthorized:
+      description: Token JWT absent, expiré ou invalide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Token d'accès absent ou expiré.
+    Forbidden:
+      description: Permissions insuffisantes pour cette opération
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Vous n'avez pas les permissions nécessaires.
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: La ressource demandée est introuvable.
+    Conflict:
+      description: Conflit (ressource existante ou transition illégale)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: CONFLICT
+              message: Un conflit a été détecté.
+    UnprocessableEntity:
+      description: Entité non traitable (données sémantiquement invalides)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: Les données fournies sont sémantiquement invalides.
+    TooManyRequests:
+      description: Trop de requêtes — limite de débit atteinte
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: TOO_MANY_REQUESTS
+              message: Limite de débit atteinte. Réessayez ultérieurement.
+    InternalServerError:
+      description: Erreur interne du serveur
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: Une erreur interne s'est produite.
