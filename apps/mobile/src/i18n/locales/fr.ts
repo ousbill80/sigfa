@@ -47,6 +47,33 @@ export const fr = {
     badge: 'Hors ligne',
     queued: 'Ticket en attente de synchronisation',
   },
+  // Ticket vivant (MOB-003)
+  liveTicket: {
+    yourTurn: 'Votre tour !',
+    noActiveTicket: 'Aucun ticket actif',
+    notFound: "Adressez-vous à l'accueil",
+    personsBefore: 'personne(s) devant vous',
+    updatedEvery30s: 'Mis à jour toutes les 30 secondes',
+  },
+  // Feedback (MOB-005)
+  feedback: {
+    title: 'Donner mon avis',
+    commentLabel: 'Un mot à ajouter ? (facultatif)',
+    commentPlaceholder: 'Votre commentaire...',
+    submit: 'Donner mon avis',
+    success: 'Merci pour votre retour !',
+    alreadySubmitted: 'Vous avez déjà donné votre avis',
+    windowExpired: 'La fenêtre de feedback est expirée',
+    stars: 'Note',
+    historyTitle: 'Historique de tickets',
+    historyEmpty: 'Aucun ticket dans votre historique',
+    badgeReminder: 'Donnez votre avis',
+  },
+  // Notifications (MOB-004)
+  notifications: {
+    twoPersonsAhead: 'Plus que 2 personnes devant vous — dirigez-vous vers l\'agence',
+    twoPersonsWithTravel: 'Plus que 2 personnes devant vous — dirigez-vous vers l\'agence (trajet estimé : {travel} min)',
+  },
 } as const;
 
 export type TranslationKeys = typeof fr;
