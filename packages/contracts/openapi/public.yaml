@@ -1,0 +1,1181 @@
+openapi: "3.1.0"
+info:
+  title: SIGFA Public API — Client public, borne & webhooks
+  version: "1.0.0"
+  description: |
+    Contrat client public SIGFA : émission multi-canal, suivi de ticket,
+    feedback, session borne, heartbeat, webhook WhatsApp entrant et QR d'agence.
+
+    **Frontière avec CONTRACT-001** : core.yaml possède `/tickets/*` (hors feedback).
+    Ce fichier possède la surface d'accès client + borne. Les schémas partagés
+    sont référencés via $ref vers `core.yaml` — zéro duplication.
+
+    **Scopes tenant** : `public` (sans auth) ou `agency` (token session borne).
+
+    **Conventions** :
+    - 9 codes de réponse par endpoint (2xx, 400, 401, 403, 404, 409, 422, 429, 500)
+    - `x-tenant-scope` et `x-required-role` sur chaque opération
+    - Exemples requête/réponse sur chaque endpoint
+
+servers:
+  - url: /api/v1
+    description: SIGFA v1
+
+security:
+  - BearerAuth: []
+
+# ─── TAGS ──────────────────────────────────────────────────────────────────────
+tags:
+  - name: KioskSession
+    description: Session borne (credentials dédiés, TTL 12 heures, non renouvelable)
+  - name: KioskHeartbeat
+    description: Heartbeat borne (printerStatus, appVersion, lastSeen)
+  - name: PublicTickets
+    description: Émission multi-canal et suivi public des tickets
+  - name: Feedback
+    description: Feedback client après clôture du ticket (fenêtre 24 h)
+  - name: Webhooks
+    description: Webhook WhatsApp entrant signé HMAC par banque
+  - name: AgencyQR
+    description: QR d'agence (URL PWA + identifiant signé)
+
+# ─── PATHS ─────────────────────────────────────────────────────────────────────
+paths:
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # SESSION BORNE
+  # ──────────────────────────────────────────────────────────────────────────────
+  /kiosk/session:
+    post:
+      tags: [KioskSession]
+      summary: Créer une session borne (JWT scope agency, TTL 12 h, non renouvelable)
+      description: |
+        Authentifie une borne avec des credentials dédiés (kioskId + kioskSecret)
+        et retourne un JWT avec scope `agency`, durée de vie **12 heures (43200 secondes),
+        non renouvelable par refresh**.
+
+        Toutes les routes borne requièrent ce token.
+        La révocation se fait via `DELETE /kiosk/session/{kioskId}`.
+      x-tenant-scope: agency
+      x-required-role: NONE
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KioskSessionRequest"
+            example:
+              kioskId: "kiosk_01"
+              kioskSecret: "s3cr3t-kiosk-k3y"
+              agencyId: "agency_01"
+      responses:
+        "201":
+          description: Session borne créée — JWT TTL 12 h (43200 s)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KioskSessionResponse"
+              example:
+                accessToken: "eyJhbGciOiJIUzI1NiJ9.kioskPayload.sig"
+                expiresIn: 43200
+                kioskId: "kiosk_01"
+                agencyId: "agency_01"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  /kiosk/session/{kioskId}:
+    delete:
+      tags: [KioskSession]
+      summary: Révoquer la session d'une borne (AGENCY_DIRECTOR+)
+      description: |
+        Révoque immédiatement le token JWT de la borne identifiée par `kioskId`.
+        Requiert le rôle **AGENCY_DIRECTOR** ou supérieur.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: kioskId
+          in: path
+          required: true
+          description: Identifiant de la borne à déconnecter
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session révoquée
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                properties:
+                  success:
+                    type: boolean
+              example:
+                success: true
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          description: Borne introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: KIOSK_NOT_FOUND
+                  message: "Borne introuvable."
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # HEARTBEAT BORNE
+  # ──────────────────────────────────────────────────────────────────────────────
+  /kiosks/{kioskId}/heartbeat:
+    post:
+      tags: [KioskHeartbeat]
+      summary: Heartbeat borne — mise à jour printerStatus, appVersion, lastSeen
+      description: |
+        La borne envoie un heartbeat périodique pour mettre à jour son état.
+        Alimente `lastSeen` et `printerStatus` de la supervision (CONTRACT-006)
+        et déclenche l'événement `kiosk:printer-error` si `printerStatus != OK`
+        (CONTRACT-002).
+
+        Requiert le token de session borne (scope agency).
+
+        **printerStatus** valeurs : `OK` | `ERROR` | `OFFLINE`
+      x-tenant-scope: agency
+      x-required-role: NONE
+      parameters:
+        - name: kioskId
+          in: path
+          required: true
+          description: Identifiant de la borne
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HeartbeatRequest"
+            example:
+              printerStatus: OK
+              appVersion: "1.4.2"
+              uptimeSeconds: 3600
+      responses:
+        "200":
+          description: Heartbeat enregistré — serverTime retourné
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeartbeatResponse"
+              example:
+                serverTime: "2026-07-11T10:00:00Z"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          description: Borne introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: KIOSK_NOT_FOUND
+                  message: "Borne introuvable."
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # ÉMISSION MULTI-CANAL
+  # ──────────────────────────────────────────────────────────────────────────────
+  /public/tickets:
+    post:
+      tags: [PublicTickets]
+      summary: "† Émettre un ticket multi-canal (X-Idempotency-Key requis)"
+      description: |
+        Crée un ticket dans l'état **WAITING** via un des 4 canaux supportés.
+
+        Le corps de la requête est un **oneOf discriminé par `channel`** :
+        - `KIOSK` : émission borne (téléphone facultatif, `smsConsent` obligatoire si téléphone)
+        - `QR` : scan code QR d'agence
+        - `MOBILE` : application mobile SIGFA
+        - `WHATSAPP` : émission via WhatsApp Business
+
+        **Mutation critique** : l'en-tête `X-Idempotency-Key` est obligatoire.
+        Même clé + même payload = même réponse pendant 24 h.
+        Même clé + payload différent → 409 `IDEMPOTENCY_CONFLICT`.
+
+        Le `trackingId` retourné est un **nanoid(21)** (`^[A-Za-z0-9_-]{21}$`),
+        distinct de l'uuid interne qui n'apparaît dans AUCUNE réponse publique.
+      x-tenant-scope: public
+      x-required-role: NONE
+      security: []
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdempotencyKeyParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicTicketRequest"
+            examples:
+              kiosk:
+                summary: Émission via borne (KIOSK)
+                value:
+                  channel: KIOSK
+                  serviceId: "svc_01"
+                  agencyId: "agency_01"
+                  priority: false
+              qr:
+                summary: Émission via QR
+                value:
+                  channel: QR
+                  serviceId: "svc_01"
+                  agencyId: "agency_01"
+                  phoneNumber: "+2250700000001"
+                  smsConsent: true
+              mobile:
+                summary: Émission via mobile
+                value:
+                  channel: MOBILE
+                  serviceId: "svc_01"
+                  agencyId: "agency_01"
+                  phoneNumber: "+2250700000002"
+                  smsConsent: true
+              whatsapp:
+                summary: Émission via WhatsApp
+                value:
+                  channel: WHATSAPP
+                  serviceId: "svc_01"
+                  agencyId: "agency_01"
+                  phoneNumber: "+2250700000003"
+                  smsConsent: true
+      responses:
+        "201":
+          description: Ticket créé en état WAITING — trackingId nanoid(21) retourné
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicTicketCreatedResponse"
+              examples:
+                kiosk:
+                  summary: Ticket émis via borne
+                  value:
+                    trackingId: "V9k2mXpLqRwZsYn8fBjH3"
+                    number: "A042"
+                    status: WAITING
+                    channel: KIOSK
+                    position: 5
+                    estimatedWaitMinutes: 10
+                    serviceId: "svc_01"
+                    agencyId: "agency_01"
+                    createdAt: "2026-07-11T09:00:00Z"
+                qr:
+                  summary: Ticket émis via QR
+                  value:
+                    trackingId: "Xp3nBmKqLrTs7vWzYj9cD"
+                    number: "A043"
+                    status: WAITING
+                    channel: QR
+                    position: 6
+                    estimatedWaitMinutes: 12
+                    serviceId: "svc_01"
+                    agencyId: "agency_01"
+                    createdAt: "2026-07-11T09:01:00Z"
+                mobile:
+                  summary: Ticket émis via mobile
+                  value:
+                    trackingId: "Mn4pQrStUvWxYzAb5cDeF"
+                    number: "A044"
+                    status: WAITING
+                    channel: MOBILE
+                    position: 7
+                    estimatedWaitMinutes: 14
+                    serviceId: "svc_01"
+                    agencyId: "agency_01"
+                    createdAt: "2026-07-11T09:02:00Z"
+                whatsapp:
+                  summary: Ticket émis via WhatsApp
+                  value:
+                    trackingId: "Gh6iJkLmNoPqRsTu7vWxY"
+                    number: "A045"
+                    status: WAITING
+                    channel: WHATSAPP
+                    position: 8
+                    estimatedWaitMinutes: 16
+                    serviceId: "svc_01"
+                    agencyId: "agency_01"
+                    createdAt: "2026-07-11T09:03:00Z"
+        "400":
+          description: Requête invalide ou X-Idempotency-Key absent
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_KEY_REQUIRED
+                  message: "L'en-tête X-Idempotency-Key est obligatoire pour cette mutation."
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          description: Conflit d'idempotence (même clé, payload différent)
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_CONFLICT
+                  message: "Même X-Idempotency-Key avec un payload différent."
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # SUIVI PUBLIC
+  # ──────────────────────────────────────────────────────────────────────────────
+  /public/tickets/{trackingId}:
+    get:
+      tags: [PublicTickets]
+      summary: Suivi public d'un ticket par trackingId nanoid(21)
+      description: |
+        Retourne l'état public d'un ticket identifié par son `trackingId`
+        (nanoid 21 caractères, `^[A-Za-z0-9_-]{21}$`).
+
+        **Sans authentification** — rate-limité à 30 req/min par IP (429).
+
+        **Cache** : `Cache-Control: max-age=30` et `ETag` retournés pour le
+        Service Worker en réseau instable.
+
+        **Sécurité** : l'uuid interne du ticket n'apparaît dans AUCUNE réponse
+        de cette route — seul le `trackingId` est exposé.
+      x-tenant-scope: public
+      x-required-role: NONE
+      security: []
+      parameters:
+        - name: trackingId
+          in: path
+          required: true
+          description: "Identifiant public nanoid(21) — format: ^[A-Za-z0-9_-]{21}$"
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{21}$"
+            example: "V9k2mXpLqRwZsYn8fBjH3"
+      responses:
+        "200":
+          description: État public du ticket
+          headers:
+            Cache-Control:
+              description: "Directive de cache : max-age=30 pour le Service Worker"
+              schema:
+                type: string
+                example: "max-age=30"
+            ETag:
+              description: Identifiant de version pour la revalidation conditionnelle
+              schema:
+                type: string
+                example: '"abc123def456"'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicTicketStatus"
+              example:
+                trackingId: "V9k2mXpLqRwZsYn8fBjH3"
+                number: "A042"
+                status: WAITING
+                channel: KIOSK
+                position: 3
+                estimatedWaitMinutes: 6
+                agencyId: "agency_01"
+                serviceId: "svc_01"
+                createdAt: "2026-07-11T09:00:00Z"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          description: Ticket introuvable par ce trackingId
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: TICKET_NOT_FOUND
+                  message: "Ticket introuvable pour ce trackingId."
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          description: Trop de requêtes — limite rate-limit 30 req/min par IP
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: TOO_MANY_REQUESTS
+                  message: "Limite de débit atteinte. Réessayez dans 60 secondes."
+                  details:
+                    retryAfterSeconds: 60
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # FEEDBACK
+  # ──────────────────────────────────────────────────────────────────────────────
+  /public/tickets/{trackingId}/feedback:
+    post:
+      tags: [Feedback]
+      summary: Soumettre un feedback client après clôture du ticket
+      description: |
+        Permet au client de soumettre une note (1–5) et un commentaire optionnel
+        (≤ 500 caractères) après la clôture de son ticket.
+
+        **Règles métier** :
+        - 422 `TICKET_NOT_CLOSED` si le ticket n'est pas en état DONE
+        - 409 `FEEDBACK_ALREADY_SUBMITTED` si un feedback a déjà été soumis
+        - 422 `FEEDBACK_WINDOW_EXPIRED` si plus de 24 h se sont écoulées depuis la clôture
+      x-tenant-scope: public
+      x-required-role: NONE
+      security: []
+      parameters:
+        - name: trackingId
+          in: path
+          required: true
+          description: "Identifiant public nanoid(21) du ticket"
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{21}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+            example:
+              note: 4
+              commentaire: "Service rapide, agent très professionnel."
+      responses:
+        "201":
+          description: Feedback enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+              example:
+                success: true
+                message: "Merci pour votre avis !"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          description: Ticket introuvable par ce trackingId
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: TICKET_NOT_FOUND
+                  message: "Ticket introuvable pour ce trackingId."
+        "409":
+          description: Feedback déjà soumis pour ce ticket (doublon)
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: FEEDBACK_ALREADY_SUBMITTED
+                  message: "Un feedback a déjà été soumis pour ce ticket."
+        "422":
+          description: Ticket non clôturé ou fenêtre de feedback expirée (24 h)
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              examples:
+                ticket_not_closed:
+                  summary: Ticket non clôturé
+                  value:
+                    error:
+                      code: TICKET_NOT_CLOSED
+                      message: "Le feedback n'est autorisé que pour les tickets en état DONE."
+                      details:
+                        currentStatus: WAITING
+                feedback_window_expired:
+                  summary: Fenêtre de feedback expirée (> 24 h)
+                  value:
+                    error:
+                      code: FEEDBACK_WINDOW_EXPIRED
+                      message: "La fenêtre de feedback de 24 h après clôture est expirée."
+                      details:
+                        windowHours: 24
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # WEBHOOK WHATSAPP ENTRANT
+  # ──────────────────────────────────────────────────────────────────────────────
+  /webhooks/whatsapp/inbound/{bankSlug}:
+    post:
+      tags: [Webhooks]
+      summary: Webhook WhatsApp entrant signé HMAC-SHA256 par banque
+      description: |
+        Reçoit un message WhatsApp entrant et le route vers la banque identifiée
+        par `bankSlug`. La signature HMAC-SHA256 dans l'en-tête `x-hub-signature-256`
+        est vérifiée avec le secret propre à la banque.
+
+        **401** si la signature HMAC est invalide ou absente.
+
+        Message entrant → création de ticket ou consultation d'état.
+        Les accusés de livraison sortants sont dans CONTRACT-007.
+      x-tenant-scope: public
+      x-required-role: NONE
+      security: []
+      parameters:
+        - name: bankSlug
+          in: path
+          required: true
+          description: Identifiant slug de la banque (routage tenant)
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+            example: "bnci"
+        - name: x-hub-signature-256
+          in: header
+          required: true
+          description: |
+            Signature HMAC-SHA256 du corps de la requête avec le secret propre à la banque.
+            Format : `sha256=<hex-digest>`
+          schema:
+            type: string
+            pattern: "^sha256=[0-9a-f]{64}$"
+            example: "sha256=b94d27b9934d3e08a52e52d7da7dabfac484efe04294e576a8bfb4b38d1f4b4c"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsAppInboundPayload"
+            example:
+              object: "whatsapp_business_account"
+              entry:
+                - id: "bank_wa_account_01"
+                  changes:
+                    - value:
+                        messaging_product: "whatsapp"
+                        messages:
+                          - from: "+2250700000001"
+                            type: "text"
+                            text:
+                              body: "Bonjour, je souhaite prendre un ticket pour un virement."
+                        metadata:
+                          phone_number_id: "wa_phone_01"
+                          display_phone_number: "+2252700000001"
+      responses:
+        "200":
+          description: Webhook traité avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                properties:
+                  success:
+                    type: boolean
+              example:
+                success: true
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          description: Signature HMAC-SHA256 invalide ou absente
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: WEBHOOK_SIGNATURE_INVALID
+                  message: "La signature HMAC-SHA256 est invalide ou absente."
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          description: Banque introuvable pour ce bankSlug
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: BANK_NOT_FOUND
+                  message: "Banque introuvable pour ce slug."
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # QR D'AGENCE
+  # ──────────────────────────────────────────────────────────────────────────────
+  /agencies/{id}/qr:
+    get:
+      tags: [AgencyQR]
+      summary: Obtenir le payload QR d'une agence (URL PWA + identifiant signé)
+      description: |
+        Retourne le payload du QR code d'une agence : URL de la PWA SIGFA
+        avec l'identifiant d'agence signé (HMAC ou JWT court-circuit).
+        Ce QR est affiché en agence et scanné par les clients pour émettre
+        un ticket via le canal QR.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant UUID de l'agence
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Payload QR d'agence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgencyQRPayload"
+              example:
+                agencyId: "agency_01"
+                qrUrl: "https://app.sigfa.ci/q/agency_01?sig=eyJhbGci..."
+                payload: "eyJhZ2VuY3lJZCI6ImFnZW5jeV8wMSJ9.sig"
+                expiresAt: "2026-07-12T09:00:00Z"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+# ─── COMPONENTS ────────────────────────────────────────────────────────────────
+components:
+
+  # ── Security Schemes ─────────────────────────────────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token (scope agency — session borne 12 h OU token utilisateur 15 min).
+        Format : `Authorization: Bearer <accessToken>`
+
+  # ── Schemas ───────────────────────────────────────────────────────────────────
+  schemas:
+
+    # ── Session borne ────────────────────────────────────────────────────────────
+
+    KioskSessionRequest:
+      type: object
+      required:
+        - kioskId
+        - kioskSecret
+        - agencyId
+      properties:
+        kioskId:
+          type: string
+          description: Identifiant unique de la borne
+          example: "kiosk_01"
+        kioskSecret:
+          type: string
+          description: Secret d'authentification de la borne (rotation possible par AGENCY_DIRECTOR)
+          minLength: 16
+          example: "s3cr3t-kiosk-k3y"
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence à laquelle est rattachée la borne
+
+    KioskSessionResponse:
+      type: object
+      required:
+        - accessToken
+        - expiresIn
+        - kioskId
+        - agencyId
+      properties:
+        accessToken:
+          type: string
+          description: "JWT scope agency — TTL 12 heures (43200 secondes), non renouvelable par refresh"
+        expiresIn:
+          type: integer
+          description: Durée de vie du token en secondes (toujours 43200 = 12 h)
+          example: 43200
+        kioskId:
+          type: string
+        agencyId:
+          type: string
+          format: uuid
+
+    # ── Heartbeat ────────────────────────────────────────────────────────────────
+
+    PrinterStatus:
+      type: string
+      description: État de l'imprimante de la borne
+      enum:
+        - OK
+        - ERROR
+        - OFFLINE
+
+    HeartbeatRequest:
+      type: object
+      required:
+        - printerStatus
+        - appVersion
+        - uptimeSeconds
+      properties:
+        printerStatus:
+          $ref: "#/components/schemas/PrinterStatus"
+        appVersion:
+          type: string
+          description: Version de l'application borne (semver)
+          example: "1.4.2"
+        uptimeSeconds:
+          type: integer
+          minimum: 0
+          description: Durée de fonctionnement de la borne en secondes
+          example: 3600
+
+    HeartbeatResponse:
+      type: object
+      required:
+        - serverTime
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+          description: Heure serveur au moment du heartbeat (UTC ISO 8601)
+          example: "2026-07-11T10:00:00Z"
+
+    # ── Ticket public (émission multi-canal) ─────────────────────────────────────
+
+    # Schéma de base commun à tous les canaux
+    PublicTicketBase:
+      type: object
+      required:
+        - channel
+        - serviceId
+        - agencyId
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+          description: Identifiant du service demandé
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence
+        priority:
+          type: boolean
+          default: false
+          description: Ticket prioritaire (PMR, VIP)
+
+    # Canal KIOSK : téléphone facultatif, smsConsent obligatoire si téléphone
+    PublicTicketKiosk:
+      allOf:
+        - $ref: "#/components/schemas/PublicTicketBase"
+        - type: object
+          required:
+            - channel
+          properties:
+            channel:
+              type: string
+              enum: [KIOSK]
+            phoneNumber:
+              type: ["string", "null"]
+              description: "Numéro de téléphone — FACULTATIF sur borne (format E.164)"
+              pattern: "^\\+[1-9]\\d{7,14}$"
+            smsConsent:
+              type: boolean
+              description: "Opt-in SMS UEMOA — OBLIGATOIRE si phoneNumber fourni"
+
+    # Canal QR : téléphone recommandé
+    PublicTicketQR:
+      allOf:
+        - $ref: "#/components/schemas/PublicTicketBase"
+        - type: object
+          required:
+            - channel
+          properties:
+            channel:
+              type: string
+              enum: [QR]
+            phoneNumber:
+              type: ["string", "null"]
+              description: "Numéro de téléphone pour notifications (format E.164)"
+              pattern: "^\\+[1-9]\\d{7,14}$"
+            smsConsent:
+              type: boolean
+              description: "Opt-in SMS UEMOA — obligatoire si phoneNumber fourni"
+
+    # Canal MOBILE : téléphone requis
+    PublicTicketMobile:
+      allOf:
+        - $ref: "#/components/schemas/PublicTicketBase"
+        - type: object
+          required:
+            - channel
+            - phoneNumber
+            - smsConsent
+          properties:
+            channel:
+              type: string
+              enum: [MOBILE]
+            phoneNumber:
+              type: string
+              description: "Numéro de téléphone (format E.164)"
+              pattern: "^\\+[1-9]\\d{7,14}$"
+            smsConsent:
+              type: boolean
+              description: "Opt-in SMS UEMOA — obligatoire (application mobile)"
+
+    # Canal WHATSAPP : numéro WhatsApp requis
+    PublicTicketWhatsApp:
+      allOf:
+        - $ref: "#/components/schemas/PublicTicketBase"
+        - type: object
+          required:
+            - channel
+            - phoneNumber
+            - smsConsent
+          properties:
+            channel:
+              type: string
+              enum: [WHATSAPP]
+            phoneNumber:
+              type: string
+              description: "Numéro WhatsApp (format E.164)"
+              pattern: "^\\+[1-9]\\d{7,14}$"
+            smsConsent:
+              type: boolean
+              description: "Opt-in UEMOA pour les messages WhatsApp"
+
+    # Schéma discriminé oneOf par canal
+    PublicTicketRequest:
+      description: |
+        Corps de la requête d'émission de ticket — discriminé par `channel`.
+        Chaque canal a des champs conditionnels spécifiques.
+      oneOf:
+        - $ref: "#/components/schemas/PublicTicketKiosk"
+        - $ref: "#/components/schemas/PublicTicketQR"
+        - $ref: "#/components/schemas/PublicTicketMobile"
+        - $ref: "#/components/schemas/PublicTicketWhatsApp"
+      discriminator:
+        propertyName: channel
+        mapping:
+          KIOSK: "#/components/schemas/PublicTicketKiosk"
+          QR: "#/components/schemas/PublicTicketQR"
+          MOBILE: "#/components/schemas/PublicTicketMobile"
+          WHATSAPP: "#/components/schemas/PublicTicketWhatsApp"
+
+    # Réponse ticket public (sans uuid interne)
+    PublicTicketCreatedResponse:
+      type: object
+      description: |
+        Réponse à POST /public/tickets — ticket créé en état WAITING.
+        **L'uuid interne n'est PAS exposé** — seul le trackingId nanoid(21) est retourné.
+      required:
+        - trackingId
+        - number
+        - status
+        - channel
+        - position
+        - estimatedWaitMinutes
+        - serviceId
+        - agencyId
+        - createdAt
+      properties:
+        trackingId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{21}$"
+          description: "Identifiant public nanoid(21) — distinct de l'uuid interne"
+          example: "V9k2mXpLqRwZsYn8fBjH3"
+        number:
+          type: string
+          description: "Numéro affiché (ex: A042)"
+          example: "A042"
+        status:
+          $ref: "./core.yaml#/components/schemas/TicketStatus"
+        channel:
+          $ref: "./core.yaml#/components/schemas/TicketChannel"
+        position:
+          type: integer
+          minimum: 0
+          description: Position dans la file au moment de l'émission
+        estimatedWaitMinutes:
+          type: integer
+          minimum: 0
+          description: Estimation du temps d'attente en minutes
+        serviceId:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    # État public du ticket (suivi — sans uuid interne)
+    PublicTicketStatus:
+      type: object
+      description: |
+        État public d'un ticket pour le suivi.
+        **L'uuid interne n'est PAS exposé** — seul le trackingId est retourné.
+      required:
+        - trackingId
+        - number
+        - status
+        - channel
+        - position
+        - estimatedWaitMinutes
+        - agencyId
+        - serviceId
+        - createdAt
+      properties:
+        trackingId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{21}$"
+          description: "Identifiant public nanoid(21)"
+          example: "V9k2mXpLqRwZsYn8fBjH3"
+        number:
+          type: string
+          example: "A042"
+        status:
+          $ref: "./core.yaml#/components/schemas/TicketStatus"
+        channel:
+          $ref: "./core.yaml#/components/schemas/TicketChannel"
+        position:
+          type: integer
+          minimum: 0
+        estimatedWaitMinutes:
+          type: integer
+          minimum: 0
+        agencyId:
+          type: string
+          format: uuid
+        serviceId:
+          type: string
+          format: uuid
+        calledAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Heure d'appel (null si pas encore appelé)
+        closedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Heure de clôture (null si pas encore clôturé)
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Feedback ─────────────────────────────────────────────────────────────────
+
+    FeedbackRequest:
+      type: object
+      required:
+        - note
+      properties:
+        note:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Note de satisfaction de 1 (très insatisfait) à 5 (très satisfait)
+          example: 4
+        commentaire:
+          type: ["string", "null"]
+          maxLength: 500
+          description: Commentaire libre optionnel (≤ 500 caractères)
+          example: "Service rapide, agent très professionnel."
+
+    FeedbackResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+          example: "Merci pour votre avis !"
+
+    # ── Webhook WhatsApp ──────────────────────────────────────────────────────────
+
+    WhatsAppMessageText:
+      type: object
+      properties:
+        body:
+          type: string
+          description: Corps du message texte WhatsApp
+
+    WhatsAppMessage:
+      type: object
+      properties:
+        from:
+          type: string
+          description: Numéro WhatsApp de l'émetteur (format E.164)
+        type:
+          type: string
+          enum: [text, image, document, audio, video, interactive]
+        text:
+          $ref: "#/components/schemas/WhatsAppMessageText"
+
+    WhatsAppMetadata:
+      type: object
+      properties:
+        phone_number_id:
+          type: string
+        display_phone_number:
+          type: string
+
+    WhatsAppValue:
+      type: object
+      properties:
+        messaging_product:
+          type: string
+          enum: [whatsapp]
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/WhatsAppMessage"
+        metadata:
+          $ref: "#/components/schemas/WhatsAppMetadata"
+
+    WhatsAppChange:
+      type: object
+      properties:
+        value:
+          $ref: "#/components/schemas/WhatsAppValue"
+
+    WhatsAppEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identifiant du compte WhatsApp Business
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/WhatsAppChange"
+
+    WhatsAppInboundPayload:
+      type: object
+      description: Payload webhook WhatsApp Business API entrant
+      required:
+        - object
+        - entry
+      properties:
+        object:
+          type: string
+          enum: [whatsapp_business_account]
+        entry:
+          type: array
+          items:
+            $ref: "#/components/schemas/WhatsAppEntry"
+          minItems: 1
+
+    # ── QR d'agence ──────────────────────────────────────────────────────────────
+
+    AgencyQRPayload:
+      type: object
+      required:
+        - agencyId
+        - qrUrl
+        - payload
+      properties:
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence
+        qrUrl:
+          type: string
+          format: uri
+          description: URL PWA complète avec identifiant d'agence signé (encodée dans le QR)
+          example: "https://app.sigfa.ci/q/agency_01?sig=eyJhbGci..."
+        payload:
+          type: string
+          description: Payload JWT court-circuit signé (agencyId + expiration)
+          example: "eyJhZ2VuY3lJZCI6ImFnZW5jeV8wMSJ9.sig"
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Date d'expiration du payload signé (null si permanent)
+          example: "2026-07-12T09:00:00Z"
