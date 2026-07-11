@@ -119,7 +119,7 @@ describe("INFRA-002: compose config atteste structure services applicatifs", () 
     expect(configOutput).toMatch(/@sigfa\/api/);
     // La commande inclut pnpm et dev dans le service api
     const apiSection = configOutput.match(
-      /api:[\s\S]*?(?=\n  [a-z]|$)/
+      /api:[\s\S]*?(?=\n {2}[a-z]|$)/
     )?.[0] ?? "";
     expect(apiSection).toMatch(/pnpm/);
     expect(apiSection).toMatch(/@sigfa\/api/);
@@ -139,7 +139,7 @@ describe("INFRA-002: compose config atteste structure services applicatifs", () 
   it("command pnpm --filter @sigfa/kiosk dev présente", () => {
     expect(configOutput).toMatch(/@sigfa\/kiosk/);
     const kioskSection = configOutput.match(
-      /kiosk:[\s\S]*?(?=\n  [a-z]|$)/
+      /kiosk:[\s\S]*?(?=\n {2}[a-z]|$)/
     )?.[0] ?? "";
     expect(kioskSection).toMatch(/pnpm/);
     expect(kioskSection).toMatch(/@sigfa\/kiosk/);
