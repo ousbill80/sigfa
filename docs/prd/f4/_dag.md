@@ -26,8 +26,8 @@ CONTRACT-012 est prérequis de : KIOSK-007, TV-002
 
 | Piste | Stories | Agent | Statut |
 |---|---|---|---|
-| Kiosque | KIOSK-001..009 | agent-kiosk | TODO (arbitrage v2 appliqué) |
-| TV + Dashboards | TV-001..002, WEB-001..006 | agent-web | TODO (arbitrage v2 appliqué) |
+| Kiosque | KIOSK-001..009 (002-005 DONE) | agent-kiosk | EN COURS |
+| TV + Dashboards | TV+WEB-001-002-003 DONE | agent-web | EN COURS |
 | Mobile | MOB-001..005 | agent-mobile | DONE |
 
 ## Décisions d'arbitrage pré-critiques (issues des notes rédacteurs)
