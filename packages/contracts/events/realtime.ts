@@ -23,7 +23,7 @@
 import { z } from "zod";
 import { uuidSchema } from "@sigfa/schemas";
 
-// ─── Constante SLA ─────────────────────────────────────────────────────────
+// ─── Constantes ────────────────────────────────────────────────────────────
 
 /**
  * SLA de réception de l'événement ticket:called en millisecondes.
@@ -31,6 +31,12 @@ import { uuidSchema } from "@sigfa/schemas";
  * Mesure réelle : RT-002.
  */
 export const TICKET_CALLED_SLA_MS = 500 as const;
+
+/**
+ * CONTRACT-012 : Nombre maximum de tickets CALLED récents renvoyés dans sync:state.
+ * Permet la reconstruction complète de l'écran TV après reconnexion.
+ */
+export const SYNC_RECENT_CALLS = 4 as const;
 
 // ─── Schémas partiels réutilisés ──────────────────────────────────────────
 
@@ -99,12 +105,16 @@ const counterSummarySchema = z.object({
  * Frontière avec CONTRACT-008 (anomalies IA) :
  *   - Alerte : instantanée (1 occurrence)
  *   - Anomalie IA : motif agrégé sur une fenêtre temporelle
+ *
+ * CONTRACT-012 : ajout de KIOSK_SYSTEM_ERROR — émis par api-server sur
+ * échecs système borne remontés par sync/heartbeat.
  */
 const alertManagerTypeSchema = z.enum([
   "AGENT_INACTIVE",
   "AGENT_DISCONNECTED_WITH_TICKET",
   "SLA_BREACH",
   "QUEUE_CRITICAL",
+  "KIOSK_SYSTEM_ERROR",
 ]);
 
 // ─── Événements Socket.io ──────────────────────────────────────────────────
@@ -340,6 +350,9 @@ export type SyncRequestPayload = z.infer<typeof syncRequestEvent.payloadSchema>;
  * Contient l'état complet des files et guichets de l'agence demandée.
  * Émis par : serveur API
  * Consommateurs : client (borne, dashboard, mobile)
+ *
+ * CONTRACT-012 : ajout de recentCalls — les SYNC_RECENT_CALLS (4) derniers
+ * tickets CALLED, pour reconstruction complète de l'écran TV après reconnexion.
  */
 export const syncStateEvent = {
   name: "sync:state",
@@ -368,6 +381,23 @@ export const syncStateEvent = {
         status: counterStatusEnumSchema,
         /** Identifiant UUID de l'agent affecté (absent si guichet fermé) */
         agentId: uuidSchema.optional(),
+      })
+    ),
+    /**
+     * CONTRACT-012 : Les SYNC_RECENT_CALLS (4) derniers tickets CALLED de l'agence.
+     * Permet la reconstruction complète de l'écran TV après reconnexion.
+     * Trié du plus récent au plus ancien.
+     */
+    recentCalls: z.array(
+      z.object({
+        /** Numéro lisible du ticket (ex. "A001") */
+        ticketNumber: z.string().min(1),
+        /** Numéro affiché sur l'écran TV au format {code}-{NNN} (ex. "OC-047") */
+        displayNumber: z.string().min(1),
+        /** Libellé du guichet appelant (ex. "Guichet 1") */
+        counterLabel: z.string().min(1),
+        /** Horodatage ISO 8601 de l'appel */
+        calledAt: z.string().datetime(),
       })
     ),
     /** Horodatage ISO 8601 de la snapshot */

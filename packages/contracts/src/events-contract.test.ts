@@ -312,6 +312,15 @@ describe("CONTRACT-002: tout payload d'exemple valide son schéma (test par év�
           agentId: "550e8400-e29b-41d4-a716-446655440004",
         },
       ],
+      // CONTRACT-012 : recentCalls ajouté (SYNC_RECENT_CALLS = 4 derniers CALLED)
+      recentCalls: [
+        {
+          ticketNumber: "A001",
+          displayNumber: "OC-001",
+          counterLabel: "Guichet 1",
+          calledAt: new Date().toISOString(),
+        },
+      ],
       timestamp: new Date().toISOString(),
     };
     expect(() => syncStateEvent.payloadSchema.parse(payload)).not.toThrow();
@@ -410,12 +419,13 @@ describe("CONTRACT-002: typecheck strict vert, types consommables depuis @sigfa/
     expect(sample.counter.label).toBe("Guichet 2");
   });
 
-  it("AlertManagerType est bien énuméré sur 4 valeurs", () => {
+  it("AlertManagerType est bien énuméré sur 5 valeurs (CONTRACT-012 : ajout KIOSK_SYSTEM_ERROR)", () => {
     const validTypes = [
       "AGENT_INACTIVE",
       "SLA_BREACH",
       "AGENT_DISCONNECTED_WITH_TICKET",
       "QUEUE_CRITICAL",
+      "KIOSK_SYSTEM_ERROR",
     ];
     for (const type of validTypes) {
       const payload = { type, payload: {} };
