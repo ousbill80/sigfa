@@ -20,7 +20,7 @@ pre-commit:
 commit-msg:
   commands:
     commitlint:
-      run: npx --no -- commitlint --edit {1}
+      run: npx --no -- commitlint --edit "{1}"
       fail_text: |
         ❌ Message de commit invalide.
         Format attendu : <type>(<scope>): <description>

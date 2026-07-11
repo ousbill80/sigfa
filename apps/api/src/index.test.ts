@@ -1,16 +1,16 @@
 import { describe, it, expect, afterAll } from "vitest";
 import * as http from "node:http";
-import { createServer } from "./index.js";
+import { createServer, startServer } from "./index.js";
 
 describe("@sigfa/api", () => {
-  let server: http.Server;
-  let port: number;
+  const servers: http.Server[] = [];
 
-  it("responds 200 with SIGFA api skeleton", async () => {
-    server = createServer();
+  it("INFRA-001: responds 200 with SIGFA api skeleton", async () => {
+    const server = createServer();
+    servers.push(server);
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const address = server.address() as { port: number };
-    port = address.port;
+    const port = address.port;
 
     const body = await new Promise<string>((resolve, reject) => {
       http.get(`http://localhost:${port}/`, (res) => {
@@ -24,7 +24,21 @@ describe("@sigfa/api", () => {
     expect(body).toBe("SIGFA api skeleton");
   });
 
+  it("INFRA-007: startServer démarre le serveur sur API_PORT", async () => {
+    // Teste la fonction startServer qui couvre le guard isMain
+    const originalPort = process.env["API_PORT"];
+    process.env["API_PORT"] = "29801";
+    const server = startServer();
+    servers.push(server);
+    // Attendre que le serveur soit prêt
+    await new Promise<void>((resolve) => {
+      if (server.listening) { resolve(); } else { server.once("listening", resolve); }
+    });
+    expect(server.listening).toBe(true);
+    process.env["API_PORT"] = originalPort;
+  });
+
   afterAll(() => {
-    server?.close();
+    servers.forEach((s) => s?.close());
   });
 });

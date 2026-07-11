@@ -7,6 +7,8 @@
 #
 # Ports configurables via .env (voir .env.example pour les défauts).
 # Aucun secret en dur : tous les mots de passe passent par des variables ${...}.
+# Bindings limités à 127.0.0.1 pour ne pas exposer les ports sur les interfaces réseau
+# externes de la machine de développement (INFRA-007: S5).
 
 services:
   # ---------------------------------------------------------------------------
@@ -21,7 +23,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sigfa} -d ${POSTGRES_DB:-sigfa}"]
       interval: 5s
@@ -38,7 +40,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -59,7 +61,7 @@ services:
         target: /app
     command: pnpm --filter @sigfa/api dev
     ports:
-      - "${API_PORT:-3001}:3001"
+      - "127.0.0.1:${API_PORT:-3001}:3001"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: postgresql://${POSTGRES_USER:-sigfa}:${POSTGRES_PASSWORD:-sigfa}@postgres:5432/${POSTGRES_DB:-sigfa}
@@ -84,7 +86,7 @@ services:
         target: /app
     command: pnpm --filter @sigfa/web dev
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_URL: http://api:3001
@@ -108,7 +110,7 @@ services:
         target: /app
     command: pnpm --filter @sigfa/kiosk dev
     ports:
-      - "${KIOSK_PORT:-3002}:3002"
+      - "127.0.0.1:${KIOSK_PORT:-3002}:3002"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_URL: http://api:3001

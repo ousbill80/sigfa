@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { mobileVersion } from "./index.js";
+import { MOBILE_VERSION } from "./index.js";
 
 describe("@sigfa/mobile", () => {
-  it("exports mobileVersion", () => {
-    expect(mobileVersion).toBe("0.0.0");
+  it("INFRA-001: exports MOBILE_VERSION", () => {
+    expect(MOBILE_VERSION).toBe("0.0.0");
   });
 });

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { configVersion } from "./index.js";
+import { CONFIG_VERSION } from "./index.js";
 
 describe("@sigfa/config", () => {
-  it("exports configVersion", () => {
-    expect(configVersion).toBe("0.0.0");
+  it("INFRA-001: exports CONFIG_VERSION", () => {
+    expect(CONFIG_VERSION).toBe("0.0.0");
   });
 });

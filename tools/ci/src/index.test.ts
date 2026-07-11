@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { ciVersion } from "./index.js";
+import { CI_VERSION } from "./index.js";
 
 describe("@sigfa/ci", () => {
-  it("exports ciVersion", () => {
-    expect(ciVersion).toBe("0.0.0");
+  it("exports CI_VERSION", () => {
+    expect(CI_VERSION).toBe("0.0.0");
   });
 });
