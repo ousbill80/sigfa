@@ -1,7 +1,7 @@
 // __tests__/mob-001-auth-otp.test.tsx
 // MOB-001: auth OTP — écran de saisie téléphone rendu + opt-in UEMOA visible
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import PhoneScreen from '../app/(auth)/phone';
 import { requestOtp, verifyOtp } from '../src/services/auth';
 
@@ -14,11 +14,22 @@ jest.mock('../src/services/auth', () => ({
 const mockRequestOtp = requestOtp as jest.MockedFunction<typeof requestOtp>;
 const mockVerifyOtp = verifyOtp as jest.MockedFunction<typeof verifyOtp>;
 
-describe('MOB-001: auth OTP — écran de saisie téléphone rendu + opt-in UEMOA visible', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+// Use fake timers to prevent TouchableOpacity's Animated.timing (requestAnimationFrame →
+// setTimeout(0)) from firing outside of act() and producing "not wrapped in act(...)" warnings.
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.useFakeTimers();
+});
 
+afterEach(async () => {
+  // Flush pending Animated timers inside act() so React processes state updates safely.
+  await act(async () => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+});
+
+describe('MOB-001: auth OTP — écran de saisie téléphone rendu + opt-in UEMOA visible', () => {
   test('champ téléphone est visible', () => {
     const { getByTestId } = render(<PhoneScreen />);
     expect(getByTestId('phone-input')).toBeTruthy();

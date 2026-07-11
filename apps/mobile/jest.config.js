@@ -10,6 +10,9 @@ module.exports = {
     require.resolve('./node_modules/react-native/jest/setup.js'),
     './jest.setup.js',
   ],
+  // setupFilesAfterEnv runs after the test framework is installed,
+  // allowing use of global test hooks (afterEach, beforeEach, etc.).
+  setupFilesAfterEnv: ['./jest.setup.afterFramework.js'],
   testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

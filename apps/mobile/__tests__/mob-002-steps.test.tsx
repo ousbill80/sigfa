@@ -1,10 +1,24 @@
 // __tests__/mob-002-steps.test.tsx
 // MOB-002: parcours 3 étapes — navigation Étape 1 → 2 → 3 sans régression
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import Step1Screen from '../app/(app)/new-ticket/step-1';
 import Step2Screen from '../app/(app)/new-ticket/step-2';
 import Step3Screen from '../app/(app)/new-ticket/step-3';
+
+// Use fake timers to prevent TouchableOpacity's Animated.timing (via requestAnimationFrame →
+// setTimeout(0)) from firing outside of act() and producing "not wrapped in act(...)" warnings.
+beforeEach(() => {
+  jest.useFakeTimers();
+});
+
+afterEach(async () => {
+  // Flush pending Animated timers inside act() so React processes state updates safely.
+  await act(async () => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+});
 
 describe('MOB-002: parcours 3 étapes — navigation Étape 1 → 2 → 3 sans régression', () => {
   test('Step1 se rend avec les options agence et service', () => {

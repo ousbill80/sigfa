@@ -1,7 +1,7 @@
 // __tests__/mob-002-step2-flow.test.tsx
 // MOB-002: Step2 flow — confirmation téléphone + opt-in UEMOA complet
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import Step2Screen from '../app/(app)/new-ticket/step-2';
 
 const mockPush = jest.fn();
@@ -18,12 +18,23 @@ jest.mock('expo-router', () => ({
   Redirect: jest.fn(() => null),
 }));
 
-describe('MOB-002: Step2 flow — confirmation téléphone + opt-in UEMOA complet', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockPush.mockClear();
-  });
+// Use fake timers to prevent TouchableOpacity's Animated.timing (requestAnimationFrame →
+// setTimeout(0)) from firing outside of act() and producing "not wrapped in act(...)" warnings.
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockPush.mockClear();
+  jest.useFakeTimers();
+});
 
+afterEach(async () => {
+  // Flush pending Animated timers inside act() so React processes state updates safely.
+  await act(async () => {
+    jest.runAllTimers();
+  });
+  jest.useRealTimers();
+});
+
+describe('MOB-002: Step2 flow — confirmation téléphone + opt-in UEMOA complet', () => {
   test('affiche le formulaire de confirmation', () => {
     const { getByTestId } = render(<Step2Screen />);
     expect(getByTestId('step2-phone-input')).toBeTruthy();
