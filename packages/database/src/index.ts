@@ -3,6 +3,7 @@ export const DATABASE_VERSION = "0.0.0";
 
 export * from "./schema/index.js";
 export * from "./tenant.js";
+export * from "./platform.js";
 export * from "./audit/index.js";
 export * from "./crypto/index.js";
 export { purgeAiHistory } from "./ai/index.js";

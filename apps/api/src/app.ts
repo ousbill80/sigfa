@@ -4,6 +4,7 @@
  * Expose /api/v1 avec :
  * - Gestion d'erreur globale au format LA LOI
  * - Logs Pino structurés (console.log interdit)
+ * - Middleware tenant + RBAC (API-002)
  * - Routes /auth/*
  *
  * @module
@@ -15,6 +16,11 @@ import type { Client } from "pg";
 import { buildError } from "src/lib/errors.js";
 import { logger } from "src/lib/logger.js";
 import { createAuthRouter } from "src/routes/auth.js";
+import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
+import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
+
+// Valider le mapping route→rôle au démarrage du module
+validateRouteMapping();
 
 /** Variables de contexte globales de l'app */
 interface AppEnv {
@@ -22,6 +28,7 @@ interface AppEnv {
     db: Client;
     redis: Redis;
     jwtSecret: Uint8Array;
+    tenant: TenantContext;
   };
 }
 
@@ -54,6 +61,9 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
     c.set("jwtSecret", options.jwtSecret);
     await next();
   });
+
+  // Middleware tenant + RBAC (API-002) — vérifie JWT, rôle, et scope tenant
+  app.use("/api/v1/*", tenantMiddleware as Parameters<typeof app.use>[1]);
 
   // Logging structuré Pino de chaque requête
   app.use("*", async (c, next) => {
