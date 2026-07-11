@@ -1,0 +1,1159 @@
+openapi: "3.1.0"
+info:
+  title: SIGFA IA API
+  version: "1.0.0"
+  description: |
+    Contrat IA SIGFA : prédictions d'affluence, recommandations staffing,
+    détection d'anomalies et insights feedbacks NLP. Servi sous /api/v1.
+
+    **Dépendances** : CONTRACT-001 (core.yaml) et CONTRACT-006 (reporting.yaml).
+
+    **Multi-tenant** : toutes les prédictions sont calculées exclusivement sur
+    les données SIGFA de la banque authentifiée (claim `bankId`). Aucune donnée
+    externe au tenant n'est utilisée dans les modèles IA (modèles entraînés sur
+    les données SIGFA du tenant uniquement).
+
+    **État transitoire — INSUFFICIENT_HISTORY** : les endpoints IA nécessitent
+    un historique minimum de **90 jours** de tickets fermés pour calculer des
+    prédictions fiables. Tant que cet historique est insuffisant, tous les
+    endpoints IA retournent 422 `INSUFFICIENT_HISTORY` avec
+    `details: { requiredDays: 90, availableDays }`. Cet état transitoire est
+    attendu par les frontends lors des premiers mois d'utilisation d'une agence.
+
+    **Métadonnées modèle (AiMeta)** : toutes les réponses IA incluent un objet
+    `meta` de type `AiMeta` (`{ modelVersion, computedAt, dataWindow }`)
+    documentant la version du modèle utilisé, l'horodatage de calcul et la
+    fenêtre de données utilisée.
+
+    **Scope + rôle** : lecture DIRECTOR+ (agency) ou réseau (bank). Les
+    prédicitions ne croisent jamais les données de tenants différents.
+
+servers:
+  - url: /api/v1
+    description: SIGFA v1
+
+security:
+  - BearerAuth: []
+
+# ─── TAGS ──────────────────────────────────────────────────────────────────────
+tags:
+  - name: Forecast
+    description: Prédictions d'affluence horaires par agence
+  - name: Staffing
+    description: Recommandations de staffing (ouverture/fermeture de guichets)
+  - name: Anomalies
+    description: Détection d'anomalies agrégées (motifs, cycle open/acked/resolved)
+  - name: Insights
+    description: Insights feedbacks NLP — sentiments, thèmes, qualité (anonymisés)
+
+# ─── PATHS ─────────────────────────────────────────────────────────────────────
+paths:
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # FORECAST — prédictions d'affluence
+  # ──────────────────────────────────────────────────────────────────────────────
+  /ai/forecast:
+    get:
+      tags: [Forecast]
+      summary: Prédiction d'affluence horaire pour une agence
+      description: |
+        Retourne les séries horaires prédites pour une agence à une date donnée.
+        Chaque entrée contient `hour` (heure ISO HH:MM), `expectedTickets`
+        (nombre de tickets attendus) et `confidence` (indice de confiance 0–1).
+
+        **Facteurs contextuels** documentés dans la réponse :
+        - `END_OF_MONTH` : fin de mois (jours 28–31)
+        - `CIVIL_SERVICE_PAY` : jour de paie de la fonction publique
+        - `PUBLIC_HOLIDAY` : jour férié ou veille de férié
+        - `SCHOOL_START` : rentrée scolaire
+        - `NONE` : aucun facteur exceptionnel
+
+        **Historique insuffisant** : si l'agence dispose de moins de
+        **90 jours** de tickets fermés, la réponse est 422 `INSUFFICIENT_HISTORY`
+        avec `details: { requiredDays: 90, availableDays }`.
+
+        **Scope** : agency — AGENCY_DIRECTOR minimum.
+        Prédictions calculées sur les données du tenant uniquement (isolation garantie).
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: agencyId
+          in: query
+          required: true
+          description: Identifiant de l'agence (UUID)
+          schema:
+            type: string
+            format: uuid
+            example: "agency_01"
+        - name: date
+          in: query
+          required: true
+          description: "Date de prédiction (YYYY-MM-DD)"
+          schema:
+            type: string
+            format: date
+            example: "2026-07-15"
+      responses:
+        "200":
+          description: "Prédiction d'affluence horaire calculée avec succès. La réponse inclut un objet `meta` de type AiMeta."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForecastResponse"
+              example:
+                agencyId: "agency_01"
+                date: "2026-07-15"
+                contextualFactors:
+                  - "NONE"
+                forecast:
+                  - hour: "08:00"
+                    expectedTickets: 12
+                    confidence: 0.87
+                  - hour: "09:00"
+                    expectedTickets: 25
+                    confidence: 0.91
+                  - hour: "10:00"
+                    expectedTickets: 38
+                    confidence: 0.89
+                  - hour: "11:00"
+                    expectedTickets: 30
+                    confidence: 0.85
+                  - hour: "14:00"
+                    expectedTickets: 22
+                    confidence: 0.82
+                meta:
+                  modelVersion: "forecast-v1.2.0"
+                  computedAt: "2026-07-14T22:00:00Z"
+                  dataWindow: "2026-01-05/2026-07-14"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: |
+            Historique insuffisant — l'agence ne dispose pas de l'historique minimum
+            requis pour calculer des prédictions fiables. Retourné par TOUS les endpoints
+            IA tant que l'historique est insuffisant (état transitoire).
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: INSUFFICIENT_HISTORY
+                  message: "Historique insuffisant pour calculer les prédictions. Minimum requis : 90 jours de tickets fermés."
+                  details:
+                    requiredDays: 90
+                    availableDays: 42
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # STAFFING RECOMMENDATIONS
+  # ──────────────────────────────────────────────────────────────────────────────
+  /ai/staffing-recommendations:
+    get:
+      tags: [Staffing]
+      summary: Recommandations de staffing pour une agence à une date
+      description: |
+        Retourne la liste des recommandations de staffing pour une agence donnée
+        à une date donnée. Chaque recommandation contient :
+        - `time` : heure d'application recommandée (HH:MM)
+        - `action` : type d'action recommandée (`OPEN_COUNTER` | `CLOSE_COUNTER` | `BREAK`)
+        - `counters` : nombre de guichets concernés
+        - `rationale` : justification textuelle (ex. « Pic prévu à 10h30, 38 tickets attendus »)
+        - `status` : statut d'acquittement (`pending` | `acked`)
+
+        **Acquittement** : les recommandations peuvent être acquittées via
+        `POST /ai/staffing-recommendations/{id}/ack` pour indiquer qu'elles ont
+        été prises en compte par le manager.
+
+        **Historique insuffisant** : 422 `INSUFFICIENT_HISTORY` si moins de 90 jours
+        d'historique disponible.
+
+        **Scope** : agency — AGENCY_DIRECTOR minimum.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: agencyId
+          in: query
+          required: true
+          description: Identifiant de l'agence (UUID)
+          schema:
+            type: string
+            format: uuid
+            example: "agency_01"
+        - name: date
+          in: query
+          required: true
+          description: "Date des recommandations (YYYY-MM-DD)"
+          schema:
+            type: string
+            format: date
+            example: "2026-07-15"
+      responses:
+        "200":
+          description: "Recommandations de staffing calculées avec succès. La réponse inclut un objet `meta` de type AiMeta."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffingRecommendationsResponse"
+              example:
+                agencyId: "agency_01"
+                date: "2026-07-15"
+                recommendations:
+                  - id: "rec_01"
+                    time: "10:30"
+                    action: OPEN_COUNTER
+                    counters: 2
+                    rationale: "Pic prévu à 10h30 : 38 tickets attendus, capacité actuelle insuffisante."
+                    status: pending
+                  - id: "rec_02"
+                    time: "13:00"
+                    action: CLOSE_COUNTER
+                    counters: 1
+                    rationale: "Creux d'activité attendu entre 13h et 14h (déjeuner)."
+                    status: acked
+                meta:
+                  modelVersion: "staffing-v1.1.0"
+                  computedAt: "2026-07-14T22:05:00Z"
+                  dataWindow: "2026-01-05/2026-07-14"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: |
+            Historique insuffisant — moins de 90 jours de tickets fermés disponibles.
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: INSUFFICIENT_HISTORY
+                  message: "Historique insuffisant pour calculer les recommandations staffing."
+                  details:
+                    requiredDays: 90
+                    availableDays: 55
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  /ai/staffing-recommendations/{id}/ack:
+    post:
+      tags: [Staffing]
+      summary: Acquitter une recommandation de staffing
+      description: |
+        Marque une recommandation de staffing comme acquittée (`acked`) par le manager.
+        Transition : `pending → acked`. Une recommandation déjà acquittée retourne
+        le même objet sans erreur (idempotent).
+
+        **Scope** : agency — MANAGER minimum.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de la recommandation
+          schema:
+            type: string
+            example: "rec_01"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+            example: {}
+      responses:
+        "200":
+          description: Recommandation acquittée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffingRecommendation"
+              example:
+                id: "rec_01"
+                time: "10:30"
+                action: OPEN_COUNTER
+                counters: 2
+                rationale: "Pic prévu à 10h30 : 38 tickets attendus."
+                status: acked
+                meta:
+                  modelVersion: "staffing-v1.1.0"
+                  computedAt: "2026-07-14T22:05:00Z"
+                  dataWindow: "2026-01-05/2026-07-14"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          description: Recommandation introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: RECOMMENDATION_NOT_FOUND
+                  message: "Recommandation de staffing introuvable."
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # ANOMALIES — motifs agrégés (QUEUE_STUCK, AGENT_INACTIVE_PATTERN, SLA_SYSTEMIC)
+  # Cycle de vie : open → acked → resolved
+  # Frontière avec CONTRACT-002 : l'alerte est instantanée (1 occurrence),
+  # l'anomalie est un motif agrégé.
+  # ──────────────────────────────────────────────────────────────────────────────
+  /ai/anomalies:
+    get:
+      tags: [Anomalies]
+      summary: Lister les anomalies agrégées (motifs détectés sur 7 jours glissants)
+      description: |
+        Retourne la liste des anomalies détectées par le module IA sur la base de
+        motifs agrégés (contrairement aux alertes temps réel de CONTRACT-002 qui
+        sont instantanées, une par occurrence).
+
+        **Frontière alertes/anomalies** :
+        - **Alerte** (CONTRACT-002) : instantanée, 1 occurrence unique (ex. un agent
+          inactif pendant 10 min déclenche 1 alerte `alert:manager`).
+        - **Anomalie** (ce contrat) : motif agrégé sur une période glissante.
+
+        **Types d'anomalies** (`AnomalyType`) :
+        - `QUEUE_STUCK` : file d'attente bloquée sans appel pendant une durée anormale.
+        - `AGENT_INACTIVE_PATTERN` : motif d'inactivité récurrent pour un agent.
+          **Seuil** : ≥3 alertes `AGENT_INACTIVE` sur 7 jours glissants pour le même
+          agent. Les seuils personnalisés sont configurables via `/banks/:id/thresholds`
+          (CONTRACT-005).
+        - `SLA_SYSTEMIC` : violations SLA systémiques sur un service ou une agence
+          (taux SLA < seuil configuré sur plusieurs jours consécutifs).
+
+        **Cycle de vie** :
+        - `open` : anomalie détectée, non acquittée
+        - `acked` : anomalie acquittée par un manager (via POST /ai/anomalies/{id}/ack)
+        - `resolved` : anomalie résolue (disparition du motif ou résolution manuelle)
+
+        **Scope** : agency — AGENCY_DIRECTOR minimum. BANK_ADMIN voit toutes les
+        anomalies de sa banque.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: "Filtrer par statut de l'anomalie (défaut : open)"
+          schema:
+            type: string
+            enum: [open, acked, resolved]
+            default: open
+          example: open
+        - name: agencyId
+          in: query
+          required: false
+          description: "Identifiant de l'agence (UUID). Défaut : agence du JWT."
+          schema:
+            type: string
+            format: uuid
+            example: "agency_01"
+        - $ref: "./core.yaml#/components/parameters/PageParam"
+        - $ref: "./core.yaml#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: "Liste des anomalies détectées. La réponse inclut un objet `aiMeta` de type AiMeta."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomaliesListResponse"
+              example:
+                data:
+                  - id: "anomaly_01"
+                    type: AGENT_INACTIVE_PATTERN
+                    status: open
+                    agentId: "user_05"
+                    agencyId: "agency_01"
+                    description: "Agent user_05 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours (seuil : ≥3)."
+                    detectedAt: "2026-07-11T08:00:00Z"
+                    alertCount: 4
+                    windowDays: 7
+                  - id: "anomaly_02"
+                    type: QUEUE_STUCK
+                    status: acked
+                    agencyId: "agency_01"
+                    serviceId: "svc_02"
+                    description: "File Virements bloquée 45 min sans appel (seuil normal : 20 min)."
+                    detectedAt: "2026-07-10T14:30:00Z"
+                    ackedAt: "2026-07-10T14:45:00Z"
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 2
+                aiMeta:
+                  modelVersion: "anomaly-v1.0.0"
+                  computedAt: "2026-07-11T08:00:00Z"
+                  dataWindow: "2026-07-04/2026-07-11"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  /ai/anomalies/{id}/ack:
+    post:
+      tags: [Anomalies]
+      summary: Acquitter une anomalie détectée
+      description: |
+        Marque une anomalie comme acquittée (`acked`) par un manager.
+        Transition : `open → acked`.
+
+        Une anomalie en statut `resolved` ne peut pas être acquittée
+        (409 `ILLEGAL_TRANSITION`).
+
+        **Scope** : agency — MANAGER minimum.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de l'anomalie
+          schema:
+            type: string
+            example: "anomaly_01"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  description: Commentaire optionnel du manager lors de l'acquittement
+                  example: "Pris en charge - RH notifiés."
+            example:
+              comment: "Pris en charge - RH notifiés."
+      responses:
+        "200":
+          description: Anomalie acquittée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Anomaly"
+              example:
+                id: "anomaly_01"
+                type: AGENT_INACTIVE_PATTERN
+                status: acked
+                agentId: "user_05"
+                agencyId: "agency_01"
+                description: "Agent user_05 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours."
+                detectedAt: "2026-07-11T08:00:00Z"
+                ackedAt: "2026-07-11T09:15:00Z"
+                ackedBy: "user_manager_01"
+                meta:
+                  modelVersion: "anomaly-v1.0.0"
+                  computedAt: "2026-07-11T08:00:00Z"
+                  dataWindow: "2026-07-04/2026-07-11"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          description: Anomalie introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ANOMALY_NOT_FOUND
+                  message: "Anomalie introuvable."
+        "409":
+          description: Transition illégale (anomalie déjà résolue)
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ILLEGAL_TRANSITION
+                  message: "Impossible d'acquitter une anomalie déjà résolue."
+                  details:
+                    currentStatus: resolved
+                    requestedTransition: acked
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # FEEDBACK INSIGHTS — NLP, sentiments, thèmes, qualité
+  # Schémas réseau : $ref vers reporting.yaml#/components/schemas/AnonymizedNetworkAggregate
+  # ──────────────────────────────────────────────────────────────────────────────
+  /ai/feedback-insights:
+    get:
+      tags: [Insights]
+      summary: Insights NLP sur les feedbacks clients (sentiments, thèmes, qualité)
+      description: |
+        Retourne les insights générés par le module NLP sur les feedbacks clients
+        collectés via CONTRACT-003 pour la période et le scope donnés.
+
+        **Données retournées** :
+        - `sentimentBreakdown` : répartition des sentiments (positif, neutre, négatif)
+        - `recurrentThemes` : thèmes récurrents détectés (ex. « temps d'attente »,
+          « accueil », « compétence agent »)
+        - `qualityScores` : scores de qualité agrégés par agence et par agent
+        - `networkAggregate` : agrégat réseau anonymisé (`AnonymizedNetworkAggregate`
+          de reporting.yaml — scope bank uniquement, BANK_ADMIN)
+
+        **Anonymisation** : zéro donnée personnelle brute dans les réponses.
+        Les schémas réseau héritent de `AnonymizedNetworkAggregate` (reporting.yaml,
+        CONTRACT-006 — jamais redéfini dans ce fichier).
+
+        **Scope** : agency (AGENCY_DIRECTOR) ou bank (BANK_ADMIN pour la vue réseau).
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: period
+          in: query
+          required: true
+          description: "Période d'analyse ISO 8601 (ex: 2026-07, 2026-Q2, 2026)"
+          schema:
+            type: string
+            pattern: "^\\d{4}(-\\d{2}(-\\d{2})?|-Q[1-4])?$"
+            example: "2026-07"
+        - name: scope
+          in: query
+          required: false
+          description: "Périmètre d'analyse (agency pour l'agence courante, bank pour la vue réseau anonymisée)"
+          schema:
+            type: string
+            enum: [agency, bank]
+            default: agency
+          example: agency
+        - name: agencyId
+          in: query
+          required: false
+          description: Identifiant de l'agence (UUID). Requis si scope=agency et l'appelant n'est pas lié à une agence par son JWT.
+          schema:
+            type: string
+            format: uuid
+            example: "agency_01"
+      responses:
+        "200":
+          description: "Insights NLP calculés avec succès. La réponse inclut un objet `meta` de type AiMeta."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackInsightsResponse"
+              examples:
+                agency_insights:
+                  summary: Insights pour une agence
+                  value:
+                    scope: agency
+                    period: "2026-07"
+                    agencyId: "agency_01"
+                    feedbackCount: 147
+                    sentimentBreakdown:
+                      positive: 68.0
+                      neutral: 22.4
+                      negative: 9.6
+                    recurrentThemes:
+                      - theme: "temps d'attente"
+                        frequency: 0.42
+                        sentiment: negative
+                      - theme: "accueil"
+                        frequency: 0.31
+                        sentiment: positive
+                      - theme: "compétence agent"
+                        frequency: 0.18
+                        sentiment: positive
+                    qualityScores:
+                      agency:
+                        agencyId: "agency_01"
+                        score: 4.1
+                        scale: 5
+                    networkAggregate:
+                      totalTickets: 284560
+                      avgTma: 13.4
+                      avgTmt: 9.1
+                      avgTts: 22.5
+                      avgTauxAbandon: 6.2
+                      avgTauxSLA: 79.8
+                      avgOccupation: 66.3
+                      agencyCount: 187
+                    meta:
+                      modelVersion: "nlp-v2.0.0"
+                      computedAt: "2026-07-11T06:00:00Z"
+                      dataWindow: "2026-07-01/2026-07-11"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: |
+            Historique insuffisant ou période invalide.
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: INSUFFICIENT_HISTORY
+                  message: "Historique insuffisant pour calculer les insights feedbacks."
+                  details:
+                    requiredDays: 90
+                    availableDays: 30
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+# ─── COMPONENTS ────────────────────────────────────────────────────────────────
+components:
+
+  # ── Security Schemes ─────────────────────────────────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      $ref: "./core.yaml#/components/securitySchemes/BearerAuth"
+
+  # ── Schemas ───────────────────────────────────────────────────────────────────
+  schemas:
+
+    # ── AiMeta — métadonnées modèle IA (présent sur TOUTES les réponses IA) ────
+    AiMeta:
+      type: object
+      description: |
+        Métadonnées du modèle IA ayant calculé la réponse.
+        Présent sur **toutes** les réponses des endpoints IA.
+        - `modelVersion` : identifiant de la version du modèle utilisé
+        - `computedAt` : horodatage UTC du calcul de la prédiction
+        - `dataWindow` : fenêtre temporelle des données utilisées pour le calcul
+          (format ISO 8601 interval : `YYYY-MM-DD/YYYY-MM-DD`)
+
+        Les modèles sont entraînés exclusivement sur les données SIGFA du tenant
+        (isolation complète des données entre banques).
+      required:
+        - modelVersion
+        - computedAt
+        - dataWindow
+      properties:
+        modelVersion:
+          type: string
+          description: Version du modèle IA utilisé (ex. forecast-v1.2.0)
+          example: "forecast-v1.2.0"
+        computedAt:
+          type: string
+          format: date-time
+          description: Horodatage UTC du calcul (ISO 8601)
+          example: "2026-07-14T22:00:00Z"
+        dataWindow:
+          type: string
+          description: "Fenêtre temporelle des données d'entraînement utilisées (ISO 8601 interval : YYYY-MM-DD/YYYY-MM-DD)"
+          example: "2026-01-05/2026-07-14"
+
+    # ── ContextualFactor — facteurs contextuels de prédiction ─────────────────
+    ContextualFactor:
+      type: string
+      description: |
+        Facteurs contextuels influençant les prédictions d'affluence.
+        - `END_OF_MONTH` : fin de mois (jours 28–31)
+        - `CIVIL_SERVICE_PAY` : jour de paie de la fonction publique ivoirienne
+        - `PUBLIC_HOLIDAY` : jour férié ou veille de férié
+        - `SCHOOL_START` : rentrée scolaire
+        - `NONE` : aucun facteur contextuel exceptionnel
+      enum:
+        - END_OF_MONTH
+        - CIVIL_SERVICE_PAY
+        - PUBLIC_HOLIDAY
+        - SCHOOL_START
+        - NONE
+
+    # ── ForecastHour — prédiction horaire ────────────────────────────────────
+    ForecastHour:
+      type: object
+      description: Prédiction d'affluence pour une heure donnée.
+      required:
+        - hour
+        - expectedTickets
+        - confidence
+      properties:
+        hour:
+          type: string
+          description: "Heure de la prédiction (format HH:MM)"
+          pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+          example: "10:00"
+        expectedTickets:
+          type: integer
+          minimum: 0
+          description: Nombre de tickets attendus pour cette heure
+          example: 38
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: |
+            Indice de confiance de la prédiction (0.0 à 1.0).
+            - 0.9–1.0 : très haute confiance (historique dense et régulier)
+            - 0.7–0.9 : bonne confiance
+            - 0.5–0.7 : confiance modérée (données récentes insuffisantes)
+            - < 0.5 : confiance faible (utiliser avec précaution)
+          example: 0.87
+
+    # ── ForecastResponse — réponse prédiction affluence ──────────────────────
+    ForecastResponse:
+      type: object
+      description: Réponse de prédiction d'affluence horaire pour une agence.
+      required:
+        - agencyId
+        - date
+        - contextualFactors
+        - forecast
+        - meta
+      properties:
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence
+          example: "agency_01"
+        date:
+          type: string
+          format: date
+          description: Date de la prédiction
+          example: "2026-07-15"
+        contextualFactors:
+          type: array
+          description: Facteurs contextuels détectés pour cette date
+          items:
+            $ref: "#/components/schemas/ContextualFactor"
+          example:
+            - "NONE"
+        forecast:
+          type: array
+          description: Série horaire de prédictions (une entrée par heure d'ouverture)
+          items:
+            $ref: "#/components/schemas/ForecastHour"
+        meta:
+          $ref: "#/components/schemas/AiMeta"
+
+    # ── StaffingAction — type d'action recommandée ───────────────────────────
+    StaffingAction:
+      type: string
+      description: |
+        Type d'action recommandée par le module IA de staffing.
+        - `OPEN_COUNTER` : ouvrir des guichets supplémentaires
+        - `CLOSE_COUNTER` : fermer des guichets (sous-activité prévue)
+        - `BREAK` : décaler une pause agent (pic imminent)
+      enum:
+        - OPEN_COUNTER
+        - CLOSE_COUNTER
+        - BREAK
+
+    # ── StaffingAckStatus — statut d'acquittement d'une recommandation ───────
+    StaffingAckStatus:
+      type: string
+      description: |
+        Statut d'acquittement d'une recommandation de staffing.
+        - `pending` : recommandation non encore prise en compte
+        - `acked` : recommandation acquittée par un manager
+      enum:
+        - pending
+        - acked
+
+    # ── StaffingRecommendation — recommandation individuelle ─────────────────
+    StaffingRecommendation:
+      type: object
+      description: Recommandation de staffing individuelle avec son statut d'acquittement.
+      required:
+        - id
+        - time
+        - action
+        - counters
+        - rationale
+        - status
+        - meta
+      properties:
+        id:
+          type: string
+          description: Identifiant unique de la recommandation
+          example: "rec_01"
+        time:
+          type: string
+          description: "Heure d'application recommandée (HH:MM)"
+          pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+          example: "10:30"
+        action:
+          $ref: "#/components/schemas/StaffingAction"
+        counters:
+          type: integer
+          minimum: 1
+          description: Nombre de guichets concernés par l'action
+          example: 2
+        rationale:
+          type: string
+          description: Justification textuelle de la recommandation
+          example: "Pic prévu à 10h30 : 38 tickets attendus, capacité actuelle insuffisante."
+        status:
+          $ref: "#/components/schemas/StaffingAckStatus"
+        ackedAt:
+          type: string
+          format: date-time
+          description: Horodatage de l'acquittement (présent si status=acked)
+          example: "2026-07-11T09:15:00Z"
+        ackedBy:
+          type: string
+          description: Identifiant du manager ayant acquitté la recommandation
+          example: "user_manager_01"
+        meta:
+          $ref: "#/components/schemas/AiMeta"
+
+    # ── StaffingRecommendationsResponse ──────────────────────────────────────
+    StaffingRecommendationsResponse:
+      type: object
+      description: Réponse de la liste des recommandations de staffing.
+      required:
+        - agencyId
+        - date
+        - recommendations
+        - meta
+      properties:
+        agencyId:
+          type: string
+          format: uuid
+          example: "agency_01"
+        date:
+          type: string
+          format: date
+          example: "2026-07-15"
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffingRecommendation"
+        meta:
+          $ref: "#/components/schemas/AiMeta"
+
+    # ── AnomalyType — types d'anomalies détectables ──────────────────────────
+    AnomalyType:
+      type: string
+      description: |
+        Types d'anomalies agrégées détectées par le module IA SIGFA.
+
+        **QUEUE_STUCK** : file d'attente bloquée sans appel pendant une durée
+        anormale (supérieure au seuil configuré par service via CONTRACT-005).
+
+        **AGENT_INACTIVE_PATTERN** : motif d'inactivité récurrent pour un agent.
+        **Seuil v1 (défaut)** : ≥3 alertes `AGENT_INACTIVE` sur 7 jours glissants
+        pour le même agent. Contrairement à une alerte (instantanée, 1 occurrence),
+        ce type détecte un comportement structurel. Les seuils sont personnalisables
+        via `/banks/:id/thresholds` (CONTRACT-005).
+
+        **SLA_SYSTEMIC** : violations SLA systémiques sur un service ou une agence —
+        taux SLA en dessous du seuil configuré pendant plusieurs jours consécutifs.
+
+        Frontière CONTRACT-002 : les alertes instantanées (`alert:manager`) sont
+        émises dès la 1ère occurrence via Socket.io. Les anomalies de ce contrat
+        sont calculées par agrégation sur une fenêtre temporelle glissante.
+      enum:
+        - QUEUE_STUCK
+        - AGENT_INACTIVE_PATTERN
+        - SLA_SYSTEMIC
+
+    # ── AnomalyStatus — cycle de vie d'une anomalie ──────────────────────────
+    AnomalyStatus:
+      type: string
+      description: |
+        Statut du cycle de vie d'une anomalie agrégée.
+        - `open` : anomalie détectée, non acquittée
+        - `acked` : anomalie acquittée par un manager (via POST /ai/anomalies/{id}/ack)
+        - `resolved` : anomalie résolue (disparition du motif ou résolution manuelle)
+
+        Transitions légales :
+        - `open → acked` (via /ack)
+        - `open → resolved` (résolution automatique si le motif disparaît)
+        - `acked → resolved` (résolution après acquittement)
+        - Toute autre transition → 409 `ILLEGAL_TRANSITION`
+      enum:
+        - open
+        - acked
+        - resolved
+
+    # ── Anomaly — anomalie individuelle ──────────────────────────────────────
+    Anomaly:
+      type: object
+      description: Anomalie agrégée détectée par le module IA SIGFA.
+      required:
+        - id
+        - type
+        - status
+        - agencyId
+        - description
+        - detectedAt
+        - meta
+      properties:
+        id:
+          type: string
+          description: Identifiant unique de l'anomalie
+          example: "anomaly_01"
+        type:
+          $ref: "#/components/schemas/AnomalyType"
+        status:
+          $ref: "#/components/schemas/AnomalyStatus"
+        agencyId:
+          type: string
+          format: uuid
+          description: Agence concernée par l'anomalie
+          example: "agency_01"
+        agentId:
+          type: string
+          description: Identifiant de l'agent concerné (pour AGENT_INACTIVE_PATTERN)
+          example: "user_05"
+        serviceId:
+          type: string
+          format: uuid
+          description: Identifiant du service concerné (pour QUEUE_STUCK, SLA_SYSTEMIC)
+          example: "svc_02"
+        description:
+          type: string
+          description: Description lisible de l'anomalie avec contexte et métriques
+          example: "Agent user_05 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours (seuil : ≥3)."
+        detectedAt:
+          type: string
+          format: date-time
+          description: Horodatage UTC de détection de l'anomalie
+          example: "2026-07-11T08:00:00Z"
+        ackedAt:
+          type: string
+          format: date-time
+          description: Horodatage UTC de l'acquittement (présent si status=acked ou resolved)
+          example: "2026-07-11T09:15:00Z"
+        ackedBy:
+          type: string
+          description: Identifiant du manager ayant acquitté l'anomalie
+          example: "user_manager_01"
+        resolvedAt:
+          type: string
+          format: date-time
+          description: Horodatage UTC de résolution (présent si status=resolved)
+          example: "2026-07-12T08:00:00Z"
+        alertCount:
+          type: integer
+          minimum: 0
+          description: Nombre d'alertes ayant déclenché cette anomalie (pour AGENT_INACTIVE_PATTERN)
+          example: 4
+        windowDays:
+          type: integer
+          minimum: 1
+          description: Fenêtre temporelle glissante utilisée pour la détection (jours)
+          example: 7
+        meta:
+          $ref: "#/components/schemas/AiMeta"
+
+    # ── AnomaliesListResponse ─────────────────────────────────────────────────
+    AnomaliesListResponse:
+      type: object
+      description: Réponse de la liste des anomalies avec pagination.
+      required:
+        - data
+        - meta
+        - aiMeta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Anomaly"
+        meta:
+          $ref: "./core.yaml#/components/schemas/PaginationMeta"
+        aiMeta:
+          $ref: "#/components/schemas/AiMeta"
+
+    # ── SentimentBreakdown — répartition des sentiments ──────────────────────
+    SentimentBreakdown:
+      type: object
+      description: Répartition des sentiments détectés dans les feedbacks clients.
+      required:
+        - positive
+        - neutral
+        - negative
+      properties:
+        positive:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: "Proportion de feedbacks positifs (%)"
+          example: 68.0
+        neutral:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: "Proportion de feedbacks neutres (%)"
+          example: 22.4
+        negative:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: "Proportion de feedbacks négatifs (%)"
+          example: 9.6
+
+    # ── RecurrentTheme — thème récurrent détecté par NLP ────────────────────
+    RecurrentTheme:
+      type: object
+      description: Thème récurrent détecté par le module NLP sur les feedbacks clients.
+      required:
+        - theme
+        - frequency
+        - sentiment
+      properties:
+        theme:
+          type: string
+          description: Libellé du thème récurrent détecté
+          example: "temps d'attente"
+        frequency:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Fréquence relative du thème (0.0 à 1.0, proportion des feedbacks mentionnant ce thème)
+          example: 0.42
+        sentiment:
+          type: string
+          description: Sentiment dominant associé à ce thème
+          enum: [positive, neutral, negative]
+          example: negative
+
+    # ── QualityScore — score de qualité agrégé ───────────────────────────────
+    QualityScore:
+      type: object
+      description: Score de qualité agrégé (anonymisé — pas d'identifiant agent individuel dans la vue réseau).
+      required:
+        - score
+        - scale
+      properties:
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence (présent pour scope=agency)
+          example: "agency_01"
+        score:
+          type: number
+          format: float
+          minimum: 0
+          description: Score de qualité calculé
+          example: 4.1
+        scale:
+          type: integer
+          minimum: 1
+          description: Échelle maximale du score (ex. 5 pour une note sur 5)
+          example: 5
+
+    # ── QualityScores — scores par agence et réseau ───────────────────────────
+    QualityScores:
+      type: object
+      description: Scores de qualité agrégés (agence et/ou réseau).
+      properties:
+        agency:
+          $ref: "#/components/schemas/QualityScore"
+
+    # ── FeedbackInsightsResponse — insights NLP anonymisés ───────────────────
+    # Les schémas réseau héritent de AnonymizedNetworkAggregate (reporting.yaml — jamais redéfini ici)
+    FeedbackInsightsResponse:
+      type: object
+      description: |
+        Insights NLP sur les feedbacks clients — données entièrement anonymisées.
+        Zéro donnée personnelle brute : pas de nom, prénom, téléphone, email,
+        identifiant client ou agent individuel dans la vue réseau.
+
+        Les métriques réseau utilisent le schéma `AnonymizedNetworkAggregate`
+        défini dans reporting.yaml (CONTRACT-006) — jamais redéfini ici.
+
+        Conformité UEMOA : toutes les métriques sont des agrégats statistiques.
+      required:
+        - scope
+        - period
+        - feedbackCount
+        - sentimentBreakdown
+        - recurrentThemes
+        - qualityScores
+        - meta
+      properties:
+        scope:
+          type: string
+          enum: [agency, bank]
+          description: Périmètre de l'analyse
+          example: agency
+        period:
+          type: string
+          description: Période analysée
+          example: "2026-07"
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence (présent si scope=agency)
+          example: "agency_01"
+        feedbackCount:
+          type: integer
+          minimum: 0
+          description: Nombre total de feedbacks analysés sur la période
+          example: 147
+        sentimentBreakdown:
+          $ref: "#/components/schemas/SentimentBreakdown"
+        recurrentThemes:
+          type: array
+          description: Thèmes récurrents détectés par NLP (top N thèmes)
+          items:
+            $ref: "#/components/schemas/RecurrentTheme"
+        qualityScores:
+          $ref: "#/components/schemas/QualityScores"
+        networkAggregate:
+          $ref: "./reporting.yaml#/components/schemas/AnonymizedNetworkAggregate"
+        meta:
+          $ref: "#/components/schemas/AiMeta"
