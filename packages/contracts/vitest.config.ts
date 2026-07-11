@@ -24,13 +24,18 @@ const vitestDefaultCoverageExcludes = [
 
 export default defineConfig({
   test: {
-    // Exclure les tests runtime lourds (Prism + Schemathesis Docker) du gate rapide.
+    // Exclure les tests runtime lourds du gate couverture rapide.
     //
-    // Justification : mock-prism.test.ts spawne 7 serveurs Prism + 1 conteneur Docker
-    // Schemathesis. Sur un runner CI 2 cœurs, la contention CPU provoque des timeouts
-    // intermittents ("Port 4012 not ready") qui font échouer le gate de manière opaque.
-    // Ces tests sont exécutés séparément via `test:runtime` (vitest.runtime.config.ts)
-    // sur un job CI isolé avec Docker disponible.
+    // Tests exclus et leur justification (T8 contention CI) :
+    //
+    //   mock-prism.test.ts       — spawne 7 serveurs Prism + 1 conteneur Docker Schemathesis
+    //   contract-diff.test.ts    — spawne Docker (oasdiff) ~16s ; aussi check-generated-sync qui
+    //                              relance `pnpm generate` (redocly + openapi-typescript × 7)
+    //   bundle-determinism.test.ts — spawne `pnpm generate` 2× pour vérifier le déterminisme
+    //
+    // Sur un runner CI 2 cœurs + instrumentation couverture, ces opérations provoquent des
+    // timeouts intermittents qui font échouer le gate de manière opaque.
+    // Ces tests sont exécutés via `test:runtime` (vitest.runtime.config.ts) sur un job CI dédié.
     //
     // Ref leçon : .claude/lessons/etat-local-residuel-masque-la-ci.md
     // Pattern : cf. KIOSK test:visual (séparation gate rapide / tests lourds).
@@ -39,9 +44,9 @@ export default defineConfig({
       "**/dist/**",
       // Tests runtime lourds — séparés du gate couverture (T8 contention CI)
       "src/mock-prism.test.ts",
+      "src/contract-diff.test.ts",
+      "src/bundle-determinism.test.ts",
     ],
-    hookTimeout: 150_000, // generate (redocly + openapi-typescript × 7) peut prendre > 60s
-    testTimeout: 300_000, // Docker (oasdiff) + generate peut prendre > 60s par test
     coverage: {
       provider: "v8",
       reporter: ["json"],
@@ -57,20 +62,23 @@ export default defineConfig({
       // Justification scripts/** : ces fichiers (bundle.mjs, generate.mjs, mock.mjs) sont exécutés
       // exclusivement via des sous-processus (execSync/execa) dans les tests end-to-end.
       // L'instrumentation V8 ne peut pas les couvrir car ils tournent dans un processus fils
-      // séparé. Ils sont testés de bout en bout par les suites structurelles (bundle-generate.test.ts,
-      // contract-diff.test.ts) qui valident leurs artefacts produits.
+      // séparé. Ils sont testés de bout en bout par les suites runtime (bundle-determinism.test.ts,
+      // contract-diff.test.ts, mock-prism.test.ts) qui valident leurs artefacts produits.
       //
-      // Justification mock-prism.test.ts (et scripts mock/schemathesis) : exclus du gate rapide
-      // pour isoler la contention CI (T8) — voir exclude test ci-dessus.
+      // Justification src/mock-prism.test.ts, src/contract-diff.test.ts,
+      //               src/bundle-determinism.test.ts : exclus du gate rapide pour isoler la
+      // contention CI (T8) — voir exclude test ci-dessus. Testés par test:runtime.
       // Ref : .claude/lessons/etat-local-residuel-masque-la-ci.md
       exclude: [
         ...vitestDefaultCoverageExcludes,
         "generated/**",
         "scripts/**",
-        // Scripts mock/schemathesis exercés uniquement par les tests runtime (mock-prism.test.ts)
-        // L'instrumentation V8 ne couvre pas les processus fils (prism, docker).
-        // Ces fichiers sont exclus du gate couverture unitaire — T8 contention CI.
+        // Fichiers exercés uniquement par les tests runtime (docker, generate, prism)
+        // L'instrumentation V8 ne couvre pas les processus fils.
+        // Testés de bout en bout via test:runtime — T8 contention CI.
         "src/mock-prism.test.ts",
+        "src/contract-diff.test.ts",
+        "src/bundle-determinism.test.ts",
       ],
     },
   },
