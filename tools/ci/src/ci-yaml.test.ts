@@ -178,6 +178,127 @@ describe("ci.yml — INFRA-007: build tools/ci avant ratchet", () => {
   );
 });
 
+// ─── CONTRACT-009c : job contract-diff ───────────────────────────────────────
+
+describe("ci.yml — CONTRACT-009c: job contract-diff", () => {
+  it("CONTRACT-009c: le job contract-diff existe dans ci.yml", () => {
+    const ci = loadCiYml();
+    const jobs = ci["jobs"] as Record<string, unknown>;
+    expect(
+      jobs["contract-diff"],
+      'job "contract-diff" manquant dans ci.yml'
+    ).toBeDefined();
+  });
+
+  it("CONTRACT-009c: contract-diff nécessite lint (needs: lint)", () => {
+    const ci = loadCiYml();
+    const jobs = ci["jobs"] as Record<string, { needs?: string | string[] }>;
+    const needs = normalizeNeeds(jobs["contract-diff"]?.needs);
+    expect(
+      needs,
+      'contract-diff doit déclarer needs: lint'
+    ).toContain("lint");
+  });
+
+  it("CONTRACT-009c: contract-diff contient une étape de bundle avant check-generated-sync", () => {
+    const ci = loadCiYml();
+    const jobs = ci["jobs"] as Record<
+      string,
+      { steps?: Array<{ name?: string; run?: string }> }
+    >;
+    const contractDiffJob = jobs["contract-diff"];
+    expect(
+      contractDiffJob,
+      'job "contract-diff" manquant dans ci.yml'
+    ).toBeDefined();
+
+    const steps = contractDiffJob?.steps ?? [];
+
+    // Trouver une étape qui exécute le bundle (artefact requis avant check-generated-sync)
+    const bundleStepIdx = steps.findIndex(
+      (s) =>
+        typeof s.run === "string" &&
+        (s.run.includes("bundle") || s.run.includes("--filter @sigfa/contracts"))
+    );
+    expect(
+      bundleStepIdx,
+      "Aucune étape de bundle trouvée dans le job contract-diff — " +
+        "toute étape CI référençant generated/ doit construire l'artefact d'abord (leçon etat-local-residuel)"
+    ).toBeGreaterThanOrEqual(0);
+
+    // Trouver l'étape check-generated-sync
+    const syncStepIdx = steps.findIndex(
+      (s) =>
+        typeof s.run === "string" &&
+        s.run.includes("check-generated-sync")
+    );
+    expect(
+      syncStepIdx,
+      "Aucune étape check-generated-sync.sh trouvée dans le job contract-diff"
+    ).toBeGreaterThanOrEqual(0);
+
+    // Bundle DOIT précéder check-generated-sync
+    expect(
+      bundleStepIdx,
+      `L'étape bundle (idx ${bundleStepIdx}) doit précéder check-generated-sync (idx ${syncStepIdx}) — ` +
+        "leçon etat-local-residuel-masque-la-ci"
+    ).toBeLessThan(syncStepIdx);
+  });
+
+  it("CONTRACT-009c: contract-diff contient une étape contract-diff.sh pour les PRs", () => {
+    const rawYml = fs.readFileSync(CI_YML_PATH, "utf-8");
+    // Le script contract-diff.sh doit être référencé dans le job
+    expect(
+      rawYml,
+      "contract-diff.sh non référencé dans ci.yml"
+    ).toContain("contract-diff.sh");
+  });
+
+  it("CONTRACT-009c: le breaking-change check est conditionnel (PR uniquement)", () => {
+    const ci = loadCiYml();
+    const jobs = ci["jobs"] as Record<
+      string,
+      { steps?: Array<{ name?: string; run?: string; if?: string }> }
+    >;
+    const contractDiffJob = jobs["contract-diff"];
+    const steps = contractDiffJob?.steps ?? [];
+
+    // Une étape doit être conditionnelle : github.event_name == 'pull_request'
+    const prOnlyStep = steps.find(
+      (s) =>
+        typeof s["if"] === "string" &&
+        s["if"].includes("pull_request")
+    );
+    expect(
+      prOnlyStep,
+      "Aucune étape conditionnelle 'pull_request' dans contract-diff — " +
+        "le breaking-check doit être exécuté uniquement en PR"
+    ).toBeDefined();
+  });
+
+  it("CONTRACT-009c: contract-diff fait fetch-depth: 0 pour avoir l'historique git complet", () => {
+    const ci = loadCiYml();
+    const jobs = ci["jobs"] as Record<
+      string,
+      { steps?: Array<{ name?: string; uses?: string; with?: Record<string, unknown> }> }
+    >;
+    const contractDiffJob = jobs["contract-diff"];
+    const steps = contractDiffJob?.steps ?? [];
+
+    // Trouver l'étape checkout
+    const checkoutStep = steps.find(
+      (s) => typeof s.uses === "string" && s.uses.includes("actions/checkout")
+    );
+    expect(checkoutStep, "Aucune étape checkout dans contract-diff").toBeDefined();
+
+    const fetchDepth = checkoutStep?.with?.["fetch-depth"];
+    expect(
+      fetchDepth,
+      "contract-diff checkout doit avoir fetch-depth: 0 pour comparer avec origin/main"
+    ).toBe(0);
+  });
+});
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
