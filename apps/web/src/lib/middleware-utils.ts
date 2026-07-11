@@ -6,8 +6,11 @@
 import type { Role } from "./roles";
 import { canAccess, getDefaultDashboard } from "./roles";
 
-/** Public routes that don't require auth */
-export const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/refresh", "/_next", "/favicon.ico"];
+/**
+ * Public routes that don't require auth.
+ * `/tv` is a public per-agency read-only display (TV-001, RBAC public).
+ */
+export const PUBLIC_ROUTES = ["/login", "/tv", "/api/auth/login", "/api/auth/refresh", "/_next", "/favicon.ico"];
 
 /**
  * Determines if a pathname is a public route.

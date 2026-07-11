@@ -15,10 +15,36 @@
   --warning: #f59e0b;
   --danger: #ef4444;
   --info: #3b82f6;
+
+  /* TV-001 — écran d'appel plein écran (session borne type affichage) */
+  --surface-screen: #0a0f1a;
+  --ink-inverse: #f8fafc;
+  --tv-separator: rgba(255, 255, 255, 0.08);
+  --display-tv-hero: 180px;
+  --display-tv-counter: 120px;
+  --display-tv: 64px;
+  --tv-header-height: 64px;
+  --duration-celebration: 400ms;
+  --tv-slide-duration: 250ms;
+  --tv-slide-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* WEB-002 — interface agent guichet */
+  --kpi-value: 96px;
+  --caption: 0.875rem;
 }
 
 body {
   background-color: var(--surface-0);
   color: var(--ink-strong);
   font-family: system-ui, -apple-system, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

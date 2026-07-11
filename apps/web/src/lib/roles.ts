@@ -19,7 +19,8 @@ export type Role = (typeof ROLES)[number];
 /** Route permission matrix — which roles can access which route prefixes */
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   "/admin": ["SUPER_ADMIN", "BANK_ADMIN"],
-  "/dashboard/manager": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER"],
+  // AUDITOR reaches the manager dashboard in read-only mode (WEB-003).
+  "/dashboard/manager": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AUDITOR"],
   "/dashboard/agent": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AGENT"],
   "/agent": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AGENT"],
   "/audit": ["SUPER_ADMIN", "BANK_ADMIN", "AUDITOR"],
