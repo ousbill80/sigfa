@@ -1,6 +1,6 @@
 # INFRA-007 : Corrections lot F0 — durcissement CI, ratchet, flaky ESLint, traçabilité T3 (issues panel Boucle 3)
 
-**Module** : F0 — Fondations · **Agent** : direct · **Dépend de** : INFRA-001..004 (DONE) · **Statut** : TODO
+**Module** : F0 — Fondations · **Agent** : direct · **Dépend de** : INFRA-001..004 (DONE) · **Statut** : DONE (2026-07-11 — zéro retry, 13 tests, baseline recalculée 92.2/92.2/84.18/100)
 **Origine** : findings panel (07-panel-f0-synthese.md) + premier run CI rouge.
 
 ## Exigences (EARS)

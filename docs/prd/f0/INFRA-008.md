@@ -1,6 +1,6 @@
 # INFRA-008 : Corrections lot F0 — packages partagés (issues panel Boucle 3)
 
-**Module** : F0 — Fondations · **Agent** : agent-database (périmètre étendu F0 : packages/{schemas,factories,testing,ui,database}) · **Dépend de** : INFRA-005 (DONE) · **Statut** : TODO
+**Module** : F0 — Fondations · **Agent** : agent-database (périmètre étendu F0 : packages/{schemas,factories,testing,ui,database}) · **Dépend de** : INFRA-005 (DONE) · **Statut** : DONE (2026-07-11 — zéro retry, contract/harness 100% statements)
 **Origine** : findings panel (07-panel-f0-synthese.md).
 
 ## Exigences (EARS)

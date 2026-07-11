@@ -29,6 +29,8 @@ INFRA-001 (monorepo pnpm + Turborepo 2)        ← racine absolue, dispatch seul
 | INFRA-003 | CI GitHub Actions : lint → typecheck → test → build + ratchet couverture (tools/ci) | direct | INFRA-001 | DONE-local |
 | INFRA-004 | Hooks git (lefthook ^1.7) : require-test-in-commit (T1) + commitlint ^19 | direct | INFRA-001 | DONE |
 | INFRA-005 | @sigfa/schemas (primitifs), @sigfa/factories (T10, seedé + fast-check), @sigfa/testing (5 harness outillés) | agent-database (périmètre étendu — voir story) | INFRA-001 | DONE |
+| INFRA-007 | Corrections panel : durcissement CI, ratchet fixtures, flaky eslint (T8), traçabilité T3, 127.0.0.1 | direct | 001..004 | DONE |
+| INFRA-008 | Corrections panel : découpages >30 lignes, couverture harness contract, UPPER_SNAKE, README asymétrie | agent-database | 005 | DONE |
 
 ## Prérequis humains (avant intégration INFRA-003)
 - Dépôt git initialisé + remote GitHub avec Actions activées.
