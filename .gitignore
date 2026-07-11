@@ -11,3 +11,5 @@ dist
 # artefacts next.js
 .next/
 out/
+
+*.tsbuildinfo
