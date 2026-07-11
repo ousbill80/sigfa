@@ -1,0 +1,127 @@
+# SIGFA — Docker Compose dev
+# INFRA-002 : postgres16 + redis7 + api + web + kiosk (node:22-slim, hot reload)
+#
+# Usage :
+#   cp .env.example .env   # ajuster les valeurs si besoin
+#   docker compose up -d
+#
+# Ports configurables via .env (voir .env.example pour les défauts).
+# Aucun secret en dur : tous les mots de passe passent par des variables ${...}.
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sigfa}
+      POSTGRES_USER: ${POSTGRES_USER:-sigfa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sigfa}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sigfa} -d ${POSTGRES_DB:-sigfa}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redis 7
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # API (@sigfa/api) — Hono 4 + TypeScript
+  # ---------------------------------------------------------------------------
+  api:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    command: pnpm --filter @sigfa/api dev
+    ports:
+      - "${API_PORT:-3001}:3001"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sigfa}:${POSTGRES_PASSWORD:-sigfa}@postgres:5432/${POSTGRES_DB:-sigfa}
+      REDIS_URL: redis://redis:6379
+      PORT: "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Web (@sigfa/web) — Next.js 15
+  # ---------------------------------------------------------------------------
+  web:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    command: pnpm --filter @sigfa/web dev
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      API_URL: http://api:3001
+      PORT: "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Kiosk (@sigfa/kiosk) — Electron (mode serveur dev)
+  # ---------------------------------------------------------------------------
+  kiosk:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    command: pnpm --filter @sigfa/kiosk dev
+    ports:
+      - "${KIOSK_PORT:-3002}:3002"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      API_URL: http://api:3001
+      PORT: "3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
