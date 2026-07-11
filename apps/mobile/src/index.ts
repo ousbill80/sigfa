@@ -1,1 +1,1 @@
-export const mobileVersion = "0.0.0";
+export const MOBILE_VERSION = "0.0.0";

@@ -201,57 +201,39 @@ function computeFileMetrics(
 }
 
 /**
- * Point d'entrée principal du ratchet de couverture.
- * Compare les métriques courantes avec la baseline et applique les règles.
- * @param options - Options du ratchet
- * @returns Résultat avec exitCode 0 (succès) ou 1 (échec)
+ * Vérifie que les nouveaux fichiers d'une PR atteignent le seuil de 85%.
+ * @param merged - Map de couverture fusionnée
+ * @param newFiles - Liste des chemins de nouveaux fichiers
+ * @returns Message d'erreur ou null si tous les fichiers passent le seuil
  */
-export async function runRatchet(options: RatchetOptions): Promise<RatchetResult> {
-  const { baselinePath, coverageReports, context, newFiles, artifactDir, onLog } = options;
-  const log = (msg: string) => {
-    process.stdout.write(msg + "\n");
-    onLog?.(msg);
-  };
-
-  // Diff vide → exit 0 direct
-  if (coverageReports.length === 0) {
-    return { exitCode: 0, message: "Aucun rapport de couverture — diff vide, skip ratchet." };
-  }
-
-  // Fusion des rapports
-  const merged = mergeIstanbulReports(coverageReports);
-  const current = computeGlobalMetrics(merged);
-
-  // Lecture de la baseline
-  const baselineRaw = fs.readFileSync(baselinePath, "utf-8");
-  const baseline: BaselineFile = JSON.parse(baselineRaw) as BaselineFile;
-  const base = baseline.global;
-
-  // ── Vérification par fichier (uniquement sur pull_request) ──
-  if (context === "pull_request" && newFiles.length > 0) {
-    const failingFiles: string[] = [];
-
-    for (const filePath of newFiles) {
-      const fileMetrics = computeFileMetrics(merged, filePath);
-      if (!fileMetrics) continue;
-      // Seuil : statements ≥ 85%
-      if (fileMetrics.statements < 85) {
-        failingFiles.push(`${filePath} (${fileMetrics.statements}% statements < 85%)`);
-      }
-    }
-
-    if (failingFiles.length > 0) {
-      const msg =
-        `Nouveaux fichiers sous le seuil de 85% de couverture :\n` +
-        failingFiles.map((f) => `  - ${f}`).join("\n");
-      return { exitCode: 1, message: msg, metrics: current };
+function checkNewFilesThreshold(
+  merged: IstanbulCoverageMap,
+  newFiles: string[]
+): string | null {
+  const failingFiles: string[] = [];
+  for (const filePath of newFiles) {
+    const fileMetrics = computeFileMetrics(merged, filePath);
+    if (!fileMetrics) continue;
+    if (fileMetrics.statements < 85) {
+      failingFiles.push(`${filePath} (${fileMetrics.statements}% statements < 85%)`);
     }
   }
+  if (failingFiles.length === 0) return null;
+  return (
+    `Nouveaux fichiers sous le seuil de 85% de couverture :\n` +
+    failingFiles.map((f) => `  - ${f}`).join("\n")
+  );
+}
 
-  // ── Ratchet global ──
+/**
+ * Vérifie le ratchet global : aucune métrique ne doit baisser de plus de TOLERANCE.
+ * @param current - Métriques courantes
+ * @param base - Métriques de la baseline
+ * @returns Message d'erreur ou null si le ratchet est respecté
+ */
+function checkGlobalRatchet(current: GlobalMetrics, base: GlobalMetrics): string | null {
   const metrics: Array<keyof GlobalMetrics> = ["lines", "statements", "branches", "functions"];
   const TOLERANCE = 0.1;
-
   const deltas: string[] = [];
   for (const metric of metrics) {
     const diff = current[metric] - base[metric];
@@ -261,31 +243,63 @@ export async function runRatchet(options: RatchetOptions): Promise<RatchetResult
       );
     }
   }
+  if (deltas.length === 0) return null;
+  return `Ratchet de couverture ÉCHOUÉ — baisse détectée (delta par métrique) :\n` + deltas.join("\n");
+}
 
-  if (deltas.length > 0) {
-    const msg =
-      `Ratchet de couverture ÉCHOUÉ — baisse détectée (delta par métrique) :\n` +
-      deltas.join("\n");
-    return { exitCode: 1, message: msg, metrics: current };
-  }
-
-  // ── Vérification si amélioration ──
+/**
+ * Régénère la baseline si au moins une métrique s'est améliorée de plus de TOLERANCE.
+ * @param current - Métriques courantes
+ * @param base - Métriques de la baseline
+ * @param artifactDir - Répertoire de sortie de la nouvelle baseline
+ * @param log - Fonction de log
+ * @returns true si la baseline a été régénérée, false sinon
+ */
+function maybeUpdateBaseline(
+  current: GlobalMetrics,
+  base: GlobalMetrics,
+  artifactDir: string,
+  log: (msg: string) => void
+): boolean {
+  const metrics: Array<keyof GlobalMetrics> = ["lines", "statements", "branches", "functions"];
+  const TOLERANCE = 0.1;
   const improved = metrics.some((m) => current[m] > base[m] + TOLERANCE);
-  if (improved) {
-    const newBaseline: BaselineFile = { global: current };
-    const artifactPath = path.join(artifactDir, "coverage-baseline.json");
-    fs.writeFileSync(artifactPath, JSON.stringify(newBaseline, null, 2));
-    log("baseline améliorée — commitez coverage-baseline.json");
-    return {
-      exitCode: 0,
-      message: "Couverture améliorée. Baseline régénérée en artefact.",
-      metrics: current,
-    };
+  if (!improved) return false;
+  const newBaseline: BaselineFile = { global: current };
+  fs.writeFileSync(path.join(artifactDir, "coverage-baseline.json"), JSON.stringify(newBaseline, null, 2));
+  log("baseline améliorée — commitez coverage-baseline.json");
+  return true;
+}
+
+/**
+ * Point d'entrée principal du ratchet de couverture.
+ * Compare les métriques courantes avec la baseline et applique les règles.
+ * @param options - Options du ratchet
+ * @returns Résultat avec exitCode 0 (succès) ou 1 (échec)
+ */
+export async function runRatchet(options: RatchetOptions): Promise<RatchetResult> {
+  const { baselinePath, coverageReports, context, newFiles, artifactDir, onLog } = options;
+  const log = (msg: string) => { process.stdout.write(msg + "\n"); onLog?.(msg); };
+
+  if (coverageReports.length === 0) {
+    return { exitCode: 0, message: "Aucun rapport de couverture — diff vide, skip ratchet." };
   }
 
-  return {
-    exitCode: 0,
-    message: "Couverture stable. Ratchet OK.",
-    metrics: current,
-  };
+  const merged = mergeIstanbulReports(coverageReports);
+  const current = computeGlobalMetrics(merged);
+  const base = (JSON.parse(fs.readFileSync(baselinePath, "utf-8")) as BaselineFile).global;
+
+  if (context === "pull_request" && newFiles.length > 0) {
+    const err = checkNewFilesThreshold(merged, newFiles);
+    if (err) return { exitCode: 1, message: err, metrics: current };
+  }
+
+  const ratchetErr = checkGlobalRatchet(current, base);
+  if (ratchetErr) return { exitCode: 1, message: ratchetErr, metrics: current };
+
+  if (maybeUpdateBaseline(current, base, artifactDir, log)) {
+    return { exitCode: 0, message: "Couverture améliorée. Baseline régénérée en artefact.", metrics: current };
+  }
+
+  return { exitCode: 0, message: "Couverture stable. Ratchet OK.", metrics: current };
 }

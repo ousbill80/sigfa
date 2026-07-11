@@ -1,16 +1,16 @@
 import { describe, it, expect, afterAll } from "vitest";
 import * as http from "node:http";
-import { createServer } from "./index.js";
+import { createServer, startServer } from "./index.js";
 
 describe("@sigfa/kiosk", () => {
-  let server: http.Server;
-  let port: number;
+  const servers: http.Server[] = [];
 
-  it("responds 200 with SIGFA kiosk skeleton", async () => {
-    server = createServer();
+  it("INFRA-001: responds 200 with SIGFA kiosk skeleton", async () => {
+    const server = createServer();
+    servers.push(server);
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const address = server.address() as { port: number };
-    port = address.port;
+    const port = address.port;
 
     const body = await new Promise<string>((resolve, reject) => {
       http.get(`http://localhost:${port}/`, (res) => {
@@ -24,7 +24,19 @@ describe("@sigfa/kiosk", () => {
     expect(body).toBe("SIGFA kiosk skeleton");
   });
 
+  it("INFRA-007: startServer démarre le serveur sur KIOSK_PORT", async () => {
+    const originalPort = process.env["KIOSK_PORT"];
+    process.env["KIOSK_PORT"] = "29803";
+    const server = startServer();
+    servers.push(server);
+    await new Promise<void>((resolve) => {
+      if (server.listening) { resolve(); } else { server.once("listening", resolve); }
+    });
+    expect(server.listening).toBe(true);
+    process.env["KIOSK_PORT"] = originalPort;
+  });
+
   afterAll(() => {
-    server?.close();
+    servers.forEach((s) => s?.close());
   });
 });

@@ -5,6 +5,7 @@
  * - La chaîne needs : lint → typecheck → test → build
  * - Les triggers push/PR sur main et staging
  * - La présence des caches pnpm et turbo
+ * - INFRA-007: permissions, SHA des actions, restore-keys scoped par branche
  */
 
 import { describe, it, expect } from "vitest";
@@ -86,6 +87,46 @@ describe("ci.yml — structure", () => {
     const rawYml = fs.readFileSync(CI_YML_PATH, "utf-8");
     expect(rawYml).toMatch(/turbo/i);
     expect(rawYml).toMatch(/cache/i);
+  });
+});
+
+// ─── INFRA-007: sécurisation du workflow ──────────────────────────────────────
+
+describe("ci.yml — INFRA-007: sécurité et épinglage", () => {
+  it("INFRA-007: permissions: contents: read déclaré au niveau workflow", () => {
+    const ci = loadCiYml();
+    const permissions = ci["permissions"] as Record<string, string> | undefined;
+    expect(permissions, "bloc permissions manquant dans ci.yml").toBeDefined();
+    expect(permissions?.["contents"]).toBe("read");
+  });
+
+  it("INFRA-007: zéro action uses: sans SHA de commit (toutes épinglées à un SHA40)", () => {
+    const rawYml = fs.readFileSync(CI_YML_PATH, "utf-8");
+    // Trouve toutes les lignes `uses: owner/action@ref`
+    const usesLines = rawYml
+      .split("\n")
+      .filter((l) => /^\s+uses:\s+\S+/.test(l));
+
+    expect(usesLines.length, "Aucune ligne uses: trouvée").toBeGreaterThan(0);
+
+    const notPinned = usesLines.filter((l) => {
+      const match = l.match(/uses:\s+\S+@(\S+)/);
+      if (!match) return true;
+      const ref = match[1];
+      // Un SHA de commit est exactement 40 caractères hexadécimaux
+      return !/^[0-9a-f]{40}$/.test(ref ?? "");
+    });
+
+    expect(
+      notPinned,
+      `Actions non épinglées à un SHA40 :\n${notPinned.join("\n")}`
+    ).toHaveLength(0);
+  });
+
+  it("INFRA-007: restore-keys du cache turbo scoped par branche (github.ref_name)", () => {
+    const rawYml = fs.readFileSync(CI_YML_PATH, "utf-8");
+    // La restore-key doit contenir ref_name pour être scopée par branche
+    expect(rawYml).toContain("github.ref_name");
   });
 });
 
