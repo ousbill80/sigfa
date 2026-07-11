@@ -17,7 +17,7 @@ CONTRACT-001..010 (DONE) ──► CONTRACT-011 (DONE)
 | DB-002 | Policies RLS toutes tables + helper SQL `app.current_bank_id` + suite tenant-isolation initiale | DB-001 | DONE |
 | DB-003 | Migrations initiales + seed : 8 services défaut avec SLA, rôles, jours fériés CI | DB-002 | DONE |
 | DB-004 | Table audit_log immuable (rétention 24 mois) + triggers | DB-003 | DONE |
-| DB-005 | Tables notifications : templates par banque, opt-in/consent, journal d'envoi, devices push | DB-004 | TODO |
+| DB-005 | Tables notifications : templates par banque, opt-in/consent, journal d'envoi, devices push | DB-004 | DONE |
 | DB-006 | Tables reporting : agrégats journaliers matérialisés, index bank_id+date | DB-005 | TODO |
 | DB-008 | Chiffrement AES-256 des téléphones au repos + purge auto 13 mois (droit à l'oubli) | DB-006 | TODO |
 | DB-007 | Tables IA : prédictions, anomalies, recommandations, scores + rétention | DB-008 | TODO |
