@@ -76,7 +76,9 @@ describe("INFRA-002: grep du compose → zéro secret littéral hors ${...}", ()
       // Pattern : indentation + POSTGRES_PASSWORD: valeur
       const match = line.match(/^\s+POSTGRES_PASSWORD\s*:\s*(.+)/);
       if (!match) return false;
-      const value = match[1].trim();
+      const captured = match[1];
+      if (captured === undefined) return false;
+      const value = captured.trim();
       // La valeur est littérale si elle ne commence pas par ${ (interpolation)
       return !value.startsWith("${");
     });
