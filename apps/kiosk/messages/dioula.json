@@ -1,0 +1,22 @@
+{
+  "common": {
+    "welcome": "Bisimila",
+    "chooseLanguage": "I kan kan ka sɛbɛn i ka kan",
+    "loading": "A bɛ kɛ...",
+    "error": "Fili kelen bɛ yen",
+    "retry": "Mɔgɔ"
+  },
+  "home": {
+    "title": "Bisimila",
+    "subtitle": "I ka kan minɛ ka taa ɲɛ",
+    "languageLabel": "Dioula"
+  },
+  "session": {
+    "expired": "I ka session tɛmɛna",
+    "reconnecting": "Cogoya bɛ kɛ..."
+  },
+  "error": {
+    "offline": "Borne tɛ segin",
+    "contactStaff": "Tɔgɔ mɔgɔ dɔ dɛmɛ don"
+  }
+}

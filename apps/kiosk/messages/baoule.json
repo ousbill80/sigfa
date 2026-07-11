@@ -1,0 +1,22 @@
+{
+  "common": {
+    "welcome": "Mian su",
+    "chooseLanguage": "Klɛ n'gban su nun",
+    "loading": "An bla...",
+    "error": "Nzuɛ kulo bo'",
+    "retry": "San yi klo"
+  },
+  "home": {
+    "title": "Mian su",
+    "subtitle": "Klɛ i kan ka klo man",
+    "languageLabel": "Baoulé"
+  },
+  "session": {
+    "expired": "I session wla'n",
+    "reconnecting": "An bla kpli..."
+  },
+  "error": {
+    "offline": "Borne su kpli",
+    "contactStaff": "Kɔ mɔgɔ kun dɔ dɛmɛ"
+  }
+}
