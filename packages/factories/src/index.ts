@@ -2,6 +2,9 @@ import { z } from "zod";
 import { mulberry32 } from "./mulberry32.js";
 import { generateForSchema } from "./zod-generator.js";
 
+/** Version du package @sigfa/factories */
+export const FACTORIES_VERSION = "0.0.0";
+
 /** Options d'invocation de la factory */
 export interface FactoryOptions<T> {
   /** Graine PRNG — même graine → même fixture */

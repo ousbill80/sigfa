@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { databaseVersion } from "./index.js";
+import { DATABASE_VERSION } from "./index.js";
 
 describe("@sigfa/database", () => {
-  it("exports databaseVersion", () => {
-    expect(databaseVersion).toBe("0.0.0");
+  it("exports DATABASE_VERSION", () => {
+    expect(DATABASE_VERSION).toBe("0.0.0");
   });
 });

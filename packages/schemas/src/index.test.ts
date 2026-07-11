@@ -4,10 +4,17 @@ import {
   uuidSchema,
   paginationMetaSchema,
   errorSchema,
+  SCHEMAS_VERSION,
   type UuidSchema,
   type PaginationMetaSchema,
   type ErrorSchema,
 } from "./index.js";
+
+describe("@sigfa/schemas — version", () => {
+  it("INFRA-008: SCHEMAS_VERSION est une chaîne semver", () => {
+    expect(SCHEMAS_VERSION).toBe("0.0.0");
+  });
+});
 
 describe("@sigfa/schemas — primitifs partagés", () => {
   // uuidSchema

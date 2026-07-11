@@ -26,6 +26,59 @@ export interface RedisHarness {
 }
 
 /**
+ * Construit la chaîne de connexion PostgreSQL à partir d'un conteneur démarré.
+ * @param container - Conteneur Testcontainers démarré
+ * @returns URL de connexion postgresql://
+ */
+function buildPostgresConnectionString(container: StartedTestContainer): string {
+  const host = container.getHost();
+  const port = container.getMappedPort(5432);
+  return `postgresql://sigfa:sigfa_test@${host}:${port}/sigfa_test`;
+}
+
+/**
+ * Construit l'URL de connexion Redis à partir d'un conteneur démarré.
+ * @param container - Conteneur Testcontainers démarré
+ * @returns URL de connexion redis://
+ */
+function buildRedisConnectionUrl(container: StartedTestContainer): string {
+  const host = container.getHost();
+  const port = container.getMappedPort(6379);
+  return `redis://${host}:${port}`;
+}
+
+/**
+ * Retourne une fonction permettant d'envoyer une commande brute à Redis via net.Socket.
+ * @param port - Port Redis mappé
+ * @param host - Hôte Redis
+ * @param net - Module net Node.js (pré-importé)
+ * @returns Fonction envoyant la commande et retournant la réponse
+ */
+function makeSendCommand(
+  port: number,
+  host: string,
+  net: typeof import("net")
+): (command: string) => Promise<string> {
+  return (command: string): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const socket = net.createConnection(port, host, () => {
+        socket.write(command);
+      });
+      let data = "";
+      socket.on("data", (chunk: Buffer) => {
+        data += chunk.toString();
+        socket.destroy();
+      });
+      socket.on("close", () => resolve(data.trim().replace(/^\+/, "")));
+      socket.on("error", reject);
+      socket.setTimeout(5000, () => {
+        socket.destroy();
+        reject(new Error("Redis connection timeout"));
+      });
+    });
+}
+
+/**
  * Démarre un conteneur PostgreSQL 16 éphémère via Testcontainers.
  * Connexion vérifiée par SELECT 1.
  * @returns Harness avec query() et stop()
@@ -41,9 +94,7 @@ export async function startPostgresContainer(): Promise<PostgresHarness> {
     .withWaitStrategy(Wait.forLogMessage(/database system is ready to accept connections/, 2))
     .start();
 
-  const host = container.getHost();
-  const port = container.getMappedPort(5432);
-  const connectionString = `postgresql://sigfa:sigfa_test@${host}:${port}/sigfa_test`;
+  const connectionString = buildPostgresConnectionString(container);
 
   // Import dynamique pour éviter une dépendance lourde au niveau du package
   const { default: pg } = await import("pg");
@@ -76,28 +127,10 @@ export async function startRedisContainer(): Promise<RedisHarness> {
 
   const host = container.getHost();
   const port = container.getMappedPort(6379);
-  const connectionUrl = `redis://${host}:${port}`;
-
+  const connectionUrl = buildRedisConnectionUrl(container);
   // Client Redis minimal via net.Socket pour éviter dépendance ioredis
   const net = await import("net");
-
-  const sendCommand = (command: string): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const socket = net.createConnection(port, host, () => {
-        socket.write(command);
-      });
-      let data = "";
-      socket.on("data", (chunk: Buffer) => {
-        data += chunk.toString();
-        socket.destroy();
-      });
-      socket.on("close", () => resolve(data.trim().replace(/^\+/, "")));
-      socket.on("error", reject);
-      socket.setTimeout(5000, () => {
-        socket.destroy();
-        reject(new Error("Redis connection timeout"));
-      });
-    });
+  const sendCommand = makeSendCommand(port, host, net);
 
   return {
     connectionUrl,
