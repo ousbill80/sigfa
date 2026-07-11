@@ -1,0 +1,45 @@
+// dioula.ts — Locale Dioula
+export const dioula = {
+  auth: {
+    title: 'Sɛbɛnni',
+    phoneLabel: 'Telefɔni nimɔrɔ',
+    phonePlaceholder: '+225 XX XX XX XX XX',
+    sendOtp: 'Code ci',
+    otpLabel: 'Dɔgɔmana nimɔrɔ',
+    otpPlaceholder: '6 sɛbɛn',
+    verifyOtp: 'Sɛgɛsɛgɛ',
+    uemoa_consent: "N bɛ sɔn n ka kunko cogosira don UEMOA sariya kɔnɔ",
+    uemoa_required: 'UEMOA sɔn ka kan kɛ walima',
+  },
+  nav: {
+    home: 'Gɛrɛfɛ',
+    newTicket: 'Kunnafoni kura',
+    myTicket: 'Ne ka kunnafoni',
+  },
+  ticket: {
+    title: 'Kunnafoni ta',
+    step1Title: 'I baarakɛyɔrɔ sugandi',
+    step2Title: 'Dɔgɔmana',
+    step3Title: 'I ka kunnafoni',
+    agency: 'Ajɑ̃si',
+    service: 'Baaraw',
+    confirm: 'Dafa',
+    next: 'Ntɛ',
+    back: 'Kɔsɛgi',
+    trackingId: 'Kirigoliden nimɔrɔ',
+    displayNumber: 'Bɔli nimɔrɔ',
+    estimatedWait: 'Makɔnɔni waati',
+    position: 'Yɔrɔ sɛbɛ kɔnɔ',
+  },
+  screen: {
+    loading: 'Sɛgɛsɛgɛli...',
+    error: 'Fili dɔ kɛra',
+    empty: 'Foyi tɛ',
+    offline: 'Netwɛriki tɛ',
+    retry: 'Kɔsɛgi gɛlɛya',
+  },
+  offline: {
+    badge: 'Netwɛriki tɛ',
+    queued: 'Kunnafoni bɛ makɔnɔ',
+  },
+} as const;
