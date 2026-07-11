@@ -5,3 +5,5 @@ export * from "./schema/index.js";
 export * from "./tenant.js";
 export * from "./audit/index.js";
 export * from "./crypto/index.js";
+export { purgeAiHistory } from "./ai/index.js";
+export type { PurgeAiOptions, PurgeAiHistoryResult } from "./ai/index.js";

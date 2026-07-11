@@ -42,6 +42,11 @@ const BUSINESS_TABLES = [
   // DB-006 : tables de reporting
   "daily_agency_stats",
   "export_jobs",
+  // DB-007 : tables IA
+  "ai_forecasts",
+  "ai_staffing_recommendations",
+  "ai_anomalies",
+  "ai_quality_scores",
 ] as const;
 
 describe("DB-002 — RLS + tenant-isolation", () => {
