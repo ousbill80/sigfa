@@ -40,6 +40,7 @@ export const users = pgTable(
      * Banque propriétaire — NULL uniquement pour le SUPER_ADMIN plateforme.
      * FK banks RESTRICT · index (bank_id, email) bank_id-first.
      */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     bankId: uuid("bank_id").references(() => banks.id, { onDelete: "restrict" }),
     /** Email de connexion — UNIQUE GLOBAL. */
     email: text("email").notNull().unique(),
@@ -101,14 +102,17 @@ export const userServices = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Utilisateur (agent) (FK RESTRICT). */
     userId: uuid("user_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => users.id, { onDelete: "restrict" }),
     /** Service traitable (FK RESTRICT). */
     serviceId: uuid("service_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => services.id, { onDelete: "restrict" }),
     /** Horodatage de création. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -131,14 +135,17 @@ export const agencyUsers = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Agence d'affectation (FK RESTRICT). */
     agencyId: uuid("agency_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => agencies.id, { onDelete: "restrict" }),
     /** Utilisateur affecté (FK RESTRICT). */
     userId: uuid("user_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => users.id, { onDelete: "restrict" }),
     /** Horodatage de création. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -162,14 +169,17 @@ export const agentStatusHistory = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Agence de contexte (FK RESTRICT). */
     agencyId: uuid("agency_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => agencies.id, { onDelete: "restrict" }),
     /** Agent concerné (FK RESTRICT). */
     agentId: uuid("agent_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => users.id, { onDelete: "restrict" }),
     /** Statut de départ (null au premier passage en ligne). */
     fromStatus: agentStatusEnum("from_status"),

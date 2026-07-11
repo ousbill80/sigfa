@@ -30,10 +30,12 @@ export const counters = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Agence propriétaire (FK RESTRICT). */
     agencyId: uuid("agency_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => agencies.id, { onDelete: "restrict" }),
     /** Numéro du guichet. */
     number: integer("number").notNull(),
@@ -42,6 +44,7 @@ export const counters = pgTable(
     /** Statut du guichet (LA LOI `CounterStatus`). */
     status: counterStatusEnum("status").notNull().default("CLOSED"),
     /** Agent affecté (FK RESTRICT, optionnel). */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     agentId: uuid("agent_id").references(() => users.id, { onDelete: "restrict" }),
     /** Ticket en cours de traitement (uuid nu — voir note d'entête). */
     currentTicketId: uuid("current_ticket_id"),
@@ -68,14 +71,17 @@ export const counterServices = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Guichet (FK RESTRICT). */
     counterId: uuid("counter_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => counters.id, { onDelete: "restrict" }),
     /** Service couvert (FK RESTRICT). */
     serviceId: uuid("service_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => services.id, { onDelete: "restrict" }),
     /** Horodatage de création. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

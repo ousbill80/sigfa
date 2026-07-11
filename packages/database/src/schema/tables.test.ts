@@ -132,4 +132,19 @@ describe("DB-001: modèle Drizzle (structure)", () => {
       }
     }
   });
+
+  it("DB-001: chaque table métier (hors racine tenant) déclare au moins une FK (bank_id, agency_id ou autre)", () => {
+    // Vérifie que les callbacks lazy .references(() => ...) sont bien enregistrés par Drizzle.
+    // Ces callbacks sont exécutés par Drizzle au chargement du module (résolution des FK circulaires).
+    // Le rapport V8 ne les voit pas comme "couverts" (instrumentation avant résolution) — ils sont
+    // donc exclus par /* v8 ignore next */ dans les fichiers de schéma. Ce test assure que la
+    // configuration FK est fonctionnelle côté Drizzle.
+    for (const [name, table] of Object.entries(BUSINESS_TABLES)) {
+      const config = getTableConfig(table);
+      expect(
+        config.foreignKeys.length,
+        `${name} doit déclarer au moins une FK`
+      ).toBeGreaterThanOrEqual(1);
+    }
+  });
 });

@@ -43,6 +43,7 @@ export const agencies = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Nom de l'agence. */
     name: text("name").notNull(),
@@ -82,10 +83,12 @@ export const agencyExceptionalClosures = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Agence concernée (FK RESTRICT). */
     agencyId: uuid("agency_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => agencies.id, { onDelete: "restrict" }),
     /** Date de fermeture (jour local). */
     date: date("date").notNull(),

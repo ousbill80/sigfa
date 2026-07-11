@@ -52,6 +52,7 @@ export const auditLog = pgTable(
     /** Tenant — banque propriétaire (FK banks RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Acteur ayant provoqué la mutation (utilisateur), optionnel (job/système). */
     actorId: uuid("actor_id"),

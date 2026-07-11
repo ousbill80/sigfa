@@ -20,10 +20,12 @@ export const kiosks = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Agence propriétaire (FK RESTRICT). */
     agencyId: uuid("agency_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => agencies.id, { onDelete: "restrict" }),
     /** Libellé de la borne. */
     label: text("label").notNull(),

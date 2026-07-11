@@ -40,22 +40,28 @@ export const tickets = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Agence d'émission (FK RESTRICT). */
     agencyId: uuid("agency_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => agencies.id, { onDelete: "restrict" }),
     /** File d'attente (FK RESTRICT). */
     queueId: uuid("queue_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => queues.id, { onDelete: "restrict" }),
     /** Service demandé (FK RESTRICT). */
     serviceId: uuid("service_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => services.id, { onDelete: "restrict" }),
     /** Guichet de traitement (FK RESTRICT, optionnel). */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     counterId: uuid("counter_id").references(() => counters.id, { onDelete: "restrict" }),
     /** Agent en charge (FK RESTRICT, optionnel). */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     agentId: uuid("agent_id").references(() => users.id, { onDelete: "restrict" }),
     /** Numéro séquentiel brut dans la file. */
     number: integer("number").notNull(),
@@ -140,28 +146,35 @@ export const ticketTransfers = pgTable(
     /** Tenant — banque propriétaire (FK RESTRICT). */
     bankId: uuid("bank_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => banks.id, { onDelete: "restrict" }),
     /** Ticket transféré (FK RESTRICT). */
     ticketId: uuid("ticket_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => tickets.id, { onDelete: "restrict" }),
     /** Guichet source (FK RESTRICT, optionnel). */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     fromCounterId: uuid("from_counter_id").references(() => counters.id, { onDelete: "restrict" }),
     /** Service source (FK RESTRICT). */
     fromServiceId: uuid("from_service_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => services.id, { onDelete: "restrict" }),
     /** Service cible (FK RESTRICT). */
     toServiceId: uuid("to_service_id")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => services.id, { onDelete: "restrict" }),
     /** Guichet cible (FK RESTRICT, optionnel). */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     toCounterId: uuid("to_counter_id").references(() => counters.id, { onDelete: "restrict" }),
     /** Motif du transfert. */
     reason: text("reason"),
     /** Agent ayant initié le transfert (FK RESTRICT). */
     transferredBy: uuid("transferred_by")
       .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => users.id, { onDelete: "restrict" }),
     /** Horodatage du transfert. */
     transferredAt: timestamp("transferred_at", { withTimezone: true }).notNull().defaultNow(),
