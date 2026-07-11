@@ -1,0 +1,1665 @@
+openapi: "3.1.0"
+info:
+  title: SIGFA Admin API
+  version: "1.0.0"
+  description: |
+    Contrat admin SIGFA : RBAC, configuration banque/agence, theming, templates SMS,
+    audit trail (immuable) et droit à l'oubli UEMOA. Servi sous /api/v1.
+
+    **Hiérarchie RBAC** (du plus large au plus restreint) :
+    - `SUPER_ADMIN` : accès platform complet (toutes les banques)
+    - `BANK_ADMIN` : admin de la banque (toutes les agences)
+    - `AGENCY_DIRECTOR` : directeur d'agence (une agence)
+    - `MANAGER` : manager d'agence
+    - `AGENT` : agent de guichet
+    - `AUDITOR` : lecture seule, audit trail
+    - `NONE` : routes publiques (sans auth)
+
+    **Rôles requis** : définis par `x-required-role` sur chaque opération.
+    La hiérarchie est cumulative : un SUPER_ADMIN peut effectuer toutes les
+    opérations d'un BANK_ADMIN ou AUDITOR.
+
+    **Mutations critiques** (†) : `POST /data/purge-phone` nécessite
+    l'en-tête `X-Idempotency-Key`.
+
+servers:
+  - url: /api/v1
+    description: SIGFA v1
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Theme
+    description: Theming banque — logo R2 (2 étapes), couleurs (appliedColors/requestedColors), messages de bienvenue
+  - name: AgencyConfig
+    description: Configuration agences — horaires, fériés, fermetures exceptionnelles
+  - name: SmsTemplates
+    description: Templates SMS par type de notification (NotificationType)
+  - name: Thresholds
+    description: Seuils d'alerte et délais configurables de la file d'attente
+  - name: AuditLogs
+    description: Journal d'audit — lecture seule, AUDITOR et SUPER_ADMIN uniquement
+  - name: DataPrivacy
+    description: Droit à l'oubli UEMOA — purge téléphonique et politique de rétention
+  - name: Onboarding
+    description: Onboarding agences — clonage de config et accès borne (kiosk)
+  - name: Agencies
+    description: Gestion des agences (admin) — suppression soft avec vérification tickets ouverts
+
+paths:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # THEME
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /banks/{id}/theme:
+    get:
+      tags: [Theme]
+      summary: Obtenir le thème de la banque
+      description: |
+        Retourne la configuration de theming de la banque : logo (URL signée R2),
+        couleurs (`requestedColors` soumises et `appliedColors` après correction
+        automatique du contraste ≥4.5:1), et messages de bienvenue en 4 langues.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Thème de la banque
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankTheme"
+              example:
+                logoUrl: "https://cdn.sigfa.ci/logos/bank_01/logo.png"
+                requestedColors:
+                  primary: "#003f7f"
+                  secondary: "#e8a000"
+                  background: "#ffffff"
+                appliedColors:
+                  primary: "#003f7f"
+                  secondary: "#c07800"
+                  background: "#ffffff"
+                welcomeMessages:
+                  fr: "Bienvenue à la Banque Nationale de Côte d'Ivoire"
+                  dioula: "Bienvenida BNCI"
+                  baoule: "Akwaba BNCI"
+                  en: "Welcome to BNCI"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+    patch:
+      tags: [Theme]
+      summary: Mettre à jour le thème de la banque
+      description: |
+        Met à jour la configuration de theming. Les couleurs soumises
+        (`requestedColors`) sont stockées telles quelles ; les couleurs
+        appliquées (`appliedColors`) sont calculées automatiquement avec
+        correction de contraste ≥4.5:1 (WCAG AA).
+
+        **additionalProperties: false** : tout champ hors schéma → 422.
+
+        Messages de bienvenue (`welcomeMessages`) :
+        - `fr` : requis, texte brut, max 200 caractères
+        - `dioula`, `baoule`, `en` : optionnels, texte brut, max 200 caractères
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBankThemeRequest"
+            example:
+              requestedColors:
+                primary: "#003f7f"
+                secondary: "#e8a000"
+                background: "#ffffff"
+              welcomeMessages:
+                fr: "Bienvenue à la BNCI"
+                en: "Welcome to BNCI"
+      responses:
+        "200":
+          description: Thème mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankTheme"
+              example:
+                logoUrl: "https://cdn.sigfa.ci/logos/bank_01/logo.png"
+                requestedColors:
+                  primary: "#003f7f"
+                  secondary: "#e8a000"
+                  background: "#ffffff"
+                appliedColors:
+                  primary: "#003f7f"
+                  secondary: "#c07800"
+                  background: "#ffffff"
+                welcomeMessages:
+                  fr: "Bienvenue à la BNCI"
+                  en: "Welcome to BNCI"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: Champ hors schéma ou données sémantiquement invalides
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: UNPROCESSABLE_ENTITY
+                  message: "Champ inconnu : 'fontFamily'. additionalProperties est false."
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  /banks/{id}/theme/logo-upload-url:
+    get:
+      tags: [Theme]
+      summary: Obtenir une URL présignée R2 pour l'upload du logo (étape 1/2)
+      description: |
+        Première étape de l'upload du logo en 2 temps (R2 signé) :
+        1. `GET /banks/{id}/theme/logo-upload-url` → `{ presignedUrl, expiresIn: 300 }`
+        2. Le client effectue un `PUT` HTTP directement vers `presignedUrl`
+           avec le fichier logo (Content-Type approprié).
+
+        **Formats acceptés** : `image/png`, `image/svg+xml`, `image/jpeg`
+        **Taille maximale** : 2 Mo (2 000 000 octets)
+        **Dimensions minimales** : 200×200 px
+
+        Après le PUT client, aucun appel serveur supplémentaire n'est requis ;
+        le logo est disponible via l'URL publique du CDN.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+        - name: contentType
+          in: query
+          required: true
+          description: |
+            Type MIME du fichier logo à uploader.
+            Valeurs acceptées : `image/png`, `image/svg+xml`, `image/jpeg`.
+          schema:
+            type: string
+            enum:
+              - image/png
+              - image/svg+xml
+              - image/jpeg
+      responses:
+        "200":
+          description: URL présignée R2 valide 300 secondes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoUploadUrlResponse"
+              example:
+                presignedUrl: "https://r2.sigfa.ci/logos/bank_01/logo.png?X-Amz-Signature=abc123&X-Amz-Expires=300"
+                expiresIn: 300
+                maxSizeBytes: 2000000
+                minDimensionsPx: 200
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: Type MIME non accepté
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: UNSUPPORTED_MEDIA_TYPE
+                  message: "Type MIME non accepté. Formats valides : image/png, image/svg+xml, image/jpeg."
+                  details:
+                    accepted:
+                      - image/png
+                      - image/svg+xml
+                      - image/jpeg
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AGENCY HOURS
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /agencies/{id}/hours:
+    get:
+      tags: [AgencyConfig]
+      summary: Obtenir les horaires d'une agence
+      description: |
+        Retourne la configuration des horaires de l'agence : heures par jour de la
+        semaine, jours fériés nationaux CI (pré-chargés) et fermetures exceptionnelles.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Horaires de l'agence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgencyHours"
+              example:
+                weeklySchedule:
+                  monday:
+                    open: "08:00"
+                    close: "17:00"
+                    closed: false
+                  tuesday:
+                    open: "08:00"
+                    close: "17:00"
+                    closed: false
+                  wednesday:
+                    open: "08:00"
+                    close: "17:00"
+                    closed: false
+                  thursday:
+                    open: "08:00"
+                    close: "17:00"
+                    closed: false
+                  friday:
+                    open: "08:00"
+                    close: "16:00"
+                    closed: false
+                  saturday:
+                    open: "09:00"
+                    close: "13:00"
+                    closed: false
+                  sunday:
+                    open: "00:00"
+                    close: "00:00"
+                    closed: true
+                publicHolidaysCI:
+                  - date: "2026-01-01"
+                    label: "Jour de l'An"
+                  - date: "2026-08-07"
+                    label: "Fête Nationale de Côte d'Ivoire"
+                exceptionalClosures:
+                  - date: "2026-03-15"
+                    reason: "Formation du personnel"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+    patch:
+      tags: [AgencyConfig]
+      summary: Mettre à jour les horaires d'une agence
+      description: |
+        Met à jour les horaires hebdomadaires et/ou les fermetures exceptionnelles.
+        Les fériés CI sont gérés en lecture seule (pré-chargés par le système).
+
+        **additionalProperties: false** : tout champ hors schéma → 422.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgencyHoursRequest"
+            example:
+              weeklySchedule:
+                saturday:
+                  open: "09:00"
+                  close: "12:00"
+                  closed: false
+              exceptionalClosures:
+                - date: "2026-03-15"
+                  reason: "Formation du personnel"
+      responses:
+        "200":
+          description: Horaires mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgencyHours"
+              example:
+                weeklySchedule:
+                  monday:
+                    open: "08:00"
+                    close: "17:00"
+                    closed: false
+                  saturday:
+                    open: "09:00"
+                    close: "12:00"
+                    closed: false
+                  sunday:
+                    open: "00:00"
+                    close: "00:00"
+                    closed: true
+                publicHolidaysCI:
+                  - date: "2026-08-07"
+                    label: "Fête Nationale de Côte d'Ivoire"
+                exceptionalClosures:
+                  - date: "2026-03-15"
+                    reason: "Formation du personnel"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: Champ hors schéma ou données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: UNPROCESSABLE_ENTITY
+                  message: "Champ inconnu dans la requête. additionalProperties est false."
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SMS TEMPLATES
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /banks/{id}/sms-templates:
+    get:
+      tags: [SmsTemplates]
+      summary: Obtenir les templates SMS de la banque
+      description: |
+        Retourne les templates SMS configurés par type de notification
+        (`NotificationType` référencé depuis core.yaml).
+
+        Variables autorisées dans les templates : `{{number}}`, `{{position}}`,
+        `{{estimate}}`.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Templates SMS de la banque
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsTemplateList"
+              example:
+                templates:
+                  - type: TICKET_CONFIRMATION
+                    content: "Votre ticket {{number}} est enregistré. Position : {{position}}. Attente estimée : {{estimate}} min."
+                  - type: YOUR_TURN
+                    content: "C'est votre tour ! Ticket {{number}}, présentez-vous au guichet."
+                  - type: POSITION_UPDATE
+                    content: "Mise à jour : vous êtes maintenant {{position}}e dans la file (ticket {{number}})."
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+    patch:
+      tags: [SmsTemplates]
+      summary: Mettre à jour les templates SMS de la banque
+      description: |
+        Met à jour un ou plusieurs templates SMS. Chaque template est identifié
+        par son `type` (enum `NotificationType` de core.yaml).
+
+        **Variables autorisées** : `{{number}}`, `{{position}}`, `{{estimate}}`.
+        Toute autre variable → **422 `UNKNOWN_TEMPLATE_VARIABLE`**.
+
+        **additionalProperties: false** : tout champ hors schéma → 422.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSmsTemplatesRequest"
+            example:
+              templates:
+                - type: TICKET_CONFIRMATION
+                  content: "Votre ticket {{number}} est créé. Vous êtes {{position}}e, attente : {{estimate}} min."
+      responses:
+        "200":
+          description: Templates SMS mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsTemplateList"
+              example:
+                templates:
+                  - type: TICKET_CONFIRMATION
+                    content: "Votre ticket {{number}} est créé. Vous êtes {{position}}e, attente : {{estimate}} min."
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: Variable de template inconnue ou champ hors schéma
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              examples:
+                unknown_variable:
+                  summary: Variable inconnue dans le template
+                  value:
+                    error:
+                      code: UNKNOWN_TEMPLATE_VARIABLE
+                      message: "Variable inconnue '{{agentName}}'. Variables autorisées : {{number}}, {{position}}, {{estimate}}."
+                      details:
+                        unknownVariable: "{{agentName}}"
+                        allowedVariables:
+                          - "{{number}}"
+                          - "{{position}}"
+                          - "{{estimate}}"
+                additional_property:
+                  summary: Champ hors schéma
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: "Champ inconnu dans la requête. additionalProperties est false."
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # THRESHOLDS
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /banks/{id}/thresholds:
+    get:
+      tags: [Thresholds]
+      summary: Obtenir les seuils de la banque
+      description: |
+        Retourne les seuils d'alerte et délais configurables de la file d'attente :
+        - `queueCriticalThreshold` : seuil d'alerte file critique (1–500 tickets)
+        - `agentInactivityMinutes` : délai d'inactivité agent avant alerte (1–60 min)
+        - `noShowTimeoutMinutes` : délai d'attente avant no-show (1–30 min, défaut 3)
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Seuils de la banque
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankThresholds"
+              example:
+                queueCriticalThreshold: 50
+                agentInactivityMinutes: 15
+                noShowTimeoutMinutes: 3
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+    patch:
+      tags: [Thresholds]
+      summary: Mettre à jour les seuils de la banque
+      description: |
+        Met à jour les seuils de la banque. Les bornes sont imposées par le schéma :
+        - `queueCriticalThreshold` : entier, 1–500
+        - `agentInactivityMinutes` : entier, 1–60
+        - `noShowTimeoutMinutes` : entier, 1–30 (défaut 3)
+
+        **additionalProperties: false** : tout champ hors schéma → 422.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBankThresholdsRequest"
+            example:
+              queueCriticalThreshold: 100
+              noShowTimeoutMinutes: 5
+      responses:
+        "200":
+          description: Seuils mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankThresholds"
+              example:
+                queueCriticalThreshold: 100
+                agentInactivityMinutes: 15
+                noShowTimeoutMinutes: 5
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          description: Valeur hors bornes ou champ hors schéma
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: UNPROCESSABLE_ENTITY
+                  message: "queueCriticalThreshold doit être entre 1 et 500."
+                  details:
+                    field: queueCriticalThreshold
+                    min: 1
+                    max: 500
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AUDIT LOGS
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /audit-logs:
+    get:
+      tags: [AuditLogs]
+      summary: Consulter le journal d'audit (AUDITOR / SUPER_ADMIN uniquement)
+      description: |
+        Retourne le journal d'audit paginé de la plateforme.
+        **Lecture seule** — aucune mutation n'est contractualisée (immuabilité DB-004).
+
+        Filtres disponibles : `entityType`, `entityId`, `actorId`, `from`, `to`.
+
+        **Rôles autorisés** : AUDITOR (accès en lecture seule) et SUPER_ADMIN.
+        Tout autre rôle → 403 FORBIDDEN.
+
+        Le schéma `AuditEntry` contient : `actor`, `action`, `entityType`,
+        `entityId`, `timestamp`, `ip`, `diff`.
+      x-tenant-scope: platform
+      x-required-role: AUDITOR
+      parameters:
+        - name: entityType
+          in: query
+          required: false
+          description: Filtrer par type d'entité (ex. "Bank", "Agency", "Ticket")
+          schema:
+            type: string
+        - name: entityId
+          in: query
+          required: false
+          description: Filtrer par identifiant d'entité
+          schema:
+            type: string
+            format: uuid
+        - name: actorId
+          in: query
+          required: false
+          description: Filtrer par identifiant de l'acteur
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          description: Date de début de la plage (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Date de fin de la plage (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - $ref: "./core.yaml#/components/parameters/PageParam"
+        - $ref: "./core.yaml#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Journal d'audit paginé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+              example:
+                data:
+                  - actor:
+                      id: "user_01"
+                      email: "admin@bnci.ci"
+                      role: BANK_ADMIN
+                    action: "PATCH /banks/bank_01/theme"
+                    entityType: "BankTheme"
+                    entityId: "bank_01"
+                    timestamp: "2026-07-11T09:00:00Z"
+                    ip: "41.67.128.1"
+                    diff:
+                      before:
+                        requestedColors:
+                          primary: "#003f7f"
+                      after:
+                        requestedColors:
+                          primary: "#004f9f"
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 142
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # DATA PRIVACY — DROIT À L'OUBLI UEMOA
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /data/purge-phone:
+    post:
+      tags: [DataPrivacy]
+      summary: "† Purger un numéro de téléphone (droit à l'oubli UEMOA — mutation critique)"
+      description: |
+        Purge toutes les données personnelles associées à un numéro de téléphone
+        dans le périmètre de la banque authentifiée.
+
+        **Mutation critique (†)** : l'en-tête `X-Idempotency-Key` est obligatoire.
+        - 1er appel (phone non encore purgé) → `{ purged: true, affectedTickets: N }`
+        - Appel suivant (idempotence) → `{ purged: false, affectedTickets: 0 }`
+
+        Le numéro est effacé ou anonymisé dans tous les tickets associés.
+        Conformité UEMOA / droit à l'oubli (DB-008).
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdempotencyKeyParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurgePhoneRequest"
+            example:
+              phone: "+2250700000001"
+      responses:
+        "200":
+          description: Purge effectuée (ou déjà effectuée — idempotence)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurgePhoneResponse"
+              examples:
+                first_call:
+                  summary: Premier appel — purge effectuée
+                  value:
+                    purged: true
+                    affectedTickets: 7
+                idempotent_call:
+                  summary: "Appel suivant — idempotence (purged: false)"
+                  value:
+                    purged: false
+                    affectedTickets: 0
+        "400":
+          description: X-Idempotency-Key absent ou numéro invalide
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_KEY_REQUIRED
+                  message: "L'en-tête X-Idempotency-Key est obligatoire pour cette mutation."
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          description: Conflit d'idempotence (même clé, payload différent)
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_CONFLICT
+                  message: "Même X-Idempotency-Key avec un payload différent."
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  /data/retention-policy:
+    get:
+      tags: [DataPrivacy]
+      summary: Obtenir la politique de rétention des données
+      description: |
+        Retourne la politique de rétention des données personnelles de la banque.
+        Durée par défaut : **13 mois** (configurable par la banque, DB-008).
+        Conformité UEMOA / droit à l'oubli.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      responses:
+        "200":
+          description: Politique de rétention
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionPolicy"
+              example:
+                retentionMonths: 13
+                description: "Les données personnelles des clients sont conservées 13 mois après la dernière interaction."
+                purgeSchedule: "daily"
+                lastPurgeAt: "2026-07-10T02:00:00Z"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ONBOARDING
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /agencies/{id}/clone-from/{templateId}:
+    post:
+      tags: [Onboarding]
+      summary: Cloner la configuration d'une agence template
+      description: |
+        Copie la configuration (horaires, templates SMS, seuils, services) d'une
+        agence template vers l'agence cible. **Jamais les données clients** (tickets,
+        files d'attente, etc.).
+
+        Utile pour l'onboarding rapide de nouvelles agences.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+        - name: templateId
+          in: path
+          required: true
+          description: Identifiant de l'agence template source
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Configuration clonée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloneAgencyResponse"
+              example:
+                targetAgencyId: "agency_02"
+                templateAgencyId: "agency_01"
+                clonedSections:
+                  - hours
+                  - smsTemplates
+                  - thresholds
+                  - services
+                clonedAt: "2026-07-11T10:00:00Z"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  /agencies/{id}/kiosk-access:
+    post:
+      tags: [Onboarding]
+      summary: Générer les credentials de borne (kiosk) et le QR d'installation
+      description: |
+        Génère un couple identifiant/secret pour une borne kiosque de l'agence,
+        ainsi qu'un QR code d'installation. Le QR encode l'URL de configuration
+        avec les credentials embarqués (à scanner depuis l'app Electron).
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KioskAccessRequest"
+            example:
+              label: "Borne entrée principale"
+      responses:
+        "201":
+          description: Credentials borne + QR d'installation générés
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KioskAccessResponse"
+              example:
+                kioskId: "kiosk_01"
+                clientId: "kiosk_client_7f3a9b"
+                clientSecret: "ksk_XzP9mQr2nLsT4vWyBjH6cKdF"
+                qrCodeDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA..."
+                label: "Borne entrée principale"
+                agencyId: "agency_01"
+                createdAt: "2026-07-11T10:05:00Z"
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          $ref: "./core.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AGENCIES (admin — DELETE avec soft delete + 409 AGENCY_HAS_OPEN_TICKETS)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  /agencies/{id}:
+    delete:
+      tags: [Agencies]
+      summary: Supprimer une agence (soft delete)
+      description: |
+        Désactivation logique (soft delete) d'une agence. L'agence est marquée
+        inactive mais ses données sont conservées.
+
+        **409 `AGENCY_HAS_OPEN_TICKETS`** : si l'agence possède des tickets ouverts
+        (état WAITING, CALLED ou SERVING), la suppression est refusée.
+        Il faut clore ou transférer tous les tickets ouverts avant la suppression.
+
+        **Précision CONTRACT-005** : le code 409 est `AGENCY_HAS_OPEN_TICKETS`
+        (conformément au PRD v2 — distinction des tickets « ouverts » vs « actifs »).
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "./core.yaml#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Agence désactivée (soft delete)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - success
+                properties:
+                  success:
+                    type: boolean
+                    description: Indique que la désactivation a réussi
+              example:
+                success: true
+        "400":
+          $ref: "./core.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "./core.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "./core.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "./core.yaml#/components/responses/NotFound"
+        "409":
+          description: Conflit — agence avec des tickets ouverts (WAITING, CALLED ou SERVING)
+          content:
+            application/json:
+              schema:
+                $ref: "./core.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: AGENCY_HAS_OPEN_TICKETS
+                  message: "Impossible de supprimer une agence avec des tickets ouverts. Closez ou transférez tous les tickets avant la suppression."
+                  details:
+                    openTicketsCount: 12
+                    statuses:
+                      - WAITING
+                      - CALLED
+                      - SERVING
+        "422":
+          $ref: "./core.yaml#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "./core.yaml#/components/responses/TooManyRequests"
+        "500":
+          $ref: "./core.yaml#/components/responses/InternalServerError"
+
+# ─── COMPONENTS ──────────────────────────────────────────────────────────────
+components:
+
+  # ── Security Schemes (reprise de core pour la cohérence documentaire) ──────
+  securitySchemes:
+    BearerAuth:
+      $ref: "./core.yaml#/components/securitySchemes/BearerAuth"
+
+  # ── Schemas ──────────────────────────────────────────────────────────────────
+  schemas:
+
+    # ── Theme ─────────────────────────────────────────────────────────────────
+
+    ColorSet:
+      type: object
+      description: |
+        Ensemble de couleurs de theming (format hexadécimal #RRGGBB).
+        `requestedColors` : couleurs soumises par le BANK_ADMIN.
+        `appliedColors` : couleurs effectives après correction de contraste ≥4.5:1 (WCAG AA).
+      additionalProperties: false
+      required:
+        - primary
+        - secondary
+        - background
+      properties:
+        primary:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: Couleur primaire (hexadécimal)
+          example: "#003f7f"
+        secondary:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: Couleur secondaire (hexadécimal)
+          example: "#e8a000"
+        background:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: Couleur de fond (hexadécimal)
+          example: "#ffffff"
+
+    WelcomeMessages:
+      type: object
+      description: |
+        Messages de bienvenue en 4 langues (texte brut, max 200 caractères).
+        `fr` est requis. `dioula`, `baoule` et `en` sont optionnels.
+      additionalProperties: false
+      required:
+        - fr
+      properties:
+        fr:
+          type: string
+          maxLength: 200
+          description: Message en français (requis)
+          example: "Bienvenue à la Banque Nationale de Côte d'Ivoire"
+        dioula:
+          type: string
+          maxLength: 200
+          description: Message en dioula (optionnel)
+          example: "Bienvenida BNCI"
+        baoule:
+          type: string
+          maxLength: 200
+          description: Message en baoulé (optionnel)
+          example: "Akwaba BNCI"
+        en:
+          type: string
+          maxLength: 200
+          description: Message en anglais (optionnel)
+          example: "Welcome to BNCI"
+
+    BankTheme:
+      type: object
+      description: Thème complet de la banque
+      additionalProperties: false
+      required:
+        - requestedColors
+        - appliedColors
+        - welcomeMessages
+      properties:
+        logoUrl:
+          type: ["string", "null"]
+          format: uri
+          description: URL publique du logo CDN (null si aucun logo uploadé)
+          example: "https://cdn.sigfa.ci/logos/bank_01/logo.png"
+        requestedColors:
+          $ref: "#/components/schemas/ColorSet"
+        appliedColors:
+          $ref: "#/components/schemas/ColorSet"
+        welcomeMessages:
+          $ref: "#/components/schemas/WelcomeMessages"
+
+    UpdateBankThemeRequest:
+      type: object
+      description: Requête de mise à jour du thème (champs partiels acceptés)
+      additionalProperties: false
+      properties:
+        requestedColors:
+          $ref: "#/components/schemas/ColorSet"
+        welcomeMessages:
+          $ref: "#/components/schemas/WelcomeMessages"
+
+    LogoUploadUrlResponse:
+      type: object
+      description: URL présignée R2 pour l'upload du logo (étape 1/2)
+      additionalProperties: false
+      required:
+        - presignedUrl
+        - expiresIn
+        - maxSizeBytes
+        - minDimensionsPx
+      properties:
+        presignedUrl:
+          type: string
+          format: uri
+          description: URL présignée R2 pour le PUT HTTP du logo
+          example: "https://r2.sigfa.ci/logos/bank_01/logo.png?X-Amz-Signature=abc123&X-Amz-Expires=300"
+        expiresIn:
+          type: integer
+          description: Durée de validité de l'URL en secondes
+          enum: [300]
+          example: 300
+        maxSizeBytes:
+          type: integer
+          description: Taille maximale autorisée en octets (2 Mo = 2 000 000 octets)
+          enum: [2000000]
+          example: 2000000
+        minDimensionsPx:
+          type: integer
+          description: Dimension minimale en pixels (largeur ET hauteur ≥ 200 px)
+          enum: [200]
+          example: 200
+
+    # ── Agency Hours ──────────────────────────────────────────────────────────
+
+    DaySchedule:
+      type: object
+      description: Horaires d'ouverture pour un jour de la semaine
+      additionalProperties: false
+      required:
+        - open
+        - close
+        - closed
+      properties:
+        open:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+          description: Heure d'ouverture (HH:MM)
+          example: "08:00"
+        close:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+          description: Heure de fermeture (HH:MM)
+          example: "17:00"
+        closed:
+          type: boolean
+          description: true si l'agence est fermée ce jour
+
+    WeeklySchedule:
+      type: object
+      description: Planning hebdomadaire de l'agence
+      additionalProperties: false
+      properties:
+        monday:
+          $ref: "#/components/schemas/DaySchedule"
+        tuesday:
+          $ref: "#/components/schemas/DaySchedule"
+        wednesday:
+          $ref: "#/components/schemas/DaySchedule"
+        thursday:
+          $ref: "#/components/schemas/DaySchedule"
+        friday:
+          $ref: "#/components/schemas/DaySchedule"
+        saturday:
+          $ref: "#/components/schemas/DaySchedule"
+        sunday:
+          $ref: "#/components/schemas/DaySchedule"
+
+    PublicHoliday:
+      type: object
+      description: Jour férié national CI (pré-chargé par le système)
+      additionalProperties: false
+      required:
+        - date
+        - label
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date du jour férié (YYYY-MM-DD)
+          example: "2026-08-07"
+        label:
+          type: string
+          description: Libellé du jour férié
+          example: "Fête Nationale de Côte d'Ivoire"
+
+    ExceptionalClosure:
+      type: object
+      description: Fermeture exceptionnelle définie par l'agence
+      additionalProperties: false
+      required:
+        - date
+        - reason
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date de la fermeture exceptionnelle (YYYY-MM-DD)
+          example: "2026-03-15"
+        reason:
+          type: string
+          maxLength: 200
+          description: Motif de la fermeture
+          example: "Formation du personnel"
+
+    AgencyHours:
+      type: object
+      description: Configuration des horaires d'une agence
+      additionalProperties: false
+      required:
+        - weeklySchedule
+      properties:
+        weeklySchedule:
+          $ref: "#/components/schemas/WeeklySchedule"
+        publicHolidaysCI:
+          type: array
+          description: Jours fériés nationaux CI (lecture seule, pré-chargés)
+          items:
+            $ref: "#/components/schemas/PublicHoliday"
+        exceptionalClosures:
+          type: array
+          description: Fermetures exceptionnelles définies par l'agence
+          items:
+            $ref: "#/components/schemas/ExceptionalClosure"
+
+    UpdateAgencyHoursRequest:
+      type: object
+      description: Mise à jour partielle des horaires d'une agence
+      additionalProperties: false
+      properties:
+        weeklySchedule:
+          $ref: "#/components/schemas/WeeklySchedule"
+        exceptionalClosures:
+          type: array
+          description: Fermetures exceptionnelles (remplace la liste existante)
+          items:
+            $ref: "#/components/schemas/ExceptionalClosure"
+
+    # ── SMS Templates ─────────────────────────────────────────────────────────
+
+    SmsTemplate:
+      type: object
+      description: |
+        Template SMS pour un type de notification.
+        Le type est l'enum `NotificationType` de core.yaml.
+        Variables autorisées : `{{number}}`, `{{position}}`, `{{estimate}}`.
+      additionalProperties: false
+      required:
+        - type
+        - content
+      properties:
+        type:
+          $ref: "./core.yaml#/components/schemas/NotificationType"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: |
+            Contenu du template SMS.
+            Variables autorisées : `{{number}}`, `{{position}}`, `{{estimate}}`.
+            Toute autre variable → 422 `UNKNOWN_TEMPLATE_VARIABLE`.
+          example: "Votre ticket {{number}} est enregistré. Position : {{position}}. Attente : {{estimate}} min."
+
+    SmsTemplateList:
+      type: object
+      description: Liste des templates SMS de la banque
+      additionalProperties: false
+      required:
+        - templates
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/SmsTemplate"
+
+    UpdateSmsTemplatesRequest:
+      type: object
+      description: Mise à jour des templates SMS (liste complète ou partielle)
+      additionalProperties: false
+      required:
+        - templates
+      properties:
+        templates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SmsTemplate"
+
+    # ── Thresholds ────────────────────────────────────────────────────────────
+
+    BankThresholds:
+      type: object
+      description: |
+        Seuils d'alerte et délais configurables de la file d'attente.
+        - `queueCriticalThreshold` : seuil d'alerte file critique (1–500 tickets)
+        - `agentInactivityMinutes` : délai d'inactivité agent avant alerte (1–60 min)
+        - `noShowTimeoutMinutes` : délai d'attente avant no-show (1–30 min, défaut 3)
+      additionalProperties: false
+      required:
+        - queueCriticalThreshold
+        - agentInactivityMinutes
+        - noShowTimeoutMinutes
+      properties:
+        queueCriticalThreshold:
+          type: integer
+          minimum: 1
+          maximum: 500
+          description: Nombre de tickets dans la file déclenchant une alerte critique
+          example: 50
+        agentInactivityMinutes:
+          type: integer
+          minimum: 1
+          maximum: 60
+          description: Minutes d'inactivité d'un agent avant alerte manager
+          example: 15
+        noShowTimeoutMinutes:
+          type: integer
+          minimum: 1
+          maximum: 30
+          default: 3
+          description: Minutes d'attente après appel avant passage en NO_SHOW (défaut 3)
+          example: 3
+
+    UpdateBankThresholdsRequest:
+      type: object
+      description: Mise à jour partielle des seuils (tous champs optionnels)
+      additionalProperties: false
+      properties:
+        queueCriticalThreshold:
+          type: integer
+          minimum: 1
+          maximum: 500
+          description: Nouveau seuil d'alerte file critique (1–500)
+          example: 100
+        agentInactivityMinutes:
+          type: integer
+          minimum: 1
+          maximum: 60
+          description: Nouveau délai d'inactivité agent (1–60 min)
+          example: 20
+        noShowTimeoutMinutes:
+          type: integer
+          minimum: 1
+          maximum: 30
+          description: Nouveau délai no-show (1–30 min)
+          example: 5
+
+    # ── Audit Logs ────────────────────────────────────────────────────────────
+
+    AuditActor:
+      type: object
+      description: Acteur de l'entrée d'audit
+      additionalProperties: false
+      required:
+        - id
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identifiant de l'utilisateur acteur
+          example: "user_01"
+        email:
+          type: string
+          format: email
+          description: Email de l'acteur (si disponible)
+          example: "admin@bnci.ci"
+        role:
+          $ref: "./core.yaml#/components/schemas/Role"
+
+    AuditEntry:
+      type: object
+      description: |
+        Entrée du journal d'audit (immuable).
+        Champs : `actor`, `action`, `entityType`, `entityId`, `timestamp`, `ip`, `diff`.
+      additionalProperties: false
+      required:
+        - actor
+        - action
+        - entityType
+        - entityId
+        - timestamp
+        - ip
+      properties:
+        actor:
+          $ref: "#/components/schemas/AuditActor"
+        action:
+          type: string
+          description: Opération effectuée (ex. "PATCH /banks/bank_01/theme")
+          example: "PATCH /banks/bank_01/theme"
+        entityType:
+          type: string
+          description: Type de l'entité modifiée (ex. "BankTheme", "Agency")
+          example: "BankTheme"
+        entityId:
+          type: string
+          description: Identifiant de l'entité modifiée
+          example: "bank_01"
+        timestamp:
+          type: string
+          format: date-time
+          description: Horodatage de l'action (UTC ISO 8601)
+          example: "2026-07-11T09:00:00Z"
+        ip:
+          type: string
+          description: Adresse IP de l'acteur au moment de l'action
+          example: "41.67.128.1"
+        diff:
+          type: object
+          additionalProperties: true
+          description: |
+            Différentiel avant/après la modification (optionnel selon l'action).
+            Format : `{ before: {...}, after: {...} }`
+          example:
+            before:
+              requestedColors:
+                primary: "#003f7f"
+            after:
+              requestedColors:
+                primary: "#004f9f"
+
+    AuditLogListResponse:
+      type: object
+      description: Réponse paginée du journal d'audit
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEntry"
+        meta:
+          $ref: "./core.yaml#/components/schemas/PaginationMeta"
+
+    # ── Data Privacy ──────────────────────────────────────────────────────────
+
+    PurgePhoneRequest:
+      type: object
+      description: Requête de purge d'un numéro de téléphone (droit à l'oubli UEMOA)
+      additionalProperties: false
+      required:
+        - phone
+      properties:
+        phone:
+          type: string
+          pattern: "^\\+[1-9][0-9]{7,14}$"
+          description: Numéro de téléphone au format E.164 (ex. +2250700000001)
+          example: "+2250700000001"
+
+    PurgePhoneResponse:
+      type: object
+      description: |
+        Réponse à POST /data/purge-phone.
+        - `purged: true` → premier appel, purge effectuée.
+        - `purged: false` → appel idempotent (téléphone déjà purgé).
+      additionalProperties: false
+      required:
+        - purged
+        - affectedTickets
+      properties:
+        purged:
+          type: boolean
+          description: |
+            true si la purge a été effectuée lors de cet appel.
+            false si le téléphone avait déjà été purgé (idempotence).
+          example: true
+        affectedTickets:
+          type: integer
+          minimum: 0
+          description: Nombre de tickets dont les données personnelles ont été effacées
+          example: 7
+
+    RetentionPolicy:
+      type: object
+      description: Politique de rétention des données personnelles
+      additionalProperties: false
+      required:
+        - retentionMonths
+        - description
+        - purgeSchedule
+      properties:
+        retentionMonths:
+          type: integer
+          minimum: 1
+          maximum: 120
+          description: Durée de rétention en mois (défaut 13 mois)
+          example: 13
+        description:
+          type: string
+          description: Description de la politique
+          example: "Les données personnelles des clients sont conservées 13 mois après la dernière interaction."
+        purgeSchedule:
+          type: string
+          enum:
+            - daily
+            - weekly
+            - monthly
+          description: Fréquence du batch de purge automatique
+          example: "daily"
+        lastPurgeAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Horodatage du dernier batch de purge (null si jamais lancé)
+          example: "2026-07-10T02:00:00Z"
+
+    # ── Onboarding ────────────────────────────────────────────────────────────
+
+    CloneAgencyResponse:
+      type: object
+      description: Résultat du clonage de configuration d'agence
+      additionalProperties: false
+      required:
+        - targetAgencyId
+        - templateAgencyId
+        - clonedSections
+        - clonedAt
+      properties:
+        targetAgencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence cible (celle qui reçoit la config)
+          example: "agency_02"
+        templateAgencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence template (source de la config)
+          example: "agency_01"
+        clonedSections:
+          type: array
+          description: Sections de configuration clonées (jamais les données clients)
+          items:
+            type: string
+            enum:
+              - hours
+              - smsTemplates
+              - thresholds
+              - services
+          example:
+            - hours
+            - smsTemplates
+            - thresholds
+            - services
+        clonedAt:
+          type: string
+          format: date-time
+          description: Horodatage du clonage
+          example: "2026-07-11T10:00:00Z"
+
+    KioskAccessRequest:
+      type: object
+      description: Requête de génération de credentials borne
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          maxLength: 100
+          description: Libellé de la borne (ex. "Borne entrée principale")
+          example: "Borne entrée principale"
+
+    KioskAccessResponse:
+      type: object
+      description: Credentials borne + QR d'installation
+      additionalProperties: false
+      required:
+        - kioskId
+        - clientId
+        - clientSecret
+        - qrCodeDataUrl
+        - agencyId
+        - createdAt
+      properties:
+        kioskId:
+          type: string
+          format: uuid
+          description: Identifiant unique de la borne
+          example: "kiosk_01"
+        clientId:
+          type: string
+          description: Client ID pour l'authentification de la borne
+          example: "kiosk_client_7f3a9b"
+        clientSecret:
+          type: string
+          description: Client secret (transmis une seule fois, à stocker côté borne)
+          example: "ksk_XzP9mQr2nLsT4vWyBjH6cKdF"
+        qrCodeDataUrl:
+          type: string
+          description: QR code d'installation encodé en Data URL (PNG base64)
+          example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA..."
+        label:
+          type: ["string", "null"]
+          maxLength: 100
+          description: Libellé de la borne
+          example: "Borne entrée principale"
+        agencyId:
+          type: string
+          format: uuid
+          description: Identifiant de l'agence à laquelle appartient la borne
+          example: "agency_01"
+        createdAt:
+          type: string
+          format: date-time
+          description: Horodatage de création des credentials
+          example: "2026-07-11T10:05:00Z"
