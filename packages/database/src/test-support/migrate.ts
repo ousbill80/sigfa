@@ -34,7 +34,7 @@ export function splitStatements(sql: string): string[] {
  */
 export function listMigrationFiles(): string[] {
   return readdirSync(MIGRATIONS_DIR)
-    .filter((name) => name.endsWith(".sql"))
+    .filter((name) => name.endsWith(".sql") && !name.endsWith(".down.sql"))
     .sort((a, b) => a.localeCompare(b))
     .map((name) => join(MIGRATIONS_DIR, name));
 }

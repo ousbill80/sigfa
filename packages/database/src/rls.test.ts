@@ -29,6 +29,7 @@ const BUSINESS_TABLES = [
   "ticket_transfers",
   "tickets",
   "users",
+  "audit_log",
 ] as const;
 
 describe("DB-002 — RLS + tenant-isolation", () => {

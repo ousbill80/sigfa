@@ -7,3 +7,4 @@ export * from "./counters.js";
 export * from "./kiosks.js";
 export * from "./users.js";
 export * from "./tickets.js";
+export * from "./audit-log.js";
