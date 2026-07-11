@@ -18,7 +18,7 @@ INFRA-005 (DONE)
 
 | ID | Story | Fichier(s) possédé(s) | Dépend de | Statut |
 |---|---|---|---|---|
-| CONTRACT-001 | Contrat cœur : tenants, auth, agences, services, guichets, files, tickets | `openapi/core.yaml` | INFRA-005 | TODO |
+| CONTRACT-001 | Contrat cœur : tenants, auth, agences, services, guichets, files, tickets | `openapi/core.yaml` | INFRA-005 | DONE |
 | CONTRACT-002 | Événements Socket.io temps réel | `events/realtime.ts` | 001 | TODO |
 | CONTRACT-003 | Client public : émission multi-canal, suivi, feedback, sync borne | `openapi/public.yaml` | 001 | TODO |
 | CONTRACT-004 | Agents & compétences | `openapi/agents.yaml` | 001 | TODO |
