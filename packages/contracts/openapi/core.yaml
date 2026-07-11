@@ -1,0 +1,2766 @@
+openapi: "3.1.0"
+info:
+  title: SIGFA Core API
+  version: "1.0.0"
+  description: |
+    Contrat cœur SIGFA : tenants (banks), agences, services, guichets,
+    files d'attente et tickets. Servi sous /api/v1.
+
+    **Multi-tenant** : chaque requête est scopée par le JWT (claim `bankId`
+    pour les scopes `bank` et `agency`). Toutes les routes documentent leur
+    `x-tenant-scope` et `x-required-role`.
+
+    **Mutations critiques** (†) : POST /tickets, POST /tickets/{id}/close,
+    POST /tickets/sync nécessitent l'en-tête `X-Idempotency-Key`.
+
+servers:
+  - url: /api/v1
+    description: SIGFA v1
+
+security:
+  - BearerAuth: []
+
+# ─── TAGS ──────────────────────────────────────────────────────────────────────
+tags:
+  - name: Auth
+    description: Authentification JWT (access 15 min · refresh 7 j rotation)
+  - name: Banks
+    description: Ressources banques (scope platform, SUPER_ADMIN)
+  - name: Agencies
+    description: Agences d'une banque
+  - name: Services
+    description: Services proposés par une agence
+  - name: Counters
+    description: Guichets et sélection du ticket suivant
+  - name: Queues
+    description: Files d'attente par agence
+  - name: Tickets
+    description: Machine à états du ticket (WAITING→CALLED→SERVING→DONE|NO_SHOW|ABANDONED|TRANSFERRED)
+
+# ─── PATHS ─────────────────────────────────────────────────────────────────────
+paths:
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # AUTH
+  # ──────────────────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Connexion et obtention des tokens JWT
+      description: |
+        Authentifie un utilisateur et retourne un access token (15 min) et un
+        refresh token (7 j, rotation). Limité à **5 tentatives par 15 min** par
+        IP (429 `TOO_MANY_REQUESTS`).
+      x-tenant-scope: bank
+      x-required-role: NONE
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: agent@banque-ci.com
+              password: "S3cr3t!"
+      responses:
+        "200":
+          description: Tokens JWT retournés
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+              example:
+                accessToken: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyXzEifQ.sig"
+                refreshToken: "rt_abc123"
+                expiresIn: 900
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          description: Trop de tentatives (5 tentatives / 15 min par IP)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: TOO_MANY_REQUESTS
+                  message: "Trop de tentatives de connexion. Réessayez dans 15 minutes."
+                  details:
+                    retryAfterSeconds: 900
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renouvellement du token d'accès
+      description: |
+        Échange un refresh token valide contre un nouveau couple access/refresh
+        (rotation : l'ancien refresh token est invalidé).
+      x-tenant-scope: bank
+      x-required-role: NONE
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+            example:
+              refreshToken: "rt_abc123"
+      responses:
+        "200":
+          description: Nouveaux tokens JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+              example:
+                accessToken: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyXzEifQ.sig2"
+                refreshToken: "rt_def456"
+                expiresIn: 900
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Déconnexion (révocation du refresh token)
+      description: Révoque le refresh token actif de l'utilisateur.
+      x-tenant-scope: bank
+      x-required-role: NONE
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+            example:
+              refreshToken: "rt_abc123"
+      responses:
+        "200":
+          description: Déconnexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+              example:
+                success: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Profil de l'utilisateur connecté
+      description: Retourne le profil et les permissions de l'utilisateur authentifié.
+      x-tenant-scope: bank
+      x-required-role: NONE
+      responses:
+        "200":
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+              example:
+                id: "user_01"
+                email: "agent@banque-ci.com"
+                role: AGENT
+                bankId: "bank_01"
+                agencyId: "agency_01"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # BANKS
+  # ──────────────────────────────────────────────────────────────────────────────
+  /banks:
+    get:
+      tags: [Banks]
+      summary: Liste toutes les banques (platform)
+      description: |
+        Retourne la liste paginée de toutes les banques.
+        Scope **platform** — accessible uniquement au SUPER_ADMIN.
+      x-tenant-scope: platform
+      x-required-role: SUPER_ADMIN
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Liste paginée des banques
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankListResponse"
+              example:
+                data:
+                  - id: "bank_01"
+                    name: "Banque Nationale de Côte d'Ivoire"
+                    slug: "bnci"
+                    active: true
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 3
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags: [Banks]
+      summary: Créer une banque (platform)
+      description: |
+        Crée une nouvelle banque. Scope **platform** — SUPER_ADMIN uniquement.
+      x-tenant-scope: platform
+      x-required-role: SUPER_ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBankRequest"
+            example:
+              name: "Banque Atlantique CI"
+              slug: "baci"
+              contactEmail: "admin@baci.ci"
+      responses:
+        "201":
+          description: Banque créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bank"
+              example:
+                id: "bank_02"
+                name: "Banque Atlantique CI"
+                slug: "baci"
+                active: true
+                createdAt: "2026-01-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /banks/{id}:
+    get:
+      tags: [Banks]
+      summary: Obtenir une banque par son identifiant
+      description: Retourne le détail d'une banque. Scope **bank** (BANK_ADMIN) ou **platform** (SUPER_ADMIN).
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Détail de la banque
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bank"
+              example:
+                id: "bank_01"
+                name: "Banque Nationale de Côte d'Ivoire"
+                slug: "bnci"
+                active: true
+                createdAt: "2025-01-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags: [Banks]
+      summary: Mettre à jour une banque
+      description: Mise à jour partielle d'une banque (nom, statut, etc.).
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBankRequest"
+            example:
+              name: "BNCI (renommée)"
+              active: false
+      responses:
+        "200":
+          description: Banque mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bank"
+              example:
+                id: "bank_01"
+                name: "BNCI (renommée)"
+                slug: "bnci"
+                active: false
+                createdAt: "2025-01-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # AGENCIES
+  # ──────────────────────────────────────────────────────────────────────────────
+  /agencies:
+    get:
+      tags: [Agencies]
+      summary: Lister les agences de la banque
+      description: |
+        Retourne la liste paginée des agences de la banque authentifiée (claim `bankId`).
+        Scope **bank**.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Liste paginée des agences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgencyListResponse"
+              example:
+                data:
+                  - id: "agency_01"
+                    name: "Agence Plateau"
+                    bankId: "bank_01"
+                    active: true
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 5
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags: [Agencies]
+      summary: Créer une agence
+      description: Crée une nouvelle agence rattachée à la banque authentifiée.
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgencyRequest"
+            example:
+              name: "Agence Cocody"
+              address: "Cocody, Abidjan, CI"
+              phone: "+2250700000001"
+              timezone: "Africa/Abidjan"
+      responses:
+        "201":
+          description: Agence créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agency"
+              example:
+                id: "agency_02"
+                name: "Agence Cocody"
+                bankId: "bank_01"
+                active: true
+                createdAt: "2026-01-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /agencies/{id}:
+    get:
+      tags: [Agencies]
+      summary: Obtenir une agence
+      description: Retourne le détail d'une agence. Scope **agency** — AGENCY_DIRECTOR minimum.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Détail de l'agence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agency"
+              example:
+                id: "agency_01"
+                name: "Agence Plateau"
+                bankId: "bank_01"
+                active: true
+                createdAt: "2025-06-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags: [Agencies]
+      summary: Mettre à jour une agence
+      description: Mise à jour partielle d'une agence.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgencyRequest"
+            example:
+              name: "Agence Plateau (renommée)"
+              active: false
+      responses:
+        "200":
+          description: Agence mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agency"
+              example:
+                id: "agency_01"
+                name: "Agence Plateau (renommée)"
+                bankId: "bank_01"
+                active: false
+                createdAt: "2025-06-01T00:00:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags: [Agencies]
+      summary: Supprimer une agence
+      description: |
+        Supprime logiquement une agence (désactivation). Une agence avec des
+        tickets actifs ne peut pas être supprimée (409 `AGENCY_HAS_ACTIVE_TICKETS`).
+      x-tenant-scope: bank
+      x-required-role: BANK_ADMIN
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Agence supprimée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+              example:
+                success: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflit — agence avec tickets actifs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: AGENCY_HAS_ACTIVE_TICKETS
+                  message: "Impossible de supprimer une agence avec des tickets actifs."
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # SERVICES
+  # ──────────────────────────────────────────────────────────────────────────────
+  /services:
+    get:
+      tags: [Services]
+      summary: Lister les services d'une agence
+      description: Retourne la liste paginée des services proposés par l'agence authentifiée.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Liste paginée des services
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceListResponse"
+              example:
+                data:
+                  - id: "svc_01"
+                    name: "Virements"
+                    agencyId: "agency_01"
+                    slaMinutes: 10
+                    active: true
+                    order: 1
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 4
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags: [Services]
+      summary: Créer un service
+      description: Crée un nouveau service dans l'agence authentifiée.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequest"
+            example:
+              name: "Crédits immobiliers"
+              slaMinutes: 20
+              order: 5
+      responses:
+        "201":
+          description: Service créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+              example:
+                id: "svc_05"
+                name: "Crédits immobiliers"
+                agencyId: "agency_01"
+                slaMinutes: 20
+                active: true
+                order: 5
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /services/{id}:
+    patch:
+      tags: [Services]
+      summary: Mettre à jour un service (SLA, ordre, statut)
+      description: Mise à jour partielle d'un service (SLA, ordre d'affichage, actif/inactif).
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceRequest"
+            example:
+              slaMinutes: 15
+              active: false
+              order: 2
+      responses:
+        "200":
+          description: Service mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+              example:
+                id: "svc_01"
+                name: "Virements"
+                agencyId: "agency_01"
+                slaMinutes: 15
+                active: false
+                order: 2
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # COUNTERS (GUICHETS)
+  # ──────────────────────────────────────────────────────────────────────────────
+  /counters:
+    get:
+      tags: [Counters]
+      summary: Lister les guichets d'une agence
+      description: Retourne la liste paginée des guichets de l'agence authentifiée.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Liste paginée des guichets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CounterListResponse"
+              example:
+                data:
+                  - id: "counter_01"
+                    label: "Guichet 1"
+                    agencyId: "agency_01"
+                    status: OPEN
+                    agentId: "user_01"
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 8
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags: [Counters]
+      summary: Créer un guichet
+      description: Crée un nouveau guichet dans l'agence authentifiée.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCounterRequest"
+            example:
+              label: "Guichet 9"
+              serviceIds: ["svc_01", "svc_02"]
+      responses:
+        "201":
+          description: Guichet créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Counter"
+              example:
+                id: "counter_09"
+                label: "Guichet 9"
+                agencyId: "agency_01"
+                status: OPEN
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /counters/{id}:
+    patch:
+      tags: [Counters]
+      summary: Mettre à jour un guichet (statut, agent affecté)
+      description: |
+        Mise à jour partielle d'un guichet : statut (`OPEN` | `PAUSED` | `CLOSED`),
+        agent affecté, services couverts.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCounterRequest"
+            example:
+              status: PAUSED
+              agentId: "user_02"
+      responses:
+        "200":
+          description: Guichet mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Counter"
+              example:
+                id: "counter_01"
+                label: "Guichet 1"
+                agencyId: "agency_01"
+                status: PAUSED
+                agentId: "user_02"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /counters/{counterId}/call-next:
+    post:
+      tags: [Counters]
+      summary: Appeler le ticket suivant (sélection serveur)
+      description: |
+        Le serveur sélectionne le prochain ticket éligible selon les priorités du
+        moteur de file (API-004) et le passe à l'état **CALLED**.
+
+        - **200** : ticket sélectionné et retourné.
+        - **404 `QUEUE_EMPTY`** : aucun ticket en état WAITING éligible pour ce guichet.
+
+        La transition `WAITING → CALLED` est documentée ; une transition illégale
+        retourne 409 `ILLEGAL_TRANSITION`.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - name: counterId
+          in: path
+          required: true
+          description: Identifiant du guichet
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ticket suivant sélectionné et passé à CALLED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketCallResponse"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: CALLED
+                counterId: "counter_01"
+                serviceId: "svc_01"
+                position: 0
+                estimatedWaitMinutes: 0
+                calledAt: "2026-07-11T09:30:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Aucun ticket en attente — file vide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: QUEUE_EMPTY
+                  message: "Aucun ticket en attente pour ce guichet."
+        "409":
+          description: Transition illégale depuis l'état actuel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ILLEGAL_TRANSITION
+                  message: "Transition illégale : le ticket n'est pas dans l'état WAITING."
+                  details:
+                    currentStatus: CALLED
+                    requestedTransition: CALLED
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # QUEUES
+  # ──────────────────────────────────────────────────────────────────────────────
+  /queues:
+    get:
+      tags: [Queues]
+      summary: Lister les files d'attente d'une agence
+      description: |
+        Retourne les files d'attente de l'agence filtrées par `agencyId`.
+        Chaque file inclut son état actuel (longueur, estimation d'attente).
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - name: agencyId
+          in: query
+          required: true
+          description: Identifiant de l'agence
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Liste des files d'attente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueListResponse"
+              example:
+                data:
+                  - id: "queue_01"
+                    agencyId: "agency_01"
+                    serviceId: "svc_01"
+                    status: OPEN
+                    length: 12
+                    estimatedWaitMinutes: 24
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 4
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /queues/{id}:
+    patch:
+      tags: [Queues]
+      summary: Mettre à jour une file (statut, plage horaire)
+      description: |
+        Ouvre ou ferme une file, ou met à jour ses plages horaires.
+        Statuts possibles : `OPEN` | `PAUSED` | `CLOSED`.
+      x-tenant-scope: agency
+      x-required-role: MANAGER
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQueueRequest"
+            example:
+              status: PAUSED
+              openAt: "08:00"
+              closeAt: "17:00"
+      responses:
+        "200":
+          description: File mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Queue"
+              example:
+                id: "queue_01"
+                agencyId: "agency_01"
+                serviceId: "svc_01"
+                status: PAUSED
+                openAt: "08:00"
+                closeAt: "17:00"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # TICKETS — machine à états
+  # WAITING → CALLED → SERVING → DONE | NO_SHOW | ABANDONED | TRANSFERRED
+  # ──────────────────────────────────────────────────────────────────────────────
+  /tickets:
+    post:
+      tags: [Tickets]
+      summary: "† Émettre un ticket (mutation critique — X-Idempotency-Key requis)"
+      description: |
+        Crée un nouveau ticket dans l'état **WAITING**.
+        Le canal d'émission (`channel`) est fourni par l'appelant.
+
+        **Mutation critique** : l'en-tête `X-Idempotency-Key` est obligatoire.
+        Même clé + même payload = même réponse pendant 24 h.
+        Même clé + payload différent → 409 `IDEMPOTENCY_CONFLICT`.
+
+        Les variantes multi-canal détaillées (borne, QR, WhatsApp…) sont dans
+        CONTRACT-003.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketRequest"
+            example:
+              serviceId: "svc_01"
+              agencyId: "agency_01"
+              channel: KIOSK
+              phoneNumber: "+2250700000001"
+              priority: false
+      responses:
+        "201":
+          description: Ticket créé en état WAITING
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketCreatedResponse"
+              example:
+                id: "ticket_99"
+                number: "A099"
+                status: WAITING
+                serviceId: "svc_01"
+                agencyId: "agency_01"
+                channel: KIOSK
+                position: 13
+                estimatedWaitMinutes: 26
+                trackingId: "tck_V9k2mXpLqRwZsYn8fBjH3"
+                createdAt: "2026-07-11T09:00:00Z"
+        "400":
+          description: Requête invalide ou X-Idempotency-Key absent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_KEY_REQUIRED
+                  message: "L'en-tête X-Idempotency-Key est obligatoire pour cette mutation."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflit d'idempotence (même clé, payload différent)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_CONFLICT
+                  message: "Même X-Idempotency-Key avec un payload différent."
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Obtenir un ticket (suivi)
+      description: Retourne le détail d'un ticket, incluant sa position actuelle en file.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Détail du ticket
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: WAITING
+                serviceId: "svc_01"
+                agencyId: "agency_01"
+                channel: QR
+                position: 5
+                estimatedWaitMinutes: 10
+                trackingId: "tck_abc123"
+                createdAt: "2026-07-11T08:45:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/{id}/call:
+    post:
+      tags: [Tickets]
+      summary: Appel ciblé / re-appel d'un ticket précis
+      description: |
+        Appelle un ticket précis (re-appel ou appel ciblé).
+        Transition : `WAITING → CALLED`.
+
+        - **409 `TICKET_ALREADY_CLAIMED`** : un autre guichet a déjà obtenu ce ticket.
+        - **409 `ILLEGAL_TRANSITION`** : le ticket n'est pas dans un état permettant
+          la transition vers CALLED.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CallTicketRequest"
+            example:
+              counterId: "counter_01"
+      responses:
+        "200":
+          description: Ticket passé à l'état CALLED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketCallResponse"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: CALLED
+                counterId: "counter_01"
+                serviceId: "svc_01"
+                position: 0
+                estimatedWaitMinutes: 0
+                calledAt: "2026-07-11T09:30:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Ticket déjà pris par un autre guichet ou transition illégale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                already_claimed:
+                  summary: Ticket déjà pris par un autre guichet
+                  value:
+                    error:
+                      code: TICKET_ALREADY_CLAIMED
+                      message: "Ce ticket a déjà été pris par le guichet counter_02."
+                      details:
+                        claimedByCounterId: "counter_02"
+                illegal_transition:
+                  summary: Transition illégale
+                  value:
+                    error:
+                      code: ILLEGAL_TRANSITION
+                      message: "Transition illégale depuis l'état SERVING."
+                      details:
+                        currentStatus: SERVING
+                        requestedTransition: CALLED
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/{id}/serve:
+    post:
+      tags: [Tickets]
+      summary: Débuter la prise en charge d'un ticket
+      description: |
+        Passe le ticket de l'état **CALLED** à **SERVING**.
+        409 `ILLEGAL_TRANSITION` si le ticket n'est pas en état CALLED.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+            example: {}
+      responses:
+        "200":
+          description: Ticket passé à l'état SERVING
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: SERVING
+                counterId: "counter_01"
+                serviceId: "svc_01"
+                position: 0
+                estimatedWaitMinutes: 0
+                calledAt: "2026-07-11T09:30:00Z"
+                servedAt: "2026-07-11T09:31:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Transition illégale — ticket non en état CALLED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ILLEGAL_TRANSITION
+                  message: "Le ticket doit être en état CALLED pour être passé à SERVING."
+                  details:
+                    currentStatus: WAITING
+                    requestedTransition: SERVING
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/{id}/close:
+    post:
+      tags: [Tickets]
+      summary: "† Clôturer un ticket (mutation critique — X-Idempotency-Key requis)"
+      description: |
+        Passe le ticket de l'état **SERVING** à **DONE**. Calcule automatiquement
+        `waitTime` (WAITING → CALLED) et `serviceTime` (SERVING → DONE).
+
+        **Mutation critique** : `X-Idempotency-Key` obligatoire (TTL 24 h).
+        409 `ILLEGAL_TRANSITION` si le ticket n'est pas en état SERVING.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+        - $ref: "#/components/parameters/IdempotencyKeyParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseTicketRequest"
+            example:
+              notes: "Virement effectué avec succès."
+      responses:
+        "200":
+          description: Ticket clôturé en état DONE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketClosed"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: DONE
+                counterId: "counter_01"
+                waitTime: 600
+                serviceTime: 300
+                closedAt: "2026-07-11T09:36:00Z"
+        "400":
+          description: X-Idempotency-Key absent ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_KEY_REQUIRED
+                  message: "L'en-tête X-Idempotency-Key est obligatoire."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Transition illégale — ticket non en état SERVING
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ILLEGAL_TRANSITION
+                  message: "Le ticket doit être en état SERVING pour être clôturé."
+                  details:
+                    currentStatus: WAITING
+                    requestedTransition: DONE
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/{id}/no-show:
+    post:
+      tags: [Tickets]
+      summary: Marquer un ticket comme non-présenté
+      description: |
+        Passe le ticket à l'état **NO_SHOW** (après le délai d'appel configurable).
+        Transition valide depuis : CALLED.
+        409 `ILLEGAL_TRANSITION` si le ticket n'est pas en état CALLED.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+            example: {}
+      responses:
+        "200":
+          description: Ticket passé à l'état NO_SHOW
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: NO_SHOW
+                counterId: "counter_01"
+                noShowAt: "2026-07-11T09:35:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Transition illégale — ticket non en état CALLED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ILLEGAL_TRANSITION
+                  message: "Seul un ticket en état CALLED peut être marqué NO_SHOW."
+                  details:
+                    currentStatus: WAITING
+                    requestedTransition: NO_SHOW
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/{id}/transfer:
+    post:
+      tags: [Tickets]
+      summary: Transférer un ticket vers un autre guichet ou service
+      description: |
+        Transfère un ticket vers un autre guichet ou service.
+        Le ticket repart en état **WAITING** dans la file cible (transition : SERVING → TRANSFERRED).
+        409 `ILLEGAL_TRANSITION` si le ticket n'est pas en état SERVING.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferTicketRequest"
+            example:
+              targetServiceId: "svc_02"
+
+              reason: "Compétence spécialisée requise."
+      responses:
+        "200":
+          description: Ticket transféré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: TRANSFERRED
+                transferredToServiceId: "svc_02"
+                transferredAt: "2026-07-11T09:33:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Transition illégale — ticket non en état SERVING
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ILLEGAL_TRANSITION
+                  message: "Seul un ticket en état SERVING peut être transféré."
+                  details:
+                    currentStatus: WAITING
+                    requestedTransition: TRANSFERRED
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/{id}/abandon:
+    post:
+      tags: [Tickets]
+      summary: Marquer un ticket comme abandonné
+      description: |
+        Passe le ticket à l'état **ABANDONED** (client parti avant appel).
+        Transition valide depuis : WAITING.
+        409 `ILLEGAL_TRANSITION` si le ticket n'est pas en état WAITING.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+            example: {}
+      responses:
+        "200":
+          description: Ticket passé à l'état ABANDONED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+              example:
+                id: "ticket_42"
+                number: "A042"
+                status: ABANDONED
+                abandonedAt: "2026-07-11T09:20:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Transition illégale — ticket non en état WAITING
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: ILLEGAL_TRANSITION
+                  message: "Seul un ticket en état WAITING peut être abandonné."
+                  details:
+                    currentStatus: CALLED
+                    requestedTransition: ABANDONED
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /tickets/sync:
+    post:
+      tags: [Tickets]
+      summary: "† Synchroniser des tickets offline (mutation critique — X-Idempotency-Key requis)"
+      description: |
+        Batch de synchronisation de tickets créés hors-ligne (borne, mobile).
+        Limite : **100 tickets maximum** par appel. Au-delà : 422 `BATCH_TOO_LARGE`.
+
+        Chaque entrée est identifiée par son `localUuid` client (idempotence unitaire).
+        La réponse indique les tickets synchronisés (`synced`) et ceux ignorés
+        (`skipped`) avec la raison.
+
+        **Mutation critique** : `X-Idempotency-Key` obligatoire sur le batch complet.
+      x-tenant-scope: agency
+      x-required-role: AGENT
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketSyncRequest"
+            example:
+              tickets:
+                - localUuid: "550e8400-e29b-41d4-a716-446655440001"
+                  serviceId: "svc_01"
+                  agencyId: "agency_01"
+                  channel: KIOSK
+                  createdOfflineAt: "2026-07-11T07:00:00Z"
+                - localUuid: "550e8400-e29b-41d4-a716-446655440002"
+                  serviceId: "svc_02"
+                  agencyId: "agency_01"
+                  channel: KIOSK
+                  createdOfflineAt: "2026-07-11T07:01:00Z"
+      responses:
+        "200":
+          description: Synchronisation effectuée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketSyncResponse"
+              example:
+                synced:
+                  - localUuid: "550e8400-e29b-41d4-a716-446655440001"
+                    serverId: "ticket_100"
+                    number: "A100"
+                skipped:
+                  - localUuid: "550e8400-e29b-41d4-a716-446655440002"
+                    reason: "SERVICE_NOT_FOUND"
+        "400":
+          description: X-Idempotency-Key absent ou requête invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_KEY_REQUIRED
+                  message: "L'en-tête X-Idempotency-Key est obligatoire."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflit d'idempotence (même clé, payload différent)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: IDEMPOTENCY_CONFLICT
+                  message: "Même X-Idempotency-Key avec un payload différent."
+        "422":
+          description: Batch trop large (> 100 tickets) ou données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: BATCH_TOO_LARGE
+                  message: "Le batch dépasse la limite de 100 tickets par synchronisation."
+                  details:
+                    maxItems: 100
+                    receivedItems: 150
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+# ─── COMPONENTS ────────────────────────────────────────────────────────────────
+components:
+
+  # ── Security Schemes ─────────────────────────────────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token (durée de vie : **15 minutes**).
+        Obtenu via POST /auth/login ou POST /auth/refresh.
+        Format : `Authorization: Bearer <accessToken>`
+
+    RefreshToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT refresh token (durée de vie : **7 jours**, rotation).
+        Utilisé uniquement sur POST /auth/refresh et POST /auth/logout.
+
+  # ── Headers ──────────────────────────────────────────────────────────────────
+  headers:
+    IdempotencyKey:
+      description: |
+        Clé d'idempotence pour les mutations critiques (émission, clôture, sync).
+        **Format** : chaîne de 1 à 255 caractères (UUID v4 recommandé, non imposé).
+        **TTL** : 24 heures. Même clé + même payload → même réponse.
+        Même clé + payload différent → 409 `IDEMPOTENCY_CONFLICT`.
+        Absent → 400 `IDEMPOTENCY_KEY_REQUIRED`.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+        description: "UUID v4 recommandé (ex: 550e8400-e29b-41d4-a716-446655440000)"
+
+  # ── Parameters ────────────────────────────────────────────────────────────────
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: Identifiant unique de la ressource (UUID v4)
+      schema:
+        type: string
+        format: uuid
+
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Numéro de page (≥1, défaut 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Taille de page (1–100, défaut 20)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    IdempotencyKeyParam:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Clé d'idempotence. Voir `components/headers/IdempotencyKey` pour la sémantique complète.
+      schema:
+        $ref: "#/components/headers/IdempotencyKey/schema"
+
+  # ── Schemas ───────────────────────────────────────────────────────────────────
+  schemas:
+
+    # ── Schémas transverses possédés par core.yaml (référencés par 002–008) ───
+
+    TicketStatus:
+      type: string
+      description: |
+        États possibles d'un ticket dans la machine à états SIGFA.
+        **Transitions légales** :
+        - WAITING → CALLED (call-next ou /call)
+        - CALLED → SERVING (/serve)
+        - SERVING → DONE (/close)
+        - CALLED → NO_SHOW (/no-show)
+        - SERVING → TRANSFERRED (/transfer)
+        - WAITING → ABANDONED (/abandon)
+        Toute autre transition → 409 `ILLEGAL_TRANSITION`.
+      enum:
+        - WAITING
+        - CALLED
+        - SERVING
+        - DONE
+        - NO_SHOW
+        - ABANDONED
+        - TRANSFERRED
+
+    Role:
+      type: string
+      description: |
+        Rôles utilisateur SIGFA (matrice RBAC v5 §MODULE 4).
+        - SUPER_ADMIN : accès platform complet
+        - BANK_ADMIN : admin de la banque
+        - AGENCY_DIRECTOR : directeur d'agence
+        - MANAGER : manager d'agence
+        - AGENT : agent de guichet
+        - AUDITOR : lecture seule, audit
+        - NONE : accès sans authentification (routes publiques)
+      enum:
+        - SUPER_ADMIN
+        - BANK_ADMIN
+        - AGENCY_DIRECTOR
+        - MANAGER
+        - AGENT
+        - AUDITOR
+        - NONE
+
+    NotificationType:
+      type: string
+      description: |
+        Types de notifications SIGFA (SMS, WhatsApp, email, push).
+        Schéma transverse référencé par CONTRACT-007.
+      enum:
+        - SMS
+        - WHATSAPP
+        - EMAIL
+        - PUSH
+
+    TicketChannel:
+      type: string
+      description: Canal d'émission du ticket.
+      enum:
+        - KIOSK
+        - QR
+        - MOBILE
+        - WHATSAPP
+
+    CounterStatus:
+      type: string
+      description: Statut d'un guichet.
+      enum:
+        - OPEN
+        - PAUSED
+        - CLOSED
+
+    QueueStatus:
+      type: string
+      description: Statut d'une file d'attente.
+      enum:
+        - OPEN
+        - PAUSED
+        - CLOSED
+
+    # ── Schéma d'erreur standardisé (identique à @sigfa/schemas errorSchema) ─
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              pattern: "^[A-Z][A-Z0-9_]*$"
+              description: Code d'erreur UPPER_SNAKE_CASE commençant par une lettre
+              example: ILLEGAL_TRANSITION
+            message:
+              type: string
+              minLength: 1
+              description: Message d'erreur humain
+              example: "Transition illégale depuis l'état actuel."
+            details:
+              type: object
+              additionalProperties: true
+              description: Informations complémentaires (champ optionnel)
+
+    # ── Pagination ────────────────────────────────────────────────────────────
+
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Numéro de page courant
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Taille de page
+        total:
+          type: integer
+          minimum: 0
+          description: Nombre total d'éléments
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    RefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+
+    AuthTokens:
+      type: object
+      required:
+        - accessToken
+        - refreshToken
+        - expiresIn
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token (durée de vie 15 min)
+        refreshToken:
+          type: string
+          description: JWT refresh token (durée de vie 7 j, rotation)
+        expiresIn:
+          type: integer
+          description: Durée de vie de l'access token en secondes (900)
+          example: 900
+
+    UserProfile:
+      type: object
+      required:
+        - id
+        - email
+        - role
+        - bankId
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Role"
+        bankId:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+
+    # ── Bank ─────────────────────────────────────────────────────────────────
+
+    Bank:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - active
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateBankRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+          pattern: "^[a-z0-9-]+$"
+        contactEmail:
+          type: string
+          format: email
+
+    UpdateBankRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        active:
+          type: boolean
+
+    BankListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bank"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    # ── Agency ────────────────────────────────────────────────────────────────
+
+    Agency:
+      type: object
+      required:
+        - id
+        - name
+        - bankId
+        - active
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        bankId:
+          type: string
+          format: uuid
+        active:
+          type: boolean
+        address:
+          type: string
+        phone:
+          type: string
+        timezone:
+          type: string
+          default: "Africa/Abidjan"
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateAgencyRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        timezone:
+          type: string
+
+    UpdateAgencyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        active:
+          type: boolean
+        address:
+          type: string
+        phone:
+          type: string
+
+    AgencyListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Agency"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    # ── Service ───────────────────────────────────────────────────────────────
+
+    Service:
+      type: object
+      required:
+        - id
+        - name
+        - agencyId
+        - slaMinutes
+        - active
+        - order
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        agencyId:
+          type: string
+          format: uuid
+        slaMinutes:
+          type: integer
+          minimum: 1
+        active:
+          type: boolean
+        order:
+          type: integer
+          minimum: 1
+
+    CreateServiceRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        slaMinutes:
+          type: integer
+          minimum: 1
+          default: 10
+        order:
+          type: integer
+          minimum: 1
+
+    UpdateServiceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        slaMinutes:
+          type: integer
+          minimum: 1
+        active:
+          type: boolean
+        order:
+          type: integer
+          minimum: 1
+
+    ServiceListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    # ── Counter ───────────────────────────────────────────────────────────────
+
+    Counter:
+      type: object
+      required:
+        - id
+        - label
+        - agencyId
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        agencyId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/CounterStatus"
+        agentId:
+          type: string
+          format: uuid
+
+    CreateCounterRequest:
+      type: object
+      required:
+        - label
+      properties:
+        label:
+          type: string
+        serviceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    UpdateCounterRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/CounterStatus"
+        agentId:
+          type: string
+          format: uuid
+        serviceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    CounterListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Counter"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    # ── Queue ─────────────────────────────────────────────────────────────────
+
+    Queue:
+      type: object
+      required:
+        - id
+        - agencyId
+        - serviceId
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+        serviceId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/QueueStatus"
+        length:
+          type: integer
+          minimum: 0
+          description: Nombre de tickets en état WAITING
+        estimatedWaitMinutes:
+          type: integer
+          minimum: 0
+        openAt:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+          example: "08:00"
+        closeAt:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+          example: "17:00"
+
+    UpdateQueueRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/QueueStatus"
+        openAt:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+        closeAt:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+
+    QueueListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Queue"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    # ── Ticket ────────────────────────────────────────────────────────────────
+
+    Ticket:
+      type: object
+      required:
+        - id
+        - number
+        - status
+        - serviceId
+        - agencyId
+        - channel
+        - position
+        - estimatedWaitMinutes
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+          description: "Numéro affiché (ex: A042)"
+          example: "A042"
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        serviceId:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+        channel:
+          $ref: "#/components/schemas/TicketChannel"
+        position:
+          type: integer
+          minimum: 0
+          description: Position dans la file (0 = en cours de traitement)
+        estimatedWaitMinutes:
+          type: integer
+          minimum: 0
+        trackingId:
+          type: string
+          description: Nanoid 21 pour le suivi public
+        counterId:
+          type: string
+          format: uuid
+        calledAt:
+          type: string
+          format: date-time
+        servedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+        noShowAt:
+          type: string
+          format: date-time
+        abandonedAt:
+          type: string
+          format: date-time
+        transferredAt:
+          type: string
+          format: date-time
+        transferredToServiceId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    TicketCreatedResponse:
+      type: object
+      description: Réponse à POST /tickets — ticket créé en état WAITING
+      required:
+        - id
+        - number
+        - status
+        - serviceId
+        - agencyId
+        - channel
+        - position
+        - estimatedWaitMinutes
+        - trackingId
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+          description: "Numéro affiché (ex: A099)"
+          example: "A099"
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        serviceId:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+        channel:
+          $ref: "#/components/schemas/TicketChannel"
+        position:
+          type: integer
+          minimum: 0
+          description: Position dans la file au moment de l'émission
+        estimatedWaitMinutes:
+          type: integer
+          minimum: 0
+          description: Estimation du temps d'attente en minutes
+        trackingId:
+          type: string
+          description: Nanoid 21 pour le suivi public (CONTRACT-003)
+        createdAt:
+          type: string
+          format: date-time
+
+    TicketCallResponse:
+      type: object
+      description: Réponse à call-next ou /call — ticket en état CALLED
+      required:
+        - id
+        - number
+        - status
+        - counterId
+        - serviceId
+        - position
+        - estimatedWaitMinutes
+        - calledAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+          example: "A042"
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        counterId:
+          type: string
+          format: uuid
+        serviceId:
+          type: string
+          format: uuid
+        position:
+          type: integer
+          minimum: 0
+        estimatedWaitMinutes:
+          type: integer
+          minimum: 0
+        calledAt:
+          type: string
+          format: date-time
+
+    TicketClosed:
+      type: object
+      description: Réponse à POST /tickets/{id}/close — ticket en état DONE
+      required:
+        - id
+        - number
+        - status
+        - counterId
+        - waitTime
+        - serviceTime
+        - closedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+          example: "A042"
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        counterId:
+          type: string
+          format: uuid
+        waitTime:
+          type: integer
+          minimum: 0
+          description: Temps d'attente en secondes (WAITING → CALLED)
+        serviceTime:
+          type: integer
+          minimum: 0
+          description: Temps de service en secondes (SERVING → DONE)
+        closedAt:
+          type: string
+          format: date-time
+
+    CreateTicketRequest:
+      type: object
+      required:
+        - serviceId
+        - agencyId
+        - channel
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+        channel:
+          $ref: "#/components/schemas/TicketChannel"
+        phoneNumber:
+          type: string
+          description: Numéro de téléphone pour les notifications SMS/WhatsApp
+        priority:
+          type: boolean
+          default: false
+          description: Ticket prioritaire (PMR, VIP)
+
+    CallTicketRequest:
+      type: object
+      required:
+        - counterId
+      properties:
+        counterId:
+          type: string
+          format: uuid
+
+    CloseTicketRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+          maxLength: 1000
+
+    TransferTicketRequest:
+      type: object
+      required:
+        - targetServiceId
+      properties:
+        targetServiceId:
+          type: string
+          format: uuid
+        targetCounterId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 500
+
+    # ── Sync ─────────────────────────────────────────────────────────────────
+
+    TicketSyncItem:
+      type: object
+      required:
+        - localUuid
+        - serviceId
+        - agencyId
+        - channel
+        - createdOfflineAt
+      properties:
+        localUuid:
+          type: string
+          format: uuid
+          description: UUID généré côté client pour l'idempotence
+        serviceId:
+          type: string
+          format: uuid
+        agencyId:
+          type: string
+          format: uuid
+        channel:
+          $ref: "#/components/schemas/TicketChannel"
+        createdOfflineAt:
+          type: string
+          format: date-time
+        priority:
+          type: boolean
+          default: false
+
+    TicketSyncRequest:
+      type: object
+      required:
+        - tickets
+      properties:
+        tickets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketSyncItem"
+          minItems: 1
+          maxItems: 100
+          description: Batch de tickets offline — maximum 100 par appel
+
+    SyncedTicket:
+      type: object
+      required:
+        - localUuid
+        - serverId
+        - number
+      properties:
+        localUuid:
+          type: string
+          format: uuid
+        serverId:
+          type: string
+          format: uuid
+        number:
+          type: string
+          description: Numéro définitif côté serveur (résolution local → serveur)
+          example: "A100"
+
+    SkippedTicket:
+      type: object
+      required:
+        - localUuid
+        - reason
+      properties:
+        localUuid:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          description: Raison du rejet (code d'erreur)
+          example: "SERVICE_NOT_FOUND"
+
+    TicketSyncResponse:
+      type: object
+      required:
+        - synced
+        - skipped
+      properties:
+        synced:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncedTicket"
+          description: Tickets synchronisés avec succès (résolution localUuid → serverId + number)
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkippedTicket"
+          description: Tickets ignorés avec la raison
+
+  # ── Responses partagées ───────────────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Requête invalide (validation échouée ou en-tête obligatoire absent)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: BAD_REQUEST
+              message: "Le corps de la requête est invalide."
+              details:
+                field: "email"
+                issue: "Format d'email invalide."
+
+    Unauthorized:
+      description: Token JWT absent, expiré ou invalide
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: "Token d'accès absent ou expiré."
+
+    Forbidden:
+      description: Permissions insuffisantes pour cette opération
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: FORBIDDEN
+              message: "Vous n'avez pas les permissions nécessaires."
+
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: NOT_FOUND
+              message: "La ressource demandée est introuvable."
+
+    Conflict:
+      description: Conflit (ressource existante ou transition illégale)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: CONFLICT
+              message: "Un conflit a été détecté."
+
+    UnprocessableEntity:
+      description: Entité non traitable (données sémantiquement invalides)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: "Les données fournies sont sémantiquement invalides."
+
+    TooManyRequests:
+      description: Trop de requêtes — limite de débit atteinte
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: TOO_MANY_REQUESTS
+              message: "Limite de débit atteinte. Réessayez ultérieurement."
+
+    InternalServerError:
+      description: Erreur interne du serveur
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: "Une erreur interne s'est produite."

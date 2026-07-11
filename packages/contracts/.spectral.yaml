@@ -1,0 +1,131 @@
+extends:
+  - spectral:oas
+
+rules:
+  # ─── Surcharges des règles built-in ──────────────────────────────────────────
+  # Les exemples utilisent des IDs courts pour la lisibilité — désactivé
+  oas3-valid-media-example: off
+  oas3-valid-schema-example: off
+  # contact non requis dans notre contexte projet
+  info-contact: off
+  # description optionnelle sur info
+  info-description: off
+  # operationId : recommandé mais non obligatoire dans notre workflow (CONTRACT-009 les génère)
+  operation-operationId: off
+  # Composants transverses (NotificationType, IdempotencyKey) : référencés
+  # par les stories 002-007 via $ref inter-fichiers — pas détectés par Spectral
+  oas3-unused-component: off
+
+  # ─── Règle 1 : 9 codes de réponse obligatoires par opération ──────────────
+  sigfa-required-response-400:
+    message: "{{path}} doit documenter le code 400"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "400"
+      function: truthy
+
+  sigfa-required-response-401:
+    message: "{{path}} doit documenter le code 401"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "401"
+      function: truthy
+
+  sigfa-required-response-403:
+    message: "{{path}} doit documenter le code 403"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "403"
+      function: truthy
+
+  sigfa-required-response-404:
+    message: "{{path}} doit documenter le code 404"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "404"
+      function: truthy
+
+  sigfa-required-response-409:
+    message: "{{path}} doit documenter le code 409"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "409"
+      function: truthy
+
+  sigfa-required-response-422:
+    message: "{{path}} doit documenter le code 422"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "422"
+      function: truthy
+
+  sigfa-required-response-429:
+    message: "{{path}} doit documenter le code 429"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "429"
+      function: truthy
+
+  sigfa-required-response-500:
+    message: "{{path}} doit documenter le code 500"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      field: "500"
+      function: truthy
+
+  # ─── Règle 2 : x-tenant-scope obligatoire ────────────────────────────────
+  sigfa-x-tenant-scope-required:
+    message: "L'opération doit définir x-tenant-scope (platform|bank|agency|public)"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete]"
+    then:
+      field: "x-tenant-scope"
+      function: enumeration
+      functionOptions:
+        values:
+          - platform
+          - bank
+          - agency
+          - public
+
+  # ─── Règle 3 : x-required-role obligatoire ───────────────────────────────
+  sigfa-x-required-role-required:
+    message: "L'opération doit définir x-required-role"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete]"
+    then:
+      field: "x-required-role"
+      function: enumeration
+      functionOptions:
+        values:
+          - SUPER_ADMIN
+          - BANK_ADMIN
+          - AGENCY_DIRECTOR
+          - MANAGER
+          - AGENT
+          - AUDITOR
+          - NONE
+
+  # ─── Règle 4 : exemples obligatoires dans les réponses 2xx ───────────────
+  sigfa-response-examples-required:
+    message: "La réponse doit avoir un example ou examples"
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses[200,201].content[*]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          oneOf:
+            - required:
+                - example
+            - required:
+                - examples
