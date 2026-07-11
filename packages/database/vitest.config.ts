@@ -21,7 +21,8 @@ export default defineConfig({
     // qu'en test ; la production les fournit via .env (voir .env.example).
     env: {
       PHONE_ENCRYPTION_KEY: "0".repeat(64),
-      PHONE_HASH_KEY: "sigfa-test-hmac-key-db008",
+      // DB-009: PHONE_HASH_KEY doit faire exactement 64 hex chars (32 octets)
+      PHONE_HASH_KEY: "a".repeat(64),
     },
     coverage: {
       provider: "v8",

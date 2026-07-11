@@ -37,4 +37,14 @@ describe("INFRA-005: harness tenant-isolation", () => {
     },
     30_000
   );
+
+  it(
+    "DB-009: harness query — requêtes paramétrées ($1) supportées",
+    async () => {
+      // DB-009 : query() doit supporter les requêtes paramétrées (values array)
+      const result = await pgHarness.query("SELECT $1::text AS val", ["hello"]);
+      expect(result.rows[0]).toEqual({ val: "hello" });
+    },
+    30_000
+  );
 });

@@ -1,5 +1,6 @@
 /**
  * DB-006 — `upsertDailyStats` : recalcul idempotent des agrégats journaliers.
+ * DB-009 — Requêtes paramétrées ($1/$2/$3) : l'injection devient structurellement impossible.
  *
  * Recalcule depuis `tickets` (source de vérité) et insère ou met à jour
  * la ligne correspondante dans `daily_agency_stats` (upsert idempotent).
@@ -19,30 +20,33 @@
  * @module
  */
 
-/** Fonction de requête SQL compatible avec `DualConnectionHarness.query`. */
-type QueryFn = (sql: string) => Promise<{ rows: Array<Record<string, unknown>> }>;
+/**
+ * Fonction de requête SQL paramétrée — DB-009 : plus aucune interpolation de valeurs
+ * dynamiques dans le texte SQL. Compatible avec `pg.Client.query(text, values)`.
+ * Les valeurs sont passées en paramètres positionnels ($1, $2, ...).
+ */
+export type QueryFn = (
+  sql: string,
+  values?: unknown[]
+) => Promise<{ rows: Array<Record<string, unknown>> }>;
 
 /**
- * Recalcule et upserte les agrégats journaliers pour une agence donnée.
+ * Construit l'agrégat toutes-services et l'insère/met à jour dans daily_agency_stats.
+ * Paramètres : $1=bankId, $2=agencyId, $3=day.
  *
- * Insère ou met à jour DEUX lignes dans `daily_agency_stats` :
- * 1. Une ligne toutes-services (`service_id IS NULL`)
- * 2. Une ligne par service actif ce jour (`service_id IS NOT NULL`)
- *
- * @param query     - Connexion migrateur (BYPASSRLS, pour écrire dans la table agrégat)
- * @param day       - Date de l'agrégat (format 'YYYY-MM-DD', timezone Africa/Abidjan)
- * @param agencyId  - UUID de l'agence
- * @param bankId    - UUID de la banque (tenant)
- * @returns Nombre de lignes insérées ou mises à jour
+ * @param query    - Connexion paramétrée (BYPASSRLS)
+ * @param bankId   - UUID de la banque
+ * @param agencyId - UUID de l'agence
+ * @param day      - Date au format YYYY-MM-DD
  */
-export async function upsertDailyStats(
+async function upsertAllServicesStats(
   query: QueryFn,
-  day: string,
+  bankId: string,
   agencyId: string,
-  bankId: string
-): Promise<number> {
-  // ── 1. Agrégat toutes-services (service_id IS NULL) ─────────────────────────
-  await query(`
+  day: string
+): Promise<void> {
+  await query(
+    `
     WITH ticket_stats AS (
       SELECT
         COUNT(*)                                                          AS tickets_issued,
@@ -51,7 +55,6 @@ export async function upsertDailyStats(
         COUNT(*) FILTER (WHERE status = 'NO_SHOW')                       AS tickets_no_show,
         COALESCE(SUM(wait_time_seconds) FILTER (WHERE status = 'DONE'), 0)     AS total_wait_seconds,
         COALESCE(SUM(service_time_seconds) FILTER (WHERE status = 'DONE'), 0)  AS total_service_seconds,
-        -- SLA : comparaison avec sla_minutes de la table services
         COUNT(*) FILTER (
           WHERE status = 'DONE'
             AND wait_time_seconds IS NOT NULL
@@ -68,14 +71,13 @@ export async function upsertDailyStats(
         )                                                                 AS sla_met_count,
         COUNT(*) FILTER (WHERE status = 'DONE' AND feedback_score IS NOT NULL)  AS feedback_count,
         COALESCE(SUM(feedback_score) FILTER (WHERE status = 'DONE' AND feedback_score IS NOT NULL), 0) AS feedback_sum,
-        -- NPS : score 5 = promoteur, score 4 = passif, score ≤ 3 = détracteur
         COUNT(*) FILTER (WHERE status = 'DONE' AND feedback_score = 5)   AS nps_promoters,
         COUNT(*) FILTER (WHERE status = 'DONE' AND feedback_score = 4)   AS nps_passives,
         COUNT(*) FILTER (WHERE status = 'DONE' AND feedback_score <= 3 AND feedback_score IS NOT NULL) AS nps_detractors
       FROM tickets
-      WHERE bank_id = '${bankId}'
-        AND agency_id = '${agencyId}'
-        AND (issued_at AT TIME ZONE 'Africa/Abidjan')::date = '${day}'::date
+      WHERE bank_id = $1
+        AND agency_id = $2
+        AND (issued_at AT TIME ZONE 'Africa/Abidjan')::date = $3::date
     ),
     agent_stats AS (
       SELECT COALESCE(SUM(active_seconds), 0)::integer AS agent_active_seconds
@@ -90,9 +92,9 @@ export async function upsertDailyStats(
             ELSE 0
           END AS active_seconds
         FROM agent_status_history
-        WHERE bank_id = '${bankId}'
-          AND agency_id = '${agencyId}'
-          AND (changed_at AT TIME ZONE 'Africa/Abidjan')::date = '${day}'::date
+        WHERE bank_id = $1
+          AND agency_id = $2
+          AND (changed_at AT TIME ZONE 'Africa/Abidjan')::date = $3::date
       ) intervals
       WHERE active_seconds IS NOT NULL AND active_seconds > 0
     )
@@ -107,10 +109,7 @@ export async function upsertDailyStats(
       updated_at
     )
     SELECT
-      '${bankId}',
-      '${agencyId}',
-      NULL,
-      '${day}'::date,
+      $1, $2, NULL, $3::date,
       ts.tickets_issued,
       ts.tickets_served,
       ts.tickets_abandoned,
@@ -146,11 +145,28 @@ export async function upsertDailyStats(
       nps_detractors       = EXCLUDED.nps_detractors,
       agent_active_seconds = EXCLUDED.agent_active_seconds,
       updated_at           = EXCLUDED.updated_at
-  `);
+    `,
+    [bankId, agencyId, day]
+  );
+}
 
-  // ── 2. Agrégats par service (service_id IS NOT NULL) ──────────────────────
-  // Pour chaque service actif ce jour, insérer/mettre à jour une ligne
-  await query(`
+/**
+ * Insère/met à jour les agrégats par service pour daily_agency_stats.
+ * Paramètres : $1=bankId, $2=agencyId, $3=day.
+ *
+ * @param query    - Connexion paramétrée (BYPASSRLS)
+ * @param bankId   - UUID de la banque
+ * @param agencyId - UUID de l'agence
+ * @param day      - Date au format YYYY-MM-DD
+ */
+async function upsertPerServiceStats(
+  query: QueryFn,
+  bankId: string,
+  agencyId: string,
+  day: string
+): Promise<void> {
+  await query(
+    `
     INSERT INTO daily_agency_stats (
       bank_id, agency_id, service_id, day,
       tickets_issued, tickets_served, tickets_abandoned, tickets_no_show,
@@ -162,10 +178,7 @@ export async function upsertDailyStats(
       updated_at
     )
     SELECT
-      '${bankId}',
-      '${agencyId}',
-      t.service_id,
-      '${day}'::date,
+      $1, $2, t.service_id, $3::date,
       COUNT(*)                                                                 AS tickets_issued,
       COUNT(*) FILTER (WHERE t.status = 'DONE')                               AS tickets_served,
       COUNT(*) FILTER (WHERE t.status = 'ABANDONED')                          AS tickets_abandoned,
@@ -194,9 +207,9 @@ export async function upsertDailyStats(
       NULL::integer,
       now()
     FROM tickets t
-    WHERE t.bank_id = '${bankId}'
-      AND t.agency_id = '${agencyId}'
-      AND (t.issued_at AT TIME ZONE 'Africa/Abidjan')::date = '${day}'::date
+    WHERE t.bank_id = $1
+      AND t.agency_id = $2
+      AND (t.issued_at AT TIME ZONE 'Africa/Abidjan')::date = $3::date
     GROUP BY t.service_id
     ON CONFLICT (bank_id, agency_id, service_id, day)
       WHERE service_id IS NOT NULL
@@ -215,15 +228,59 @@ export async function upsertDailyStats(
       nps_passives         = EXCLUDED.nps_passives,
       nps_detractors       = EXCLUDED.nps_detractors,
       updated_at           = EXCLUDED.updated_at
-  `);
+    `,
+    [bankId, agencyId, day]
+  );
+}
 
-  // Retourner le nombre de lignes dans daily_agency_stats pour cette agence/jour
-  const result = await query(`
+/**
+ * Compte les lignes dans daily_agency_stats pour un agrégat donné.
+ *
+ * @param query    - Connexion paramétrée
+ * @param bankId   - UUID de la banque
+ * @param agencyId - UUID de l'agence
+ * @param day      - Date au format YYYY-MM-DD
+ * @returns Nombre de lignes (toutes-services + par-service)
+ */
+async function countDailyStats(
+  query: QueryFn,
+  bankId: string,
+  agencyId: string,
+  day: string
+): Promise<number> {
+  const result = await query(
+    `
     SELECT COUNT(*)::integer AS count
     FROM daily_agency_stats
-    WHERE bank_id = '${bankId}'
-      AND agency_id = '${agencyId}'
-      AND day = '${day}'::date
-  `);
+    WHERE bank_id = $1 AND agency_id = $2 AND day = $3::date
+    `,
+    [bankId, agencyId, day]
+  );
   return parseInt(String(result.rows[0]?.["count"] ?? "0"), 10);
+}
+
+/**
+ * Recalcule et upserte les agrégats journaliers pour une agence donnée.
+ *
+ * Insère ou met à jour DEUX types de lignes dans `daily_agency_stats` :
+ * 1. Une ligne toutes-services (`service_id IS NULL`)
+ * 2. Une ligne par service actif ce jour (`service_id IS NOT NULL`)
+ *
+ * Utilise des requêtes paramétrées ($1, $2, $3) — injection structurellement impossible.
+ *
+ * @param query     - Connexion migrateur (BYPASSRLS, pour écrire dans la table agrégat)
+ * @param day       - Date de l'agrégat (format 'YYYY-MM-DD', timezone Africa/Abidjan)
+ * @param agencyId  - UUID de l'agence
+ * @param bankId    - UUID de la banque (tenant)
+ * @returns Nombre de lignes insérées ou mises à jour
+ */
+export async function upsertDailyStats(
+  query: QueryFn,
+  day: string,
+  agencyId: string,
+  bankId: string
+): Promise<number> {
+  await upsertAllServicesStats(query, bankId, agencyId, day);
+  await upsertPerServiceStats(query, bankId, agencyId, day);
+  return countDailyStats(query, bankId, agencyId, day);
 }

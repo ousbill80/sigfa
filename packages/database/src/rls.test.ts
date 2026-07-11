@@ -16,9 +16,12 @@ import { assertTenantIsolated } from "@sigfa/testing/tenant-isolation";
 
 /**
  * Tables métier attendues avec RLS activé.
- * Inclut les 5 tables de notifications (DB-005).
+ * DB-009 : ajout de banks (SELECT only, REVOKE mutations) et retention_policies.
+ * Total : 27 tables (scan exhaustif RLS).
  */
 const BUSINESS_TABLES = [
+  // DB-009 : banks avec RLS SELECT only + REVOKE INSERT/UPDATE/DELETE sigfa_app
+  "banks",
   "agencies",
   "agency_exceptional_closures",
   "services",
@@ -42,6 +45,8 @@ const BUSINESS_TABLES = [
   // DB-006 : tables de reporting
   "daily_agency_stats",
   "export_jobs",
+  // DB-008 : rétention
+  "retention_policies",
   // DB-007 : tables IA
   "ai_forecasts",
   "ai_staffing_recommendations",

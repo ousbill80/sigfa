@@ -81,24 +81,42 @@ function loadEncryptionKey(): Buffer {
   return key;
 }
 
+/** Taille requise pour PHONE_HASH_KEY en caractères hexadécimaux (32 octets). */
+const HASH_KEY_HEX_LENGTH = 64;
+
 /**
  * Charge et valide la clé HMAC depuis l'environnement.
- * @returns Clé HMAC (string non vide)
- * @throws Si la variable est absente ou vide
+ * DB-009 (MAJOR) : exactement 64 caractères hexadécimaux (32 octets) exigés —
+ * même rigueur que la clé de chiffrement.
+ *
+ * @returns Clé HMAC sous forme de Buffer (32 octets)
+ * @throws Si la variable est absente, non-hex, ou de mauvaise taille
  */
-function loadHashKey(): string {
+function loadHashKey(): Buffer {
   const raw = process.env.PHONE_HASH_KEY;
   if (raw === undefined || raw.length === 0) {
     throw new Error(
-      "PHONE_HASH_KEY est absente : définir une clé HMAC secrète (générer via `openssl rand -hex 32`) — voir .env.example."
+      "PHONE_HASH_KEY est absente : définir une clé HMAC de 32 octets (64 caractères hex) — voir .env.example."
     );
   }
-  return raw;
+  if (!/^[0-9a-fA-F]+$/.test(raw)) {
+    throw new Error(
+      "PHONE_HASH_KEY doit être une chaîne hexadécimale (générer via `openssl rand -hex 32`)."
+    );
+  }
+  const key = Buffer.from(raw, "hex");
+  if (key.length !== HASH_KEY_HEX_LENGTH / 2) {
+    throw new Error(
+      `PHONE_HASH_KEY doit faire exactement 32 octets (64 caractères hex) — reçu ${String(key.length)} octets.`
+    );
+  }
+  return key;
 }
 
 // ── Fail-fast : validation des clés au chargement du module ────────────────────
 const ENCRYPTION_KEY = loadEncryptionKey();
-const HASH_KEY = loadHashKey();
+/** Clé HMAC-SHA256 (32 octets), validée au chargement du module. */
+const HASH_KEY: Buffer = loadHashKey();
 
 /**
  * Normalise un numéro de téléphone : strippe espaces et tirets, valide E.164.

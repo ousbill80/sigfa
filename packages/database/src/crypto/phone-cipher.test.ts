@@ -18,7 +18,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // Clés de test valides (32 octets = 64 hex chars).
 const VALID_ENC_KEY = "0".repeat(64); // 32 octets hex
-const VALID_HASH_KEY = "sigfa-test-hmac-key-db008";
+// DB-009: PHONE_HASH_KEY doit faire exactement 64 hex chars (32 octets)
+const VALID_HASH_KEY = "a".repeat(64);
 
 /**
  * Recharge le module `phone-cipher.ts` avec un environnement contrôlé.

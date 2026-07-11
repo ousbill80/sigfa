@@ -7,8 +7,11 @@ export interface QueryResult {
 
 /** Harness PostgreSQL éphémère (Testcontainers) */
 export interface PostgresHarness {
-  /** Exécute une requête SQL et retourne les lignes */
-  query: (sql: string) => Promise<QueryResult>;
+  /**
+   * Exécute une requête SQL et retourne les lignes.
+   * DB-009 : supporte les requêtes paramétrées ($1, $2, ...) via le tableau `values`.
+   */
+  query: (sql: string, values?: unknown[]) => Promise<QueryResult>;
   /** Arrête le conteneur */
   stop: () => Promise<void>;
   /** URL de connexion */
@@ -28,8 +31,11 @@ export interface DualConnectionHarness extends PostgresHarness {
   migrationConnectionString: string;
   /** URL de connexion applicative (sigfa_app, sans BYPASSRLS) */
   appConnectionString: string;
-  /** Exécute une requête via la connexion applicative (sigfa_app) */
-  appQuery: (sql: string) => Promise<QueryResult>;
+  /**
+   * Exécute une requête via la connexion applicative (sigfa_app).
+   * DB-009 : supporte les requêtes paramétrées ($1, $2, ...) via le tableau `values`.
+   */
+  appQuery: (sql: string, values?: unknown[]) => Promise<QueryResult>;
 }
 
 /** Harness Redis éphémère (Testcontainers) */
@@ -120,8 +126,10 @@ export async function startPostgresContainer(): Promise<PostgresHarness> {
 
   return {
     connectionString,
-    query: async (sql: string): Promise<QueryResult> => {
-      const res = await client.query(sql);
+    query: async (sql: string, values?: unknown[]): Promise<QueryResult> => {
+      const res = values !== undefined
+        ? await client.query(sql, values)
+        : await client.query(sql);
       return { rows: res.rows as Array<Record<string, unknown>> };
     },
     stop: async (): Promise<void> => {
@@ -188,12 +196,16 @@ export async function startPostgresContainerWithRoles(): Promise<DualConnectionH
     connectionString: migrationConnectionString,
     migrationConnectionString,
     appConnectionString,
-    query: async (sql: string): Promise<QueryResult> => {
-      const res = await migClient.query(sql);
+    query: async (sql: string, values?: unknown[]): Promise<QueryResult> => {
+      const res = values !== undefined
+        ? await migClient.query(sql, values)
+        : await migClient.query(sql);
       return { rows: res.rows as Array<Record<string, unknown>> };
     },
-    appQuery: async (sql: string): Promise<QueryResult> => {
-      const res = await appClient.query(sql);
+    appQuery: async (sql: string, values?: unknown[]): Promise<QueryResult> => {
+      const res = values !== undefined
+        ? await appClient.query(sql, values)
+        : await appClient.query(sql);
       return { rows: res.rows as Array<Record<string, unknown>> };
     },
     stop: async (): Promise<void> => {

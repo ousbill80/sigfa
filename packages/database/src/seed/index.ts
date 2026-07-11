@@ -1,11 +1,17 @@
 /**
- * Seed SIGFA — DB-003
+ * Seed SIGFA — DB-003 / DB-009
  *
  * Exécutable : `pnpm --filter @sigfa/database seed`
  *
  * ## Périmètre
  * 1. Jours fériés ivoiriens (table `public_holidays`, hors-tenant) — via connexion migrateur
  * 2. Tenant de démonstration complet (flag `SEED_DEMO=1`) — via connexion migrateur (BYPASSRLS)
+ *
+ * ## DB-009 : Sécurité renforcée
+ * - Mots de passe de démo générés via `crypto.randomBytes` (aléatoires, uniques par exécution)
+ * - Hash bcrypt réel cost 12 (jamais de hash simulé)
+ * - Garde `NODE_ENV !== 'production'` — le seed de démo lève une erreur en production
+ * - Affichage des mots de passe UNE SEULE FOIS à la console
  *
  * ## Idempotence
  * Tous les INSERT utilisent `ON CONFLICT DO NOTHING` (clés naturelles).
@@ -19,7 +25,8 @@
  * @module
  */
 
-import { createHash } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { DEFAULT_SERVICES } from "./default-services.js";
 import { PERSISTABLE_ROLES } from "./rbac-matrix.js";
 
@@ -162,8 +169,8 @@ const MAX_MOBILE_YEAR = Math.max(
  * Vérifie si l'année courante dépasse la couverture des fériés mobiles.
  * Si oui, appelle `warnFn` avec un message d'avertissement.
  *
- * @param maxYear     - Année maximale couverte par les fériés mobiles (défaut : MAX_MOBILE_YEAR)
- * @param warnFn      - Fonction de log (défaut : console.warn)
+ * @param maxYear - Année maximale couverte par les fériés mobiles
+ * @param warnFn  - Fonction de log (défaut : console.warn)
  */
 export async function checkHolidayWarning(
   maxYear: number = MAX_MOBILE_YEAR,
@@ -185,6 +192,28 @@ export async function checkHolidayWarning(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Insère un jour férié dans `public_holidays` (idempotent via ON CONFLICT).
+ *
+ * @param query   - Connexion migrateur (BYPASSRLS)
+ * @param holiday - Jour férié à insérer
+ */
+async function insertHoliday(query: QueryFn, holiday: Holiday): Promise<void> {
+  const desc = holiday.description
+    ? `'${holiday.description.replace(/'/g, "''")}'`
+    : "NULL";
+  await query(`
+    INSERT INTO public_holidays (date, name, description, is_approximate)
+    VALUES (
+      '${holiday.date}',
+      '${holiday.name.replace(/'/g, "''")}',
+      ${desc},
+      ${holiday.isApproximate}
+    )
+    ON CONFLICT (date, name) DO NOTHING
+  `);
+}
+
+/**
  * Insère les jours fériés ivoiriens dans `public_holidays`.
  * Idempotent : ON CONFLICT (date, name) DO NOTHING.
  *
@@ -192,24 +221,12 @@ export async function checkHolidayWarning(
  */
 async function seedPublicHolidays(query: QueryFn): Promise<void> {
   for (const holiday of ALL_HOLIDAYS) {
-    const desc = holiday.description
-      ? `'${holiday.description.replace(/'/g, "''")}'`
-      : "NULL";
-    await query(`
-      INSERT INTO public_holidays (date, name, description, is_approximate)
-      VALUES (
-        '${holiday.date}',
-        '${holiday.name.replace(/'/g, "''")}',
-        ${desc},
-        ${holiday.isApproximate}
-      )
-      ON CONFLICT (date, name) DO NOTHING
-    `);
+    await insertHoliday(query, holiday);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seed démo : tenant complet (SEED_DEMO=1 uniquement)
+// Seed démo : génération des mots de passe (DB-009)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** UUIDs déterministes de démo (stable entre exécutions). */
@@ -221,7 +238,29 @@ const DEMO_COUNTER_2_ID = "d0000002-1111-4000-8000-000000000002";
 const DEMO_KIOSK_1_ID = "d0000003-1111-4000-8000-000000000001";
 
 /**
+ * Génère un mot de passe aléatoire de démo via `crypto.randomBytes`.
+ * DB-009 : aucun mot de passe fixe — chaque exécution produit des mots de passe uniques.
+ * Affiché UNE SEULE FOIS à la console (voir `runSeed`).
+ *
+ * @returns Mot de passe aléatoire (16 octets en hex = 32 caractères)
+ */
+function generateDemoPassword(): string {
+  return randomBytes(16).toString("hex");
+}
+
+/**
+ * Hash bcrypt réel cost 12 (DB-009 — plus aucun hash simulé de type demo).
+ *
+ * @param password - Mot de passe en clair
+ * @returns Hash bcrypt (format $2b$12$...)
+ */
+async function hashDemoPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
+}
+
+/**
  * Génère un email de démo déterministe par rôle.
+ *
  * @param role - Rôle SIGFA
  * @returns Email de démo
  */
@@ -229,44 +268,21 @@ function demoEmail(role: string): string {
   return `demo.${role.toLowerCase().replace(/_/g, ".")}@sigfa-demo.ci`;
 }
 
-/**
- * Génère un hash bcrypt simulé pour les tests (non sécurisé — démo uniquement).
- * En production, bcrypt cost 12 est utilisé par l'API (API-001).
- * @param password - Mot de passe en clair
- * @returns Hash déterministe (préfixe $demo$ non valide bcrypt — marqueur clair)
- */
-function demoPasswordHash(password: string): string {
-  const hash = createHash("sha256").update(password).digest("hex").substring(0, 16);
-  return `$demo$12$${hash}`;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Seed démo : fixtures structurelles
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Insère le tenant de démonstration complet.
- * Idempotent : ON CONFLICT DO NOTHING partout.
+ * Insère la banque et les agences de démo (idempotent).
  *
- * Contenu :
- * - 1 banque (slug "demo-sigfa")
- * - 2 agences
- * - 8 services par agence (catalogue par défaut)
- * - 2 guichets
- * - 1 kiosque
- * - 1 utilisateur par rôle persistable (sauf SUPER_ADMIN → bank_id NULL, hors tenant)
- *
- * @param query      - Connexion migrateur (BYPASSRLS)
- * @param passwords  - Map role → mot de passe généré (pour affichage unique)
+ * @param query - Connexion migrateur (BYPASSRLS)
  */
-async function seedDemoTenant(
-  query: QueryFn,
-  passwords: Map<string, string>
-): Promise<void> {
-  // ── Banque de démo ──────────────────────────────────────────────────────
+async function seedDemoBank(query: QueryFn): Promise<void> {
   await query(`
     INSERT INTO banks (id, name, slug)
     VALUES ('${DEMO_BANK_ID}', 'Banque de Démonstration SIGFA', 'demo-sigfa')
     ON CONFLICT (id) DO NOTHING
   `);
-
-  // ── Agences ─────────────────────────────────────────────────────────────
   await query(`
     INSERT INTO agencies (id, bank_id, name, city)
     VALUES
@@ -274,28 +290,35 @@ async function seedDemoTenant(
       ('${DEMO_AGENCY_2_ID}', '${DEMO_BANK_ID}', 'Agence Plateau - Démo', 'Abidjan')
     ON CONFLICT (id) DO NOTHING
   `);
+}
 
-  // ── Services (catalogue par défaut × 2 agences) ──────────────────────
-  for (const agency of [DEMO_AGENCY_1_ID, DEMO_AGENCY_2_ID]) {
-    for (const service of DEFAULT_SERVICES) {
-      const serviceId = generateDemoServiceId(agency, service.code);
-      await query(`
-        INSERT INTO services (id, bank_id, agency_id, code, name, sla_minutes, display_order)
-        VALUES (
-          '${serviceId}',
-          '${DEMO_BANK_ID}',
-          '${agency}',
-          '${service.code}',
-          '${service.name.replace(/'/g, "''")}',
-          ${service.slaMinutes},
-          ${service.displayOrder}
-        )
-        ON CONFLICT (agency_id, code) DO NOTHING
-      `);
-    }
+/**
+ * Insère les services du catalogue par défaut pour une agence de démo.
+ *
+ * @param query    - Connexion migrateur (BYPASSRLS)
+ * @param agencyId - UUID de l'agence cible
+ */
+async function seedDemoServices(query: QueryFn, agencyId: string): Promise<void> {
+  for (const service of DEFAULT_SERVICES) {
+    const serviceId = generateDemoServiceId(agencyId, service.code);
+    await query(`
+      INSERT INTO services (id, bank_id, agency_id, code, name, sla_minutes, display_order)
+      VALUES (
+        '${serviceId}', '${DEMO_BANK_ID}', '${agencyId}',
+        '${service.code}', '${service.name.replace(/'/g, "''")}',
+        ${service.slaMinutes}, ${service.displayOrder}
+      )
+      ON CONFLICT (agency_id, code) DO NOTHING
+    `);
   }
+}
 
-  // ── Guichets ─────────────────────────────────────────────────────────
+/**
+ * Insère les guichets et le kiosque de démo (idempotent).
+ *
+ * @param query - Connexion migrateur (BYPASSRLS)
+ */
+async function seedDemoCountersAndKiosk(query: QueryFn): Promise<void> {
   await query(`
     INSERT INTO counters (id, bank_id, agency_id, number, label)
     VALUES
@@ -303,59 +326,69 @@ async function seedDemoTenant(
       ('${DEMO_COUNTER_2_ID}', '${DEMO_BANK_ID}', '${DEMO_AGENCY_1_ID}', 2, 'Guichet 2')
     ON CONFLICT (id) DO NOTHING
   `);
-
-  // ── Kiosque ───────────────────────────────────────────────────────────
   await query(`
     INSERT INTO kiosks (id, bank_id, agency_id, label, credentials_hash)
     VALUES (
-      '${DEMO_KIOSK_1_ID}',
-      '${DEMO_BANK_ID}',
-      '${DEMO_AGENCY_1_ID}',
-      'Borne Accueil - Démo',
-      '$demo$12$kiosk_placeholder_hash'
+      '${DEMO_KIOSK_1_ID}', '${DEMO_BANK_ID}', '${DEMO_AGENCY_1_ID}',
+      'Borne Accueil - Démo', '$2b$12$placeholder_kiosk_hash_value'
     )
     ON CONFLICT (id) DO NOTHING
   `);
+}
 
-  // ── Utilisateurs de démo par rôle (sauf SUPER_ADMIN — hors tenant) ───
-  for (const role of PERSISTABLE_ROLES) {
-    if (role === "SUPER_ADMIN") continue; // SUPER_ADMIN n'appartient pas à un tenant
+/**
+ * Insère un utilisateur de démo pour un rôle donné.
+ *
+ * @param query    - Connexion migrateur (BYPASSRLS)
+ * @param role     - Rôle SIGFA à créer
+ * @param passwords - Map role → password (pour affichage unique)
+ */
+async function seedDemoUser(
+  query: QueryFn,
+  role: string,
+  passwords: Map<string, string>
+): Promise<void> {
+  const password = generateDemoPassword();
+  passwords.set(role, password);
+  const hash = await hashDemoPassword(password);
+  const userId = generateDemoUserId(role);
+  const email = demoEmail(role);
+  await query(`
+    INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
+    VALUES (
+      '${userId}', '${DEMO_BANK_ID}', '${email}',
+      '${hash}', 'Demo', '${role}', '${role}'
+    )
+    ON CONFLICT (email) DO NOTHING
+  `);
+}
 
-    const password = `Demo${role}2026!`;
-    passwords.set(role, password);
-    const hash = demoPasswordHash(password);
-    const userId = generateDemoUserId(role);
-    const email = demoEmail(role);
-
-    await query(`
-      INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
-      VALUES (
-        '${userId}',
-        '${DEMO_BANK_ID}',
-        '${email}',
-        '${hash}',
-        'Demo',
-        '${role}',
-        '${role}'
-      )
-      ON CONFLICT (email) DO NOTHING
-    `);
-  }
-
-  // ── Templates de notification FR par défaut (DB-005) ──────────────────
-  // Seed des 4 NotificationType × canal SMS en français pour le tenant de démo.
-  // Les templates pour les autres canaux (WHATSAPP, EMAIL, PUSH) et langues
-  // (DIOULA, BAOULE, EN) sont créés par le BANK_ADMIN via l'interface.
-  await seedDefaultNotificationTemplates(query, DEMO_BANK_ID);
+/**
+ * Insère un template de notification SMS FR par défaut.
+ *
+ * @param query  - Connexion migrateur (BYPASSRLS)
+ * @param bankId - UUID de la banque cible
+ * @param type   - Type de notification
+ * @param body   - Corps du message (avec variables {{...}})
+ */
+async function insertNotificationTemplate(
+  query: QueryFn,
+  bankId: string,
+  type: string,
+  body: string
+): Promise<void> {
+  await query(`
+    INSERT INTO notification_templates (id, bank_id, type, channel, lang, body)
+    VALUES (
+      gen_random_uuid(), '${bankId}', '${type}', 'SMS', 'FR',
+      '${body.replace(/'/g, "''")}'
+    )
+    ON CONFLICT (bank_id, type, channel, lang) DO NOTHING
+  `);
 }
 
 /**
  * Templates de notification FR par défaut pour les 4 NotificationType (DB-005).
- *
- * Variables autorisées : `{{number}}` (numéro de ticket), `{{position}}`
- * (position dans la file), `{{estimate}}` (estimation en minutes).
- * Validation côté API (CONTRACT-005) — la base stocke sans contrainte.
- *
  * Seed idempotent : ON CONFLICT (bank_id, type, channel, lang) DO NOTHING.
  *
  * @param query  - Connexion migrateur (BYPASSRLS)
@@ -365,8 +398,7 @@ async function seedDefaultNotificationTemplates(
   query: QueryFn,
   bankId: string
 ): Promise<void> {
-  /** Templates FR par défaut pour les 4 NotificationType, canal SMS. */
-  const FR_SMS_TEMPLATES: Array<{ type: string; body: string }> = [
+  const templates = [
     {
       type: "TICKET_CONFIRMATION",
       body: "Votre ticket {{number}} a été enregistré. Vous êtes en position {{position}} dans la file. Estimation : {{estimate}} min.",
@@ -384,25 +416,30 @@ async function seedDefaultNotificationTemplates(
       body: "Rapport journalier de votre agence : {{number}} tickets traités aujourd'hui.",
     },
   ];
-
-  for (const tpl of FR_SMS_TEMPLATES) {
-    await query(`
-      INSERT INTO notification_templates (id, bank_id, type, channel, lang, body)
-      VALUES (
-        gen_random_uuid(),
-        '${bankId}',
-        '${tpl.type}',
-        'SMS',
-        'FR',
-        '${tpl.body.replace(/'/g, "''")}'
-      )
-      ON CONFLICT (bank_id, type, channel, lang) DO NOTHING
-    `);
+  for (const tpl of templates) {
+    await insertNotificationTemplate(query, bankId, tpl.type, tpl.body);
   }
 }
 
 /**
+ * Convertit un hash hex en UUID v4-like déterministe.
+ *
+ * @param hash - Hash hex de 64 caractères (SHA256)
+ * @returns UUID déterministe (format xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx)
+ */
+function hexToUuid(hash: string): string {
+  return [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    "4" + hash.substring(13, 16),
+    "8" + hash.substring(17, 20),
+    hash.substring(20, 32),
+  ].join("-");
+}
+
+/**
  * Génère un UUID déterministe pour un service de démo.
+ *
  * @param agencyId - UUID de l'agence
  * @param code     - Code du service
  */
@@ -410,31 +447,71 @@ function generateDemoServiceId(agencyId: string, code: string): string {
   const hash = createHash("sha256")
     .update(`demo-service-${agencyId}-${code}`)
     .digest("hex");
-  // Format UUID v4-like depuis le hash
-  return [
-    hash.substring(0, 8),
-    hash.substring(8, 12),
-    "4" + hash.substring(13, 16),
-    "8" + hash.substring(17, 20),
-    hash.substring(20, 32),
-  ].join("-");
+  return hexToUuid(hash);
 }
 
 /**
  * Génère un UUID déterministe pour un utilisateur de démo.
+ *
  * @param role - Rôle de l'utilisateur
  */
 function generateDemoUserId(role: string): string {
-  const hash = createHash("sha256")
-    .update(`demo-user-${role}`)
-    .digest("hex");
-  return [
-    hash.substring(0, 8),
-    hash.substring(8, 12),
-    "4" + hash.substring(13, 16),
-    "8" + hash.substring(17, 20),
-    hash.substring(20, 32),
-  ].join("-");
+  const hash = createHash("sha256").update(`demo-user-${role}`).digest("hex");
+  return hexToUuid(hash);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Seed démo : point d'entrée principal
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Affiche les mots de passe de démo à la console (UNE SEULE FOIS).
+ *
+ * @param passwords - Map role → password généré
+ */
+function printDemoPasswords(passwords: Map<string, string>): void {
+  if (passwords.size === 0) return;
+  console.log("\n╔══════════════════════════════════════════════════════╗");
+  console.log("║  SIGFA DEMO — Comptes créés (affichés UNE SEULE FOIS) ║");
+  console.log("╠══════════════════════════════════════════════════════╣");
+  for (const [role, password] of passwords) {
+    const email = demoEmail(role);
+    console.log(`║  ${role.padEnd(18)} │ ${email.padEnd(32)} │ ${password}`);
+  }
+  console.log("╚══════════════════════════════════════════════════════╝\n");
+}
+
+/**
+ * Insère le tenant de démonstration complet.
+ * DB-009 : garde `NODE_ENV !== 'production'` — lève une erreur en production.
+ * Idempotent : ON CONFLICT DO NOTHING partout.
+ *
+ * @param query - Connexion migrateur (BYPASSRLS)
+ */
+async function seedDemoTenant(query: QueryFn): Promise<void> {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[SIGFA SEED] Le seed de démo est interdit en production (NODE_ENV=production). " +
+      "Retirer SEED_DEMO=1 ou utiliser NODE_ENV=development."
+    );
+  }
+
+  await seedDemoBank(query);
+
+  for (const agencyId of [DEMO_AGENCY_1_ID, DEMO_AGENCY_2_ID]) {
+    await seedDemoServices(query, agencyId);
+  }
+
+  await seedDemoCountersAndKiosk(query);
+
+  const passwords = new Map<string, string>();
+  for (const role of PERSISTABLE_ROLES) {
+    if (role === "SUPER_ADMIN") continue;
+    await seedDemoUser(query, role, passwords);
+  }
+
+  await seedDefaultNotificationTemplates(query, DEMO_BANK_ID);
+  printDemoPasswords(passwords);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -451,27 +528,10 @@ export async function runSeed(
   query: QueryFn,
   options: SeedOptions = { seedDemo: false }
 ): Promise<void> {
-  // 1. Avertissement si les fériés mobiles sont périmés
   await checkHolidayWarning(MAX_MOBILE_YEAR);
-
-  // 2. Jours fériés ivoiriens (hors-tenant, connexion migrateur)
   await seedPublicHolidays(query);
-
-  // 3. Tenant de démo (seulement si SEED_DEMO=1)
   if (options.seedDemo) {
-    const passwords = new Map<string, string>();
-    await seedDemoTenant(query, passwords);
-
-    if (passwords.size > 0) {
-      console.log("\n╔══════════════════════════════════════════════════════╗");
-      console.log("║  SIGFA DEMO — Comptes créés (affichés UNE SEULE FOIS) ║");
-      console.log("╠══════════════════════════════════════════════════════╣");
-      for (const [role, password] of passwords) {
-        const email = demoEmail(role);
-        console.log(`║  ${role.padEnd(18)} │ ${email.padEnd(32)} │ ${password}`);
-      }
-      console.log("╚══════════════════════════════════════════════════════╝\n");
-    }
+    await seedDemoTenant(query);
   }
 }
 
@@ -479,7 +539,6 @@ export async function runSeed(
 // Entrypoint CLI : `pnpm --filter @sigfa/database seed`
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Seulement exécuté si lancé directement (pas en import de test)
 if (import.meta.url === new URL(process.argv[1]!, "file://").href) {
   const { Client } = await import("pg");
   const connectionString =

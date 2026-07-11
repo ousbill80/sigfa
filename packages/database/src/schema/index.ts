@@ -1,5 +1,6 @@
 export * from "./enums.js";
 export * from "./banks.js";
+export * from "./public-holidays.js";
 export * from "./agencies.js";
 export * from "./services.js";
 export * from "./queues.js";
