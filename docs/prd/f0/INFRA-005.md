@@ -1,6 +1,6 @@
 # INFRA-005 : Packages @sigfa/schemas, @sigfa/factories, @sigfa/testing — squelettes des 5 suites critiques
 
-**Module** : F0 — Fondations · **Agent** : agent-database (périmètre étendu pour cette story à `packages/{schemas,factories,testing}` — exception consignée au plan de dispatch, aucune autre story de la vague ne touche ces fichiers, le hook d'écriture l'autorise pour cette story uniquement) · **Dépend de** : INFRA-001 · **Statut** : TODO
+**Module** : F0 — Fondations · **Agent** : agent-database (périmètre étendu pour cette story à `packages/{schemas,factories,testing}` — exception consignée au plan de dispatch, aucune autre story de la vague ne touche ces fichiers, le hook d'écriture l'autorise pour cette story uniquement) · **Dépend de** : INFRA-001 · **Statut** : DONE (2026-07-11 — zéro retry ; 30 tests, PG16+Redis7 réels via Testcontainers, 5 harness livrés)
 **Révision** : v2 — amendée après critique (Boucle 1, itération 1)
 
 ## Exigences (EARS)

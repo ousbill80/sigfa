@@ -1,6 +1,6 @@
 # INFRA-002 : Docker Compose dev — postgres16 + redis7 + api + web + kiosk
 
-**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : INFRA-001 · **Statut** : TODO
+**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : INFRA-001 · **Statut** : DONE (2026-07-11 — 2 retries : garde noUncheckedIndexedAccess + no-regex-spaces ; 26 tests dont Docker réels)
 **Révision** : v2 — amendée après critique (Boucle 1, itération 1)
 
 ## Exigences (EARS)

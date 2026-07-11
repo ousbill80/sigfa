@@ -1,6 +1,6 @@
 # INFRA-004 : Hooks git (lefthook) — require-test-in-commit (T1) + commitlint
 
-**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : INFRA-001 · **Statut** : TODO
+**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : INFRA-001 · **Statut** : DONE (2026-07-11 — 1 retry : variable inutilisée ; hooks actifs et vérifiés en conditions réelles, 19 tests)
 **Révision** : v2 — amendée après critique (Boucle 1, itération 1)
 
 ## Exigences (EARS)

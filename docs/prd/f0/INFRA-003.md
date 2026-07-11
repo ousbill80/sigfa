@@ -1,6 +1,6 @@
 # INFRA-003 : CI GitHub Actions — lint → typecheck → test → build + ratchet de couverture
 
-**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : INFRA-001 · **Statut** : TODO
+**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : INFRA-001 · **Statut** : DONE-local / critères [gate] en attente du premier run GitHub (2026-07-11 — 2 retries : import vi + couture DOCKER_CONFIG/cli-plugins, voir leçon)
 **Révision** : v2 — amendée après critique (Boucle 1, itération 1)
 **Prérequis humain** : dépôt git initialisé + remote GitHub avec Actions activées (à fournir avant intégration — voir `_dag.md`).
 
