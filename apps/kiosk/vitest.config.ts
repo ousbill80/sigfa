@@ -2,6 +2,29 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
+// Leçon f1 : fournir `coverage.exclude` REMPLACE les defaults vitest (defaultCoverageExcludes).
+// On les ré-inclut ici explicitement pour ne pas perdre l'exclusion de node_modules, test files, etc.
+// Même pattern que packages/contracts/vitest.config.ts.
+const vitestDefaultCoverageExcludes = [
+  "coverage/**",
+  "dist/**",
+  "**/node_modules/**",
+  "**/[.]**",
+  "packages/*/test?(s)/**",
+  "**/*.d.ts",
+  "**/virtual:*",
+  "**/__x00__*",
+  "**/\0*",
+  "cypress/**",
+  "test?(s)/**",
+  "test?(-*).?(c|m)[jt]s?(x)",
+  "**/*{.,-}{test,spec,bench,benchmark}?(-d).?(c|m)[jt]s?(x)",
+  "**/__tests__/**",
+  "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*",
+  "**/vitest.{workspace,projects}.[jt]s?(on)",
+  "**/.{eslint,mocha,prettier}rc.{?(c|m)js,yml}",
+];
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -18,14 +41,19 @@ export default defineConfig({
         branches: 80,
         statements: 85,
       },
+      // `include` scope la couverture aux fichiers projet uniquement — sans cela,
+      // vitest instrumente node_modules, .next/, etc. et les métriques sont faussées.
+      include: ["src/**/*.{ts,tsx}"],
       exclude: [
+        ...vitestDefaultCoverageExcludes,
+        // Kiosk-specific exclusions
         "src/mocks/**",
+        "src/app/**",          // Next.js App Router — nécessite runtime Next.js
+        "src/i18n/request.ts", // next-intl server config (getRequestConfig) — Next.js server-only, non testable en jsdom
+        "src/middleware.ts",
         "electron/**",
-        "src/app/**",
-        "**/*.config.*",
-        "**/*.d.ts",
-        "dist/**",
-        "coverage/**",
+        ".next/**",
+        "out/**",
       ],
     },
     include: [

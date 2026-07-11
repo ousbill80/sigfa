@@ -70,6 +70,25 @@ describe("KIOSK-001: kiosk-session", () => {
     expect(isSessionExpired(result!)).toBe(true);
   });
 
+  it("KIOSK-001: POST /kiosk/session retourne null si le serveur répond avec une erreur", async () => {
+    server.use(
+      http.post("http://localhost:4010/kiosk/session", () => {
+        return HttpResponse.json({ error: "Unauthorized" }, { status: 401 });
+      })
+    );
+
+    const { createKioskSession } = await import("../lib/kiosk-session");
+
+    const result = await createKioskSession({
+      kioskId: "bad-kiosk-id",
+      kioskSecret: "wrong-secret",
+      agencyId: "33333333-3333-4333-a333-333333333333",
+      apiUrl: "http://localhost:4010",
+    });
+
+    expect(result).toBeNull();
+  });
+
   it("KIOSK-001: aucun fetch direct — seul @sigfa/contracts utilisé", async () => {
     // Vérifie que le module kiosk-session n'utilise pas fetch directement
     // en lisant son code source (approche structurelle)
