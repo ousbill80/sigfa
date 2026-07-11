@@ -1,0 +1,1565 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`MOB-005: écran feedback — 5 étoiles + champ commentaire rendus avec tokens SIGFA (RNTL snapshot × 4 langues) MOB-005: FeedbackScreen — rendu avec 5 étoiles et champ commentaire en français: FeedbackScreen-fr 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#FFFFFF",
+      "flex": 1,
+      "padding": 24,
+    }
+  }
+  testID="feedback-form"
+>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Note
+  </Text>
+  <View
+    style={
+      {
+        "flexDirection": "row",
+        "marginBottom": 16,
+      }
+    }
+    testID="feedback-stars"
+  >
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-1"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-2"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-3"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-4"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-5"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Un mot à ajouter ? (facultatif)
+  </Text>
+  <TextInput
+    maxLength={500}
+    multiline={true}
+    onChangeText={[Function]}
+    placeholder="Votre commentaire..."
+    placeholderTextColor="#475467"
+    style={
+      {
+        "borderColor": "#475467",
+        "borderRadius": 12,
+        "borderWidth": 1,
+        "color": "#101828",
+        "fontSize": 15,
+        "marginBottom": 24,
+        "minHeight": 100,
+        "padding": 12,
+        "textAlignVertical": "top",
+      }
+    }
+    testID="feedback-comment"
+    value=""
+  />
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "alignItems": "center",
+        "backgroundColor": "#2E90FA",
+        "borderRadius": 12,
+        "justifyContent": "center",
+        "minHeight": 44,
+        "opacity": 1,
+        "paddingHorizontal": 24,
+        "paddingVertical": 12,
+      }
+    }
+    testID="feedback-submit"
+  >
+    <Text
+      style={
+        {
+          "color": "#F5F7FA",
+          "fontSize": 15,
+          "fontWeight": "bold",
+        }
+      }
+    >
+      Donner mon avis
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`MOB-005: écran feedback — 5 étoiles + champ commentaire rendus avec tokens SIGFA (RNTL snapshot × 4 langues) MOB-005: FeedbackScreen — snapshot en anglais: FeedbackScreen-en 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#FFFFFF",
+      "flex": 1,
+      "padding": 24,
+    }
+  }
+  testID="feedback-form"
+>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Rating
+  </Text>
+  <View
+    style={
+      {
+        "flexDirection": "row",
+        "marginBottom": 16,
+      }
+    }
+    testID="feedback-stars"
+  >
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-1"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-2"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-3"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-4"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-5"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Anything to add? (optional)
+  </Text>
+  <TextInput
+    maxLength={500}
+    multiline={true}
+    onChangeText={[Function]}
+    placeholder="Your comment..."
+    placeholderTextColor="#475467"
+    style={
+      {
+        "borderColor": "#475467",
+        "borderRadius": 12,
+        "borderWidth": 1,
+        "color": "#101828",
+        "fontSize": 15,
+        "marginBottom": 24,
+        "minHeight": 100,
+        "padding": 12,
+        "textAlignVertical": "top",
+      }
+    }
+    testID="feedback-comment"
+    value=""
+  />
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "alignItems": "center",
+        "backgroundColor": "#2E90FA",
+        "borderRadius": 12,
+        "justifyContent": "center",
+        "minHeight": 44,
+        "opacity": 1,
+        "paddingHorizontal": 24,
+        "paddingVertical": 12,
+      }
+    }
+    testID="feedback-submit"
+  >
+    <Text
+      style={
+        {
+          "color": "#F5F7FA",
+          "fontSize": 15,
+          "fontWeight": "bold",
+        }
+      }
+    >
+      Give feedback
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`MOB-005: écran feedback — 5 étoiles + champ commentaire rendus avec tokens SIGFA (RNTL snapshot × 4 langues) MOB-005: FeedbackScreen — snapshot en baoulé: FeedbackScreen-baoule 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#FFFFFF",
+      "flex": 1,
+      "padding": 24,
+    }
+  }
+  testID="feedback-form"
+>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Nɔmbɔlɔ
+  </Text>
+  <View
+    style={
+      {
+        "flexDirection": "row",
+        "marginBottom": 16,
+      }
+    }
+    testID="feedback-stars"
+  >
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-1"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-2"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-3"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-4"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-5"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Un mot à ajouter ? (facultatif)
+  </Text>
+  <TextInput
+    maxLength={500}
+    multiline={true}
+    onChangeText={[Function]}
+    placeholder="I nian..."
+    placeholderTextColor="#475467"
+    style={
+      {
+        "borderColor": "#475467",
+        "borderRadius": 12,
+        "borderWidth": 1,
+        "color": "#101828",
+        "fontSize": 15,
+        "marginBottom": 24,
+        "minHeight": 100,
+        "padding": 12,
+        "textAlignVertical": "top",
+      }
+    }
+    testID="feedback-comment"
+    value=""
+  />
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "alignItems": "center",
+        "backgroundColor": "#2E90FA",
+        "borderRadius": 12,
+        "justifyContent": "center",
+        "minHeight": 44,
+        "opacity": 1,
+        "paddingHorizontal": 24,
+        "paddingVertical": 12,
+      }
+    }
+    testID="feedback-submit"
+  >
+    <Text
+      style={
+        {
+          "color": "#F5F7FA",
+          "fontSize": 15,
+          "fontWeight": "bold",
+        }
+      }
+    >
+      Donner mon avis
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`MOB-005: écran feedback — 5 étoiles + champ commentaire rendus avec tokens SIGFA (RNTL snapshot × 4 langues) MOB-005: FeedbackScreen — snapshot en dioula: FeedbackScreen-dioula 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#FFFFFF",
+      "flex": 1,
+      "padding": 24,
+    }
+  }
+  testID="feedback-form"
+>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Ɲɛnajɛ
+  </Text>
+  <View
+    style={
+      {
+        "flexDirection": "row",
+        "marginBottom": 16,
+      }
+    }
+    testID="feedback-stars"
+  >
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-1"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-2"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-3"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-4"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "minHeight": 44,
+          "minWidth": 44,
+          "opacity": 1,
+        }
+      }
+      testID="feedback-star-5"
+    >
+      <Text
+        style={
+          [
+            {
+              "color": "#475467",
+              "fontSize": 32,
+            },
+            false,
+          ]
+        }
+      >
+        ☆
+      </Text>
+    </View>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#101828",
+        "fontSize": 15,
+        "fontWeight": "bold",
+        "marginBottom": 8,
+        "marginTop": 16,
+      }
+    }
+  >
+    Fɔ dɔ bɛ se ka kɛ? (a fara)
+  </Text>
+  <TextInput
+    maxLength={500}
+    multiline={true}
+    onChangeText={[Function]}
+    placeholder="I fɔli..."
+    placeholderTextColor="#475467"
+    style={
+      {
+        "borderColor": "#475467",
+        "borderRadius": 12,
+        "borderWidth": 1,
+        "color": "#101828",
+        "fontSize": 15,
+        "marginBottom": 24,
+        "minHeight": 100,
+        "padding": 12,
+        "textAlignVertical": "top",
+      }
+    }
+    testID="feedback-comment"
+    value=""
+  />
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "alignItems": "center",
+        "backgroundColor": "#2E90FA",
+        "borderRadius": 12,
+        "justifyContent": "center",
+        "minHeight": 44,
+        "opacity": 1,
+        "paddingHorizontal": 24,
+        "paddingVertical": 12,
+      }
+    }
+    testID="feedback-submit"
+  >
+    <Text
+      style={
+        {
+          "color": "#F5F7FA",
+          "fontSize": 15,
+          "fontWeight": "bold",
+        }
+      }
+    >
+      Ne hakili la
+    </Text>
+  </View>
+</View>
+`;
