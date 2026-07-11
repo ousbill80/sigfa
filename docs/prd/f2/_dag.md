@@ -15,7 +15,7 @@ CONTRACT-001..010 (DONE) ──► CONTRACT-011 (DONE)
 |---|---|---|---|
 | DB-001 | Schéma cœur Drizzle : Bank, Agency, Service, Queue, Counter, **Kiosk**, Ticket, User, AgencyUser + enums alignés LA LOI | F1 DONE | DONE |
 | DB-002 | Policies RLS toutes tables + helper SQL `app.current_bank_id` + suite tenant-isolation initiale | DB-001 | DONE |
-| DB-003 | Migrations initiales + seed : 8 services défaut avec SLA, rôles, jours fériés CI | DB-002 | TODO |
+| DB-003 | Migrations initiales + seed : 8 services défaut avec SLA, rôles, jours fériés CI | DB-002 | DONE |
 | DB-004 | Table audit_log immuable (rétention 24 mois) + triggers | DB-003 | TODO |
 | DB-005 | Tables notifications : templates par banque, opt-in/consent, journal d'envoi, devices push | DB-004 | TODO |
 | DB-006 | Tables reporting : agrégats journaliers matérialisés, index bank_id+date | DB-005 | TODO |
