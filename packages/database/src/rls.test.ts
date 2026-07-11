@@ -39,6 +39,9 @@ const BUSINESS_TABLES = [
   "notification_log",
   "notification_devices",
   "notification_test_recipients",
+  // DB-006 : tables de reporting
+  "daily_agency_stats",
+  "export_jobs",
 ] as const;
 
 describe("DB-002 — RLS + tenant-isolation", () => {
