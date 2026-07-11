@@ -38,6 +38,9 @@
       ],
       "react/*": [
         "./node_modules/@types/react/*"
+      ],
+      "@sigfa/contracts": [
+        "./src/lib/contracts-entry.ts"
       ]
     },
     "noEmit": true

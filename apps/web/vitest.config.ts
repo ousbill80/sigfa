@@ -28,12 +28,18 @@ export default defineConfig({
         "src/middleware.ts",
         // Old skeleton (not part of WEB-001 feature code)
         "src/index.ts",
+        // Pure re-export barrel aliasing @sigfa/contracts (no logic)
+        "src/lib/contracts-entry.ts",
       ],
     },
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // @sigfa/contracts: the package barrel drags in node-only OPENAPI_PATHS,
+      // so we alias to a browser-safe entry re-exporting the realtime events +
+      // typed client factory (both node-free). See lib/contracts-entry.ts.
+      "@sigfa/contracts": path.resolve(__dirname, "./src/lib/contracts-entry.ts"),
     },
   },
 });

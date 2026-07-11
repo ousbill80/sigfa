@@ -37,6 +37,11 @@ describe("WEB-001: middleware auth", () => {
     it("blocks /dashboard", () => {
       expect(isPublicRoute("/dashboard")).toBe(false);
     });
+
+    it("TV-001: allows /tv without authentication (public read per agency)", () => {
+      expect(isPublicRoute("/tv")).toBe(true);
+      expect(checkAccess("/tv", null).action).toBe("allow");
+    });
   });
 
   describe("RBAC enforcement in middleware", () => {
