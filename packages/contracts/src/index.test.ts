@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { existsSync } from "node:fs";
-import { CONTRACTS_VERSION, OPENAPI_PATHS } from "./index.js";
+import { CONTRACTS_VERSION, OPENAPI_PATHS, createSigfaClient } from "./index.js";
 
 describe("@sigfa/contracts", () => {
   it("exports CONTRACTS_VERSION", () => {
@@ -36,5 +36,16 @@ describe("@sigfa/contracts", () => {
       Object.keys(OPENAPI_PATHS).length,
       "OPENAPI_PATHS doit avoir exactement 7 modules",
     ).toBe(7);
+  });
+
+  // ─── CONTRACT-009a : createSigfaClient exporté depuis l'index ────────────────
+  it("CONTRACT-009a: createSigfaClient est exporté depuis l'index public", () => {
+    expect(typeof createSigfaClient).toBe("function");
+  });
+
+  it("CONTRACT-009a: createSigfaClient retourne un client openapi-fetch valide depuis l'index", () => {
+    const client = createSigfaClient("core", "https://api.sigfa.example.com");
+    expect(typeof client.GET).toBe("function");
+    expect(typeof client.POST).toBe("function");
   });
 });
