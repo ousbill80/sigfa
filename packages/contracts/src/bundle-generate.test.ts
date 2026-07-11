@@ -291,6 +291,7 @@ describe("CONTRACT-009: déterminisme de la génération", () => {
   const firstRunContent: Record<string, string> = {};
   const secondRunContent: Record<string, string> = {};
 
+  // Timeout étendu pour absorber la durée de `generate` (redocly + openapi-typescript × 7)
   beforeAll(() => {
     // Lire les fichiers générés une première fois (ils ont été générés avant les tests)
     for (const module of MODULES) {
@@ -326,7 +327,7 @@ describe("CONTRACT-009: déterminisme de la génération", () => {
         secondRunContent[`bundle_${module}`] = readFileSync(bundledPath, "utf-8");
       }
     }
-  });
+  }, 150_000); // timeout généreux pour `pnpm generate` (redocly × 7 + openapi-typescript × 7)
 
   it("CONTRACT-009: generate 2× → zéro diff sur les types TS (déterminisme)", () => {
     for (const module of MODULES) {
