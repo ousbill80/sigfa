@@ -15,7 +15,7 @@ import { tickets, ticketTransfers } from "./tickets.js";
  * bank_id sur chaque table métier, PK, contraintes CHECK bornées, uniques.
  */
 
-/** Toutes les tables métier (hors racine tenant `banks` et identité `users`). */
+/** Toutes les tables métier (hors racine tenant `banks`). Inclut `users` (rattachée à sa banque). */
 const BUSINESS_TABLES = {
   agencies,
   agencyExceptionalClosures,
@@ -24,6 +24,7 @@ const BUSINESS_TABLES = {
   counters,
   counterServices,
   kiosks,
+  users,
   userServices,
   agencyUsers,
   agentStatusHistory,
@@ -32,12 +33,18 @@ const BUSINESS_TABLES = {
 } as const;
 
 describe("DB-001: modèle Drizzle (structure)", () => {
-  it("DB-001: chaque table métier expose une colonne bank_id NOT NULL", () => {
+  it("DB-001: chaque table métier (13) expose une colonne bank_id (NOT NULL sauf users)", () => {
     for (const [name, table] of Object.entries(BUSINESS_TABLES)) {
       const config = getTableConfig(table);
       const bankId = config.columns.find((column) => column.name === "bank_id");
       expect(bankId, `${name}.bank_id présent`).toBeDefined();
-      expect(bankId?.notNull, `${name}.bank_id NOT NULL`).toBe(true);
+      // `users.bank_id` est nullable (NULL réservé au SUPER_ADMIN plateforme).
+      // Toutes les autres tables métier ont bank_id NOT NULL.
+      if (name === "users") {
+        expect(bankId?.notNull, "users.bank_id nullable (SUPER_ADMIN)").toBe(false);
+      } else {
+        expect(bankId?.notNull, `${name}.bank_id NOT NULL`).toBe(true);
+      }
     }
   });
 
@@ -94,6 +101,27 @@ describe("DB-001: modèle Drizzle (structure)", () => {
     const languages = config.columns.find((column) => column.name === "languages");
     expect(email?.isUnique).toBe(true);
     expect(languages?.notNull).toBe(true);
+  });
+
+  it("DB-001: users.bank_id nullable + CHECK role SUPER_ADMIN ↔ bank_id NULL", () => {
+    const config = getTableConfig(users);
+    // bank_id présent, nullable (NULL pour SUPER_ADMIN plateforme).
+    const bankId = config.columns.find((column) => column.name === "bank_id");
+    expect(bankId, "users.bank_id présent").toBeDefined();
+    expect(bankId?.notNull, "users.bank_id nullable").toBe(false);
+    // CHECK garantissant l'invariant SUPER_ADMIN ↔ bank_id IS NULL.
+    const checkNames = config.checks.map((check) => check.name);
+    expect(checkNames).toContain("users_super_admin_bank_id_check");
+    // Index (bank_id, email) bank_id-first (optimise les requêtes par banque).
+    const hasBankFirst = config.indexes.some((index) => {
+      const first = index.config.columns[0];
+      return (
+        first !== undefined &&
+        "name" in first &&
+        (first as { name: string }).name === "bank_id"
+      );
+    });
+    expect(hasBankFirst, "users index bank_id-first").toBe(true);
   });
 
   it("DB-001: toutes les FK sont en RESTRICT (aucune cascade destructive)", () => {

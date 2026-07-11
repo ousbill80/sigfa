@@ -1,5 +1,5 @@
 {
-  "id": "2d545f5d-519c-4b64-9134-4ce50489f9b4",
+  "id": "3f69794b-0f0c-463c-bf66-cacd7c184af8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1419,6 +1419,12 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "bank_id": {
+          "name": "bank_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "email": {
           "name": "email",
           "type": "text",
@@ -1517,6 +1523,27 @@
         }
       },
       "indexes": {
+        "users_bank_id_email_idx": {
+          "name": "users_bank_id_email_idx",
+          "columns": [
+            {
+              "expression": "bank_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "users_email_idx": {
           "name": "users_email_idx",
           "columns": [
@@ -1533,7 +1560,21 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "users_bank_id_banks_id_fk": {
+          "name": "users_bank_id_banks_id_fk",
+          "tableFrom": "users",
+          "tableTo": "banks",
+          "columnsFrom": [
+            "bank_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "users_email_unique": {
@@ -1545,7 +1586,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "users_super_admin_bank_id_check": {
+          "name": "users_super_admin_bank_id_check",
+          "value": "(\"users\".\"role\" = 'SUPER_ADMIN') = (\"users\".\"bank_id\" IS NULL)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.ticket_transfers": {

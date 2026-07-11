@@ -21,6 +21,7 @@ const BUSINESS_TABLES = [
   "counters",
   "counter_services",
   "kiosks",
+  "users",
   "user_services",
   "agency_users",
   "agent_status_history",
@@ -71,9 +72,9 @@ async function seedBaseFixture(pg: PostgresHarness): Promise<void> {
             ('${IDS.counter2}', '${IDS.bankA}', '${IDS.agencyA}', 2, 'Guichet 2')`
   );
   await pg.query(
-    `INSERT INTO users (id, email, password_hash, first_name, last_name, role)
-     VALUES ('${IDS.agentKofi}', 'kofi@banque-a.com', 'h', 'Kofi', 'Asante', 'AGENT'),
-            ('${IDS.agentAmi}', 'ami@banque-a.com', 'h', 'Aminata', 'Coulibaly', 'AGENT')`
+    `INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
+     VALUES ('${IDS.agentKofi}', '${IDS.bankA}', 'kofi@banque-a.com', 'h', 'Kofi', 'Asante', 'AGENT'),
+            ('${IDS.agentAmi}', '${IDS.bankA}', 'ami@banque-a.com', 'h', 'Aminata', 'Coulibaly', 'AGENT')`
   );
 }
 
@@ -115,14 +116,21 @@ describe("DB-001: schéma cœur Drizzle sur PostgreSQL 16 (Testcontainers)", () 
     await seedBaseFixture(pg);
   });
 
-  it("DB-001: 100% des tables métier portent bank_id NOT NULL + index bank_id-first (information_schema)", async () => {
+  it("DB-001: 100% des tables métier (13) portent bank_id + index bank_id-first (information_schema)", async () => {
     for (const table of BUSINESS_TABLES) {
       const col = await pg.query(
         `SELECT is_nullable FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = '${table}' AND column_name = 'bank_id'`
       );
       expect(col.rows.length, `${table}.bank_id existe`).toBe(1);
-      expect(col.rows[0]?.is_nullable, `${table}.bank_id NOT NULL`).toBe("NO");
+
+      // `users.bank_id` est nullable (NULL autorisé pour SUPER_ADMIN plateforme).
+      // Toutes les autres tables métier ont bank_id NOT NULL.
+      if (table !== "users") {
+        expect(col.rows[0]?.is_nullable, `${table}.bank_id NOT NULL`).toBe("NO");
+      } else {
+        expect(col.rows[0]?.is_nullable, "users.bank_id nullable (SUPER_ADMIN)").toBe("YES");
+      }
 
       // Index dont la PREMIÈRE colonne est bank_id.
       const idx = await pg.query(
@@ -170,13 +178,43 @@ describe("DB-001: schéma cœur Drizzle sur PostgreSQL 16 (Testcontainers)", () 
     await pg.query(
       `INSERT INTO banks (id, name, slug) VALUES ('${IDS.bankB}', 'Banque B', 'banque-b')`
     );
-    // Même email qu'un utilisateur existant (rattaché conceptuellement à une autre banque)
+    // Même email qu'un utilisateur existant, mais rattaché à une autre banque → rejet (email GLOBAL).
+    await expect(
+      pg.query(
+        `INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
+         VALUES (gen_random_uuid(), '${IDS.bankB}', 'kofi@banque-a.com', 'h', 'Autre', 'Kofi', 'AGENT')`
+      )
+    ).rejects.toThrow();
+  });
+
+  it("DB-001: users.bank_id nullable + CHECK role SUPER_ADMIN ↔ bank_id NULL — 4 cas", async () => {
+    // Cas 1 : AGENT sans bank_id → rejeté (AGENT doit avoir une banque).
     await expect(
       pg.query(
         `INSERT INTO users (id, email, password_hash, first_name, last_name, role)
-         VALUES (gen_random_uuid(), 'kofi@banque-a.com', 'h', 'Autre', 'Kofi', 'AGENT')`
+         VALUES (gen_random_uuid(), 'agent-no-bank@test.com', 'h', 'Test', 'Agent', 'AGENT')`
       )
     ).rejects.toThrow();
+
+    // Cas 2 : SUPER_ADMIN avec bank_id → rejeté (SUPER_ADMIN est hors banque).
+    await expect(
+      pg.query(
+        `INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
+         VALUES (gen_random_uuid(), '${IDS.bankA}', 'superadmin-with-bank@test.com', 'h', 'Super', 'Admin', 'SUPER_ADMIN')`
+      )
+    ).rejects.toThrow();
+
+    // Cas 3 : AGENT avec bank_id → accepté.
+    await pg.query(
+      `INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
+       VALUES (gen_random_uuid(), '${IDS.bankA}', 'agent-with-bank@test.com', 'h', 'Valid', 'Agent', 'AGENT')`
+    );
+
+    // Cas 4 : SUPER_ADMIN sans bank_id → accepté.
+    await pg.query(
+      `INSERT INTO users (id, email, password_hash, first_name, last_name, role)
+       VALUES (gen_random_uuid(), 'superadmin-no-bank@test.com', 'h', 'Platform', 'Admin', 'SUPER_ADMIN')`
+    );
   });
 
   it("DB-001: unicité (queue_id, number, issued_day) violée → erreur ; issued_day = date locale Abidjan (pas UTC)", async () => {

@@ -8,7 +8,9 @@ import {
   timestamp,
   index,
   unique,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { banks } from "./banks.js";
 import { agencies } from "./agencies.js";
 import { services } from "./services.js";
@@ -18,20 +20,27 @@ import type { WeeklySchedule } from "./agencies.js";
 /**
  * `users` — compte utilisateur SIGFA (agents, managers, admins).
  *
- * Décision v1 consignée : `email` UNIQUE **GLOBAL** (login sans bankId).
- * Le multi-banque pour un même email est une story future (slug / sous-domaine).
- * `users` n'est donc PAS scopé par `bank_id` (table transverse d'identité).
+ * Modèle v5 : chaque utilisateur est rattaché à sa banque via `bank_id` (FK banks RESTRICT).
+ * Exception : le SUPER_ADMIN plateforme n'appartient à aucune banque (`bank_id NULL`).
+ * Invariant garanti par CHECK : `(role = 'SUPER_ADMIN') = (bank_id IS NULL)`.
  *
+ * - `email` UNIQUE **GLOBAL** (login sans ambiguïté de tenant).
  * - `password_hash` bcrypt cost 12 · `languages` enum-array (défaut `{FR}`).
  * - `failed_login_attempts` / `locked_until` : verrouillage API-001 (5 essais → +15 min).
  * - `phone_encrypted` text opaque (format DB-008 `v1:iv:tag:ct`) + `phone_hash`
  *   — types DÉFINITIFS dès création (aucune ALTER ultérieure).
+ * - Index `(bank_id, email)` bank_id-first pour les requêtes par banque (RLS DB-002).
  */
 export const users = pgTable(
   "users",
   {
     /** Identifiant unique de l'utilisateur. */
     id: uuid("id").primaryKey().defaultRandom(),
+    /**
+     * Banque propriétaire — NULL uniquement pour le SUPER_ADMIN plateforme.
+     * FK banks RESTRICT · index (bank_id, email) bank_id-first.
+     */
+    bankId: uuid("bank_id").references(() => banks.id, { onDelete: "restrict" }),
     /** Email de connexion — UNIQUE GLOBAL. */
     email: text("email").notNull().unique(),
     /** Empreinte bcrypt (cost 12) du mot de passe. */
@@ -63,7 +72,21 @@ export const users = pgTable(
     /** Suppression logique (entité auditable). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (table) => [index("users_email_idx").on(table.email)]
+  (table) => [
+    /** Index (bank_id, email) bank_id-first — optimise les requêtes RLS par banque. */
+    index("users_bank_id_email_idx").on(table.bankId, table.email),
+    /** Email reste indexé séparément pour la connexion globale. */
+    index("users_email_idx").on(table.email),
+    /**
+     * Invariant SUPER_ADMIN ↔ bank_id IS NULL :
+     * seul le SUPER_ADMIN plateforme peut avoir bank_id NULL ;
+     * tout autre rôle doit impérativement être rattaché à une banque.
+     */
+    check(
+      "users_super_admin_bank_id_check",
+      sql`(${table.role} = 'SUPER_ADMIN') = (${table.bankId} IS NULL)`
+    ),
+  ]
 );
 
 /**

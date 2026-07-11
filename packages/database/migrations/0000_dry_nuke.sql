@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS "user_services" (
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"bank_id" uuid,
 	"email" text NOT NULL,
 	"password_hash" text NOT NULL,
 	"first_name" text NOT NULL,
@@ -164,7 +165,8 @@ CREATE TABLE IF NOT EXISTS "users" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone,
-	CONSTRAINT "users_email_unique" UNIQUE("email")
+	CONSTRAINT "users_email_unique" UNIQUE("email"),
+	CONSTRAINT "users_super_admin_bank_id_check" CHECK (("users"."role" = 'SUPER_ADMIN') = ("users"."bank_id" IS NULL))
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "ticket_transfers" (
@@ -369,6 +371,12 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
+ ALTER TABLE "users" ADD CONSTRAINT "users_bank_id_banks_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."banks"("id") ON DELETE restrict ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
  ALTER TABLE "ticket_transfers" ADD CONSTRAINT "ticket_transfers_bank_id_banks_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."banks"("id") ON DELETE restrict ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
@@ -456,6 +464,7 @@ CREATE INDEX IF NOT EXISTS "kiosks_bank_id_agency_id_idx" ON "kiosks" USING btre
 CREATE INDEX IF NOT EXISTS "agency_users_bank_id_agency_id_idx" ON "agency_users" USING btree ("bank_id","agency_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "agent_status_history_bank_id_agent_id_changed_at_idx" ON "agent_status_history" USING btree ("bank_id","agent_id","changed_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "user_services_bank_id_user_id_idx" ON "user_services" USING btree ("bank_id","user_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "users_bank_id_email_idx" ON "users" USING btree ("bank_id","email");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "users_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ticket_transfers_bank_id_ticket_id_idx" ON "ticket_transfers" USING btree ("bank_id","ticket_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "tickets_bank_id_agency_id_idx" ON "tickets" USING btree ("bank_id","agency_id");--> statement-breakpoint
