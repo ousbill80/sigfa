@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import * as http from "node:http";
-import { createServer, startServer } from "./index.js";
+import { createServer, startServer } from "./index";
 
 describe("@sigfa/kiosk", () => {
   const servers: http.Server[] = [];

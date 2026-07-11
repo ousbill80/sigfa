@@ -3,7 +3,8 @@
  * Middleware next-intl pour la gestion des locales.
  */
 import createMiddleware from "next-intl/middleware";
-import { routing } from "./i18n/routing.js";
+// Import sans extension .js — convention Next.js 15 (bundler ne résout pas .js→.ts)
+import { routing } from "./i18n/routing";
 
 export default createMiddleware(routing);
 

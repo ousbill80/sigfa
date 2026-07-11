@@ -70,7 +70,7 @@ describe("KIOSK-001: i18n", () => {
   });
 
   it("KIOSK-001: next-intl routing supporte fr, dioula, baoule, en", async () => {
-    const { routing } = await import("../i18n/routing.js");
+    const { routing } = await import("../i18n/routing");
 
     expect(routing.locales).toContain("fr");
     expect(routing.locales).toContain("dioula");
