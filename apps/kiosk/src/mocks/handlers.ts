@@ -16,4 +16,23 @@ export const handlers = [
       { status: 201 }
     );
   }),
+  // KIOSK-004: POST /public/tickets handler
+  http.post("*/public/tickets", () => {
+    return HttpResponse.json(
+      {
+        trackingId: "TRK-00001",
+        number: 7,
+        displayNumber: "A007",
+        position: 4,
+        estimatedWaitMinutes: 12,
+        queueLength: 10,
+        serviceId: "svc-001",
+        agencyId: "agt-001",
+        channel: "KIOSK",
+        createdAt: new Date().toISOString(),
+        status: "WAITING",
+      },
+      { status: 201 }
+    );
+  }),
 ];
