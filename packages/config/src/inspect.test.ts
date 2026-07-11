@@ -38,6 +38,17 @@ describe("Root configuration inspection", () => {
     expect(deps).not.toContain("build");
   });
 
+  it("INFRA-002: turbo.json typecheck.dependsOn contains ^build (deps compiled) but NOT build (own package)", () => {
+    const turbo = JSON.parse(readFileSync(resolve(ROOT, "turbo.json"), "utf-8")) as {
+      tasks: { typecheck?: { dependsOn?: string[] } };
+    };
+    const deps = turbo.tasks.typecheck?.dependsOn ?? [];
+    // Dépendances workspace doivent être compilées avant le typecheck
+    expect(deps).toContain("^build");
+    // Mais le package courant ne doit PAS se builder lui-même avant son propre typecheck
+    expect(deps).not.toContain("build");
+  });
+
   it("INFRA-001: .env.example contient l'en-tête de sécurité et NODE_ENV", () => {
     const envExample = readFileSync(resolve(ROOT, ".env.example"), "utf-8");
     // Doit contenir l'en-tête indiquant de ne pas committer .env
