@@ -18,14 +18,14 @@ INFRA-005 (DONE)
 
 | ID | Story | Fichier(s) possédé(s) | Dépend de | Statut |
 |---|---|---|---|---|
-| CONTRACT-001 | Contrat cœur : tenants, auth, agences, services, guichets, files, tickets | `openapi/core.yaml` | INFRA-005 | DONE |
-| CONTRACT-002 | Événements Socket.io temps réel | `events/realtime.ts` | 001 | TODO |
-| CONTRACT-003 | Client public : émission multi-canal, suivi, feedback, sync borne | `openapi/public.yaml` | 001 | TODO |
-| CONTRACT-004 | Agents & compétences | `openapi/agents.yaml` | 001 | TODO |
-| CONTRACT-005 | Admin : RBAC, config, templates, onboarding | `openapi/admin.yaml` | 001 | TODO |
-| CONTRACT-006 | Reporting : KPIs, rapports, exports | `openapi/reporting.yaml` | 001 | TODO |
-| CONTRACT-007 | Notifications : SMS, WhatsApp, email, push | `openapi/notifications.yaml` | 001 | TODO |
-| CONTRACT-008 | IA : prédictions, staffing, anomalies, NLP | `openapi/ai.yaml` | 001, 006 | TODO |
+| CONTRACT-001 | Contrat cœur : tenants, auth, agences, services, guichets, files, tickets | `openapi/core.yaml` | INFRA-005 | REVIEW |
+| CONTRACT-002 | Événements Socket.io temps réel | `events/realtime.ts` | 001 | REVIEW |
+| CONTRACT-003 | Client public : émission multi-canal, suivi, feedback, sync borne | `openapi/public.yaml` | 001 | REVIEW |
+| CONTRACT-004 | Agents & compétences | `openapi/agents.yaml` | 001 | REVIEW |
+| CONTRACT-005 | Admin : RBAC, config, templates, onboarding | `openapi/admin.yaml` | 001 | REVIEW |
+| CONTRACT-006 | Reporting : KPIs, rapports, exports | `openapi/reporting.yaml` | 001 | REVIEW |
+| CONTRACT-007 | Notifications : SMS, WhatsApp, email, push | `openapi/notifications.yaml` | 001 | REVIEW |
+| CONTRACT-008 | IA : prédictions, staffing, anomalies, NLP | `openapi/ai.yaml` | 001, 006 | REVIEW |
 | CONTRACT-009 | Génération outillée : types TS + client typé + mock Prism + squelettes Schemathesis + **diff de contrat en CI (C4)** | `packages/contracts/generated/**`, scripts, job CI | 001–008 | TODO |
 
 ## Conventions communes du contrat (s'appliquent à TOUTES les stories F1 — ne pas répéter dans chaque story)
