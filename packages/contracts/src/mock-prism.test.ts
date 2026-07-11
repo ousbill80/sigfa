@@ -44,8 +44,22 @@ const MODULE_SMOKE_ENDPOINTS = {
   ai: "/ai/anomalies",                                          // pas de query params requis
 } satisfies Record<string, string>;
 
-/** Attend que le port soit prêt (polling HTTP) */
-async function waitForPort(port: number, timeoutMs = 20_000): Promise<void> {
+/**
+ * Attend que le port soit prêt (polling HTTP).
+ *
+ * Timeout augmenté à 60 s (anti-flaky CI chargée — T8) :
+ * sous forte charge (7 workspaces pnpm + runners partagés), Prism agents
+ * (port 4012) pouvait dépasser 20 s à cause de la contention CPU/fork.
+ * Intervalle de poll passé à 500 ms pour réduire le bruit syscall en CI.
+ *
+ * Démarrage séquentiel non retenu (moins invasif que repenser le beforeAll)
+ * — le timeout seul suffit à couvrir la contention observée.
+ */
+async function waitForPort(
+  port: number,
+  timeoutMs = 60_000,
+  moduleLabel = `port ${port}`
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -68,9 +82,12 @@ async function waitForPort(port: number, timeoutMs = 20_000): Promise<void> {
     } catch {
       // continue
     }
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error(`Port ${port} not ready after ${timeoutMs}ms`);
+  throw new Error(
+    `[mock-prism] module '${moduleLabel}' — port ${port} not ready after ${timeoutMs}ms` +
+    ` (CI chargée ? augmenter MOCK_READINESS_TIMEOUT ou réduire la parallélisation)`
+  );
 }
 
 /**
@@ -170,8 +187,8 @@ describe("CONTRACT-009: mock Prism démarre sur les 7 bundles (critère 5)", () 
         });
 
         try {
-          // Attendre que Prism soit prêt (jusqu'à 20s)
-          await waitForPort(port, 20_000);
+          // Attendre que Prism soit prêt (jusqu'à 60s — anti-flaky CI chargée T8)
+          await waitForPort(port, 60_000, module);
 
           // Appel smoke GET sur l'endpoint exemple du module
           const endpoint =
@@ -201,7 +218,7 @@ describe("CONTRACT-009: mock Prism démarre sur les 7 bundles (critère 5)", () 
           await new Promise((r) => setTimeout(r, 500));
         }
       },
-      45_000 // timeout généreux
+      90_000 // waitForPort 60s + smoke fetch 5s + marge 25s (anti-flaky CI T8)
     );
   }
 });
@@ -262,7 +279,7 @@ describe("CONTRACT-009: fumée Schemathesis contre mock core (critère 6)", () =
       proc.stderr?.on("data", (d: Buffer) => { prismOutput += d.toString(); });
 
       try {
-        await waitForPort(CORE_PORT, 20_000);
+        await waitForPort(CORE_PORT, 60_000, "core");
 
         // Lancer Schemathesis via Docker contre le mock
         // macOS : le mock est joint via host.docker.internal (pas localhost)
@@ -364,7 +381,7 @@ describe("CONTRACT-009: fumée Schemathesis contre mock core (critère 6)", () =
       proc.stderr?.on("data", (d: Buffer) => { prismOutput += d.toString(); });
 
       try {
-        await waitForPort(CORE_PORT + 1, 20_000);
+        await waitForPort(CORE_PORT + 1, 60_000, "core (CONTRACT-010)");
 
         const schemaUrl = `http://host.docker.internal:${CORE_PORT + 1}`;
 
