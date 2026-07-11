@@ -42,4 +42,28 @@ export const en = {
     badge: 'Offline',
     queued: 'Ticket pending synchronization',
   },
+  liveTicket: {
+    yourTurn: 'Your turn!',
+    noActiveTicket: 'No active ticket',
+    notFound: 'Please go to the reception desk',
+    personsBefore: 'person(s) before you',
+    updatedEvery30s: 'Updated every 30 seconds',
+  },
+  feedback: {
+    title: 'Give feedback',
+    commentLabel: 'Anything to add? (optional)',
+    commentPlaceholder: 'Your comment...',
+    submit: 'Give feedback',
+    success: 'Thank you for your feedback!',
+    alreadySubmitted: 'You have already submitted your feedback',
+    windowExpired: 'The feedback window has expired',
+    stars: 'Rating',
+    historyTitle: 'Ticket history',
+    historyEmpty: 'No tickets in your history',
+    badgeReminder: 'Give feedback',
+  },
+  notifications: {
+    twoPersonsAhead: 'Only 2 people ahead — head to the branch',
+    twoPersonsWithTravel: 'Only 2 people ahead — head to the branch (travel: {travel} min)',
+  },
 } as const;

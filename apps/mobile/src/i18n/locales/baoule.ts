@@ -42,4 +42,28 @@ export const baoule = {
     badge: 'Fiɔ man',
     queued: 'Tikɛt kɛ di yɛ',
   },
+  liveTicket: {
+    yourTurn: 'Wɔ i liɛ!',
+    noActiveTicket: 'Tikɛt kpɔn man',
+    notFound: 'Kɔ akɔkwafuɛ fɔlɛ',
+    personsBefore: 'bian i ɲrun',
+    updatedEvery30s: 'Mɛn 30 nun kɛkɛlɛ',
+  },
+  feedback: {
+    title: 'Donner mon avis',
+    commentLabel: 'Un mot à ajouter ? (facultatif)',
+    commentPlaceholder: 'I nian...',
+    submit: 'Donner mon avis',
+    success: 'Merci pour votre retour !',
+    alreadySubmitted: 'A klolɛ i kɛ n su',
+    windowExpired: 'Blɛ yɛ wɔ',
+    stars: 'Nɔmbɔlɔ',
+    historyTitle: 'Tikɛt kɔkun',
+    historyEmpty: 'Tikɛt kpɔn man i kɔkun nun',
+    badgeReminder: 'Donner mon avis',
+  },
+  notifications: {
+    twoPersonsAhead: 'Bian 2 bɛ i ɲrun — kɔ ajɑ̃si',
+    twoPersonsWithTravel: 'Bian 2 bɛ i ɲrun — kɔ ajɑ̃si (kɔli: {travel} mɛn)',
+  },
 } as const;
