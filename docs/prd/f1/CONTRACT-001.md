@@ -22,7 +22,7 @@
 - [ ] `CONTRACT-001: le YAML est valide OpenAPI 3.1 (spectral lint zéro erreur, règles custom x-* incluses)`
 - [ ] `CONTRACT-001: chaque endpoint expose les 9 codes de réponse avec schéma (test parcourant le YAML)`
 - [ ] `CONTRACT-001: chaque route documente x-tenant-scope + x-required-role, valeurs dans les enums (test spectral custom)`
-- [ ] `CONTRACT-001: les 3 mutations critiques référencent components/headers/IdempotencyKey (test)`
+- [ ] `CONTRACT-001: les 3 mutations critiques référencent components/parameters/IdempotencyKeyParam (schema inline) — components/headers/IdempotencyKey conservé pour la sémantique (test)` *(texte aligné post-amendement ts-nocheck)*
 - [ ] `CONTRACT-001: machine à états encodée — enum TicketStatus + 409 ILLEGAL_TRANSITION sur chaque transition (test)`
 - [ ] `CONTRACT-001: call-next → 200 | 404 QUEUE_EMPTY documentés avec exemples ; /call → 409 TICKET_ALREADY_CLAIMED (test)`
 - [ ] `CONTRACT-001: sync — maxItems 100 + 422 BATCH_TOO_LARGE + réponse synced/skipped typée (test)`

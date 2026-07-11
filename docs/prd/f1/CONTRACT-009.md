@@ -24,11 +24,11 @@ devDependencies de `@sigfa/contracts` : `@redocly/cli@^1`, `openapi-typescript@^
 - SI `generate` produit un diff non commité dans `generated/`, ALORS la CI échoue (« generated désynchronisé — relancez generate »).
 
 ## Critères d'acceptation
-- [ ] `CONTRACT-009: bundle → 8 YAML résolus ; chaîne $ref à 3 niveaux (ai→reporting→core) résolue (test)`
-- [ ] `CONTRACT-009: generate → types + client pour les 8 modules ; typecheck strict vert sur generated/`
+- [ ] `CONTRACT-009: bundle → 7 YAML résolus (les événements sont TS, pas OpenAPI) ; chaîne $ref à 3 niveaux (ai→reporting→core) résolue (test)` *(texte corrigé post-panel : 8→7)*
+- [ ] `CONTRACT-009: generate → types + client pour les 7 modules ; typecheck strict vert sur generated/`
 - [ ] `CONTRACT-009: generate 2× → zéro diff (déterminisme)`
 - [ ] `CONTRACT-009: client typé couvre 100% des endpoints (test d'inventaire chemins×méthodes vs YAML)`
-- [ ] `CONTRACT-009: mock Prism démarre sur les 8 bundles et répond aux exemples (smoke)`
+- [ ] `CONTRACT-009: mock Prism démarre sur les 7 bundles et répond aux exemples (smoke)` *(texte corrigé post-panel)*
 - [ ] `CONTRACT-009: Schemathesis (harness F0) passe contre le mock (fumée)`
 - [ ] `CONTRACT-009: breaking simulé → job diff rouge listant ; additif → vert (tests du script)`
 - [ ] `CONTRACT-009: generated désynchronisé simulé → CI rouge message actionnable (test)`
