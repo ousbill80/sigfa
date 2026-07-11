@@ -341,6 +341,64 @@ async function seedDemoTenant(
       ON CONFLICT (email) DO NOTHING
     `);
   }
+
+  // ── Templates de notification FR par défaut (DB-005) ──────────────────
+  // Seed des 4 NotificationType × canal SMS en français pour le tenant de démo.
+  // Les templates pour les autres canaux (WHATSAPP, EMAIL, PUSH) et langues
+  // (DIOULA, BAOULE, EN) sont créés par le BANK_ADMIN via l'interface.
+  await seedDefaultNotificationTemplates(query, DEMO_BANK_ID);
+}
+
+/**
+ * Templates de notification FR par défaut pour les 4 NotificationType (DB-005).
+ *
+ * Variables autorisées : `{{number}}` (numéro de ticket), `{{position}}`
+ * (position dans la file), `{{estimate}}` (estimation en minutes).
+ * Validation côté API (CONTRACT-005) — la base stocke sans contrainte.
+ *
+ * Seed idempotent : ON CONFLICT (bank_id, type, channel, lang) DO NOTHING.
+ *
+ * @param query  - Connexion migrateur (BYPASSRLS)
+ * @param bankId - UUID de la banque cible
+ */
+async function seedDefaultNotificationTemplates(
+  query: QueryFn,
+  bankId: string
+): Promise<void> {
+  /** Templates FR par défaut pour les 4 NotificationType, canal SMS. */
+  const FR_SMS_TEMPLATES: Array<{ type: string; body: string }> = [
+    {
+      type: "TICKET_CONFIRMATION",
+      body: "Votre ticket {{number}} a été enregistré. Vous êtes en position {{position}} dans la file. Estimation : {{estimate}} min.",
+    },
+    {
+      type: "POSITION_UPDATE",
+      body: "Mise à jour : vous êtes maintenant en position {{position}} dans la file. Estimation : {{estimate}} min.",
+    },
+    {
+      type: "YOUR_TURN",
+      body: "C'est bientôt votre tour ! Ticket {{number}} — préparez vos documents. Estimation : {{estimate}} min.",
+    },
+    {
+      type: "DAILY_REPORT",
+      body: "Rapport journalier de votre agence : {{number}} tickets traités aujourd'hui.",
+    },
+  ];
+
+  for (const tpl of FR_SMS_TEMPLATES) {
+    await query(`
+      INSERT INTO notification_templates (id, bank_id, type, channel, lang, body)
+      VALUES (
+        gen_random_uuid(),
+        '${bankId}',
+        '${tpl.type}',
+        'SMS',
+        'FR',
+        '${tpl.body.replace(/'/g, "''")}'
+      )
+      ON CONFLICT (bank_id, type, channel, lang) DO NOTHING
+    `);
+  }
 }
 
 /**

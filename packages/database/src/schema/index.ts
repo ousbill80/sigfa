@@ -8,3 +8,4 @@ export * from "./kiosks.js";
 export * from "./users.js";
 export * from "./tickets.js";
 export * from "./audit-log.js";
+export * from "./notifications.js";

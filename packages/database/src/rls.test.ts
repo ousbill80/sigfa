@@ -14,7 +14,10 @@ import { applyMigrations } from "./test-support/migrate.js";
 import { withTenant } from "./tenant.js";
 import { assertTenantIsolated } from "@sigfa/testing/tenant-isolation";
 
-/** Tables métier attendues avec RLS activé. */
+/**
+ * Tables métier attendues avec RLS activé.
+ * Inclut les 5 tables de notifications (DB-005).
+ */
 const BUSINESS_TABLES = [
   "agencies",
   "agency_exceptional_closures",
@@ -30,6 +33,12 @@ const BUSINESS_TABLES = [
   "tickets",
   "users",
   "audit_log",
+  // DB-005 : tables de notifications
+  "notification_templates",
+  "notification_consents",
+  "notification_log",
+  "notification_devices",
+  "notification_test_recipients",
 ] as const;
 
 describe("DB-002 — RLS + tenant-isolation", () => {
