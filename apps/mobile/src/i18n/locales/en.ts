@@ -1,0 +1,45 @@
+// en.ts — Locale anglais
+export const en = {
+  auth: {
+    title: 'Sign In',
+    phoneLabel: 'Phone number',
+    phonePlaceholder: '+225 XX XX XX XX XX',
+    sendOtp: 'Send code',
+    otpLabel: 'Verification code',
+    otpPlaceholder: '6 digits',
+    verifyOtp: 'Verify',
+    uemoa_consent: 'I agree to the processing of my data in accordance with UEMOA regulations',
+    uemoa_required: 'UEMOA consent is required to continue',
+  },
+  nav: {
+    home: 'Home',
+    newTicket: 'New ticket',
+    myTicket: 'My ticket',
+  },
+  ticket: {
+    title: 'Get a ticket',
+    step1Title: 'Choose your service',
+    step2Title: 'Confirmation',
+    step3Title: 'Your ticket',
+    agency: 'Agency',
+    service: 'Service',
+    confirm: 'Confirm',
+    next: 'Next',
+    back: 'Back',
+    trackingId: 'Tracking number',
+    displayNumber: 'Queue number',
+    estimatedWait: 'Estimated wait',
+    position: 'Position in queue',
+  },
+  screen: {
+    loading: 'Loading...',
+    error: 'An error occurred',
+    empty: 'No items',
+    offline: 'Offline',
+    retry: 'Retry',
+  },
+  offline: {
+    badge: 'Offline',
+    queued: 'Ticket pending synchronization',
+  },
+} as const;

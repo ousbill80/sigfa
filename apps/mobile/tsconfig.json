@@ -1,8 +1,18 @@
 {
-  "extends": "@sigfa/config/tsconfig/base",
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "types": ["jest", "@testing-library/jest-native", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
+      "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"]
+    }
   },
-  "include": ["src/**/*"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.d.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "src/index.test.ts", "vitest.config.ts", "babel.config.js", "metro.config.js", "jest.config.js"]
 }

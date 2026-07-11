@@ -1,0 +1,45 @@
+// baoule.ts — Locale Baoulé
+export const baoule = {
+  auth: {
+    title: 'Lɔ wlɔli',
+    phoneLabel: 'Telefɔn nɔmbɔlɔ',
+    phonePlaceholder: '+225 XX XX XX XX XX',
+    sendOtp: 'Kɔd suntan',
+    otpLabel: 'Kɔd dɔlɛ',
+    otpPlaceholder: '6 nɔmbɔlɔ',
+    verifyOtp: 'Kɔtɛlɛ',
+    uemoa_consent: "N klolɛ e ka min ye n wun dɔlɛ UEMOA mmla nun",
+    uemoa_required: 'UEMOA klolɛ yɛ blofuɛ',
+  },
+  nav: {
+    home: 'Fie',
+    newTicket: 'Tikɛt kɔkun',
+    myTicket: 'Min tikɛt',
+  },
+  ticket: {
+    title: 'Tikɛt nian',
+    step1Title: 'Yɛ sɛ i sulɔpɔ',
+    step2Title: 'Kɔtɛlɛli',
+    step3Title: 'I tikɛt',
+    agency: 'Ajɑ̃si',
+    service: 'Sulɔpɔ',
+    confirm: 'Kɔtɛlɛ',
+    next: 'Kɔ fɔ',
+    back: 'Sa tu',
+    trackingId: 'Nɔmbɔlɔ kɔkun',
+    displayNumber: 'Nɔmbɔlɔ flɛ',
+    estimatedWait: 'Bɛtɛ mɛn',
+    position: 'Yɛlɛ nun',
+  },
+  screen: {
+    loading: 'Tran tran...',
+    error: 'Sɔ kɔ dɔ yɛ',
+    empty: 'Ngwlɛlɛ fɔ man',
+    offline: 'Fiɔ man',
+    retry: 'Kɔ san',
+  },
+  offline: {
+    badge: 'Fiɔ man',
+    queued: 'Tikɛt kɛ di yɛ',
+  },
+} as const;
