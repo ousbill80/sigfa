@@ -30,3 +30,17 @@ export const OPENAPI_PATHS = {
 // CONTRACT-002 : événements Socket.io temps réel
 // eslint-disable-next-line no-restricted-imports
 export * from "../events/realtime.js";
+
+// CONTRACT-009a : factory client typé + types de paths
+export {
+  createSigfaClient,
+  type SigfaModule,
+  type SigfaClientOptions,
+  type CorePaths,
+  type PublicPaths,
+  type AgentsPaths,
+  type AdminPaths,
+  type ReportingPaths,
+  type NotificationsPaths,
+  type AiPaths,
+} from "./client.js";

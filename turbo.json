@@ -16,6 +16,10 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "@sigfa/kiosk#typecheck": {
+      "dependsOn": ["^build", "build"],
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]

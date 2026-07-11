@@ -1,0 +1,22 @@
+{
+  "common": {
+    "welcome": "Welcome",
+    "chooseLanguage": "Choose your language",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry"
+  },
+  "home": {
+    "title": "Welcome",
+    "subtitle": "Please select your language to continue",
+    "languageLabel": "English"
+  },
+  "session": {
+    "expired": "Your session has expired",
+    "reconnecting": "Reconnecting..."
+  },
+  "error": {
+    "offline": "Kiosk offline",
+    "contactStaff": "Please contact a staff member"
+  }
+}

@@ -1,0 +1,27 @@
+/**
+ * KIOSK-001 — next.config.ts
+ * Configuration Next.js 15 avec next-intl et output export pour Electron.
+ *
+ * STRATÉGIE D'IMPORTS (fix KIOSK-001):
+ * Tous les imports internes de l'app utilisent la convention Next.js standard :
+ * PAS d'extension .js sur les imports de modules TypeScript locaux.
+ * Raison : le bundler Next.js 15 (webpack / turbopack) ne résout PAS .js → .ts/.tsx
+ * comme le fait Node.js en mode NodeNext/ESM. L'extension .js est réservée aux
+ * fichiers vraiment compilés en JS (dist/). Pour les sources TypeScript, on omit
+ * l'extension et le bundler résout automatiquement .ts / .tsx / /index.ts.
+ * Référence : https://nextjs.org/docs/app/building-your-application/configuring/typescript
+ */
+import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+const nextConfig: NextConfig = {
+  output: "export",
+  trailingSlash: true,
+  images: {
+    unoptimized: true,
+  },
+};
+
+export default withNextIntl(nextConfig);

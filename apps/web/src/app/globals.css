@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* SIGFA Design System — CSS Custom Properties */
+:root {
+  --brand: #1a56db;
+  --brand-soft: #e8f0fe;
+  --brand-contrast: #ffffff;
+  --surface-0: #ffffff;
+  --surface-1: #f9fafb;
+  --ink-strong: #111827;
+  --ink-soft: #6b7280;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+}
+
+body {
+  background-color: var(--surface-0);
+  color: var(--ink-strong);
+  font-family: system-ui, -apple-system, sans-serif;
+}

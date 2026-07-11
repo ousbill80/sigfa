@@ -1,7 +1,15 @@
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'jest-expo',
-  setupFiles: ['./jest.setup.js'],
+  setupFiles: [
+    // Re-apply react-native jest setup from mobile's LOCAL node_modules (react@18 path).
+    // Needed because jest-expo's preset resolves react-native from .pnpm/node_modules/react-native
+    // which points to the react@19 variation — so its NativeModules mock applies to the
+    // react@19 path, not the react@18 path used by mobile tests. Running the react@18 setup
+    // AFTER ensures the correct NativeModules module is also mocked.
+    require.resolve('./node_modules/react-native/jest/setup.js'),
+    './jest.setup.js',
+  ],
   testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
@@ -20,6 +28,15 @@ module.exports = {
     },
   },
   moduleNameMapper: {
+    // Restore runtime react mapping — tsconfig paths entries for react point to @types/react
+    // (for tsc isolation) but jest must resolve to the actual react runtime package.
+    '^react$': '<rootDir>/node_modules/react/index.js',
+    '^react/jsx-runtime$': '<rootDir>/node_modules/react/jsx-runtime.js',
+    '^react/jsx-dev-runtime$': '<rootDir>/node_modules/react/jsx-dev-runtime.js',
+    // Fix: pnpm dual-react-version — jest-expo preset loads from react-native@react@19 variant
+    // in .pnpm/node_modules; mobile tests use react-native@react@18 variant. Redirect ALL
+    // react-native NativeModules to a unified mock so the same mock applies in both variants.
+    'react-native/Libraries/BatchedBridge/NativeModules': '<rootDir>/__mocks__/NativeModules.js',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@sigfa/schemas$': '<rootDir>/../../packages/schemas/src/index.ts',
     '^@sigfa/contracts$': '<rootDir>/../../packages/contracts/src/index.ts',
