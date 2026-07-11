@@ -14,3 +14,7 @@ export const OPENAPI_PATHS = {
   /** Contrat cœur : auth, banks, agencies, services, counters, queues, tickets */
   core: resolve(__dirname, "../openapi/core.yaml"),
 } as const;
+
+// CONTRACT-002 : événements Socket.io temps réel
+// eslint-disable-next-line no-restricted-imports
+export * from "../events/realtime.js";
