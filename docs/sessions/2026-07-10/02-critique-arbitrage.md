@@ -1,0 +1,45 @@
+# Session 2026-07-10 — Arbitrage des critiques · VAGUE F0 (Boucle 1, itération 1)
+
+**Verdicts bruts** : critic-completeness → `GAPS` (2 MAJOR, 5 MINOR) · critic-ambiguity → `AMBIGUOUS` (2 BLOCKER, 10 MAJOR, 6 MINOR) · critic-feasibility → `CONVERGED` avec réserves (3 MAJOR, 7 MINOR).
+**Décision d'orchestration** : tous les BLOCKER/MAJOR sont résolus par amendement des stories (v2). Les stories sont considérées CONVERGÉES sous réserve du gate humain.
+
+## Table d'arbitrage
+
+| # | Source(s) | Sév. max | Critique (résumé) | Décision | Justification / traduction dans les stories |
+|---|---|---|---|---|---|
+| D1 | ambiguity (BLOCKER) + feasibility (MAJOR) + completeness (MINOR) | BLOCKER | « Parallélisables, aucun fichier commun » est faux : package.json racine, pnpm-lock.yaml, .env.example partagés | **INTÉGRÉ** | `_dag.md` v2 : développement parallèle en worktrees, **intégration séquentielle 002→003→004→005**, propriété explicite des fichiers de couture (.env.example → 002 seul ; prepare → 004 ; tools/ci fichiers disjoints) |
+| D2 | ambiguity (BLOCKER) | BLOCKER | Format de coverage-baseline.json indéfini, agrégation multi-workspaces non spécifiée | **INTÉGRÉ** | INFRA-003 v2 : schéma JSON exact (4 métriques, % 2 décimales), fusion istanbul-lib-coverage des coverage-final.json, tolérance 0,1 pt, test unitaire de la fusion |
+| D3 | feasibility (MAJOR) | MAJOR | Critères exigeant un run GitHub Actions réel non vérifiables par l'agent (pas même de dépôt git) | **INTÉGRÉ** | INFRA-003 v2 : critères scindés en « DONE-ables localement » et « INFRA-003[gate] » (gate humain de sortie de vague) ; prérequis humain consigné dans la story et le DAG |
+| D4 | ambiguity (MAJOR) + feasibility (MAJOR) | MAJOR | Chevauchement INFRA-003/INFRA-005 sur le test Testcontainers ; risque d'écriture croisée dans packages/testing | **INTÉGRÉ** | INFRA-003 v2 : smoke Testcontainers dans `tools/ci/src/docker-smoke.test.ts`, interdiction explicite de toucher packages/testing, critère dédié ; remplacement ultérieur consigné |
+| D5 | completeness (MAJOR) | MAJOR | Harness Redis manquant dans @sigfa/testing alors que T5/F3/F5/F6 le supposeront | **INTÉGRÉ** | INFRA-005 v2 : helper Testcontainers Redis 7 + critère `PING → PONG` symétrique à PostgreSQL |
+| D6 | completeness (MAJOR) | MAJOR | Harness realtime/sla/offline sans contenu spécifié — « ≥1 test » invérifiable | **INTÉGRÉ** | INFRA-005 v2 : contenu minimal par harness (Socket.io éphémère + mesure latence ; fake timers + builder timeline ; simulateur réseau + journal de rejeu) + un critère testable par suite |
+| D7 | ambiguity (MAJOR) | MAJOR | Version Turborepo non fixée (turbo 1 `pipeline` vs 2 `tasks`) | **INTÉGRÉ** | INFRA-001 v2 : Turborepo 2.x, clé `tasks`, `^2` épinglé |
+| D8 | ambiguity (MAJOR) | MAJOR | Règle d'imports relatifs contradictoire (`../../` vs `../`), règle ESLint et format non nommés | **INTÉGRÉ** | INFRA-001 v2 : ESLint 9 flat config via @sigfa/config, `import/no-relative-parent-imports`, tout `../` interdit, `./` permis, critère ajusté |
+| D9 | ambiguity (MAJOR) + feasibility (2×MINOR : Electron/Expo lourds, Metro/pnpm symlinks) | MAJOR | Squelettes d'apps à framework ambigus (src/index.ts n'existe pas en Next/Expo) + fragilité réseau des installs lourdes | **INTÉGRÉ** (arbitrage combiné) | INFRA-001 v2 : **zéro framework en F0** — squelettes TS pur, placeholder HTTP node:http pour api/web/kiosk, build=tsc ; frameworks différés à F3/F4 ; contrainte node-linker consignée pour MOB-001 dans le DAG |
+| D10 | ambiguity (MAJOR) | MAJOR | Services compose api/web/kiosk : image, commande, ports indéfinis | **INTÉGRÉ** | INFRA-002 v2 : node:22-slim, bind mount, `pnpm --filter @sigfa/<app> dev`, ports 3000/3001/3002 surchargeables, aucun Dockerfile en F0 |
+| D11 | ambiguity (MAJOR) | MAJOR | Référence de diff pour la règle des nouveaux fichiers (PR vs push) indéfinie | **INTÉGRÉ** | INFRA-003 v2 : PR = merge-base ; push = vérification par fichier sautée, ratchet global seul |
+| D12 | ambiguity (MAJOR) + completeness (MINOR) | MAJOR | « Proposition » de mise à jour de baseline non testable | **INTÉGRÉ, variante** | INFRA-003 v2 : hausse → run **vert** + baseline régénérée en artefact + message actionnable stdout (testé). Variante retenue contre le rewrite « exit code 2 » du critique : rougir la CI sur une amélioration de couverture pénaliserait les bons comportements ; le ratchet ne bloque que les baisses |
+| D13 | ambiguity (MAJOR) | MAJOR | « Même périmètre » de la correspondance source↔test indéfini | **INTÉGRÉ** | INFRA-004 v2 : correspondance nominale (même dossier ou __tests__/) + repli même-workspace, chaque règle testée |
+| D14 | ambiguity (MAJOR) + feasibility (MINOR) | MAJOR | Exemption barrel inexprimable en glob — incohérence de mécanisme | **INTÉGRÉ** | INFRA-004 v2 : globs seuls dans test-exemptions.txt ; détection barrel codée (regex ré-exports) avec 2 tests |
+| D15 | ambiguity (MAJOR) + feasibility (MINOR) | MAJOR | Invocation Schemathesis (outil Python) non provisionnée | **INTÉGRÉ, arbitré** | INFRA-005 v2 : image **Docker officielle** Schemathesis (Docker déjà prérequis) — retenu contre la proposition `uvx` du critic-ambiguity (un seul prérequis d'outillage au lieu de deux) ; skip documenté sans YAML, échec propre sans Docker |
+| D16 | ambiguity (MAJOR) | MAJOR | Libs de génération de fixtures et property-based non choisies (structure durablement T10) | **INTÉGRÉ** | INFRA-005 v2 : générateur maison seedé (mulberry32), zéro faker ; fast-check numRuns 100 |
+| D17 | completeness (MINOR) | MINOR | Pas de base Vitest partagée ni méthode d'agrégation de couverture | **INTÉGRÉ** | INFRA-001 v2 : base vitest.config dans packages/config ; agrégation couverte par D2 |
+| D18 | ambiguity (MINOR) | MINOR | Versions exactes Node/pnpm/packageManager/Vitest flottantes | **INTÉGRÉ** | INFRA-001 v2 : .nvmrc=22, engines >=22<23 / >=9<10, packageManager épinglé exact, Vitest ^3 |
+| D19 | ambiguity (MINOR) | MINOR | Contenu initial de .env.example non spécifié | **INTÉGRÉ** | INFRA-001 v2 : en-tête + NODE_ENV ; INFRA-002 v2 : liste exhaustive des 8 variables avec défauts |
+| D20 | ambiguity (MINOR) | MINOR | Framework de test de check-dev-env.sh + noms/défauts des ports | **INTÉGRÉ** | INFRA-002 v2 : Vitest + execa (tools/ci), ports nommés avec défauts |
+| D21 | ambiguity (MINOR) | MINOR | Versions lefthook/commitlint + définition du renommage pur | **INTÉGRÉ** | INFRA-004 v2 : lefthook ^1.7, commitlint ^19, R100 strict |
+| D22 | ambiguity (MINOR) | MINOR | Contraintes des schémas primitifs (bornes pagination, pattern code erreur) | **INTÉGRÉ** | INFRA-005 v2 : bornes et regex exactes |
+| D23 | completeness (MINOR) | MINOR | T8 (flaky) et C4 (diff de contrat CI) orphelins — reportés sans porteur | **INTÉGRÉ** | `_dag.md` v2 : INFRA-006 consignée en backlog différé ; amendement CONTRACT-009 **proposé au PO** (pas d'édition silencieuse du backlog maître) |
+| D24 | completeness (MINOR) | MINOR | Branch protection main/staging absente — gate 9 étapes contournable par push direct | **INTÉGRÉ, déplacé** | INFRA-003 v2 : critère `[gate]` vérifiable via gh api au gate humain — c'est une config de repo (action humaine), pas un livrable d'agent |
+| D25 | completeness (MINOR) | MINOR | Critère « proposition de baseline » non testable | **FUSIONNÉ avec D12** | — |
+| D26 | feasibility (MINOR) | MINOR | « healthy <60s » flaky au premier pull d'images sur réseau instable (terrain CI) | **INTÉGRÉ** | INFRA-002 v2 : « images déjà tirées » dans l'exigence ; pull initial = prérequis d'installation documenté README |
+| D27 | feasibility (MINOR) | MINOR | INFRA-005/agent-database contredit la table de routage CLAUDE.md §2 | **REJETÉ (découpage) / INTÉGRÉ (consignation)** | Le critique lui-même conclut « tension acceptable, découpage NON requis » : chaîne cohérente schemas→factories→testing, mono-couche, aucune autre story ne touche ces fichiers. Exception consignée (plan de dispatch + en-tête de story) ; le hook d'écriture l'autorisera pour cette story uniquement |
+| D28 | feasibility (MINOR) | MINOR | `test` dépendant du build du workspace courant ralentit le TDD | **INTÉGRÉ** | INFRA-001 v2 : `test` dépend de `^build` uniquement + critère d'inspection du graphe turbo |
+
+## Rejets / variantes (transparence)
+- **D12** : rewrite « exit code 2 sur hausse » rejeté au profit de « vert + artefact + message » — une CI rouge sur amélioration de couverture est un anti-incitatif ; le ratchet ne doit bloquer que les régressions.
+- **D15** : proposition `uvx` (critic-ambiguity) rejetée au profit de l'image Docker (critic-feasibility) — minimise les prérequis d'outillage.
+- **D27** : redécoupage d'INFRA-005 rejeté — surcoût d'orchestration sans gain d'isolation (les 3 packages forment une seule couche « partagés-test »).
+
+## État de convergence
+Zéro BLOCKER ni MAJOR restant après amendements v2. Les MINOR restants sont soit intégrés, soit consignés (INFRA-006, amendement CONTRACT-009, contrainte MOB-001). **Prochaine étape : GATE HUMAIN (PO)** — aucun code avant GO explicite.
