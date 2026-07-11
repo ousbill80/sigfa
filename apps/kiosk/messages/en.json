@@ -18,5 +18,50 @@
   "error": {
     "offline": "Kiosk offline",
     "contactStaff": "Please contact a staff member"
+  },
+  "home002": {
+    "title": "Akwaba — Welcome",
+    "chooseLanguage": "Choose your language",
+    "languageFr": "Français",
+    "languageDioula": "Dioula",
+    "languageBaoule": "Baoulé",
+    "languageEn": "English",
+    "queueStatus": "Queue: {count} people — estimated wait: {minutes} min",
+    "queueUnavailable": "Queue unavailable",
+    "offlineBanner": "Offline mode — your tickets remain valid",
+    "loading": "Loading..."
+  },
+  "services003": {
+    "title": "Which service do you need?",
+    "backButton": "Back",
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "See more services",
+    "closedService": "Closed — {schedule}",
+    "accessibilityButton": "♿ Priority access",
+    "emptyTitle": "No services available",
+    "emptyMessage": "Please go to reception — a staff member will assist you.",
+    "offlineBanner": "Offline mode"
+  },
+  "confirmation004": {
+    "title": "Your phone number (optional)",
+    "phonePrefix": "+225",
+    "phonePlaceholder": "07 __ __ __ __ __",
+    "smsConsent": "I agree to receive my ticket by SMS (optional)",
+    "ctaButton": "GET MY TICKET",
+    "skipButton": "Skip (without phone number)",
+    "errorPhone": "Phone number missing — or tap Skip",
+    "loadingMessage": "Issuing your ticket...",
+    "offlineBanner": "Offline mode — local ticket generated"
+  },
+  "ticket005": {
+    "position": "Position in queue: {position}",
+    "waitEstimate": "Estimated wait: {minutes} minutes",
+    "printing": "Your ticket is printing...",
+    "smsSent": "SMS sent to {maskedPhone}",
+    "returning": "Returning automatically in {seconds} s",
+    "voiceAnnounce": "Your number is {displayNumber}. You are in position {position}. Estimated wait: {minutes} minutes.",
+    "offlineBanner": "Offline mode — temporary ticket",
+    "offlineInfo": "Local ticket — sync on reconnection",
+    "printerError": "Printer unavailable — a staff member will give you your ticket"
   }
 }

@@ -18,5 +18,50 @@
   "error": {
     "offline": "Borne hors ligne",
     "contactStaff": "Veuillez contacter un agent"
+  },
+  "home002": {
+    "title": "Akwaba — Bienvenue",
+    "chooseLanguage": "Choisissez votre langue",
+    "languageFr": "Français",
+    "languageDioula": "Dioula",
+    "languageBaoule": "Baoulé",
+    "languageEn": "English",
+    "queueStatus": "File d'attente : {count} personnes — attente estimée : {minutes} min",
+    "queueUnavailable": "File d'attente non disponible",
+    "offlineBanner": "Mode hors connexion — vos tickets restent valables",
+    "loading": "Chargement..."
+  },
+  "services003": {
+    "title": "Quel service souhaitez-vous ?",
+    "backButton": "Retour",
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "Voir plus de services",
+    "closedService": "Fermé — {schedule}",
+    "accessibilityButton": "♿ Accès prioritaire",
+    "emptyTitle": "Aucun service disponible",
+    "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
+    "offlineBanner": "Mode hors connexion"
+  },
+  "confirmation004": {
+    "title": "Votre numéro de téléphone (facultatif)",
+    "phonePrefix": "+225",
+    "phonePlaceholder": "07 __ __ __ __ __",
+    "smsConsent": "J'accepte de recevoir mon ticket par SMS (optionnel)",
+    "ctaButton": "PRENDRE MON TICKET",
+    "skipButton": "Passer (sans numéro de téléphone)",
+    "errorPhone": "Il manque votre numéro — ou touchez Passer",
+    "loadingMessage": "Émission de votre ticket...",
+    "offlineBanner": "Mode hors connexion — ticket local généré"
+  },
+  "ticket005": {
+    "position": "Position dans la file : {position}e",
+    "waitEstimate": "Attente estimée : {minutes} minutes",
+    "printing": "Votre ticket s'imprime...",
+    "smsSent": "SMS envoyé au {maskedPhone}",
+    "returning": "Retour automatique dans {seconds} s",
+    "voiceAnnounce": "Votre numéro est {displayNumber}. Vous êtes en position {position}. Attente estimée : {minutes} minutes.",
+    "offlineBanner": "Mode hors connexion — ticket temporaire",
+    "offlineInfo": "Ticket local — synchronisation dès reconnexion",
+    "printerError": "Imprimante indisponible — un agent vous remettra votre ticket"
   }
 }

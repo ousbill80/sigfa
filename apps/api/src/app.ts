@@ -16,8 +16,10 @@ import type { Client } from "pg";
 import { buildError } from "src/lib/errors.js";
 import { logger } from "src/lib/logger.js";
 import { createAuthRouter } from "src/routes/auth.js";
+import { createTicketRouter } from "src/routes/tickets.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
+import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
 
 // Valider le mapping route→rôle au démarrage du module
 validateRouteMapping();
@@ -29,6 +31,7 @@ interface AppEnv {
     redis: Redis;
     jwtSecret: Uint8Array;
     tenant: TenantContext;
+    bus: RealtimeBus;
   };
 }
 
@@ -42,6 +45,8 @@ export interface AppOptions {
   redis: Redis;
   /** Secret JWT (Uint8Array) */
   jwtSecret: Uint8Array;
+  /** Bus temps réel injectable (défaut : no-op validant). API-003. */
+  bus?: RealtimeBus;
 }
 
 /**
@@ -53,12 +58,14 @@ export interface AppOptions {
  */
 export function createApp(options: AppOptions): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+  const bus = options.bus ?? createNoopBus();
 
   // Injection des dépendances dans chaque requête
   app.use("*", async (c, next) => {
     c.set("db", options.db);
     c.set("redis", options.redis);
     c.set("jwtSecret", options.jwtSecret);
+    c.set("bus", bus);
     await next();
   });
 
@@ -79,6 +86,10 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // Routes auth sous /api/v1/auth
   const authRouter = createAuthRouter();
   app.route("/api/v1/auth", authRouter);
+
+  // Routes tickets (API-003) sous /api/v1 (chemins /tickets, /counters/…)
+  const ticketRouter = createTicketRouter();
+  app.route("/api/v1", ticketRouter);
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>

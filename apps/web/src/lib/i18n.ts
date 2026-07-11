@@ -30,7 +30,33 @@ export type TranslationKey =
   | "error.403_message"
   | "error.go_to_dashboard"
   | "offline.banner"
-  | "loading";
+  | "loading"
+  | "tv.title"
+  | "tv.now_serving"
+  | "tv.please_proceed"
+  | "tv.recent_calls"
+  | "tv.waiting"
+  | "tv.empty"
+  | "tv.offline"
+  | "agent.current_ticket"
+  | "agent.timer"
+  | "agent.call_next"
+  | "agent.finish"
+  | "agent.transfer"
+  | "agent.queue_empty"
+  | "agent.error"
+  | "agent.select_destination"
+  | "manager.tma"
+  | "manager.abandon"
+  | "manager.nps"
+  | "manager.queues_by_service"
+  | "manager.agents_grid"
+  | "manager.alerts"
+  | "manager.empty"
+  | "manager.acknowledge"
+  | "manager.open"
+  | "manager.paused"
+  | "manager.vs_j7";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -55,6 +81,32 @@ export const FR: TranslationDict = {
   "error.go_to_dashboard": "Retour au tableau de bord",
   "offline.banner": "Mode hors ligne — données depuis le cache",
   loading: "Chargement…",
+  "tv.title": "APPELS EN COURS",
+  "tv.now_serving": "MAINTENANT SERVI",
+  "tv.please_proceed": "Veuillez vous présenter au",
+  "tv.recent_calls": "DERNIERS APPELÉS",
+  "tv.waiting": "EN ATTENTE",
+  "tv.empty": "Aucun appel en cours",
+  "tv.offline": "Hors ligne — reconnexion…",
+  "agent.current_ticket": "TICKET EN COURS",
+  "agent.timer": "CHRONOMÈTRE",
+  "agent.call_next": "APPELER LE SUIVANT",
+  "agent.finish": "TERMINER",
+  "agent.transfer": "TRANSFÉRER",
+  "agent.queue_empty": "Aucun client en attente",
+  "agent.error": "Une erreur est survenue, veuillez réessayer",
+  "agent.select_destination": "Choisir un guichet de destination",
+  "manager.tma": "TMA ACTUEL",
+  "manager.abandon": "Taux d'abandon",
+  "manager.nps": "NPS du jour",
+  "manager.queues_by_service": "FILE PAR SERVICE",
+  "manager.agents_grid": "GRILLE AGENTS",
+  "manager.alerts": "ALERTES",
+  "manager.empty": "Aucune donnée disponible pour le moment",
+  "manager.acknowledge": "Acquitter",
+  "manager.open": "Ouvrir",
+  "manager.paused": "Suspendre",
+  "manager.vs_j7": "vs J-7",
 };
 
 /** English translations */
@@ -77,6 +129,32 @@ export const EN: TranslationDict = {
   "error.go_to_dashboard": "Back to dashboard",
   "offline.banner": "Offline mode — data from cache",
   loading: "Loading…",
+  "tv.title": "NOW CALLING",
+  "tv.now_serving": "NOW SERVING",
+  "tv.please_proceed": "Please proceed to",
+  "tv.recent_calls": "RECENTLY CALLED",
+  "tv.waiting": "WAITING",
+  "tv.empty": "No call in progress",
+  "tv.offline": "Offline — reconnecting…",
+  "agent.current_ticket": "CURRENT TICKET",
+  "agent.timer": "TIMER",
+  "agent.call_next": "CALL NEXT",
+  "agent.finish": "FINISH",
+  "agent.transfer": "TRANSFER",
+  "agent.queue_empty": "No customer waiting",
+  "agent.error": "An error occurred, please try again",
+  "agent.select_destination": "Choose a destination counter",
+  "manager.tma": "CURRENT AWT",
+  "manager.abandon": "Abandonment rate",
+  "manager.nps": "NPS today",
+  "manager.queues_by_service": "QUEUE BY SERVICE",
+  "manager.agents_grid": "AGENTS GRID",
+  "manager.alerts": "ALERTS",
+  "manager.empty": "No data available yet",
+  "manager.acknowledge": "Acknowledge",
+  "manager.open": "Open",
+  "manager.paused": "Pause",
+  "manager.vs_j7": "vs D-7",
 };
 
 /** Dioula translations (Mandé language, Burkina Faso / Côte d'Ivoire) */
@@ -99,6 +177,32 @@ export const DIOULA: TranslationDict = {
   "error.go_to_dashboard": "Segin tableau de bord la",
   "offline.banner": "Internet tɛ sɔrɔ — kunnafoni bɔra cache la",
   loading: "A bɛ nɛgɛn…",
+  "tv.title": "WELE MINNU BƐ KƐ",
+  "tv.now_serving": "SISAN BƐ BAARA LA",
+  "tv.please_proceed": "I ka taa",
+  "tv.recent_calls": "WELE LABANW",
+  "tv.waiting": "MAKƆNƆNI NA",
+  "tv.empty": "Wele si tɛ kɛ",
+  "tv.offline": "Internet tɛ — segin kan…",
+  "agent.current_ticket": "TIKƐTI SISAN",
+  "agent.timer": "WAATI",
+  "agent.call_next": "NATA WELE",
+  "agent.finish": "A BAN",
+  "agent.transfer": "A YƐLƐMA",
+  "agent.queue_empty": "Mɔgɔ si tɛ makɔnɔni na",
+  "agent.error": "Fili dɔ kɛra, i ka segin",
+  "agent.select_destination": "Guichet sugandi taayɔrɔ ye",
+  "manager.tma": "MAKƆNƆNI WAATI",
+  "manager.abandon": "Bilali hakɛ",
+  "manager.nps": "Bi NPS",
+  "manager.queues_by_service": "FILE BAARA KƆNƆ",
+  "manager.agents_grid": "BAARAKƐLAW",
+  "manager.alerts": "LASƆMINIW",
+  "manager.empty": "Kunnafoni si tɛ yen fɔlɔ",
+  "manager.acknowledge": "A jate",
+  "manager.open": "A da wuli",
+  "manager.paused": "A jɔ",
+  "manager.vs_j7": "ka ɲɛsin J-7 ma",
 };
 
 /** Baoulé translations (Akan language, Côte d'Ivoire) */
@@ -121,6 +225,32 @@ export const BAOULE: TranslationDict = {
   "error.go_to_dashboard": "Sɛ kɔ tableau de bord'n su",
   "offline.banner": "Internet nianman — ɔ fa cache su ninnge'n",
   loading: "Ɔ nian…",
+  "tv.title": "BE FLƐ WA'N",
+  "tv.now_serving": "KƐ BE DI JUNMAN'N",
+  "tv.please_proceed": "Ko",
+  "tv.recent_calls": "BE FLƐLI'N MUN",
+  "tv.waiting": "BE MINDƐ",
+  "tv.empty": "Flɛli fi nunman",
+  "tv.offline": "Internet nianman — sɛ kɔ…",
+  "agent.current_ticket": "TIKƐ KƐ'N",
+  "agent.timer": "BLƐ'N",
+  "agent.call_next": "FLƐ KUN'N",
+  "agent.finish": "WIE",
+  "agent.transfer": "FA KƆ",
+  "agent.queue_empty": "Sran fi nunman be mindɛ",
+  "agent.error": "Sa kpa'n juman, sɛ i ekun",
+  "agent.select_destination": "Fa guichet nga be kɔ'n",
+  "manager.tma": "MINDƐ BLƐ'N",
+  "manager.abandon": "Yaci hakɛ'n",
+  "manager.nps": "NPS andɛ",
+  "manager.queues_by_service": "FILE JUNMAN'N NUN",
+  "manager.agents_grid": "JUNMANFUƐ'N MUN",
+  "manager.alerts": "AFƆTUƐ'N MUN",
+  "manager.empty": "Ninnge fi nunman ekun",
+  "manager.acknowledge": "Sie i nzɔliɛ",
+  "manager.open": "Tike",
+  "manager.paused": "Jran",
+  "manager.vs_j7": "nin J-7",
 };
 
 /** All locales map */

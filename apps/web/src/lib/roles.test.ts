@@ -15,6 +15,18 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("AUDITOR", "/agent")).toBe(false);
     });
 
+    it("WEB-003: RBAC AUDITOR — /dashboard/manager autorisé (lecture seule)", () => {
+      expect(canAccess("AUDITOR", "/dashboard/manager")).toBe(true);
+    });
+
+    it("WEB-003: RBAC AGENT — /dashboard/manager retourne 403", () => {
+      expect(canAccess("AGENT", "/dashboard/manager")).toBe(false);
+    });
+
+    it("WEB-002: RBAC AGENT — /agent autorisé (interface guichet)", () => {
+      expect(canAccess("AGENT", "/agent")).toBe(true);
+    });
+
     it("WEB-001: RBAC MANAGER — /admin retourne 403", () => {
       expect(canAccess("MANAGER", "/admin")).toBe(false);
     });

@@ -7,7 +7,6 @@
  * (getLocale()/getMessages() utilisent les headers, incompatibles avec output:export).
  * Ref: https://next-intl.dev/docs/getting-started/app-router/with-i18n-routing
  */
-import type { ReactNode } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
@@ -16,12 +15,12 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
-interface LocaleLayoutProps {
-  children: ReactNode;
+/** Corresponds to Next.js LayoutProps — children + dynamic params */
+export default async function LocaleLayout(props: {
+  children: React.ReactNode;
   params: Promise<{ locale: string }>;
-}
-
-export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
+}) {
+  const { children, params } = props;
   const { locale } = await params;
   // Requis pour static export : indique à next-intl la locale sans lire les headers
   setRequestLocale(locale);

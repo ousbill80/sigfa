@@ -13,14 +13,36 @@
  */
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+/**
+ * En mode test visuel Playwright, on désactive output:"export" et trailingSlash
+ * pour que le middleware next-intl fonctionne correctement.
+ * Invoquer avec SIGFA_PLAYWRIGHT=1 pnpm dev (ou via playwright.config.ts webServer).
+ */
+const isPlaywrightMode = process.env.SIGFA_PLAYWRIGHT === "1";
+
 const nextConfig: NextConfig = {
-  output: "export",
-  trailingSlash: true,
+  ...(isPlaywrightMode ? {} : { output: "export", trailingSlash: true }),
   images: {
     unoptimized: true,
+  },
+  webpack(config) {
+    // Alias @sigfa/contracts to the compiled client.js for webpack bundler
+    // (same resolution as vitest alias in vitest.config.ts)
+    config.resolve.alias = {
+      ...(config.resolve.alias as Record<string, string>),
+      "@sigfa/contracts": resolve(
+        __dirname,
+        "../../packages/contracts/dist/src/client.js"
+      ),
+    };
+    return config;
   },
 };
 
