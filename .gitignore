@@ -7,3 +7,7 @@ dist
 
 # artefacts runtime mock prism
 .prism-pids/
+
+# artefacts next.js
+.next/
+out/
