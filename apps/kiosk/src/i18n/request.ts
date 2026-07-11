@@ -4,7 +4,8 @@
  */
 import { getRequestConfig } from "next-intl/server";
 import type { AbstractIntlMessages } from "next-intl";
-import { routing } from "./routing.js";
+// Import sans extension .js — convention Next.js 15 (bundler ne résout pas .js→.ts)
+import { routing } from "./routing";
 
 export default getRequestConfig(async ({ requestLocale }) => {
   let locale = await requestLocale;

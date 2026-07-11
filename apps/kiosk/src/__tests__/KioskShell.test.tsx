@@ -50,7 +50,7 @@ const enMessages = {
 
 describe("KIOSK-001: KioskShell", () => {
   it("KIOSK-001: next-intl charge les 4 locales sans erreur de clé manquante", async () => {
-    const { KioskShell } = await import("../components/KioskShell.js");
+    const { KioskShell } = await import("../components/KioskShell");
     const locales = [
       { locale: "fr", messages: frMessages },
       { locale: "dioula", messages: dioulaMessages },
@@ -71,7 +71,7 @@ describe("KIOSK-001: KioskShell", () => {
   });
 
   it("KIOSK-001: prefers-reduced-motion → zéro animation dans le DOM", async () => {
-    const { KioskShell } = await import("../components/KioskShell.js");
+    const { KioskShell } = await import("../components/KioskShell");
 
     // Simuler prefers-reduced-motion: reduce
     Object.defineProperty(window, "matchMedia", {
@@ -106,7 +106,7 @@ describe("KIOSK-001: KioskShell", () => {
   });
 
   it("KIOSK-001: rendu nominal de l'écran accueil", async () => {
-    const { KioskShell } = await import("../components/KioskShell.js");
+    const { KioskShell } = await import("../components/KioskShell");
 
     render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>

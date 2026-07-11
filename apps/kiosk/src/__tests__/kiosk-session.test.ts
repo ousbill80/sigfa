@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe("KIOSK-001: kiosk-session", () => {
   it("KIOSK-001: POST /kiosk/session appelé au boot — mock répond 201 expiresIn=43200", async () => {
-    const { createKioskSession } = await import("../lib/kiosk-session.js");
+    const { createKioskSession } = await import("../lib/kiosk-session");
 
     const result = await createKioskSession({
       kioskId: "14141414-1414-4141-a141-141414141414",
@@ -49,7 +49,7 @@ describe("KIOSK-001: kiosk-session", () => {
     vi.useFakeTimers();
 
     const { createKioskSession, isSessionExpired } = await import(
-      "../lib/kiosk-session.js"
+      "../lib/kiosk-session"
     );
 
     const result = await createKioskSession({
