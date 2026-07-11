@@ -26,7 +26,7 @@ INFRA-005 (DONE)
 | CONTRACT-006 | Reporting : KPIs, rapports, exports | `openapi/reporting.yaml` | 001 | DONE |
 | CONTRACT-007 | Notifications : SMS, WhatsApp, email, push | `openapi/notifications.yaml` | 001 | DONE |
 | CONTRACT-008 | IA : prédictions, staffing, anomalies, NLP | `openapi/ai.yaml` | 001, 006 | DONE |
-| CONTRACT-009 | Génération outillée : types TS + client typé + mock Prism + squelettes Schemathesis + **diff de contrat en CI (C4)** | `packages/contracts/generated/**`, scripts, job CI | 001–008 | TODO |
+| CONTRACT-009 | Génération outillée : types TS + client typé + mock Prism + squelettes Schemathesis + **diff de contrat en CI (C4)** | `packages/contracts/generated/**`, scripts, job CI | 001–008 | DONE |
 
 ## Conventions communes du contrat (s'appliquent à TOUTES les stories F1 — ne pas répéter dans chaque story)
 - **OpenAPI 3.1**, un fichier par périmètre sous `packages/contracts/openapi/`, servi sous `/api/v1`.
