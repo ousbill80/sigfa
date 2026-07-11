@@ -1,6 +1,6 @@
 # CONTRACT-011 : Amendement LA LOI — TicketPriority enum, Service.code, exemples display_number
 
-**Module** : F1 — Contrats (amendement) · **Agent** : agent-contract · **Dépend de** : CONTRACT-010 (DONE) · **Statut** : TODO
+**Module** : F1 — Contrats (amendement) · **Agent** : agent-contract · **Dépend de** : CONTRACT-010 (DONE) · **Statut** : DONE (2026-07-11)
 **Origine** : Boucle 1 F2 — les critiques ont détecté que le contrat contredit le produit (v5 §MODULE 1 : 5 niveaux de priorité). Fenêtre pré-consommateurs (F3/F4 non démarrées) : breaking accepté et validé au GO F2.
 
 ## Exigences (EARS)

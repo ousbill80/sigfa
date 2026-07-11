@@ -21,6 +21,7 @@ CONTRACT-001..010 (DONE) ──► CONTRACT-011 (DONE)
 | DB-006 | Tables reporting : agrégats journaliers matérialisés, index bank_id+date | DB-005 | DONE |
 | DB-008 | Chiffrement AES-256 des téléphones au repos + purge auto 13 mois (droit à l'oubli) | DB-006 | DONE |
 | DB-007 | Tables IA : prédictions, anomalies, recommandations, scores + rétention | DB-008 | DONE |
+| DB-009 | Corrections panel : RLS banks, secrets paramétrés, down complet, découpages | DB-001..008 | DONE |
 
 ## Conventions communes F2 (ne pas répéter dans les stories)
 - **Drizzle ORM + PostgreSQL 16**, schéma TypeScript dans `packages/database/src/schema/` (un fichier par domaine + barrel), migrations `drizzle-kit` mode strict dans `packages/database/migrations/`, policies dans `packages/database/src/rls/`, seed dans `packages/database/src/seed/`.
