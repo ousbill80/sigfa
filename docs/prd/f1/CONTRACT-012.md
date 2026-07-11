@@ -1,6 +1,6 @@
 # CONTRACT-012 : Amendement LA LOI — sync:state.recentCalls + KIOSK_SYSTEM_ERROR
 
-**Module** : F1 — Contrats (amendement) · **Agent** : agent-contract · **Dépend de** : CONTRACT-011 (DONE) · **Statut** : TODO
+**Module** : F1 — Contrats (amendement) · **Agent** : agent-contract · **Dépend de** : CONTRACT-011 (DONE) · **Statut** : DONE (2026-07-11)
 **Origine** : Boucle 1 F3+F4 (arbitrage `19-critique-arbitrage-f3-f4.md`). Fenêtre pré-implémentation clients — non-breaking (ajouts).
 
 ## Exigences (EARS)
