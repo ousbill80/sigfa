@@ -13,7 +13,8 @@
     "lint": "eslint src",
     "lint:contract": "spectral lint openapi/*.yaml",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
+    "test:runtime": "vitest run --config vitest.runtime.config.ts",
     "mock": "node scripts/mock.mjs",
     "mock:stop": "pkill -f 'prism mock' || true"
   },
