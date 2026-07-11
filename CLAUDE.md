@@ -46,6 +46,8 @@ Tâche triviale (typo, renommage local) → agent unique en direct, pas d'orches
 8. Mapping critères EARS ↔ tests nommés (`STORY-xxx: ...`)
 9. Ratchet de couverture : ≥85% nouveaux fichiers, jamais de baisse
 
+- DESIGN-gate écrans majeurs : l'orchestrateur ne dispatche l'implémentation qu'après GO wireframe humain (KIOSK-002..005, TV-001, WEB-002/003).
+
 ## 5. Hors scope DÉFINITIF (ne jamais implémenter, ne jamais proposer)
 
 Core Banking (CBS) · CRM bancaire · Mobile Money · USSD · Biométrie · Connecteur BCEAO.
