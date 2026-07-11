@@ -389,7 +389,9 @@ export interface paths {
                          * @example {
                          *       "trackingId": "V9k2mXpLqRwZsYn8fBjH3",
                          *       "number": "A042",
+                         *       "displayNumber": "OC-042",
                          *       "status": "WAITING",
+                         *       "priority": "STANDARD",
                          *       "channel": "KIOSK",
                          *       "position": 3,
                          *       "estimatedWaitMinutes": 6,
@@ -828,11 +830,7 @@ export interface components {
              * @description Identifiant de l'agence
              */
             agencyId: string;
-            /**
-             * @description Ticket prioritaire (PMR, VIP)
-             * @default false
-             */
-            priority: boolean;
+            priority?: components["schemas"]["TicketPriority"];
         };
         PublicTicketKiosk: components["schemas"]["PublicTicketBase"] & {
             /** @enum {string} */
@@ -906,11 +904,18 @@ export interface components {
              */
             trackingId: string;
             /**
-             * @description Numéro affiché (ex: A042)
+             * @description Numéro séquentiel brut (ex: A042)
              * @example A042
              */
             number: string;
+            /**
+             * @description Numéro d'affichage au format `{code}-{NNN}` (code service + séquence 3 chiffres).
+             *     Affiché sur la borne et le ticket imprimé.
+             * @example OC-042
+             */
+            displayNumber?: string;
             status: components["schemas"]["TicketStatus"];
+            priority?: components["schemas"]["TicketPriority"];
             channel: components["schemas"]["TicketChannel"];
             /** @description Position dans la file au moment de l'émission */
             position: number;
@@ -935,7 +940,13 @@ export interface components {
             trackingId: string;
             /** @example A042 */
             number: string;
+            /**
+             * @description Numéro d'affichage au format `{code}-{NNN}` (code service + séquence 3 chiffres).
+             * @example OC-042
+             */
+            displayNumber?: string;
             status: components["schemas"]["TicketStatus"];
+            priority?: components["schemas"]["TicketPriority"];
             channel: components["schemas"]["TicketChannel"];
             position: number;
             estimatedWaitMinutes: number;
@@ -1060,6 +1071,18 @@ export interface components {
          * @enum {string}
          */
         PrinterStatus: "OK" | "PAPER_LOW" | "ERROR" | "OFFLINE";
+        /**
+         * @description Niveau de priorité d'un ticket dans la file d'attente SIGFA (v5 §MODULE 1 — 5 niveaux).
+         *     - STANDARD : file normale, aucune priorité particulière (défaut)
+         *     - PRIORITY : file prioritaire guichet (ex. client avec rendez-vous)
+         *     - VIP : client VIP / private banking
+         *     - PMR : personne à mobilité réduite (priorité légale)
+         *     - SENIOR : client senior (priorité réglementaire)
+         *     Valeur par défaut : `STANDARD`. La valeur influence le rang dans le moteur de file (API-004).
+         * @default STANDARD
+         * @enum {string}
+         */
+        TicketPriority: "STANDARD" | "PRIORITY" | "VIP" | "PMR" | "SENIOR";
         /**
          * @description États possibles d'un ticket dans la machine à états SIGFA.
          *     **Transitions légales** :

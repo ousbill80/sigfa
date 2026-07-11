@@ -664,6 +664,7 @@ paths:
                 data:
                   - id: "77777777-7777-4777-a777-777777777777"
                     name: "Virements"
+                    code: "OC"
                     agencyId: "33333333-3333-4333-a333-333333333333"
                     slaMinutes: 10
                     active: true
@@ -703,6 +704,7 @@ paths:
               $ref: "#/components/schemas/CreateServiceRequest"
             example:
               name: "Crédits immobiliers"
+              code: "CR"
               slaMinutes: 20
               order: 5
       responses:
@@ -715,6 +717,7 @@ paths:
               example:
                 id: "bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb"
                 name: "Crédits immobiliers"
+                code: "CR"
                 agencyId: "33333333-3333-4333-a333-333333333333"
                 slaMinutes: 20
                 active: true
@@ -765,6 +768,7 @@ paths:
               example:
                 id: "77777777-7777-4777-a777-777777777777"
                 name: "Virements"
+                code: "OC"
                 agencyId: "33333333-3333-4333-a333-333333333333"
                 slaMinutes: 15
                 active: false
@@ -1149,7 +1153,7 @@ paths:
               serviceId: "77777777-7777-4777-a777-777777777777"
               channel: KIOSK
               phoneNumber: "+2250700000001"
-              priority: false
+              priority: STANDARD
       responses:
         "201":
           description: Ticket créé en état WAITING
@@ -1160,7 +1164,9 @@ paths:
               example:
                 id: "00000000-0000-4000-a000-000000000000"
                 number: "A099"
+                displayNumber: "OC-099"
                 status: WAITING
+                priority: STANDARD
                 serviceId: "77777777-7777-4777-a777-777777777777"
                 agencyId: "33333333-3333-4333-a333-333333333333"
                 channel: KIOSK
@@ -1220,7 +1226,9 @@ paths:
               example:
                 id: "ffffffff-ffff-4fff-afff-ffffffffffff"
                 number: "A042"
+                displayNumber: "OC-042"
                 status: WAITING
+                priority: STANDARD
                 serviceId: "77777777-7777-4777-a777-777777777777"
                 agencyId: "33333333-3333-4333-a333-333333333333"
                 channel: QR
@@ -1846,6 +1854,24 @@ components:
         - ABANDONED
         - TRANSFERRED
 
+    TicketPriority:
+      type: string
+      description: |
+        Niveau de priorité d'un ticket dans la file d'attente SIGFA (v5 §MODULE 1 — 5 niveaux).
+        - STANDARD : file normale, aucune priorité particulière (défaut)
+        - PRIORITY : file prioritaire guichet (ex. client avec rendez-vous)
+        - VIP : client VIP / private banking
+        - PMR : personne à mobilité réduite (priorité légale)
+        - SENIOR : client senior (priorité réglementaire)
+        Valeur par défaut : `STANDARD`. La valeur influence le rang dans le moteur de file (API-004).
+      enum:
+        - STANDARD
+        - PRIORITY
+        - VIP
+        - PMR
+        - SENIOR
+      default: STANDARD
+
     Role:
       type: string
       description: |
@@ -2199,6 +2225,16 @@ components:
           format: uuid
         name:
           type: string
+        code:
+          type: string
+          pattern: "^[A-Z]{2,4}$"
+          description: |
+            Code mnémotechnique du service — 2 à 4 lettres majuscules, unique par agence.
+            Utilisé comme préfixe du `displayNumber` (ex. `OC-047`).
+            Exemples : OC (Opérations Courantes), OA (Opérations Avancées), CR (Crédits),
+            CH (Changes), EN (Epargne/Nouveaux comptes), VIP (VIP/Private banking),
+            RE (Réclamations), EP (Epargne/Placements).
+          example: OC
         agencyId:
           type: string
           format: uuid
@@ -2218,6 +2254,13 @@ components:
       properties:
         name:
           type: string
+        code:
+          type: string
+          pattern: "^[A-Z]{2,4}$"
+          description: |
+            Code mnémotechnique du service (2–4 lettres majuscules, unique par agence).
+            Exemples : OC, OA, CR, CH, EN, VIP, RE, EP.
+          example: OC
         slaMinutes:
           type: integer
           minimum: 1
@@ -2399,8 +2442,14 @@ components:
           format: uuid
         number:
           type: string
-          description: "Numéro affiché (ex: A042)"
+          description: "Numéro séquentiel brut (ex: A042)"
           example: "A042"
+        displayNumber:
+          type: string
+          description: |
+            Numéro d'affichage complet au format `{code}-{NNN}` (code du service + séquence 3 chiffres).
+            Affiché sur la borne, l'écran d'appel et le ticket imprimé.
+          example: "OC-047"
         status:
           $ref: "#/components/schemas/TicketStatus"
         serviceId:
@@ -2418,6 +2467,8 @@ components:
         estimatedWaitMinutes:
           type: integer
           minimum: 0
+        priority:
+          $ref: "#/components/schemas/TicketPriority"
         trackingId:
           type: string
           description: Nanoid 21 pour le suivi public
@@ -2469,10 +2520,17 @@ components:
           format: uuid
         number:
           type: string
-          description: "Numéro affiché (ex: A099)"
+          description: "Numéro séquentiel brut (ex: A099)"
           example: "A099"
+        displayNumber:
+          type: string
+          description: |
+            Numéro d'affichage au format `{code}-{NNN}` (code service + séquence 3 chiffres).
+          example: "OC-099"
         status:
           $ref: "#/components/schemas/TicketStatus"
+        priority:
+          $ref: "#/components/schemas/TicketPriority"
         serviceId:
           type: string
           format: uuid
@@ -2589,9 +2647,7 @@ components:
           description: "Numéro de téléphone E.164 pour les notifications SMS/WhatsApp (ex: +2250700000001)"
           example: "+2250700000001"
         priority:
-          type: boolean
-          default: false
-          description: Ticket prioritaire (PMR, VIP)
+          $ref: "#/components/schemas/TicketPriority"
 
     CallTicketRequest:
       type: object
@@ -2651,8 +2707,7 @@ components:
           type: string
           format: date-time
         priority:
-          type: boolean
-          default: false
+          $ref: "#/components/schemas/TicketPriority"
 
     TicketSyncRequest:
       type: object

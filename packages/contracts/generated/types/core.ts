@@ -834,6 +834,7 @@ export interface paths {
                          *         {
                          *           "id": "77777777-7777-4777-a777-777777777777",
                          *           "name": "Virements",
+                         *           "code": "OC",
                          *           "agencyId": "33333333-3333-4333-a333-333333333333",
                          *           "slaMinutes": 10,
                          *           "active": true,
@@ -877,6 +878,7 @@ export interface paths {
                     /**
                      * @example {
                      *       "name": "Crédits immobiliers",
+                     *       "code": "CR",
                      *       "slaMinutes": 20,
                      *       "order": 5
                      *     }
@@ -895,6 +897,7 @@ export interface paths {
                          * @example {
                          *       "id": "bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb",
                          *       "name": "Crédits immobiliers",
+                         *       "code": "CR",
                          *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "slaMinutes": 20,
                          *       "active": true,
@@ -970,6 +973,7 @@ export interface paths {
                          * @example {
                          *       "id": "77777777-7777-4777-a777-777777777777",
                          *       "name": "Virements",
+                         *       "code": "OC",
                          *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "slaMinutes": 15,
                          *       "active": false,
@@ -1481,7 +1485,7 @@ export interface paths {
                      *       "serviceId": "77777777-7777-4777-a777-777777777777",
                      *       "channel": "KIOSK",
                      *       "phoneNumber": "+2250700000001",
-                     *       "priority": false
+                     *       "priority": "STANDARD"
                      *     }
                      */
                     "application/json": components["schemas"]["CreateTicketRequest"];
@@ -1498,7 +1502,9 @@ export interface paths {
                          * @example {
                          *       "id": "00000000-0000-4000-a000-000000000000",
                          *       "number": "A099",
+                         *       "displayNumber": "OC-099",
                          *       "status": "WAITING",
+                         *       "priority": "STANDARD",
                          *       "serviceId": "77777777-7777-4777-a777-777777777777",
                          *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "channel": "KIOSK",
@@ -1592,7 +1598,9 @@ export interface paths {
                          * @example {
                          *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
+                         *       "displayNumber": "OC-042",
                          *       "status": "WAITING",
+                         *       "priority": "STANDARD",
                          *       "serviceId": "77777777-7777-4777-a777-777777777777",
                          *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "channel": "QR",
@@ -2349,6 +2357,18 @@ export interface components {
          */
         TicketStatus: "WAITING" | "CALLED" | "SERVING" | "DONE" | "NO_SHOW" | "ABANDONED" | "TRANSFERRED";
         /**
+         * @description Niveau de priorité d'un ticket dans la file d'attente SIGFA (v5 §MODULE 1 — 5 niveaux).
+         *     - STANDARD : file normale, aucune priorité particulière (défaut)
+         *     - PRIORITY : file prioritaire guichet (ex. client avec rendez-vous)
+         *     - VIP : client VIP / private banking
+         *     - PMR : personne à mobilité réduite (priorité légale)
+         *     - SENIOR : client senior (priorité réglementaire)
+         *     Valeur par défaut : `STANDARD`. La valeur influence le rang dans le moteur de file (API-004).
+         * @default STANDARD
+         * @enum {string}
+         */
+        TicketPriority: "STANDARD" | "PRIORITY" | "VIP" | "PMR" | "SENIOR";
+        /**
          * @description Rôles utilisateur SIGFA (matrice RBAC v5 §MODULE 4).
          *     - SUPER_ADMIN : accès platform complet
          *     - BANK_ADMIN : admin de la banque
@@ -2518,6 +2538,15 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
+            /**
+             * @description Code mnémotechnique du service — 2 à 4 lettres majuscules, unique par agence.
+             *     Utilisé comme préfixe du `displayNumber` (ex. `OC-047`).
+             *     Exemples : OC (Opérations Courantes), OA (Opérations Avancées), CR (Crédits),
+             *     CH (Changes), EN (Epargne/Nouveaux comptes), VIP (VIP/Private banking),
+             *     RE (Réclamations), EP (Epargne/Placements).
+             * @example OC
+             */
+            code?: string;
             /** Format: uuid */
             agencyId: string;
             slaMinutes: number;
@@ -2526,6 +2555,12 @@ export interface components {
         };
         CreateServiceRequest: {
             name: string;
+            /**
+             * @description Code mnémotechnique du service (2–4 lettres majuscules, unique par agence).
+             *     Exemples : OC, OA, CR, CH, EN, VIP, RE, EP.
+             * @example OC
+             */
+            code?: string;
             /** @default 10 */
             slaMinutes: number;
             order?: number;
@@ -2593,10 +2628,16 @@ export interface components {
             /** Format: uuid */
             id: string;
             /**
-             * @description Numéro affiché (ex: A042)
+             * @description Numéro séquentiel brut (ex: A042)
              * @example A042
              */
             number: string;
+            /**
+             * @description Numéro d'affichage complet au format `{code}-{NNN}` (code du service + séquence 3 chiffres).
+             *     Affiché sur la borne, l'écran d'appel et le ticket imprimé.
+             * @example OC-047
+             */
+            displayNumber?: string;
             status: components["schemas"]["TicketStatus"];
             /** Format: uuid */
             serviceId: string;
@@ -2606,6 +2647,7 @@ export interface components {
             /** @description Position dans la file (0 = en cours de traitement) */
             position: number;
             estimatedWaitMinutes: number;
+            priority?: components["schemas"]["TicketPriority"];
             /** @description Nanoid 21 pour le suivi public */
             trackingId?: string;
             /** Format: uuid */
@@ -2632,11 +2674,17 @@ export interface components {
             /** Format: uuid */
             id: string;
             /**
-             * @description Numéro affiché (ex: A099)
+             * @description Numéro séquentiel brut (ex: A099)
              * @example A099
              */
             number: string;
+            /**
+             * @description Numéro d'affichage au format `{code}-{NNN}` (code service + séquence 3 chiffres).
+             * @example OC-099
+             */
+            displayNumber?: string;
             status: components["schemas"]["TicketStatus"];
+            priority?: components["schemas"]["TicketPriority"];
             /** Format: uuid */
             serviceId: string;
             /** Format: uuid */
@@ -2696,11 +2744,7 @@ export interface components {
              * @example +2250700000001
              */
             phoneNumber?: string;
-            /**
-             * @description Ticket prioritaire (PMR, VIP)
-             * @default false
-             */
-            priority: boolean;
+            priority?: components["schemas"]["TicketPriority"];
         };
         CallTicketRequest: {
             /** Format: uuid */
@@ -2731,8 +2775,7 @@ export interface components {
             channel: components["schemas"]["TicketChannel"];
             /** Format: date-time */
             createdOfflineAt: string;
-            /** @default false */
-            priority: boolean;
+            priority?: components["schemas"]["TicketPriority"];
         };
         TicketSyncRequest: {
             /** @description Batch de tickets offline — maximum 100 par appel */

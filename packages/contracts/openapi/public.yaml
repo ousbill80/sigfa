@@ -262,7 +262,7 @@ paths:
                   channel: KIOSK
                   serviceId: "77777777-7777-4777-a777-777777777777"
                   agencyId: "33333333-3333-4333-a333-333333333333"
-                  priority: false
+                  priority: STANDARD
               qr:
                 summary: Émission via QR
                 value:
@@ -300,7 +300,9 @@ paths:
                   value:
                     trackingId: "V9k2mXpLqRwZsYn8fBjH3"
                     number: "A042"
+                    displayNumber: "OC-042"
                     status: WAITING
+                    priority: STANDARD
                     channel: KIOSK
                     position: 5
                     estimatedWaitMinutes: 10
@@ -312,7 +314,9 @@ paths:
                   value:
                     trackingId: "Xp3nBmKqLrTs7vWzYj9cD"
                     number: "A043"
+                    displayNumber: "OC-043"
                     status: WAITING
+                    priority: STANDARD
                     channel: QR
                     position: 6
                     estimatedWaitMinutes: 12
@@ -324,7 +328,9 @@ paths:
                   value:
                     trackingId: "Mn4pQrStUvWxYzAb5cDeF"
                     number: "A044"
+                    displayNumber: "OA-044"
                     status: WAITING
+                    priority: STANDARD
                     channel: MOBILE
                     position: 7
                     estimatedWaitMinutes: 14
@@ -336,7 +342,9 @@ paths:
                   value:
                     trackingId: "Gh6iJkLmNoPqRsTu7vWxY"
                     number: "A045"
+                    displayNumber: "VIP-045"
                     status: WAITING
+                    priority: VIP
                     channel: WHATSAPP
                     position: 8
                     estimatedWaitMinutes: 16
@@ -427,7 +435,9 @@ paths:
               example:
                 trackingId: "V9k2mXpLqRwZsYn8fBjH3"
                 number: "A042"
+                displayNumber: "OC-042"
                 status: WAITING
+                priority: STANDARD
                 channel: KIOSK
                 position: 3
                 estimatedWaitMinutes: 6
@@ -836,9 +846,7 @@ components:
           format: uuid
           description: Identifiant de l'agence
         priority:
-          type: boolean
-          default: false
-          description: Ticket prioritaire (PMR, VIP)
+          $ref: "./core.yaml#/components/schemas/TicketPriority"
 
     # Canal KIOSK : téléphone facultatif, smsConsent obligatoire si téléphone
     PublicTicketKiosk:
@@ -962,10 +970,18 @@ components:
           example: "V9k2mXpLqRwZsYn8fBjH3"
         number:
           type: string
-          description: "Numéro affiché (ex: A042)"
+          description: "Numéro séquentiel brut (ex: A042)"
           example: "A042"
+        displayNumber:
+          type: string
+          description: |
+            Numéro d'affichage au format `{code}-{NNN}` (code service + séquence 3 chiffres).
+            Affiché sur la borne et le ticket imprimé.
+          example: "OC-042"
         status:
           $ref: "./core.yaml#/components/schemas/TicketStatus"
+        priority:
+          $ref: "./core.yaml#/components/schemas/TicketPriority"
         channel:
           $ref: "./core.yaml#/components/schemas/TicketChannel"
         position:
@@ -1011,8 +1027,15 @@ components:
         number:
           type: string
           example: "A042"
+        displayNumber:
+          type: string
+          description: |
+            Numéro d'affichage au format `{code}-{NNN}` (code service + séquence 3 chiffres).
+          example: "OC-042"
         status:
           $ref: "./core.yaml#/components/schemas/TicketStatus"
+        priority:
+          $ref: "./core.yaml#/components/schemas/TicketPriority"
         channel:
           $ref: "./core.yaml#/components/schemas/TicketChannel"
         position:
