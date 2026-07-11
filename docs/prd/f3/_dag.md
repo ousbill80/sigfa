@@ -34,7 +34,7 @@ F2 DONE ──► API-001 (auth) ──► API-002 (middleware tenant+withPlatfo
 | ID | Story | Dépend de | Statut |
 |---|---|---|---|
 | API-001 | Auth : login/refresh/logout/me, JWT 15min+refresh 7j rotation, bcrypt 12, blocage 5/15min | F2 | DONE |
-| API-002 | Middleware tenant : JWT → withTenant sur chaque requête, x-required-role enforcé (rbac-matrix) | 001 | TODO |
+| API-002 | Middleware tenant : JWT → withTenant sur chaque requête, x-required-role enforcé (rbac-matrix) | 001 | DONE |
 | API-003 | Cycle de vie ticket : émission idempotente, call-next/call/serve/close/no-show/transfer/abandon | 002 | TODO |
 | API-004 | Moteur de file : priorités 5 niveaux, routage compétence+langue, débordement, pause de file | 003 | TODO |
 | API-005 | Sync offline : batch ≤100, idempotence local_uuid, résolution numéros | 003 | TODO |

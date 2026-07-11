@@ -28,7 +28,7 @@ CONTRACT-012 est prérequis de : KIOSK-007, TV-002
 |---|---|---|---|
 | Kiosque | KIOSK-001..009 | agent-kiosk | TODO (arbitrage v2 appliqué) |
 | TV + Dashboards | TV-001..002, WEB-001..006 | agent-web | TODO (arbitrage v2 appliqué) |
-| Mobile | MOB-001..005 | agent-mobile | TODO (arbitrage v2 appliqué) |
+| Mobile | MOB-001..005 | agent-mobile | DONE |
 
 ## Décisions d'arbitrage pré-critiques (issues des notes rédacteurs)
 - **MOB-001 node-linker** : option retenue = `node-linker=hoisted` scopé ? NON — `.npmrc` racine est global au monorepo (risque sur les autres workspaces). Décision : **metro.config.js** (watchFolders + extraNodeModules) d'abord ; si échec documenté en story → bascule hoisted avec gate orchestrateur.
