@@ -1,6 +1,6 @@
 # INFRA-001 : Monorepo pnpm + Turborepo — squelette apps/ + packages/ + configs partagées
 
-**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : — (racine absolue) · **Statut** : TODO
+**Module** : F0 — Fondations · **Agent** : direct (agent unique infra) · **Dépend de** : — (racine absolue) · **Statut** : DONE (2026-07-11, commit d17bda3, gates rejoués par l'orchestrateur)
 **Révision** : v2 — amendée après critique (Boucle 1, itération 1)
 
 ## Exigences (EARS)

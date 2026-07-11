@@ -24,7 +24,7 @@ INFRA-001 (monorepo pnpm + Turborepo 2)        ← racine absolue, dispatch seul
 
 | ID | Titre | Agent | Dépend de | Statut |
 |---|---|---|---|---|
-| INFRA-001 | Monorepo pnpm + Turborepo 2, apps/ + packages/ + tools/ci, configs partagées (squelettes TS pur, zéro framework) | direct | — | TODO |
+| INFRA-001 | Monorepo pnpm + Turborepo 2, apps/ + packages/ + tools/ci, configs partagées (squelettes TS pur, zéro framework) | direct | — | DONE |
 | INFRA-002 | Docker Compose dev : postgres16 + redis7 + api + web + kiosk (node:22-slim, bind mounts) | direct | INFRA-001 | TODO |
 | INFRA-003 | CI GitHub Actions : lint → typecheck → test → build + ratchet couverture (tools/ci) | direct | INFRA-001 | TODO |
 | INFRA-004 | Hooks git (lefthook ^1.7) : require-test-in-commit (T1) + commitlint ^19 | direct | INFRA-001 | TODO |
