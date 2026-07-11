@@ -54,17 +54,40 @@ export function generateForSchema<T>(schema: z.ZodTypeAny, rng: () => number): T
   return generateValue(schema, rng) as T;
 }
 
+/**
+ * Génère un tableau de valeurs pour un schéma ZodArray (0–3 éléments).
+ * @param schema - Schéma ZodArray source
+ * @param rng - Fonction PRNG
+ */
+function generateArrayValue(schema: z.ZodArray<z.ZodTypeAny>, rng: () => number): unknown[] {
+  const len = Math.floor(rng() * 4); // 0-3 éléments
+  return Array.from({ length: len }, () =>
+    generateValue(schema._def.type as z.ZodTypeAny, rng)
+  );
+}
+
+/**
+ * Génère un objet pour un schéma ZodObject en parcourant toutes ses propriétés.
+ * @param schema - Schéma ZodObject source
+ * @param rng - Fonction PRNG
+ */
+function generateObjectValue(
+  schema: z.ZodObject<z.ZodRawShape>,
+  rng: () => number
+): Record<string, unknown> {
+  const shape = schema._def.shape() as Record<string, z.ZodTypeAny>;
+  const result: Record<string, unknown> = {};
+  for (const [key, fieldSchema] of Object.entries(shape)) {
+    result[key] = generateValue(fieldSchema, rng);
+  }
+  return result;
+}
+
 /** Génère récursivement une valeur pour un schéma Zod */
 function generateValue(schema: z.ZodTypeAny, rng: () => number): unknown {
-  if (schema instanceof z.ZodString) {
-    return generateStringValue(schema, rng);
-  }
-  if (schema instanceof z.ZodNumber) {
-    return generateNumberValue(schema, rng);
-  }
-  if (schema instanceof z.ZodBoolean) {
-    return rng() >= 0.5;
-  }
+  if (schema instanceof z.ZodString) return generateStringValue(schema, rng);
+  if (schema instanceof z.ZodNumber) return generateNumberValue(schema, rng);
+  if (schema instanceof z.ZodBoolean) return rng() >= 0.5;
   if (schema instanceof z.ZodEnum) {
     const values = schema._def.values as string[];
     return values[Math.floor(rng() * values.length)];
@@ -72,26 +95,12 @@ function generateValue(schema: z.ZodTypeAny, rng: () => number): unknown {
   if (schema instanceof z.ZodOptional) {
     return rng() > 0.3 ? generateValue(schema._def.innerType as z.ZodTypeAny, rng) : undefined;
   }
-  if (schema instanceof z.ZodArray) {
-    const len = Math.floor(rng() * 4); // 0-3 éléments
-    return Array.from({ length: len }, () =>
-      generateValue(schema._def.type as z.ZodTypeAny, rng)
-    );
-  }
-  if (schema instanceof z.ZodObject) {
-    const shape = schema._def.shape() as Record<string, z.ZodTypeAny>;
-    const result: Record<string, unknown> = {};
-    for (const [key, fieldSchema] of Object.entries(shape)) {
-      result[key] = generateValue(fieldSchema, rng);
-    }
-    return result;
-  }
+  if (schema instanceof z.ZodArray) return generateArrayValue(schema, rng);
+  if (schema instanceof z.ZodObject) return generateObjectValue(schema, rng);
   if (schema instanceof z.ZodDefault) {
     return generateValue(schema._def.innerType as z.ZodTypeAny, rng);
   }
-  if (schema instanceof z.ZodUnknown || schema instanceof z.ZodAny) {
-    return null;
-  }
+  if (schema instanceof z.ZodUnknown || schema instanceof z.ZodAny) return null;
   return null;
 }
 

@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import { expectTypeOf } from "expect-type";
 import * as fc from "fast-check";
 import { z } from "zod";
-import { createFactory } from "./index.js";
+import { createFactory, FACTORIES_VERSION } from "./index.js";
+
+describe("@sigfa/factories — version", () => {
+  it("INFRA-008: FACTORIES_VERSION est une chaîne semver", () => {
+    expect(FACTORIES_VERSION).toBe("0.0.0");
+  });
+});
 
 describe("@sigfa/factories — createFactory", () => {
   const sampleSchema = z.object({

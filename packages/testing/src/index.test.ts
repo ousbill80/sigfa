@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { testingVersion } from "./index.js";
+import { TESTING_VERSION } from "./index.js";
 
 describe("@sigfa/testing", () => {
-  it("exports testingVersion", () => {
-    expect(testingVersion).toBe("0.0.0");
+  it("exports TESTING_VERSION", () => {
+    expect(TESTING_VERSION).toBe("0.0.0");
   });
 });

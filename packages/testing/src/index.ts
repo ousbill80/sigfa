@@ -1,5 +1,5 @@
 /** Version du package @sigfa/testing */
-export const testingVersion = "0.0.0";
+export const TESTING_VERSION = "0.0.0";
 
 // Re-exporte les harnesses des 5 suites critiques
 export * from "./tenant-isolation/index.js";

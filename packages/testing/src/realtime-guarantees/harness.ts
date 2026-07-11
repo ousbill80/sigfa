@@ -16,11 +16,15 @@ export interface RealtimeHarness {
 }
 
 /**
- * Crée un harness Socket.io éphémère avec serveur et client de test.
- * Le serveur renvoie l'événement entrant avec le nom ackEvent configuré.
- * @returns Harness avec measureEventLatency() et teardown()
+ * Crée un serveur HTTP éphémère avec Socket.io attaché, écoute sur un port aléatoire.
+ * Le serveur renvoie chaque événement entrant en remplaçant `:ping` par `:pong`.
+ * @returns Le serveur HTTP et le port alloué
  */
-export async function createRealtimeHarness(): Promise<RealtimeHarness> {
+async function createAndStartHttpServer(): Promise<{
+  httpServer: ReturnType<typeof createServer>;
+  ioServer: Server;
+  port: number;
+}> {
   const httpServer = createServer();
   const ioServer = new Server(httpServer, {
     cors: { origin: "*" },
@@ -42,9 +46,16 @@ export async function createRealtimeHarness(): Promise<RealtimeHarness> {
   if (!address || typeof address === "string") {
     throw new Error("Failed to bind HTTP server");
   }
-  const port = address.port;
-  const serverUrl = `http://127.0.0.1:${port}`;
+  return { httpServer, ioServer, port: address.port };
+}
 
+/**
+ * Connecte un client Socket.io à l'URL donnée et attend la connexion.
+ * Lance une erreur si la connexion échoue ou dépasse 10 secondes.
+ * @param serverUrl - URL du serveur Socket.io
+ * @returns Le socket client connecté
+ */
+async function connectClient(serverUrl: string): Promise<ClientSocket> {
   const clientSocket: ClientSocket = ioClient(serverUrl, {
     transports: ["websocket"],
   });
@@ -54,6 +65,19 @@ export async function createRealtimeHarness(): Promise<RealtimeHarness> {
     clientSocket.on("connect_error", reject);
     setTimeout(() => reject(new Error("Socket.io connect timeout")), 10_000);
   });
+
+  return clientSocket;
+}
+
+/**
+ * Crée un harness Socket.io éphémère avec serveur et client de test.
+ * Le serveur renvoie l'événement entrant avec le nom ackEvent configuré.
+ * @returns Harness avec measureEventLatency() et teardown()
+ */
+export async function createRealtimeHarness(): Promise<RealtimeHarness> {
+  const { httpServer, ioServer, port } = await createAndStartHttpServer();
+  const serverUrl = `http://127.0.0.1:${port}`;
+  const clientSocket = await connectClient(serverUrl);
 
   return {
     measureEventLatency: (emitEvent: string, ackEvent: string): Promise<number> =>

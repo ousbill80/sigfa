@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Version du package @sigfa/schemas */
+export const SCHEMAS_VERSION = "0.0.0";
+
 /**
  * Schéma UUID v4 partagé.
  * Toutes les entités SIGFA utilisent des UUID v4 comme identifiants.
