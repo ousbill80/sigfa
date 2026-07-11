@@ -1,0 +1,29 @@
+# lefthook.yml — INFRA-004
+# Configuration des hooks git pour le projet SIGFA.
+# Lefthook ^1.7 — https://github.com/evilmartians/lefthook
+
+# Options globales
+output:
+  - failure  # Toujours afficher les erreurs
+  - summary  # Résumé après chaque hook
+
+# ─── Hook pre-commit ──────────────────────────────────────────────────────────
+pre-commit:
+  commands:
+    require-test-in-commit:
+      run: sh ./scripts/require-test-in-commit.sh
+      fail_text: |
+        ❌ Règle T1 : tout fichier source doit avoir un test dans le même commit.
+        Voir lefthook/test-exemptions.txt pour les exemptions autorisées.
+
+# ─── Hook commit-msg ─────────────────────────────────────────────────────────
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no -- commitlint --edit {1}
+      fail_text: |
+        ❌ Message de commit invalide.
+        Format attendu : <type>(<scope>): <description>
+        Exemple valide : feat(api): émission ticket de caisse
+        Types autorisés : feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+        Voir https://www.conventionalcommits.org pour la convention complète.

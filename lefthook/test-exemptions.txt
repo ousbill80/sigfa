@@ -1,0 +1,29 @@
+# lefthook/test-exemptions.txt — INFRA-004
+# Globs d'exemption pour require-test-in-commit.sh (règle T1)
+# Un glob par ligne. Lignes commençant par # = commentaires.
+# Toute nouvelle exemption doit être ajoutée ici via un commit dédié.
+# NE PAS bypasser via CLI (lefthook --no-verify est interdit).
+#
+# Format : globs shell relatifs à la racine du dépôt
+# Exemple : packages/database/migrations/* exempte tous les fichiers de migration
+
+# ─── Fichiers de test (exemptés par définition) ──────────────────────────────
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# ─── Déclarations TypeScript ──────────────────────────────────────────────────
+*.d.ts
+
+# ─── Fichiers de configuration ────────────────────────────────────────────────
+*.config.ts
+*.config.tsx
+*.config.js
+*.config.mjs
+
+# ─── Migrations de base de données ────────────────────────────────────────────
+packages/database/migrations/*
+
+# ─── Code généré automatiquement ─────────────────────────────────────────────
+packages/contracts/generated/*
