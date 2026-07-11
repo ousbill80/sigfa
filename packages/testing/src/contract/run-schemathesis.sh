@@ -34,5 +34,6 @@ YAML_ABS="$(cd "$(dirname "$YAML_PATH")" && pwd)/$(basename "$YAML_PATH")"
 echo "Running Schemathesis against: $YAML_ABS"
 docker run --rm \
   -v "${YAML_ABS}:/contract.yaml:ro" \
+  --add-host=host.docker.internal:host-gateway \
   schemathesis/schemathesis \
   run /contract.yaml

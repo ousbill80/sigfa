@@ -1,8 +1,37 @@
 import { describe, it, expect } from "vitest";
-import { mkdtemp, writeFile, chmod, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, chmod, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { runSchemathesis, type SchemathesisResult } from "./harness.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const RUN_SCHEMATHESIS_SH = resolve(__dirname, "run-schemathesis.sh");
+
+// ─── Vérification structurelle — portabilité Linux CI ─────────────────────────
+// CONTRACT-009b : sur runner Linux, host.docker.internal ne résout pas sans
+// --add-host=host.docker.internal:host-gateway.  Ce test asserte que le script
+// ET le harness TS contiennent le flag AVANT d'appliquer le fix (rouge → vert).
+
+describe("INFRA-009b: run-schemathesis.sh contient --add-host (portabilité CI Linux)", () => {
+  it(
+    "INFRA-009b: run-schemathesis.sh contient '--add-host=host.docker.internal:host-gateway'",
+    async () => {
+      const content = await readFile(RUN_SCHEMATHESIS_SH, "utf8");
+      expect(content).toContain("--add-host=host.docker.internal:host-gateway");
+    }
+  );
+
+  it(
+    "INFRA-009b: harness.ts invokeDocker contient '--add-host=host.docker.internal:host-gateway'",
+    async () => {
+      const harnessTs = resolve(__dirname, "harness.ts");
+      const content = await readFile(harnessTs, "utf8");
+      expect(content).toContain("--add-host=host.docker.internal:host-gateway");
+    }
+  );
+});
 
 describe("INFRA-005: harness contract", () => {
   it(

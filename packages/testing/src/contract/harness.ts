@@ -77,7 +77,7 @@ async function checkContractFile(contractPath: string): Promise<SchemathesisResu
 async function invokeDocker(docker: string, contractPath: string): Promise<SchemathesisResult> {
   try {
     const { stdout, stderr } = await execAsync(
-      `"${docker}" run --rm -v "${contractPath}:/contract.yaml" schemathesis/schemathesis run /contract.yaml`
+      `"${docker}" run --rm -v "${contractPath}:/contract.yaml" --add-host=host.docker.internal:host-gateway schemathesis/schemathesis run /contract.yaml`
     );
     return { exitCode: 0, output: stdout + stderr };
   } catch (err: unknown) {
