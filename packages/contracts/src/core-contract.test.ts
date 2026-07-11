@@ -84,7 +84,7 @@ function getAllOperations(): Array<{ path: string; method: string; op: Operation
 const VALID_TENANT_SCOPES = ["platform", "bank", "agency", "public"];
 const VALID_REQUIRED_ROLES = [
   "SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR",
-  "MANAGER", "AGENT", "AUDITOR", "NONE",
+  "MANAGER", "AGENT", "AUDITOR", "AUTHENTICATED", "NONE",
 ];
 
 /** Collecter les chemins en format normalisé */
@@ -422,5 +422,110 @@ describe("CONTRACT-001 — Schémas transverses", () => {
 
     const resp429 = JSON.stringify(op?.responses?.["429"] ?? {});
     expect(resp429, "/auth/login 429 doit être documenté avec rate-limit").toMatch(/429|TOO_MANY/);
+  });
+});
+
+// ─── CONTRACT-010 : hardening sécurité + cohérence inter-YAML ────────────────
+describe("CONTRACT-010 — core.yaml", () => {
+  it("CONTRACT-010: POST /auth/logout a security: [] (accès public sans token valide)", () => {
+    const pathItem = getPath("/auth/logout");
+    expect(pathItem, "/auth/logout doit exister").toBeDefined();
+    const op = (pathItem as Record<string, unknown>)?.["post"] as OperationObject | undefined;
+    expect(op, "POST /auth/logout doit exister").toBeDefined();
+    expect(
+      Array.isArray(op?.security) && op.security.length === 0,
+      "POST /auth/logout doit avoir security: [] (override global pour accepter token expiré)",
+    ).toBe(true);
+  });
+
+  it("CONTRACT-010: GET /auth/me a x-required-role: AUTHENTICATED (pas NONE)", () => {
+    const pathItem = getPath("/auth/me");
+    expect(pathItem, "/auth/me doit exister").toBeDefined();
+    const op = (pathItem as Record<string, unknown>)?.["get"] as OperationObject | undefined;
+    expect(op, "GET /auth/me doit exister").toBeDefined();
+    expect(
+      op?.["x-required-role"],
+      "GET /auth/me doit avoir x-required-role: AUTHENTICATED (token valide requis)",
+    ).toBe("AUTHENTICATED");
+  });
+
+  it("CONTRACT-010: DELETE /agencies/{id} 409 utilise AGENCY_HAS_OPEN_TICKETS (pas ACTIVE)", () => {
+    const pathItem = getPath("/agencies/{id}");
+    expect(pathItem, "/agencies/{id} doit exister").toBeDefined();
+    const op = (pathItem as Record<string, unknown>)?.["delete"] as OperationObject | undefined;
+    expect(op, "DELETE /agencies/{id} doit exister dans core.yaml").toBeDefined();
+    const resp409 = JSON.stringify(op?.responses?.["409"] ?? {});
+    expect(resp409, "DELETE /agencies/{id} 409 doit utiliser AGENCY_HAS_OPEN_TICKETS").toContain("AGENCY_HAS_OPEN_TICKETS");
+    expect(resp409, "DELETE /agencies/{id} 409 ne doit pas utiliser AGENCY_HAS_ACTIVE_TICKETS").not.toContain("AGENCY_HAS_ACTIVE_TICKETS");
+  });
+
+  it("CONTRACT-010: tous les exemples UUID dans core.yaml sont des UUID v4 valides", () => {
+    const rawContent = readFileSync(CORE_YAML_PATH, "utf-8");
+    const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi;
+    const placeholderPattern = /(bank_\d+|agency_\d+|user_\d+|svc_\d+|counter_\d+|ticket_\d+|queue_\d+|kiosk_\d+|device_\d+|agent_\d+)/;
+    expect(
+      rawContent,
+      "core.yaml ne doit pas contenir de faux IDs non-UUID (bank_01, agency_01, etc.)",
+    ).not.toMatch(placeholderPattern);
+    // Vérifier que les UUIDs sont bien en v4
+    const uuids = rawContent.match(uuidPattern) ?? [];
+    expect(uuids.length, "core.yaml doit contenir des exemples UUID v4").toBeGreaterThan(0);
+  });
+
+  it("CONTRACT-010: PrinterStatus est défini dans core.yaml components/schemas", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    expect(schemas, "components/schemas doit exister").toBeDefined();
+    const printerStatus = schemas?.["PrinterStatus"] as Record<string, unknown> | undefined;
+    expect(printerStatus, "PrinterStatus doit être défini dans core.yaml").toBeDefined();
+    const psEnum = printerStatus?.enum as string[] | undefined;
+    expect(Array.isArray(psEnum), "PrinterStatus doit avoir un enum").toBe(true);
+    expect(psEnum, "PrinterStatus doit contenir OK").toContain("OK");
+    expect(psEnum, "PrinterStatus doit contenir PAPER_LOW").toContain("PAPER_LOW");
+    expect(psEnum, "PrinterStatus doit contenir ERROR").toContain("ERROR");
+    expect(psEnum, "PrinterStatus doit contenir OFFLINE").toContain("OFFLINE");
+  });
+
+  it("CONTRACT-010: CreateTicketRequest n'a pas de champ agencyId (dérivé du JWT)", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    const createTicketReq = schemas?.["CreateTicketRequest"] as Record<string, unknown> | undefined;
+    expect(createTicketReq, "CreateTicketRequest doit exister").toBeDefined();
+    const props = (createTicketReq?.properties ?? {}) as Record<string, unknown>;
+    expect(
+      props["agencyId"],
+      "CreateTicketRequest ne doit pas avoir de champ agencyId (dérivé du JWT)",
+    ).toBeUndefined();
+    const required = (createTicketReq?.required ?? []) as string[];
+    expect(
+      required.includes("agencyId"),
+      "CreateTicketRequest.required ne doit pas lister agencyId",
+    ).toBe(false);
+  });
+
+  it("CONTRACT-010: TicketSyncItem n'a pas de champ agencyId (dérivé du JWT)", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    const syncItem = schemas?.["TicketSyncItem"] as Record<string, unknown> | undefined;
+    expect(syncItem, "TicketSyncItem doit exister").toBeDefined();
+    const props = (syncItem?.properties ?? {}) as Record<string, unknown>;
+    expect(
+      props["agencyId"],
+      "TicketSyncItem ne doit pas avoir de champ agencyId (dérivé du JWT)",
+    ).toBeUndefined();
+    const required = (syncItem?.required ?? []) as string[];
+    expect(
+      required.includes("agencyId"),
+      "TicketSyncItem.required ne doit pas lister agencyId",
+    ).toBe(false);
+  });
+
+  it("CONTRACT-010: phoneNumber dans CreateTicketRequest a un pattern E.164", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    const createTicketReq = schemas?.["CreateTicketRequest"] as Record<string, unknown> | undefined;
+    const props = (createTicketReq?.properties ?? {}) as Record<string, unknown>;
+    const phone = props["phoneNumber"] as Record<string, unknown> | undefined;
+    expect(phone, "CreateTicketRequest doit avoir le champ phoneNumber").toBeDefined();
+    expect(
+      phone?.["pattern"],
+      "phoneNumber doit avoir un pattern E.164 (^\\+[1-9]\\d{6,14}$)",
+    ).toMatch(/\+.*\d/);
   });
 });

@@ -244,11 +244,11 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "user_01",
+                         *       "id": "55555555-5555-4555-a555-555555555555",
                          *       "email": "agent@banque-ci.com",
                          *       "role": "AGENT",
-                         *       "bankId": "bank_01",
-                         *       "agencyId": "agency_01"
+                         *       "bankId": "11111111-1111-4111-a111-111111111111",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333"
                          *     }
                          */
                         "application/json": components["schemas"]["UserProfile"];
@@ -308,7 +308,7 @@ export interface paths {
                          * @example {
                          *       "data": [
                          *         {
-                         *           "id": "bank_01",
+                         *           "id": "11111111-1111-4111-a111-111111111111",
                          *           "name": "Banque Nationale de Côte d'Ivoire",
                          *           "slug": "bnci",
                          *           "active": true
@@ -367,7 +367,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "bank_02",
+                         *       "id": "22222222-2222-4222-a222-222222222222",
                          *       "name": "Banque Atlantique CI",
                          *       "slug": "baci",
                          *       "active": true,
@@ -424,7 +424,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "bank_01",
+                         *       "id": "11111111-1111-4111-a111-111111111111",
                          *       "name": "Banque Nationale de Côte d'Ivoire",
                          *       "slug": "bnci",
                          *       "active": true,
@@ -483,7 +483,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "bank_01",
+                         *       "id": "11111111-1111-4111-a111-111111111111",
                          *       "name": "BNCI (renommée)",
                          *       "slug": "bnci",
                          *       "active": false,
@@ -541,9 +541,9 @@ export interface paths {
                          * @example {
                          *       "data": [
                          *         {
-                         *           "id": "agency_01",
+                         *           "id": "33333333-3333-4333-a333-333333333333",
                          *           "name": "Agence Plateau",
-                         *           "bankId": "bank_01",
+                         *           "bankId": "11111111-1111-4111-a111-111111111111",
                          *           "active": true
                          *         }
                          *       ],
@@ -601,9 +601,9 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "agency_02",
+                         *       "id": "44444444-4444-4444-a444-444444444444",
                          *       "name": "Agence Cocody",
-                         *       "bankId": "bank_01",
+                         *       "bankId": "11111111-1111-4111-a111-111111111111",
                          *       "active": true,
                          *       "createdAt": "2026-01-01T00:00:00Z"
                          *     }
@@ -658,9 +658,9 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "agency_01",
+                         *       "id": "33333333-3333-4333-a333-333333333333",
                          *       "name": "Agence Plateau",
-                         *       "bankId": "bank_01",
+                         *       "bankId": "11111111-1111-4111-a111-111111111111",
                          *       "active": true,
                          *       "createdAt": "2025-06-01T00:00:00Z"
                          *     }
@@ -682,8 +682,8 @@ export interface paths {
         post?: never;
         /**
          * Supprimer une agence
-         * @description Supprime logiquement une agence (désactivation). Une agence avec des
-         *     tickets actifs ne peut pas être supprimée (409 `AGENCY_HAS_ACTIVE_TICKETS`).
+         * @description Supprime logiquement une agence (soft delete / désactivation). Une agence avec des
+         *     tickets ouverts ne peut pas être supprimée (409 `AGENCY_HAS_OPEN_TICKETS`).
          */
         delete: {
             parameters: {
@@ -717,7 +717,7 @@ export interface paths {
                 401: components["responses"]["Unauthorized"];
                 403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
-                /** @description Conflit — agence avec tickets actifs */
+                /** @description Conflit — agence avec tickets ouverts */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -726,8 +726,8 @@ export interface paths {
                         /**
                          * @example {
                          *       "error": {
-                         *         "code": "AGENCY_HAS_ACTIVE_TICKETS",
-                         *         "message": "Impossible de supprimer une agence avec des tickets actifs."
+                         *         "code": "AGENCY_HAS_OPEN_TICKETS",
+                         *         "message": "Impossible de supprimer une agence avec des tickets ouverts."
                          *       }
                          *     }
                          */
@@ -775,9 +775,9 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "agency_01",
+                         *       "id": "33333333-3333-4333-a333-333333333333",
                          *       "name": "Agence Plateau (renommée)",
-                         *       "bankId": "bank_01",
+                         *       "bankId": "11111111-1111-4111-a111-111111111111",
                          *       "active": false,
                          *       "createdAt": "2025-06-01T00:00:00Z"
                          *     }
@@ -832,9 +832,9 @@ export interface paths {
                          * @example {
                          *       "data": [
                          *         {
-                         *           "id": "svc_01",
+                         *           "id": "77777777-7777-4777-a777-777777777777",
                          *           "name": "Virements",
-                         *           "agencyId": "agency_01",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
                          *           "slaMinutes": 10,
                          *           "active": true,
                          *           "order": 1
@@ -893,9 +893,9 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "svc_05",
+                         *       "id": "bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb",
                          *       "name": "Crédits immobiliers",
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "slaMinutes": 20,
                          *       "active": true,
                          *       "order": 5
@@ -968,9 +968,9 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "svc_01",
+                         *       "id": "77777777-7777-4777-a777-777777777777",
                          *       "name": "Virements",
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "slaMinutes": 15,
                          *       "active": false,
                          *       "order": 2
@@ -1026,11 +1026,11 @@ export interface paths {
                          * @example {
                          *       "data": [
                          *         {
-                         *           "id": "counter_01",
+                         *           "id": "cccccccc-cccc-4ccc-accc-cccccccccccc",
                          *           "label": "Guichet 1",
-                         *           "agencyId": "agency_01",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
                          *           "status": "OPEN",
-                         *           "agentId": "user_01"
+                         *           "agentId": "55555555-5555-4555-a555-555555555555"
                          *         }
                          *       ],
                          *       "meta": {
@@ -1071,8 +1071,8 @@ export interface paths {
                      * @example {
                      *       "label": "Guichet 9",
                      *       "serviceIds": [
-                     *         "svc_01",
-                     *         "svc_02"
+                     *         "77777777-7777-4777-a777-777777777777",
+                     *         "88888888-8888-4888-a888-888888888888"
                      *       ]
                      *     }
                      */
@@ -1088,9 +1088,9 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "counter_09",
+                         *       "id": "eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee",
                          *       "label": "Guichet 9",
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "status": "OPEN"
                          *     }
                          */
@@ -1146,7 +1146,7 @@ export interface paths {
                     /**
                      * @example {
                      *       "status": "PAUSED",
-                     *       "agentId": "user_02"
+                     *       "agentId": "66666666-6666-4666-a666-666666666666"
                      *     }
                      */
                     "application/json": components["schemas"]["UpdateCounterRequest"];
@@ -1161,11 +1161,11 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "counter_01",
+                         *       "id": "cccccccc-cccc-4ccc-accc-cccccccccccc",
                          *       "label": "Guichet 1",
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "status": "PAUSED",
-                         *       "agentId": "user_02"
+                         *       "agentId": "66666666-6666-4666-a666-666666666666"
                          *     }
                          */
                         "application/json": components["schemas"]["Counter"];
@@ -1223,11 +1223,11 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "CALLED",
-                         *       "counterId": "counter_01",
-                         *       "serviceId": "svc_01",
+                         *       "counterId": "cccccccc-cccc-4ccc-accc-cccccccccccc",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
                          *       "position": 0,
                          *       "estimatedWaitMinutes": 0,
                          *       "calledAt": "2026-07-11T09:30:00Z"
@@ -1303,7 +1303,10 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    /** @description Identifiant de l'agence */
+                    /**
+                     * @description Identifiant de l'agence. Doit correspondre à l'agence du JWT de l'appelant
+                     *     (validé côté serveur — un MANAGER ne peut lister que les files de son agence).
+                     */
                     agencyId: string;
                     /** @description Numéro de page (≥1, défaut 1) */
                     page?: components["parameters"]["PageParam"];
@@ -1326,9 +1329,9 @@ export interface paths {
                          * @example {
                          *       "data": [
                          *         {
-                         *           "id": "queue_01",
-                         *           "agencyId": "agency_01",
-                         *           "serviceId": "svc_01",
+                         *           "id": "13131313-1313-4131-a131-131313131313",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *           "serviceId": "77777777-7777-4777-a777-777777777777",
                          *           "status": "OPEN",
                          *           "length": 12,
                          *           "estimatedWaitMinutes": 24
@@ -1411,9 +1414,9 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "queue_01",
-                         *       "agencyId": "agency_01",
-                         *       "serviceId": "svc_01",
+                         *       "id": "13131313-1313-4131-a131-131313131313",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
                          *       "status": "PAUSED",
                          *       "openAt": "08:00",
                          *       "closeAt": "17:00"
@@ -1475,8 +1478,7 @@ export interface paths {
                 content: {
                     /**
                      * @example {
-                     *       "serviceId": "svc_01",
-                     *       "agencyId": "agency_01",
+                     *       "serviceId": "77777777-7777-4777-a777-777777777777",
                      *       "channel": "KIOSK",
                      *       "phoneNumber": "+2250700000001",
                      *       "priority": false
@@ -1494,11 +1496,11 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_99",
+                         *       "id": "00000000-0000-4000-a000-000000000000",
                          *       "number": "A099",
                          *       "status": "WAITING",
-                         *       "serviceId": "svc_01",
-                         *       "agencyId": "agency_01",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "channel": "KIOSK",
                          *       "position": 13,
                          *       "estimatedWaitMinutes": 26,
@@ -1588,11 +1590,11 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "WAITING",
-                         *       "serviceId": "svc_01",
-                         *       "agencyId": "agency_01",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "channel": "QR",
                          *       "position": 5,
                          *       "estimatedWaitMinutes": 10,
@@ -1653,7 +1655,7 @@ export interface paths {
                 content: {
                     /**
                      * @example {
-                     *       "counterId": "counter_01"
+                     *       "counterId": "cccccccc-cccc-4ccc-accc-cccccccccccc"
                      *     }
                      */
                     "application/json": components["schemas"]["CallTicketRequest"];
@@ -1668,11 +1670,11 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "CALLED",
-                         *       "counterId": "counter_01",
-                         *       "serviceId": "svc_01",
+                         *       "counterId": "cccccccc-cccc-4ccc-accc-cccccccccccc",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
                          *       "position": 0,
                          *       "estimatedWaitMinutes": 0,
                          *       "calledAt": "2026-07-11T09:30:00Z"
@@ -1744,11 +1746,11 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "SERVING",
-                         *       "counterId": "counter_01",
-                         *       "serviceId": "svc_01",
+                         *       "counterId": "cccccccc-cccc-4ccc-accc-cccccccccccc",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
                          *       "position": 0,
                          *       "estimatedWaitMinutes": 0,
                          *       "calledAt": "2026-07-11T09:30:00Z",
@@ -1849,10 +1851,10 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "DONE",
-                         *       "counterId": "counter_01",
+                         *       "counterId": "cccccccc-cccc-4ccc-accc-cccccccccccc",
                          *       "waitTime": 600,
                          *       "serviceTime": 300,
                          *       "closedAt": "2026-07-11T09:36:00Z"
@@ -1953,10 +1955,10 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "NO_SHOW",
-                         *       "counterId": "counter_01",
+                         *       "counterId": "cccccccc-cccc-4ccc-accc-cccccccccccc",
                          *       "noShowAt": "2026-07-11T09:35:00Z"
                          *     }
                          */
@@ -2028,7 +2030,7 @@ export interface paths {
                 content: {
                     /**
                      * @example {
-                     *       "targetServiceId": "svc_02",
+                     *       "targetServiceId": "88888888-8888-4888-a888-888888888888",
                      *       "reason": "Compétence spécialisée requise."
                      *     }
                      */
@@ -2044,10 +2046,10 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "TRANSFERRED",
-                         *       "transferredToServiceId": "svc_02",
+                         *       "transferredToServiceId": "88888888-8888-4888-a888-888888888888",
                          *       "transferredAt": "2026-07-11T09:33:00Z"
                          *     }
                          */
@@ -2130,7 +2132,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "ticket_42",
+                         *       "id": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *       "number": "A042",
                          *       "status": "ABANDONED",
                          *       "abandonedAt": "2026-07-11T09:20:00Z"
@@ -2218,15 +2220,13 @@ export interface paths {
                      *       "tickets": [
                      *         {
                      *           "localUuid": "550e8400-e29b-41d4-a716-446655440001",
-                     *           "serviceId": "svc_01",
-                     *           "agencyId": "agency_01",
+                     *           "serviceId": "77777777-7777-4777-a777-777777777777",
                      *           "channel": "KIOSK",
                      *           "createdOfflineAt": "2026-07-11T07:00:00Z"
                      *         },
                      *         {
                      *           "localUuid": "550e8400-e29b-41d4-a716-446655440002",
-                     *           "serviceId": "svc_02",
-                     *           "agencyId": "agency_01",
+                     *           "serviceId": "88888888-8888-4888-a888-888888888888",
                      *           "channel": "KIOSK",
                      *           "createdOfflineAt": "2026-07-11T07:01:00Z"
                      *         }
@@ -2248,7 +2248,7 @@ export interface paths {
                          *       "synced": [
                          *         {
                          *           "localUuid": "550e8400-e29b-41d4-a716-446655440001",
-                         *           "serverId": "ticket_100",
+                         *           "serverId": "12121212-1212-4121-a121-121212121212",
                          *           "number": "A100"
                          *         }
                          *       ],
@@ -2395,6 +2395,16 @@ export interface components {
          * @enum {string}
          */
         QueueStatus: "OPEN" | "PAUSED" | "CLOSED";
+        /**
+         * @description Statut de l'imprimante de tickets d'une borne kiosque.
+         *     Schéma transverse référencé par CONTRACT-003 (public.yaml) et CONTRACT-006 (reporting.yaml).
+         *     - OK : imprimante opérationnelle
+         *     - PAPER_LOW : papier faible (intervention préventive recommandée)
+         *     - ERROR : erreur imprimante (intervention requise)
+         *     - OFFLINE : borne hors ligne ou imprimante déconnectée
+         * @enum {string}
+         */
+        PrinterStatus: "OK" | "PAPER_LOW" | "ERROR" | "OFFLINE";
         ErrorResponse: {
             error: {
                 /**
@@ -2673,13 +2683,18 @@ export interface components {
             /** Format: date-time */
             closedAt: string;
         };
+        /**
+         * @description Requête d'émission d'un ticket. L'`agencyId` est dérivé du JWT de l'appelant
+         *     (kiosque ou agent) — il ne doit pas être fourni dans le corps.
+         */
         CreateTicketRequest: {
             /** Format: uuid */
             serviceId: string;
-            /** Format: uuid */
-            agencyId: string;
             channel: components["schemas"]["TicketChannel"];
-            /** @description Numéro de téléphone pour les notifications SMS/WhatsApp */
+            /**
+             * @description Numéro de téléphone E.164 pour les notifications SMS/WhatsApp (ex: +2250700000001)
+             * @example +2250700000001
+             */
             phoneNumber?: string;
             /**
              * @description Ticket prioritaire (PMR, VIP)
@@ -2701,6 +2716,10 @@ export interface components {
             targetCounterId?: string;
             reason?: string;
         };
+        /**
+         * @description Item d'un batch de synchronisation hors-ligne. L'`agencyId` est dérivé
+         *     du JWT de la borne — il ne doit pas être fourni dans chaque item.
+         */
         TicketSyncItem: {
             /**
              * Format: uuid
@@ -2709,8 +2728,6 @@ export interface components {
             localUuid: string;
             /** Format: uuid */
             serviceId: string;
-            /** Format: uuid */
-            agencyId: string;
             channel: components["schemas"]["TicketChannel"];
             /** Format: date-time */
             createdOfflineAt: string;

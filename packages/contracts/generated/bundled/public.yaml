@@ -57,9 +57,9 @@ paths:
             schema:
               $ref: '#/components/schemas/KioskSessionRequest'
             example:
-              kioskId: kiosk_01
+              kioskId: 14141414-1414-4141-a141-141414141414
               kioskSecret: s3cr3t-kiosk-k3y
-              agencyId: agency_01
+              agencyId: 33333333-3333-4333-a333-333333333333
       responses:
         '201':
           description: Session borne créée — JWT TTL 12 h (43200 s)
@@ -70,8 +70,8 @@ paths:
               example:
                 accessToken: eyJhbGciOiJIUzI1NiJ9.kioskPayload.sig
                 expiresIn: 43200
-                kioskId: kiosk_01
-                agencyId: agency_01
+                kioskId: 14141414-1414-4141-a141-141414141414
+                agencyId: 33333333-3333-4333-a333-333333333333
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -156,9 +156,9 @@ paths:
 
         Requiert le token de session borne (scope agency).
 
-        **printerStatus** valeurs : `OK` | `ERROR` | `OFFLINE`
+        **printerStatus** valeurs : `OK` | `PAPER_LOW` | `ERROR` | `OFFLINE`
       x-tenant-scope: agency
-      x-required-role: NONE
+      x-required-role: AUTHENTICATED
       parameters:
         - name: kioskId
           in: path
@@ -245,31 +245,31 @@ paths:
                 summary: Émission via borne (KIOSK)
                 value:
                   channel: KIOSK
-                  serviceId: svc_01
-                  agencyId: agency_01
+                  serviceId: 77777777-7777-4777-a777-777777777777
+                  agencyId: 33333333-3333-4333-a333-333333333333
                   priority: false
               qr:
                 summary: Émission via QR
                 value:
                   channel: QR
-                  serviceId: svc_01
-                  agencyId: agency_01
+                  serviceId: 77777777-7777-4777-a777-777777777777
+                  agencyId: 33333333-3333-4333-a333-333333333333
                   phoneNumber: '+2250700000001'
                   smsConsent: true
               mobile:
                 summary: Émission via mobile
                 value:
                   channel: MOBILE
-                  serviceId: svc_01
-                  agencyId: agency_01
+                  serviceId: 77777777-7777-4777-a777-777777777777
+                  agencyId: 33333333-3333-4333-a333-333333333333
                   phoneNumber: '+2250700000002'
                   smsConsent: true
               whatsapp:
                 summary: Émission via WhatsApp
                 value:
                   channel: WHATSAPP
-                  serviceId: svc_01
-                  agencyId: agency_01
+                  serviceId: 77777777-7777-4777-a777-777777777777
+                  agencyId: 33333333-3333-4333-a333-333333333333
                   phoneNumber: '+2250700000003'
                   smsConsent: true
       responses:
@@ -289,8 +289,8 @@ paths:
                     channel: KIOSK
                     position: 5
                     estimatedWaitMinutes: 10
-                    serviceId: svc_01
-                    agencyId: agency_01
+                    serviceId: 77777777-7777-4777-a777-777777777777
+                    agencyId: 33333333-3333-4333-a333-333333333333
                     createdAt: '2026-07-11T09:00:00Z'
                 qr:
                   summary: Ticket émis via QR
@@ -301,8 +301,8 @@ paths:
                     channel: QR
                     position: 6
                     estimatedWaitMinutes: 12
-                    serviceId: svc_01
-                    agencyId: agency_01
+                    serviceId: 77777777-7777-4777-a777-777777777777
+                    agencyId: 33333333-3333-4333-a333-333333333333
                     createdAt: '2026-07-11T09:01:00Z'
                 mobile:
                   summary: Ticket émis via mobile
@@ -313,8 +313,8 @@ paths:
                     channel: MOBILE
                     position: 7
                     estimatedWaitMinutes: 14
-                    serviceId: svc_01
-                    agencyId: agency_01
+                    serviceId: 77777777-7777-4777-a777-777777777777
+                    agencyId: 33333333-3333-4333-a333-333333333333
                     createdAt: '2026-07-11T09:02:00Z'
                 whatsapp:
                   summary: Ticket émis via WhatsApp
@@ -325,8 +325,8 @@ paths:
                     channel: WHATSAPP
                     position: 8
                     estimatedWaitMinutes: 16
-                    serviceId: svc_01
-                    agencyId: agency_01
+                    serviceId: 77777777-7777-4777-a777-777777777777
+                    agencyId: 33333333-3333-4333-a333-333333333333
                     createdAt: '2026-07-11T09:03:00Z'
         '400':
           description: Requête invalide ou X-Idempotency-Key absent
@@ -413,8 +413,8 @@ paths:
                 channel: KIOSK
                 position: 3
                 estimatedWaitMinutes: 6
-                agencyId: agency_01
-                serviceId: svc_01
+                agencyId: 33333333-3333-4333-a333-333333333333
+                serviceId: 77777777-7777-4777-a777-777777777777
                 createdAt: '2026-07-11T09:00:00Z'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -482,7 +482,7 @@ paths:
               $ref: '#/components/schemas/FeedbackRequest'
             example:
               note: 4
-              commentaire: Service rapide, agent très professionnel.
+              comment: Service rapide, agent très professionnel.
       responses:
         '201':
           description: Feedback enregistré
@@ -677,8 +677,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/AgencyQRPayload'
               example:
-                agencyId: agency_01
-                qrUrl: https://app.sigfa.ci/q/agency_01?sig=eyJhbGci...
+                agencyId: 33333333-3333-4333-a333-333333333333
+                qrUrl: https://app.sigfa.ci/q/33333333-3333-4333-a333-333333333333?sig=eyJhbGci...
                 payload: eyJhZ2VuY3lJZCI6ImFnZW5jeV8wMSJ9.sig
                 expiresAt: '2026-07-12T09:00:00Z'
         '400':
@@ -717,7 +717,7 @@ components:
         kioskId:
           type: string
           description: Identifiant unique de la borne
-          example: kiosk_01
+          example: 14141414-1414-4141-a141-141414141414
         kioskSecret:
           type: string
           description: Secret d'authentification de la borne (rotation possible par AGENCY_DIRECTOR)
@@ -747,13 +747,6 @@ components:
         agencyId:
           type: string
           format: uuid
-    PrinterStatus:
-      type: string
-      description: État de l'imprimante de la borne
-      enum:
-        - OK
-        - ERROR
-        - OFFLINE
     HeartbeatRequest:
       type: object
       required:
@@ -1009,7 +1002,7 @@ components:
           maximum: 5
           description: Note de satisfaction de 1 (très insatisfait) à 5 (très satisfait)
           example: 4
-        commentaire:
+        comment:
           type:
             - string
             - 'null'
@@ -1115,7 +1108,7 @@ components:
           type: string
           format: uri
           description: URL PWA complète avec identifiant d'agence signé (encodée dans le QR)
-          example: https://app.sigfa.ci/q/agency_01?sig=eyJhbGci...
+          example: https://app.sigfa.ci/q/33333333-3333-4333-a333-333333333333?sig=eyJhbGci...
         payload:
           type: string
           description: Payload JWT court-circuit signé (agencyId + expiration)
@@ -1152,6 +1145,20 @@ components:
               type: object
               additionalProperties: true
               description: Informations complémentaires (champ optionnel)
+    PrinterStatus:
+      type: string
+      description: |
+        Statut de l'imprimante de tickets d'une borne kiosque.
+        Schéma transverse référencé par CONTRACT-003 (public.yaml) et CONTRACT-006 (reporting.yaml).
+        - OK : imprimante opérationnelle
+        - PAPER_LOW : papier faible (intervention préventive recommandée)
+        - ERROR : erreur imprimante (intervention requise)
+        - OFFLINE : borne hors ligne ou imprimante déconnectée
+      enum:
+        - OK
+        - PAPER_LOW
+        - ERROR
+        - OFFLINE
     TicketStatus:
       type: string
       description: |

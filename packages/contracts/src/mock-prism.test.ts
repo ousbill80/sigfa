@@ -295,4 +295,97 @@ describe("CONTRACT-009: fumée Schemathesis contre mock core (critère 6)", () =
     },
     120_000 // timeout Docker généreux
   );
+
+  it(
+    "CONTRACT-010: fumée Schemathesis contre le mock core — zéro warning de mismatch sur la phase examples (preuve)",
+    async () => {
+      // Critère CONTRACT-010 : les warnings 'Schema validation mismatch' de la phase examples
+      // doivent disparaître après correction des exemples UUID (bank_01 → UUIDs v4).
+      // Note : la phase fuzzing peut toujours générer des warnings (données aléatoires rejetées
+      // par Prism) — c'est attendu. Le critère porte sur la phase --phases=examples uniquement.
+      let dockerAvailable = false;
+      try {
+        execSync("docker --version", { stdio: "pipe" });
+        dockerAvailable = true;
+      } catch {
+        // Docker non disponible
+      }
+
+      if (!dockerAvailable) {
+        console.warn(
+          "CONTRACT-010 [SKIP-Docker]: Docker non disponible — test Schemathesis ignoré"
+        );
+        return;
+      }
+
+      expect(existsSync(CORE_BUNDLE), `Bundle core manquant : ${CORE_BUNDLE}`).toBe(true);
+
+      const proc = startPrismMock("core", CORE_PORT + 1);
+      let prismOutput = "";
+      proc.stdout?.on("data", (d: Buffer) => { prismOutput += d.toString(); });
+      proc.stderr?.on("data", (d: Buffer) => { prismOutput += d.toString(); });
+
+      try {
+        await waitForPort(CORE_PORT + 1, 20_000);
+
+        const schemaUrl = `http://host.docker.internal:${CORE_PORT + 1}`;
+
+        const dockerEnv = { ...process.env };
+        if (!dockerEnv.DOCKER_CONFIG) {
+          const tmpConfig = "/tmp/sigfa-docker-nocreds";
+          const { mkdirSync: mkd, writeFileSync: wf, existsSync: ex } = await import("node:fs");
+          if (!ex(tmpConfig)) mkd(tmpConfig, { recursive: true });
+          wf(`${tmpConfig}/config.json`, JSON.stringify({ auths: {} }));
+          dockerEnv.DOCKER_CONFIG = tmpConfig;
+        }
+
+        let schemaResult = "";
+        let schemaExitCode2 = 0;
+        try {
+          const result = execFileSync("docker", [
+            "run", "--rm",
+            "-v", `${CORE_BUNDLE}:/contract.yaml:ro`,
+            "--add-host=host.docker.internal:host-gateway",
+            "schemathesis/schemathesis",
+            "run", "/contract.yaml",
+            "--url", schemaUrl,
+            "--checks=not_a_server_error",
+            // Limiter à la phase examples : vérifie que les exemples du spec passent
+            "--phases=examples",
+          ], {
+            stdio: "pipe",
+            timeout: 120_000,
+            env: dockerEnv,
+          });
+          schemaResult = result.toString();
+        } catch (err: unknown) {
+          const e = err as { status?: number; stdout?: Buffer; stderr?: Buffer; message?: string };
+          schemaExitCode2 = e.status ?? 1;
+          schemaResult = [
+            e.stdout?.toString() ?? "",
+            e.stderr?.toString() ?? "",
+            e.message ?? "",
+          ].join("\n");
+        }
+
+        console.info(`CONTRACT-010 Schemathesis examples-only output:\n${schemaResult}`);
+
+        // Phase examples : zéro warning "Schema validation mismatch"
+        expect(
+          schemaResult,
+          "CONTRACT-010 : la phase examples ne doit PAS contenir de 'Schema validation mismatch'"
+        ).not.toContain("Schema validation mismatch");
+
+        // Exit 0 (les warnings 'Missing authentication' n'affectent pas l'exit code)
+        expect(
+          schemaExitCode2,
+          `Schemathesis examples phase échouée (exit ${schemaExitCode2}).\nDétail : ${schemaResult.slice(0, 2000)}\nPrism : ${prismOutput.slice(0, 500)}`
+        ).toBe(0);
+      } finally {
+        stopPrism(proc);
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    },
+    120_000
+  );
 });

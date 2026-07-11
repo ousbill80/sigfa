@@ -13,6 +13,18 @@ export const CONTRACTS_VERSION = "0.0.0";
 export const OPENAPI_PATHS = {
   /** Contrat cœur : auth, banks, agencies, services, counters, queues, tickets */
   core: resolve(__dirname, "../openapi/core.yaml"),
+  /** Contrat agents : profils, planning, performance, import */
+  agents: resolve(__dirname, "../openapi/agents.yaml"),
+  /** Contrat public / client : tickets, kiosques, feedback */
+  public: resolve(__dirname, "../openapi/public.yaml"),
+  /** Contrat admin : banques, agences, templates, RGPD */
+  admin: resolve(__dirname, "../openapi/admin.yaml"),
+  /** Contrat notifications : envois, journal, webhooks, devices */
+  notifications: resolve(__dirname, "../openapi/notifications.yaml"),
+  /** Contrat reporting & supervision : KPIs, exports, kiosques */
+  reporting: resolve(__dirname, "../openapi/reporting.yaml"),
+  /** Contrat IA : prévisions, staffing, anomalies, insights */
+  ai: resolve(__dirname, "../openapi/ai.yaml"),
 } as const;
 
 // CONTRACT-002 : événements Socket.io temps réel

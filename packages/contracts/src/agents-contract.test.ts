@@ -77,7 +77,7 @@ function getAllOperations(): Array<{ path: string; method: string; op: Operation
 const VALID_TENANT_SCOPES = ["platform", "bank", "agency", "public"];
 const VALID_REQUIRED_ROLES = [
   "SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR",
-  "MANAGER", "AGENT", "AUDITOR", "NONE",
+  "MANAGER", "AGENT", "AUDITOR", "AUTHENTICATED", "NONE",
 ];
 
 // ─── Critère 1 : spectral zéro erreur ; $ref core résolus ────────────────────
@@ -325,5 +325,70 @@ describe("CONTRACT-004", () => {
       schemas?.["ErrorResponse"],
       "agents.yaml ne doit PAS redéfinir ErrorResponse localement",
     ).toBeUndefined();
+  });
+});
+
+// ─── CONTRACT-010 : hardening sécurité + cohérence inter-YAML ────────────────
+describe("CONTRACT-010 — agents.yaml", () => {
+  it("CONTRACT-010: tous les exemples UUID dans agents.yaml sont des UUID v4 valides", () => {
+    const rawContent = readFileSync(AGENTS_YAML_PATH, "utf-8");
+    const placeholderPattern = /(bank_\d+|agency_\d+|user_\d+|svc_\d+|counter_\d+|ticket_\d+|queue_\d+|kiosk_\d+|device_\d+|agent_\d+)/;
+    expect(
+      rawContent,
+      "agents.yaml ne doit pas contenir de faux IDs non-UUID (user_01, agency_01, etc.)",
+    ).not.toMatch(placeholderPattern);
+  });
+
+  it("CONTRACT-010: DaySchedule.end a un pattern regex correct (pas [09])", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    const daySchedule = schemas?.["DaySchedule"] as Record<string, unknown> | undefined;
+    expect(daySchedule, "DaySchedule doit être défini").toBeDefined();
+    const props = (daySchedule?.properties ?? {}) as Record<string, unknown>;
+    const endField = props["end"] as Record<string, unknown> | undefined;
+    expect(endField, "DaySchedule.end doit être défini").toBeDefined();
+    const pattern = endField?.["pattern"] as string | undefined;
+    expect(pattern, "DaySchedule.end doit avoir un pattern regex").toBeDefined();
+    expect(
+      pattern,
+      "DaySchedule.end pattern ne doit pas contenir [09] (doit être [0-9])",
+    ).not.toContain("[09]");
+    expect(
+      pattern,
+      "DaySchedule.end pattern doit couvrir les heures valides (0-9)",
+    ).toMatch(/\[0-9\]/);
+  });
+
+  it("CONTRACT-010: AgentProfile a phoneMasked (pas phone)", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    const agentProfile = schemas?.["AgentProfile"] as Record<string, unknown> | undefined;
+    expect(agentProfile, "AgentProfile doit être défini").toBeDefined();
+    const props = (agentProfile?.properties ?? {}) as Record<string, unknown>;
+    expect(
+      props["phoneMasked"],
+      "AgentProfile doit avoir phoneMasked (UEMOA privacy)",
+    ).toBeDefined();
+    expect(
+      props["phone"],
+      "AgentProfile ne doit pas avoir le champ phone brut",
+    ).toBeUndefined();
+  });
+
+  it("CONTRACT-010: schemas agents ont additionalProperties: false", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    const schemasToCheck = ["DaySchedule", "WorkSchedule", "AgentProfile", "UpdateAgentProfileRequest"];
+    const failures: string[] = [];
+    for (const name of schemasToCheck) {
+      const schema = schemas?.[name] as Record<string, unknown> | undefined;
+      if (!schema) {
+        failures.push(`${name} — schéma absent`);
+        continue;
+      }
+      if (schema.type === "object" && schema["additionalProperties"] !== false) {
+        failures.push(`${name} — additionalProperties: false manquant`);
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(`CONTRACT-010 violations:\n${failures.join("\n")}`);
+    }
   });
 });

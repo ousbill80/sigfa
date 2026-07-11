@@ -94,6 +94,7 @@ jobs:
     services:
       docker:
         image: docker:dind
+        # --privileged requis : Testcontainers (Docker-in-Docker) — CONTRACT-010 traçabilité
         options: --privileged
     steps:
       - name: Checkout

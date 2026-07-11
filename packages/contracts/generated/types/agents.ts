@@ -39,24 +39,24 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "user_01",
+                         *       "id": "55555555-5555-4555-a555-555555555555",
                          *       "email": "kofi@banque-ci.com",
                          *       "firstName": "Kofi",
                          *       "lastName": "Asante",
                          *       "role": "AGENT",
-                         *       "bankId": "bank_01",
-                         *       "agencyId": "agency_01",
+                         *       "bankId": "11111111-1111-4111-a111-111111111111",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "status": "AVAILABLE",
                          *       "languages": [
                          *         "FR",
                          *         "DIOULA"
                          *       ],
                          *       "serviceIds": [
-                         *         "svc_01",
-                         *         "svc_02"
+                         *         "77777777-7777-4777-a777-777777777777",
+                         *         "88888888-8888-4888-a888-888888888888"
                          *       ],
                          *       "agencyIds": [
-                         *         "agency_01"
+                         *         "33333333-3333-4333-a333-333333333333"
                          *       ],
                          *       "workSchedule": {
                          *         "monday": {
@@ -121,8 +121,8 @@ export interface paths {
                      *         "EN"
                      *       ],
                      *       "serviceIds": [
-                     *         "svc_01",
-                     *         "svc_03"
+                     *         "77777777-7777-4777-a777-777777777777",
+                     *         "99999999-9999-4999-a999-999999999999"
                      *       ],
                      *       "workSchedule": {
                      *         "monday": {
@@ -144,13 +144,13 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "user_01",
+                         *       "id": "55555555-5555-4555-a555-555555555555",
                          *       "email": "kofi@banque-ci.com",
                          *       "firstName": "Kofi",
                          *       "lastName": "Asante",
                          *       "role": "AGENT",
-                         *       "bankId": "bank_01",
-                         *       "agencyId": "agency_01",
+                         *       "bankId": "11111111-1111-4111-a111-111111111111",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "status": "AVAILABLE",
                          *       "languages": [
                          *         "FR",
@@ -158,11 +158,11 @@ export interface paths {
                          *         "EN"
                          *       ],
                          *       "serviceIds": [
-                         *         "svc_01",
-                         *         "svc_03"
+                         *         "77777777-7777-4777-a777-777777777777",
+                         *         "99999999-9999-4999-a999-999999999999"
                          *       ],
                          *       "agencyIds": [
-                         *         "agency_01"
+                         *         "33333333-3333-4333-a333-333333333333"
                          *       ],
                          *       "createdAt": "2025-06-01T00:00:00Z"
                          *     }
@@ -242,7 +242,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "id": "user_01",
+                         *       "id": "55555555-5555-4555-a555-555555555555",
                          *       "status": "PAUSED",
                          *       "previousStatus": "AVAILABLE",
                          *       "updatedAt": "2026-07-11T12:00:00Z"
@@ -272,7 +272,7 @@ export interface paths {
                          *         "details": {
                          *           "currentStatus": "SERVING",
                          *           "requestedStatus": "ABSENT",
-                         *           "activeTicketId": "ticket_42"
+                         *           "activeTicketId": "ffffffff-ffff-4fff-afff-ffffffffffff"
                          *         }
                          *       }
                          *     }
@@ -333,12 +333,12 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "agentId": "user_01",
+                         *       "agentId": "55555555-5555-4555-a555-555555555555",
                          *       "period": "day",
                          *       "ticketsHandled": 24,
                          *       "avgHandlingTime": 480,
                          *       "currentTicket": {
-                         *         "ticketId": "ticket_42",
+                         *         "ticketId": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *         "number": "A042",
                          *         "durationSeconds": 120
                          *       }
@@ -569,8 +569,11 @@ export interface components {
             /** @description Agences d'affectation (principale + secondaires) */
             agencyIds: string[];
             workSchedule?: components["schemas"]["WorkSchedule"];
-            /** @description Numéro de téléphone de l'agent */
-            phone?: string;
+            /**
+             * @description Numéro de téléphone masqué (conformité UEMOA — ex: +225 07 *** ** 01)
+             * @example +225 07 *** ** 01
+             */
+            phoneMasked?: string;
             /** Format: date-time */
             createdAt: string;
         };
@@ -583,7 +586,8 @@ export interface components {
             /** @description Agences d'affectation */
             agencyIds?: string[];
             workSchedule?: components["schemas"]["WorkSchedule"];
-            phone?: string;
+            /** @description Numéro de téléphone masqué (conformité UEMOA) */
+            phoneMasked?: string;
         };
         UpdateAgentStatusRequest: {
             status: components["schemas"]["AgentStatus"];

@@ -112,6 +112,7 @@ rules:
           - MANAGER
           - AGENT
           - AUDITOR
+          - AUTHENTICATED
           - NONE
 
   # ─── Règle 4 : exemples obligatoires dans les réponses 2xx ───────────────

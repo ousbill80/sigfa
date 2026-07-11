@@ -48,17 +48,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentProfile"
               example:
-                id: "user_01"
+                id: "55555555-5555-4555-a555-555555555555"
                 email: "kofi@banque-ci.com"
                 firstName: "Kofi"
                 lastName: "Asante"
                 role: AGENT
-                bankId: "bank_01"
-                agencyId: "agency_01"
+                bankId: "11111111-1111-4111-a111-111111111111"
+                agencyId: "33333333-3333-4333-a333-333333333333"
                 status: AVAILABLE
                 languages: ["FR", "DIOULA"]
-                serviceIds: ["svc_01", "svc_02"]
-                agencyIds: ["agency_01"]
+                serviceIds: ["77777777-7777-4777-a777-777777777777", "88888888-8888-4888-a888-888888888888"]
+                agencyIds: ["33333333-3333-4333-a333-333333333333"]
                 workSchedule:
                   monday: { start: "08:00", end: "17:00" }
                   tuesday: { start: "08:00", end: "17:00" }
@@ -105,7 +105,7 @@ paths:
               $ref: "#/components/schemas/UpdateAgentProfileRequest"
             example:
               languages: ["FR", "BAOULE", "EN"]
-              serviceIds: ["svc_01", "svc_03"]
+              serviceIds: ["77777777-7777-4777-a777-777777777777", "99999999-9999-4999-a999-999999999999"]
               workSchedule:
                 monday: { start: "09:00", end: "18:00" }
       responses:
@@ -116,17 +116,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentProfile"
               example:
-                id: "user_01"
+                id: "55555555-5555-4555-a555-555555555555"
                 email: "kofi@banque-ci.com"
                 firstName: "Kofi"
                 lastName: "Asante"
                 role: AGENT
-                bankId: "bank_01"
-                agencyId: "agency_01"
+                bankId: "11111111-1111-4111-a111-111111111111"
+                agencyId: "33333333-3333-4333-a333-333333333333"
                 status: AVAILABLE
                 languages: ["FR", "BAOULE", "EN"]
-                serviceIds: ["svc_01", "svc_03"]
-                agencyIds: ["agency_01"]
+                serviceIds: ["77777777-7777-4777-a777-777777777777", "99999999-9999-4999-a999-999999999999"]
+                agencyIds: ["33333333-3333-4333-a333-333333333333"]
                 createdAt: "2025-06-01T00:00:00Z"
         "400":
           $ref: "./core.yaml#/components/responses/BadRequest"
@@ -190,7 +190,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentStatusResponse"
               example:
-                id: "user_01"
+                id: "55555555-5555-4555-a555-555555555555"
                 status: PAUSED
                 previousStatus: AVAILABLE
                 updatedAt: "2026-07-11T12:00:00Z"
@@ -217,7 +217,7 @@ paths:
                   details:
                     currentStatus: SERVING
                     requestedStatus: ABSENT
-                    activeTicketId: "ticket_42"
+                    activeTicketId: "ffffffff-ffff-4fff-afff-ffffffffffff"
         "422":
           $ref: "./core.yaml#/components/responses/UnprocessableEntity"
         "429":
@@ -263,12 +263,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentStats"
               example:
-                agentId: "user_01"
+                agentId: "55555555-5555-4555-a555-555555555555"
                 period: day
                 ticketsHandled: 24
                 avgHandlingTime: 480
                 currentTicket:
-                  ticketId: "ticket_42"
+                  ticketId: "ffffffff-ffff-4fff-afff-ffffffffffff"
                   number: "A042"
                   durationSeconds: 120
         "400":
@@ -451,6 +451,7 @@ components:
     DaySchedule:
       type: object
       description: Horaires d'ouverture pour un jour de la semaine
+      additionalProperties: false
       properties:
         start:
           type: string
@@ -459,7 +460,7 @@ components:
           example: "08:00"
         end:
           type: string
-          pattern: "^[0-2][09]:[0-5][0-9]$"
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
           description: Heure de fin (HH:MM)
           example: "17:00"
 
@@ -467,6 +468,7 @@ components:
     WorkSchedule:
       type: object
       description: Horaires de travail hebdomadaires de l'agent
+      additionalProperties: false
       properties:
         monday:
           $ref: "#/components/schemas/DaySchedule"
@@ -486,6 +488,7 @@ components:
     # ── Profil complet de l'agent ──────────────────────────────────────────
     AgentProfile:
       type: object
+      additionalProperties: false
       description: |
         Profil complet d'un agent de guichet : identité, compétences (services
         traitables), langues parlées, agences d'affectation et horaires.
@@ -549,9 +552,10 @@ components:
           description: Agences d'affectation (principale + secondaires)
         workSchedule:
           $ref: "#/components/schemas/WorkSchedule"
-        phone:
+        phoneMasked:
           type: string
-          description: Numéro de téléphone de l'agent
+          description: "Numéro de téléphone masqué (conformité UEMOA — ex: +225 07 *** ** 01)"
+          example: "+225 07 *** ** 01"
         createdAt:
           type: string
           format: date-time
@@ -560,6 +564,7 @@ components:
     UpdateAgentProfileRequest:
       type: object
       description: Mise à jour partielle du profil agent
+      additionalProperties: false
       properties:
         languages:
           type: array
@@ -581,8 +586,9 @@ components:
           description: Agences d'affectation
         workSchedule:
           $ref: "#/components/schemas/WorkSchedule"
-        phone:
+        phoneMasked:
           type: string
+          description: Numéro de téléphone masqué (conformité UEMOA)
 
     # ── Requête de changement de statut ───────────────────────────────────
     UpdateAgentStatusRequest:

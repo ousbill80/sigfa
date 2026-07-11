@@ -86,7 +86,7 @@ function getAllOperations(): Array<{ path: string; method: string; op: Operation
 const VALID_TENANT_SCOPES = ["platform", "bank", "agency", "public"];
 const VALID_REQUIRED_ROLES = [
   "SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR",
-  "MANAGER", "AGENT", "AUDITOR", "NONE",
+  "MANAGER", "AGENT", "AUDITOR", "AUTHENTICATED", "NONE",
 ];
 
 function getOp(path: string, method: string): OperationObject | undefined {
@@ -350,5 +350,56 @@ describe("CONTRACT-003", () => {
     const qrStr = JSON.stringify(qrOp);
     // doit contenir des références à l'URL PWA et identifiant signé
     expect(qrStr, "QR doit documenter une payload ou URL").toMatch(/url|payload|qr|signed/i);
+  });
+});
+
+// ─── CONTRACT-010 : hardening sécurité + cohérence inter-YAML ────────────────
+describe("CONTRACT-010 — public.yaml", () => {
+  it("CONTRACT-010: tous les exemples UUID dans public.yaml sont des UUID v4 valides", () => {
+    const rawContent = readFileSync(PUBLIC_YAML_PATH, "utf-8");
+    const placeholderPattern = /(kiosk_\d+|agency_\d+|svc_\d+|ticket_\d+)/;
+    expect(
+      rawContent,
+      "public.yaml ne doit pas contenir de faux IDs non-UUID (kiosk_01, agency_01, etc.)",
+    ).not.toMatch(placeholderPattern);
+  });
+
+  it("CONTRACT-010: POST /kiosks/{kioskId}/heartbeat a x-required-role: AUTHENTICATED", () => {
+    const op = getOp("/kiosks/{kioskId}/heartbeat", "post");
+    expect(op, "POST /kiosks/{kioskId}/heartbeat doit exister").toBeDefined();
+    expect(
+      op?.["x-required-role"],
+      "POST /kiosks/{kioskId}/heartbeat doit avoir x-required-role: AUTHENTICATED (token kiosque requis)",
+    ).toBe("AUTHENTICATED");
+  });
+
+  it("CONTRACT-010: FeedbackRequest a le champ comment (pas commentaire)", () => {
+    const schemas = (openapi.components?.schemas ?? {}) as Record<string, unknown>;
+    const feedbackReq = schemas["FeedbackRequest"] as Record<string, unknown> | undefined;
+    expect(feedbackReq, "FeedbackRequest doit être défini").toBeDefined();
+    const props = (feedbackReq?.properties ?? {}) as Record<string, unknown>;
+    expect(
+      props["comment"],
+      "FeedbackRequest doit avoir le champ comment (pas commentaire)",
+    ).toBeDefined();
+    expect(
+      props["commentaire"],
+      "FeedbackRequest ne doit pas avoir le champ commentaire (utiliser comment)",
+    ).toBeUndefined();
+  });
+
+  it("CONTRACT-010: public.yaml référence PrinterStatus depuis core.yaml (pas de définition locale)", () => {
+    const rawContent = readFileSync(PUBLIC_YAML_PATH, "utf-8");
+    // Doit référencer core.yaml pour PrinterStatus
+    expect(
+      rawContent,
+      "public.yaml doit référencer PrinterStatus depuis core.yaml",
+    ).toContain("core.yaml#/components/schemas/PrinterStatus");
+    // Ne doit pas redéfinir PrinterStatus localement
+    const schemas = (openapi.components?.schemas ?? {}) as Record<string, unknown>;
+    expect(
+      schemas["PrinterStatus"],
+      "public.yaml ne doit pas redéfinir PrinterStatus localement",
+    ).toBeUndefined();
   });
 });

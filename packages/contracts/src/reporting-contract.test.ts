@@ -65,7 +65,7 @@ const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "options", "head"
 const VALID_TENANT_SCOPES = ["platform", "bank", "agency", "public"];
 const VALID_REQUIRED_ROLES = [
   "SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR",
-  "MANAGER", "AGENT", "AUDITOR", "NONE",
+  "MANAGER", "AGENT", "AUDITOR", "AUTHENTICATED", "NONE",
 ];
 
 function getAllOperations(): Array<{ path: string; method: string; op: OperationObject }> {
@@ -422,5 +422,30 @@ describe("CONTRACT-006", () => {
     expect(exportStr, "export doit supporter le format pdf").toContain("pdf");
     expect(exportStr, "export doit supporter le format xlsx").toContain("xlsx");
     expect(exportStr, "export doit supporter le format json").toContain("json");
+  });
+});
+
+// ─── CONTRACT-010 : hardening sécurité + cohérence inter-YAML ────────────────
+describe("CONTRACT-010 — reporting.yaml", () => {
+  it("CONTRACT-010: tous les exemples UUID dans reporting.yaml sont des UUID v4 valides", () => {
+    const rawContent = readFileSync(REPORTING_YAML_PATH, "utf-8");
+    const placeholderPattern = /(kiosk_\d+|agency_\d+)/;
+    expect(
+      rawContent,
+      "reporting.yaml ne doit pas contenir de faux IDs non-UUID (kiosk_01, agency_01, etc.)",
+    ).not.toMatch(placeholderPattern);
+  });
+
+  it("CONTRACT-010: reporting.yaml référence PrinterStatus depuis core.yaml (pas de définition locale)", () => {
+    const rawContent = readFileSync(REPORTING_YAML_PATH, "utf-8");
+    expect(
+      rawContent,
+      "reporting.yaml doit référencer PrinterStatus depuis core.yaml",
+    ).toContain("core.yaml#/components/schemas/PrinterStatus");
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    expect(
+      schemas?.["PrinterStatus"],
+      "reporting.yaml ne doit pas redéfinir PrinterStatus localement",
+    ).toBeUndefined();
   });
 });

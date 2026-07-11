@@ -162,7 +162,7 @@ paths:
                   value:
                     scope: agency
                     period: "2026-07"
-                    agencyId: "agency_01"
+                    agencyId: "33333333-3333-4333-a333-333333333333"
                     kpis:
                       tma:
                         value: 12.5
@@ -254,7 +254,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DailyReportResponse"
               example:
-                agencyId: "agency_01"
+                agencyId: "33333333-3333-4333-a333-333333333333"
                 agencyName: "Agence Plateau"
                 date: "2026-07-10"
                 kpis:
@@ -345,19 +345,19 @@ paths:
                     orange: 25
                 data:
                   - rank: 1
-                    agencyId: "agency_01"
+                    agencyId: "33333333-3333-4333-a333-333333333333"
                     agencyName: "Agence Plateau"
                     status: VERT
                     tauxSLA: 92.1
                     tma: 9.3
                   - rank: 2
-                    agencyId: "agency_03"
+                    agencyId: "55555555-5555-4555-a555-555555555580"
                     agencyName: "Agence Cocody"
                     status: ORANGE
                     tauxSLA: 71.5
                     tma: 18.2
                   - rank: 3
-                    agencyId: "agency_02"
+                    agencyId: "44444444-4444-4444-a444-444444444444"
                     agencyName: "Agence Yopougon"
                     status: ROUGE
                     tauxSLA: 52.0
@@ -600,18 +600,18 @@ paths:
                 $ref: "#/components/schemas/KiosksStatusResponse"
               example:
                 kiosks:
-                  - kioskId: "kiosk_01"
-                    agencyId: "agency_01"
+                  - kioskId: "14141414-1414-4141-a141-141414141414"
+                    agencyId: "33333333-3333-4333-a333-333333333333"
                     status: ONLINE
                     lastSeen: "2026-07-11T08:58:00Z"
                     printerStatus: OK
-                  - kioskId: "kiosk_02"
-                    agencyId: "agency_01"
+                  - kioskId: "14141414-1414-4141-a141-141414141415"
+                    agencyId: "33333333-3333-4333-a333-333333333333"
                     status: DEGRADED
                     lastSeen: "2026-07-11T08:45:00Z"
                     printerStatus: PAPER_LOW
-                  - kioskId: "kiosk_03"
-                    agencyId: "agency_01"
+                  - kioskId: "14141414-1414-4141-a141-141414141416"
+                    agencyId: "33333333-3333-4333-a333-333333333333"
                     status: OFFLINE
                     lastSeen: "2026-07-11T06:00:00Z"
                     printerStatus: OFFLINE
@@ -909,7 +909,7 @@ components:
           type: string
           format: uuid
           description: Identifiant de l'agence
-          example: "agency_01"
+          example: "33333333-3333-4333-a333-333333333333"
         kpis:
           $ref: "#/components/schemas/KpiSet"
 
@@ -1175,16 +1175,6 @@ components:
         - OFFLINE
         - DEGRADED
 
-    # ── Statut imprimante ────────────────────────────────────────────────────────
-    PrinterStatus:
-      type: string
-      description: Statut de l'imprimante de tickets de la borne
-      enum:
-        - OK
-        - PAPER_LOW
-        - ERROR
-        - OFFLINE
-
     # ── Entrée statut borne ──────────────────────────────────────────────────────
     KioskStatusEntry:
       type: object
@@ -1198,12 +1188,12 @@ components:
         kioskId:
           type: string
           description: Identifiant unique de la borne kiosque
-          example: "kiosk_01"
+          example: "14141414-1414-4141-a141-141414141414"
         agencyId:
           type: string
           format: uuid
           description: Agence à laquelle la borne est rattachée
-          example: "agency_01"
+          example: "33333333-3333-4333-a333-333333333333"
         status:
           $ref: "#/components/schemas/KioskOnlineStatus"
         lastSeen:
@@ -1212,7 +1202,7 @@ components:
           description: Horodatage UTC du dernier heartbeat reçu (CONTRACT-003)
           example: "2026-07-11T08:58:00Z"
         printerStatus:
-          $ref: "#/components/schemas/PrinterStatus"
+          $ref: "./core.yaml#/components/schemas/PrinterStatus"
 
     # ── Réponse liste statuts bornes ─────────────────────────────────────────────
     KiosksStatusResponse:

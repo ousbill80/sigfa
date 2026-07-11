@@ -105,7 +105,7 @@ function getAllOperations(): Array<{ path: string; method: string; op: Operation
 const VALID_TENANT_SCOPES = ["platform", "bank", "agency", "public"];
 const VALID_REQUIRED_ROLES = [
   "SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR",
-  "MANAGER", "AGENT", "AUDITOR", "NONE",
+  "MANAGER", "AGENT", "AUDITOR", "AUTHENTICATED", "NONE",
 ];
 
 /** Obtenir un chemin depuis le doc notifications */
@@ -498,14 +498,17 @@ describe("CONTRACT-007", () => {
     const logEntryStr = JSON.stringify(logEntry ?? {});
     expect(logEntryStr, "NotificationLogEntry doit avoir failureReason").toContain("failureReason");
 
-    // failureReason doit être énuméré (pas un free-form string)
+    // failureReason doit être énuméré (via inline enum OU via $ref vers NotificationFailureReason)
     const props = (logEntry?.properties ?? {}) as Record<string, unknown>;
     const failureReasonProp = props["failureReason"] as Record<string, unknown> | undefined;
     if (failureReasonProp) {
+      const failureReasonStr = JSON.stringify(failureReasonProp);
       expect(
         failureReasonProp["enum"] !== undefined ||
-        JSON.stringify(failureReasonProp).includes("enum"),
-        "failureReason doit avoir un enum (valeurs enumerées)",
+        failureReasonStr.includes("enum") ||
+        failureReasonStr.includes("$ref") ||
+        failureReasonStr.includes("NotificationFailureReason"),
+        "failureReason doit avoir un enum inline ou référencer NotificationFailureReason via $ref",
       ).toBe(true);
     }
 
@@ -547,5 +550,70 @@ describe("CONTRACT-007", () => {
     expect(reqStr, "requestBody doit avoir channel").toContain("channel");
     expect(reqStr, "requestBody doit avoir template").toMatch(/template|templateId/);
     expect(reqStr, "requestBody doit avoir recipient").toMatch(/recipient|phone/);
+  });
+});
+
+// ─── CONTRACT-010 : hardening sécurité + cohérence inter-YAML ────────────────
+describe("CONTRACT-010 — notifications.yaml", () => {
+  it("CONTRACT-010: tous les exemples UUID dans notifications.yaml sont des UUID v4 valides", () => {
+    const rawContent = readFileSync(NOTIF_YAML_PATH, "utf-8");
+    const placeholderPattern = /(ticket_\d+|device_\d+|notif_\d+|notif_test_\d+)/;
+    expect(
+      rawContent,
+      "notifications.yaml ne doit pas contenir de faux IDs non-UUID (ticket_42, device_01, etc.)",
+    ).not.toMatch(placeholderPattern);
+  });
+
+  it("CONTRACT-010: DELETE /notifications/devices/{deviceId} a x-required-role: AUTHENTICATED et x-ownership-required: true", () => {
+    const deviceDeletePath = getPath("/notifications/devices/{deviceId}");
+    expect(deviceDeletePath, "/notifications/devices/{deviceId} doit exister").toBeDefined();
+    const op = (deviceDeletePath as Record<string, unknown>)?.["delete"] as OperationObject | undefined;
+    expect(op, "DELETE /notifications/devices/{deviceId} doit exister").toBeDefined();
+    expect(
+      op?.["x-required-role"],
+      "DELETE /notifications/devices/{deviceId} doit avoir x-required-role: AUTHENTICATED",
+    ).toBe("AUTHENTICATED");
+    expect(
+      (op as Record<string, unknown>)?.["x-ownership-required"],
+      "DELETE /notifications/devices/{deviceId} doit avoir x-ownership-required: true",
+    ).toBe(true);
+  });
+
+  it("CONTRACT-010: POST /notifications/devices a un code 429", () => {
+    const devicesPath = getPath("/notifications/devices");
+    expect(devicesPath, "/notifications/devices doit exister").toBeDefined();
+    const op = (devicesPath as Record<string, unknown>)?.["post"] as OperationObject | undefined;
+    expect(op, "POST /notifications/devices doit exister").toBeDefined();
+    const codes = Object.keys(op?.responses ?? {});
+    expect(codes, "POST /notifications/devices doit avoir un code 429").toContain("429");
+  });
+
+  it("CONTRACT-010: POST /notifications/devices réponse 200 ne contient pas deviceToken", () => {
+    const devicesPath = getPath("/notifications/devices");
+    const op = (devicesPath as Record<string, unknown>)?.["post"] as OperationObject | undefined;
+    const resp200Str = JSON.stringify(op?.responses?.["200"] ?? {});
+    expect(
+      resp200Str,
+      "POST /notifications/devices réponse 200 ne doit pas exposer deviceToken (sécurité)",
+    ).not.toContain("deviceToken");
+  });
+
+  it("CONTRACT-010: NotificationLogEntry.failureReason utilise $ref NotificationFailureReason (pas inline)", () => {
+    const schemas = (openapi.components?.schemas ?? {}) as Record<string, unknown>;
+    const logEntry = schemas["NotificationLogEntry"] as Record<string, unknown> | undefined;
+    expect(logEntry, "NotificationLogEntry doit être défini").toBeDefined();
+    const props = (logEntry?.properties ?? {}) as Record<string, unknown>;
+    const failureReason = props["failureReason"] as Record<string, unknown> | undefined;
+    if (failureReason) {
+      // Doit utiliser $ref, pas inline enum
+      expect(
+        JSON.stringify(failureReason),
+        "failureReason doit utiliser $ref vers NotificationFailureReason (pas inline enum)",
+      ).toContain("$ref");
+      expect(
+        (failureReason["enum"]),
+        "failureReason ne doit pas avoir d'enum inline (doit utiliser $ref)",
+      ).toBeUndefined();
+    }
   });
 });

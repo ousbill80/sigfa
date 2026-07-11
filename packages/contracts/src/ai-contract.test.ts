@@ -66,7 +66,7 @@ const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "options", "head"
 const VALID_TENANT_SCOPES = ["platform", "bank", "agency", "public"];
 const VALID_REQUIRED_ROLES = [
   "SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR",
-  "MANAGER", "AGENT", "AUDITOR", "NONE",
+  "MANAGER", "AGENT", "AUDITOR", "AUTHENTICATED", "NONE",
 ];
 
 function getAllOperations(): Array<{ path: string; method: string; op: OperationObject }> {
@@ -386,5 +386,36 @@ describe("CONTRACT-008", () => {
     if (failures.length > 0) {
       throw new Error(`Violations CONTRACT-008:\n${failures.join("\n")}`);
     }
+  });
+});
+
+// ─── CONTRACT-010 : hardening sécurité + cohérence inter-YAML ────────────────
+describe("CONTRACT-010 — ai.yaml", () => {
+  it("CONTRACT-010: tous les exemples UUID dans ai.yaml sont des UUID v4 valides", () => {
+    const rawContent = readFileSync(AI_YAML_PATH, "utf-8");
+    const placeholderPattern = /(agency_\d+|user_\d+|svc_\d+)/;
+    expect(
+      rawContent,
+      "ai.yaml ne doit pas contenir de faux IDs non-UUID (agency_01, user_05, svc_02, etc.)",
+    ).not.toMatch(placeholderPattern);
+  });
+
+  it("CONTRACT-010: AnomaliesListResponse a meta (PaginationMeta) ET aiMeta (AiMeta)", () => {
+    const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
+    const anomaliesListResp = schemas?.["AnomaliesListResponse"] as Record<string, unknown> | undefined;
+    expect(anomaliesListResp, "AnomaliesListResponse doit être défini").toBeDefined();
+    const props = (anomaliesListResp?.properties ?? {}) as Record<string, unknown>;
+    expect(
+      props["meta"],
+      "AnomaliesListResponse doit avoir meta (PaginationMeta)",
+    ).toBeDefined();
+    expect(
+      props["aiMeta"],
+      "AnomaliesListResponse doit avoir aiMeta (AiMeta) — dualité documentée CONTRACT-010",
+    ).toBeDefined();
+    const metaStr = JSON.stringify(props["meta"] ?? {});
+    const aiMetaStr = JSON.stringify(props["aiMeta"] ?? {});
+    expect(metaStr, "meta doit référencer PaginationMeta").toContain("PaginationMeta");
+    expect(aiMetaStr, "aiMeta doit référencer AiMeta").toContain("AiMeta");
   });
 });

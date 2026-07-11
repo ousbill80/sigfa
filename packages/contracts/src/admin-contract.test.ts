@@ -82,6 +82,7 @@ const VALID_REQUIRED_ROLES = [
   "MANAGER",
   "AGENT",
   "AUDITOR",
+  "AUTHENTICATED",
   "NONE",
 ];
 
@@ -342,21 +343,19 @@ describe("CONTRACT-005", () => {
   });
 
   // ─── Critère 7 : DELETE /agencies/:id → 409 AGENCY_HAS_OPEN_TICKETS ──────
-  it("CONTRACT-005: DELETE /agencies/:id → 409 AGENCY_HAS_OPEN_TICKETS documenté (test)", () => {
+  // CONTRACT-010: DELETE /agencies/{id} a été déplacé dans core.yaml
+  // admin.yaml ne contient plus cet endpoint — le test vérifie seulement l'absence
+  it("CONTRACT-005: DELETE /agencies/{id} n'est plus dans admin.yaml (déplacé vers core.yaml)", () => {
     const deleteAgency = getOp("/agencies/{id}", "delete");
-    expect(deleteAgency, "DELETE /agencies/{id} doit exister dans admin.yaml").toBeDefined();
-
-    // 409 avec AGENCY_HAS_OPEN_TICKETS
-    const resp409 = JSON.stringify(deleteAgency?.responses?.["409"] ?? {});
-    expect(resp409, "DELETE /agencies/{id} 409 doit contenir AGENCY_HAS_OPEN_TICKETS").toContain(
-      "AGENCY_HAS_OPEN_TICKETS",
-    );
-
-    // Soft delete documenté
-    const deleteStr = JSON.stringify(deleteAgency);
-    expect(deleteStr, "DELETE /agencies/{id} doit documenter le soft delete").toMatch(
-      /soft|logique|désactivation/i,
-    );
+    // Soft check : si l'endpoint est toujours là, vérifier qu'il est cohérent
+    if (deleteAgency) {
+      // 409 avec AGENCY_HAS_OPEN_TICKETS si présent
+      const resp409 = JSON.stringify(deleteAgency.responses?.["409"] ?? {});
+      expect(resp409, "DELETE /agencies/{id} 409 doit contenir AGENCY_HAS_OPEN_TICKETS").toContain(
+        "AGENCY_HAS_OPEN_TICKETS",
+      );
+    }
+    // L'endpoint peut être absent (déplacé vers core.yaml) : ok
   });
 
   // ─── Critère 8 : sms-templates — UNKNOWN_TEMPLATE_VARIABLE + NotificationType $ref ─
@@ -402,5 +401,25 @@ describe("CONTRACT-005", () => {
     if (failures.length > 0) {
       throw new Error(`Endpoints sans exemples:\n${failures.join("\n")}`);
     }
+  });
+});
+
+// ─── CONTRACT-010 : hardening sécurité + cohérence inter-YAML ────────────────
+describe("CONTRACT-010 — admin.yaml", () => {
+  it("CONTRACT-010: tous les exemples UUID dans admin.yaml sont des UUID v4 valides", () => {
+    const rawContent = readFileSync(ADMIN_YAML_PATH, "utf-8");
+    const placeholderPattern = /(bank_\d+|agency_\d+|user_\d+|kiosk_\d+)/;
+    expect(
+      rawContent,
+      "admin.yaml ne doit pas contenir de faux IDs non-UUID (bank_01, agency_01, etc.)",
+    ).not.toMatch(placeholderPattern);
+  });
+
+  it("CONTRACT-010: DELETE /agencies/{id} n'est plus défini dans admin.yaml (déplacé vers core.yaml)", () => {
+    const deleteAgency = getOp("/agencies/{id}", "delete");
+    expect(
+      deleteAgency,
+      "DELETE /agencies/{id} ne doit plus être dans admin.yaml (déplacé vers core.yaml — CONTRACT-010)",
+    ).toBeUndefined();
   });
 });

@@ -145,6 +145,7 @@ paths:
       description: Révoque le refresh token actif de l'utilisateur.
       x-tenant-scope: bank
       x-required-role: NONE
+      security: []
       requestBody:
         required: true
         content:
@@ -188,7 +189,7 @@ paths:
       summary: Profil de l'utilisateur connecté
       description: Retourne le profil et les permissions de l'utilisateur authentifié.
       x-tenant-scope: bank
-      x-required-role: NONE
+      x-required-role: AUTHENTICATED
       responses:
         '200':
           description: Profil utilisateur
@@ -197,11 +198,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserProfile'
               example:
-                id: user_01
+                id: 55555555-5555-4555-a555-555555555555
                 email: agent@banque-ci.com
                 role: AGENT
-                bankId: bank_01
-                agencyId: agency_01
+                bankId: 11111111-1111-4111-a111-111111111111
+                agencyId: 33333333-3333-4333-a333-333333333333
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -240,7 +241,7 @@ paths:
                 $ref: '#/components/schemas/BankListResponse'
               example:
                 data:
-                  - id: bank_01
+                  - id: 11111111-1111-4111-a111-111111111111
                     name: Banque Nationale de Côte d'Ivoire
                     slug: bnci
                     active: true
@@ -290,7 +291,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Bank'
               example:
-                id: bank_02
+                id: 22222222-2222-4222-a222-222222222222
                 name: Banque Atlantique CI
                 slug: baci
                 active: true
@@ -329,7 +330,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Bank'
               example:
-                id: bank_01
+                id: 11111111-1111-4111-a111-111111111111
                 name: Banque Nationale de Côte d'Ivoire
                 slug: bnci
                 active: true
@@ -376,7 +377,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Bank'
               example:
-                id: bank_01
+                id: 11111111-1111-4111-a111-111111111111
                 name: BNCI (renommée)
                 slug: bnci
                 active: false
@@ -419,9 +420,9 @@ paths:
                 $ref: '#/components/schemas/AgencyListResponse'
               example:
                 data:
-                  - id: agency_01
+                  - id: 33333333-3333-4333-a333-333333333333
                     name: Agence Plateau
-                    bankId: bank_01
+                    bankId: 11111111-1111-4111-a111-111111111111
                     active: true
                 meta:
                   page: 1
@@ -469,9 +470,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Agency'
               example:
-                id: agency_02
+                id: 44444444-4444-4444-a444-444444444444
                 name: Agence Cocody
-                bankId: bank_01
+                bankId: 11111111-1111-4111-a111-111111111111
                 active: true
                 createdAt: '2026-01-01T00:00:00Z'
         '400':
@@ -508,9 +509,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Agency'
               example:
-                id: agency_01
+                id: 33333333-3333-4333-a333-333333333333
                 name: Agence Plateau
-                bankId: bank_01
+                bankId: 11111111-1111-4111-a111-111111111111
                 active: true
                 createdAt: '2025-06-01T00:00:00Z'
         '400':
@@ -555,9 +556,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Agency'
               example:
-                id: agency_01
+                id: 33333333-3333-4333-a333-333333333333
                 name: Agence Plateau (renommée)
-                bankId: bank_01
+                bankId: 11111111-1111-4111-a111-111111111111
                 active: false
                 createdAt: '2025-06-01T00:00:00Z'
         '400':
@@ -581,8 +582,8 @@ paths:
         - Agencies
       summary: Supprimer une agence
       description: |
-        Supprime logiquement une agence (désactivation). Une agence avec des
-        tickets actifs ne peut pas être supprimée (409 `AGENCY_HAS_ACTIVE_TICKETS`).
+        Supprime logiquement une agence (soft delete / désactivation). Une agence avec des
+        tickets ouverts ne peut pas être supprimée (409 `AGENCY_HAS_OPEN_TICKETS`).
       x-tenant-scope: bank
       x-required-role: BANK_ADMIN
       parameters:
@@ -608,15 +609,15 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Conflit — agence avec tickets actifs
+          description: Conflit — agence avec tickets ouverts
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error:
-                  code: AGENCY_HAS_ACTIVE_TICKETS
-                  message: Impossible de supprimer une agence avec des tickets actifs.
+                  code: AGENCY_HAS_OPEN_TICKETS
+                  message: Impossible de supprimer une agence avec des tickets ouverts.
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -643,9 +644,9 @@ paths:
                 $ref: '#/components/schemas/ServiceListResponse'
               example:
                 data:
-                  - id: svc_01
+                  - id: 77777777-7777-4777-a777-777777777777
                     name: Virements
-                    agencyId: agency_01
+                    agencyId: 33333333-3333-4333-a333-333333333333
                     slaMinutes: 10
                     active: true
                     order: 1
@@ -694,9 +695,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Service'
               example:
-                id: svc_05
+                id: bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb
                 name: Crédits immobiliers
-                agencyId: agency_01
+                agencyId: 33333333-3333-4333-a333-333333333333
                 slaMinutes: 20
                 active: true
                 order: 5
@@ -744,9 +745,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Service'
               example:
-                id: svc_01
+                id: 77777777-7777-4777-a777-777777777777
                 name: Virements
-                agencyId: agency_01
+                agencyId: 33333333-3333-4333-a333-333333333333
                 slaMinutes: 15
                 active: false
                 order: 2
@@ -786,11 +787,11 @@ paths:
                 $ref: '#/components/schemas/CounterListResponse'
               example:
                 data:
-                  - id: counter_01
+                  - id: cccccccc-cccc-4ccc-accc-cccccccccccc
                     label: Guichet 1
-                    agencyId: agency_01
+                    agencyId: 33333333-3333-4333-a333-333333333333
                     status: OPEN
-                    agentId: user_01
+                    agentId: 55555555-5555-4555-a555-555555555555
                 meta:
                   page: 1
                   limit: 20
@@ -827,8 +828,8 @@ paths:
             example:
               label: Guichet 9
               serviceIds:
-                - svc_01
-                - svc_02
+                - 77777777-7777-4777-a777-777777777777
+                - 88888888-8888-4888-a888-888888888888
       responses:
         '201':
           description: Guichet créé
@@ -837,9 +838,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Counter'
               example:
-                id: counter_09
+                id: eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee
                 label: Guichet 9
-                agencyId: agency_01
+                agencyId: 33333333-3333-4333-a333-333333333333
                 status: OPEN
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -877,7 +878,7 @@ paths:
               $ref: '#/components/schemas/UpdateCounterRequest'
             example:
               status: PAUSED
-              agentId: user_02
+              agentId: 66666666-6666-4666-a666-666666666666
       responses:
         '200':
           description: Guichet mis à jour
@@ -886,11 +887,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Counter'
               example:
-                id: counter_01
+                id: cccccccc-cccc-4ccc-accc-cccccccccccc
                 label: Guichet 1
-                agencyId: agency_01
+                agencyId: 33333333-3333-4333-a333-333333333333
                 status: PAUSED
-                agentId: user_02
+                agentId: 66666666-6666-4666-a666-666666666666
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -939,11 +940,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TicketCallResponse'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: CALLED
-                counterId: counter_01
-                serviceId: svc_01
+                counterId: cccccccc-cccc-4ccc-accc-cccccccccccc
+                serviceId: 77777777-7777-4777-a777-777777777777
                 position: 0
                 estimatedWaitMinutes: 0
                 calledAt: '2026-07-11T09:30:00Z'
@@ -996,7 +997,10 @@ paths:
         - name: agencyId
           in: query
           required: true
-          description: Identifiant de l'agence
+          description: |
+            Identifiant de l'agence. Doit correspondre à l'agence du JWT de l'appelant
+            (validé côté serveur — un MANAGER ne peut lister que les files de son agence).
+          x-security-note: Le serveur valide que agencyId correspond au claim agencyId du JWT
           schema:
             type: string
             format: uuid
@@ -1011,9 +1015,9 @@ paths:
                 $ref: '#/components/schemas/QueueListResponse'
               example:
                 data:
-                  - id: queue_01
-                    agencyId: agency_01
-                    serviceId: svc_01
+                  - id: 13131313-1313-4131-a131-131313131313
+                    agencyId: 33333333-3333-4333-a333-333333333333
+                    serviceId: 77777777-7777-4777-a777-777777777777
                     status: OPEN
                     length: 12
                     estimatedWaitMinutes: 24
@@ -1067,9 +1071,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Queue'
               example:
-                id: queue_01
-                agencyId: agency_01
-                serviceId: svc_01
+                id: 13131313-1313-4131-a131-131313131313
+                agencyId: 33333333-3333-4333-a333-333333333333
+                serviceId: 77777777-7777-4777-a777-777777777777
                 status: PAUSED
                 openAt: '08:00'
                 closeAt: '17:00'
@@ -1115,8 +1119,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateTicketRequest'
             example:
-              serviceId: svc_01
-              agencyId: agency_01
+              serviceId: 77777777-7777-4777-a777-777777777777
               channel: KIOSK
               phoneNumber: '+2250700000001'
               priority: false
@@ -1128,11 +1131,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TicketCreatedResponse'
               example:
-                id: ticket_99
+                id: 00000000-0000-4000-a000-000000000000
                 number: A099
                 status: WAITING
-                serviceId: svc_01
-                agencyId: agency_01
+                serviceId: 77777777-7777-4777-a777-777777777777
+                agencyId: 33333333-3333-4333-a333-333333333333
                 channel: KIOSK
                 position: 13
                 estimatedWaitMinutes: 26
@@ -1188,11 +1191,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ticket'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: WAITING
-                serviceId: svc_01
-                agencyId: agency_01
+                serviceId: 77777777-7777-4777-a777-777777777777
+                agencyId: 33333333-3333-4333-a333-333333333333
                 channel: QR
                 position: 5
                 estimatedWaitMinutes: 10
@@ -1237,7 +1240,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CallTicketRequest'
             example:
-              counterId: counter_01
+              counterId: cccccccc-cccc-4ccc-accc-cccccccccccc
       responses:
         '200':
           description: Ticket passé à l'état CALLED
@@ -1246,11 +1249,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TicketCallResponse'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: CALLED
-                counterId: counter_01
-                serviceId: svc_01
+                counterId: cccccccc-cccc-4ccc-accc-cccccccccccc
+                serviceId: 77777777-7777-4777-a777-777777777777
                 position: 0
                 estimatedWaitMinutes: 0
                 calledAt: '2026-07-11T09:30:00Z'
@@ -1274,9 +1277,9 @@ paths:
                   value:
                     error:
                       code: TICKET_ALREADY_CLAIMED
-                      message: Ce ticket a déjà été pris par le guichet counter_02.
+                      message: Ce ticket a déjà été pris par le guichet dddddddd-dddd-4ddd-addd-dddddddddddd.
                       details:
-                        claimedByCounterId: counter_02
+                        claimedByCounterId: dddddddd-dddd-4ddd-addd-dddddddddddd
                 illegal_transition:
                   summary: Transition illégale
                   value:
@@ -1319,11 +1322,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ticket'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: SERVING
-                counterId: counter_01
-                serviceId: svc_01
+                counterId: cccccccc-cccc-4ccc-accc-cccccccccccc
+                serviceId: 77777777-7777-4777-a777-777777777777
                 position: 0
                 estimatedWaitMinutes: 0
                 calledAt: '2026-07-11T09:30:00Z'
@@ -1387,10 +1390,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/TicketClosed'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: DONE
-                counterId: counter_01
+                counterId: cccccccc-cccc-4ccc-accc-cccccccccccc
                 waitTime: 600
                 serviceTime: 300
                 closedAt: '2026-07-11T09:36:00Z'
@@ -1457,10 +1460,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ticket'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: NO_SHOW
-                counterId: counter_01
+                counterId: cccccccc-cccc-4ccc-accc-cccccccccccc
                 noShowAt: '2026-07-11T09:35:00Z'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1509,7 +1512,7 @@ paths:
             schema:
               $ref: '#/components/schemas/TransferTicketRequest'
             example:
-              targetServiceId: svc_02
+              targetServiceId: 88888888-8888-4888-a888-888888888888
               reason: Compétence spécialisée requise.
       responses:
         '200':
@@ -1519,10 +1522,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ticket'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: TRANSFERRED
-                transferredToServiceId: svc_02
+                transferredToServiceId: 88888888-8888-4888-a888-888888888888
                 transferredAt: '2026-07-11T09:33:00Z'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1579,7 +1582,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ticket'
               example:
-                id: ticket_42
+                id: ffffffff-ffff-4fff-afff-ffffffffffff
                 number: A042
                 status: ABANDONED
                 abandonedAt: '2026-07-11T09:20:00Z'
@@ -1637,13 +1640,11 @@ paths:
             example:
               tickets:
                 - localUuid: 550e8400-e29b-41d4-a716-446655440001
-                  serviceId: svc_01
-                  agencyId: agency_01
+                  serviceId: 77777777-7777-4777-a777-777777777777
                   channel: KIOSK
                   createdOfflineAt: '2026-07-11T07:00:00Z'
                 - localUuid: 550e8400-e29b-41d4-a716-446655440002
-                  serviceId: svc_02
-                  agencyId: agency_01
+                  serviceId: 88888888-8888-4888-a888-888888888888
                   channel: KIOSK
                   createdOfflineAt: '2026-07-11T07:01:00Z'
       responses:
@@ -1656,7 +1657,7 @@ paths:
               example:
                 synced:
                   - localUuid: 550e8400-e29b-41d4-a716-446655440001
-                    serverId: ticket_100
+                    serverId: 12121212-1212-4121-a121-121212121212
                     number: A100
                 skipped:
                   - localUuid: 550e8400-e29b-41d4-a716-446655440002
@@ -1868,6 +1869,20 @@ components:
         - OPEN
         - PAUSED
         - CLOSED
+    PrinterStatus:
+      type: string
+      description: |
+        Statut de l'imprimante de tickets d'une borne kiosque.
+        Schéma transverse référencé par CONTRACT-003 (public.yaml) et CONTRACT-006 (reporting.yaml).
+        - OK : imprimante opérationnelle
+        - PAPER_LOW : papier faible (intervention préventive recommandée)
+        - ERROR : erreur imprimante (intervention requise)
+        - OFFLINE : borne hors ligne ou imprimante déconnectée
+      enum:
+        - OK
+        - PAPER_LOW
+        - ERROR
+        - OFFLINE
     ErrorResponse:
       type: object
       required:
@@ -2455,22 +2470,24 @@ components:
           format: date-time
     CreateTicketRequest:
       type: object
+      description: |
+        Requête d'émission d'un ticket. L'`agencyId` est dérivé du JWT de l'appelant
+        (kiosque ou agent) — il ne doit pas être fourni dans le corps.
       required:
         - serviceId
-        - agencyId
         - channel
+      additionalProperties: false
       properties:
         serviceId:
-          type: string
-          format: uuid
-        agencyId:
           type: string
           format: uuid
         channel:
           $ref: '#/components/schemas/TicketChannel'
         phoneNumber:
           type: string
-          description: Numéro de téléphone pour les notifications SMS/WhatsApp
+          pattern: ^\+[1-9]\d{6,14}$
+          description: 'Numéro de téléphone E.164 pour les notifications SMS/WhatsApp (ex: +2250700000001)'
+          example: '+2250700000001'
         priority:
           type: boolean
           default: false
@@ -2505,21 +2522,21 @@ components:
           maxLength: 500
     TicketSyncItem:
       type: object
+      description: |
+        Item d'un batch de synchronisation hors-ligne. L'`agencyId` est dérivé
+        du JWT de la borne — il ne doit pas être fourni dans chaque item.
       required:
         - localUuid
         - serviceId
-        - agencyId
         - channel
         - createdOfflineAt
+      additionalProperties: false
       properties:
         localUuid:
           type: string
           format: uuid
           description: UUID généré côté client pour l'idempotence
         serviceId:
-          type: string
-          format: uuid
-        agencyId:
           type: string
           format: uuid
         channel:

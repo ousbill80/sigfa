@@ -57,7 +57,7 @@ paths:
           schema:
             type: string
             format: uuid
-          example: "ticket_42"
+          example: "ffffffff-ffff-4fff-afff-ffffffffffff"
         - name: channel
           in: query
           required: false
@@ -83,16 +83,16 @@ paths:
                 $ref: "#/components/schemas/NotificationLogResponse"
               example:
                 data:
-                  - id: "notif_01"
-                    ticketId: "ticket_42"
+                  - id: "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1c"
+                    ticketId: "ffffffff-ffff-4fff-afff-ffffffffffff"
                     channel: SMS
                     type: TICKET_CONFIRMATION
                     status: DELIVERED
                     phoneNumberMasked: "07 •• •• •• 47"
                     sentAt: "2026-07-11T09:00:05Z"
                     deliveredAt: "2026-07-11T09:00:07Z"
-                  - id: "notif_02"
-                    ticketId: "ticket_43"
+                  - id: "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1d"
+                    ticketId: "ffffffff-ffff-4fff-afff-fffffffffff0"
                     channel: WHATSAPP
                     type: YOUR_TURN
                     status: FAILED
@@ -159,7 +159,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotificationTestResponse"
               example:
-                notificationId: "notif_test_01"
+                notificationId: "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1e"
                 channel: SMS
                 status: SENT
                 sentAt: "2026-07-11T09:05:00Z"
@@ -215,7 +215,7 @@ paths:
         Plateformes supportées : `IOS` | `ANDROID` | `EXPO`.
         Prérequis contractuel de MOB-004.
       x-tenant-scope: bank
-      x-required-role: NONE
+      x-required-role: AUTHENTICATED
       requestBody:
         required: true
         content:
@@ -251,7 +251,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DeviceRegistration"
               example:
-                deviceId: "device_01"
+                deviceId: "15151515-1515-4151-a151-151515151515"
                 deviceToken: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
                 platform: EXPO
                 registeredAt: "2026-07-11T09:00:00Z"
@@ -262,8 +262,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DeviceRegistration"
               example:
-                deviceId: "device_01"
-                deviceToken: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+                deviceId: "15151515-1515-4151-a151-151515151515"
                 platform: EXPO
                 registeredAt: "2026-07-10T08:00:00Z"
         "400":
@@ -292,7 +291,8 @@ paths:
         plus de notifications PUSH. Scope **bank** — l'utilisateur doit être
         propriétaire du device (ou BANK_ADMIN).
       x-tenant-scope: bank
-      x-required-role: NONE
+      x-required-role: AUTHENTICATED
+      x-ownership-required: true
       parameters:
         - name: deviceId
           in: path
@@ -301,7 +301,7 @@ paths:
           schema:
             type: string
             format: uuid
-          example: "device_01"
+          example: "15151515-1515-4151-a151-151515151515"
       responses:
         "200":
           description: Device supprimé avec succès
@@ -329,7 +329,7 @@ paths:
               example:
                 error:
                   code: DEVICE_NOT_FOUND
-                  message: "Le device 'device_01' est introuvable."
+                  message: "Le device '15151515-1515-4151-a151-151515151515' est introuvable."
         "409":
           $ref: "./core.yaml#/components/responses/Conflict"
         "422":
@@ -677,12 +677,12 @@ components:
           type: string
           format: uuid
           description: Identifiant unique de la notification
-          example: "notif_01"
+          example: "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1c"
         ticketId:
           type: string
           format: uuid
           description: Identifiant du ticket associé (optionnel si notification admin)
-          example: "ticket_42"
+          example: "ffffffff-ffff-4fff-afff-ffffffffffff"
         channel:
           $ref: "./core.yaml#/components/schemas/NotificationChannel"
         type:
@@ -710,14 +710,7 @@ components:
           example: "2026-07-11T09:00:07Z"
         failureReason:
           description: Raison d'échec (null si livraison réussie ou en cours)
-          type: string
-          enum:
-            - PROVIDER_UNREACHABLE
-            - INVALID_NUMBER
-            - OPT_OUT
-            - TEMPLATE_REJECTED
-            - QUOTA_EXCEEDED
-            - UNKNOWN
+          $ref: "#/components/schemas/NotificationFailureReason" 
 
     NotificationLogResponse:
       type: object
@@ -771,7 +764,7 @@ components:
           type: string
           format: uuid
           description: Identifiant unique du device (à utiliser pour le DELETE)
-          example: "device_01"
+          example: "15151515-1515-4151-a151-151515151515"
         deviceToken:
           type: string
           description: Token push (retourné uniquement lors de l'enregistrement)
@@ -904,7 +897,7 @@ components:
           type: string
           format: uuid
           description: Identifiant de la notification de test dans le journal
-          example: "notif_test_01"
+          example: "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1e"
         channel:
           $ref: "./core.yaml#/components/schemas/NotificationChannel"
         status:
@@ -940,4 +933,4 @@ components:
         failureReason:
           type: string
           description: Raison d'échec rapportée par le fournisseur (texte libre du provider)
-          example: "2026-07-10T10:00:00Z"
+          example: "PROVIDER_UNREACHABLE"

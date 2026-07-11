@@ -53,7 +53,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "date": "2026-07-15",
                          *       "contextualFactors": [
                          *         "NONE"
@@ -185,7 +185,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "date": "2026-07-15",
                          *       "recommendations": [
                          *         {
@@ -412,9 +412,9 @@ export interface paths {
                          *           "id": "anomaly_01",
                          *           "type": "AGENT_INACTIVE_PATTERN",
                          *           "status": "open",
-                         *           "agentId": "user_05",
-                         *           "agencyId": "agency_01",
-                         *           "description": "Agent user_05 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours (seuil : ≥3).",
+                         *           "agentId": "55555555-5555-4555-a555-555555555505",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *           "description": "Agent 55555555-5555-4555-a555-555555555505 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours (seuil : ≥3).",
                          *           "detectedAt": "2026-07-11T08:00:00Z",
                          *           "alertCount": 4,
                          *           "windowDays": 7
@@ -423,8 +423,8 @@ export interface paths {
                          *           "id": "anomaly_02",
                          *           "type": "QUEUE_STUCK",
                          *           "status": "acked",
-                         *           "agencyId": "agency_01",
-                         *           "serviceId": "svc_02",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *           "serviceId": "88888888-8888-4888-a888-888888888888",
                          *           "description": "File Virements bloquée 45 min sans appel (seuil normal : 20 min).",
                          *           "detectedAt": "2026-07-10T14:30:00Z",
                          *           "ackedAt": "2026-07-10T14:45:00Z"
@@ -520,9 +520,9 @@ export interface paths {
                          *       "id": "anomaly_01",
                          *       "type": "AGENT_INACTIVE_PATTERN",
                          *       "status": "acked",
-                         *       "agentId": "user_05",
-                         *       "agencyId": "agency_01",
-                         *       "description": "Agent user_05 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours.",
+                         *       "agentId": "55555555-5555-4555-a555-555555555505",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *       "description": "Agent 55555555-5555-4555-a555-555555555505 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours.",
                          *       "detectedAt": "2026-07-11T08:00:00Z",
                          *       "ackedAt": "2026-07-11T09:15:00Z",
                          *       "ackedBy": "user_manager_01",
@@ -751,7 +751,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de l'agence
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId: string;
             /**
@@ -827,7 +827,7 @@ export interface components {
         StaffingRecommendationsResponse: {
             /**
              * Format: uuid
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId: string;
             /**
@@ -885,23 +885,23 @@ export interface components {
             /**
              * Format: uuid
              * @description Agence concernée par l'anomalie
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId: string;
             /**
              * @description Identifiant de l'agent concerné (pour AGENT_INACTIVE_PATTERN)
-             * @example user_05
+             * @example 55555555-5555-4555-a555-555555555505
              */
             agentId?: string;
             /**
              * Format: uuid
              * @description Identifiant du service concerné (pour QUEUE_STUCK, SLA_SYSTEMIC)
-             * @example svc_02
+             * @example 88888888-8888-4888-a888-888888888888
              */
             serviceId?: string;
             /**
              * @description Description lisible de l'anomalie avec contexte et métriques
-             * @example Agent user_05 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours (seuil : ≥3).
+             * @example Agent 55555555-5555-4555-a555-555555555505 : 4 alertes AGENT_INACTIVE sur les 7 derniers jours (seuil : ≥3).
              */
             description: string;
             /**
@@ -939,7 +939,13 @@ export interface components {
             windowDays?: number;
             meta: components["schemas"]["AiMeta"];
         };
-        /** @description Réponse de la liste des anomalies avec pagination. */
+        /**
+         * @description Réponse de la liste des anomalies avec pagination (dualité meta/aiMeta — CONTRACT-010).
+         *     - `meta` (PaginationMeta) : pagination standard (page, limit, total).
+         *     - `aiMeta` (AiMeta) : métadonnées IA (modelVersion, computedAt, dataWindow).
+         *     Les deux objets sont requis simultanément pour permettre au frontend d'afficher
+         *     à la fois la pagination et le contexte du modèle IA qui a généré les anomalies.
+         */
         AnomaliesListResponse: {
             data: components["schemas"]["Anomaly"][];
             meta: components["schemas"]["PaginationMeta"];
@@ -991,7 +997,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de l'agence (présent pour scope=agency)
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId?: string;
             /**
@@ -1035,7 +1041,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de l'agence (présent si scope=agency)
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId?: string;
             /**

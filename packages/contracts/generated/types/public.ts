@@ -33,9 +33,9 @@ export interface paths {
                 content: {
                     /**
                      * @example {
-                     *       "kioskId": "kiosk_01",
+                     *       "kioskId": "14141414-1414-4141-a141-141414141414",
                      *       "kioskSecret": "s3cr3t-kiosk-k3y",
-                     *       "agencyId": "agency_01"
+                     *       "agencyId": "33333333-3333-4333-a333-333333333333"
                      *     }
                      */
                     "application/json": components["schemas"]["KioskSessionRequest"];
@@ -52,8 +52,8 @@ export interface paths {
                          * @example {
                          *       "accessToken": "eyJhbGciOiJIUzI1NiJ9.kioskPayload.sig",
                          *       "expiresIn": 43200,
-                         *       "kioskId": "kiosk_01",
-                         *       "agencyId": "agency_01"
+                         *       "kioskId": "14141414-1414-4141-a141-141414141414",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333"
                          *     }
                          */
                         "application/json": components["schemas"]["KioskSessionResponse"];
@@ -167,7 +167,7 @@ export interface paths {
          *
          *     Requiert le token de session borne (scope agency).
          *
-         *     **printerStatus** valeurs : `OK` | `ERROR` | `OFFLINE`
+         *     **printerStatus** valeurs : `OK` | `PAPER_LOW` | `ERROR` | `OFFLINE`
          */
         post: {
             parameters: {
@@ -393,8 +393,8 @@ export interface paths {
                          *       "channel": "KIOSK",
                          *       "position": 3,
                          *       "estimatedWaitMinutes": 6,
-                         *       "agencyId": "agency_01",
-                         *       "serviceId": "svc_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
                          *       "createdAt": "2026-07-11T09:00:00Z"
                          *     }
                          */
@@ -488,7 +488,7 @@ export interface paths {
                     /**
                      * @example {
                      *       "note": 4,
-                     *       "commentaire": "Service rapide, agent très professionnel."
+                     *       "comment": "Service rapide, agent très professionnel."
                      *     }
                      */
                     "application/json": components["schemas"]["FeedbackRequest"];
@@ -736,8 +736,8 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "agencyId": "agency_01",
-                         *       "qrUrl": "https://app.sigfa.ci/q/agency_01?sig=eyJhbGci...",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *       "qrUrl": "https://app.sigfa.ci/q/33333333-3333-4333-a333-333333333333?sig=eyJhbGci...",
                          *       "payload": "eyJhZ2VuY3lJZCI6ImFnZW5jeV8wMSJ9.sig",
                          *       "expiresAt": "2026-07-12T09:00:00Z"
                          *     }
@@ -770,7 +770,7 @@ export interface components {
         KioskSessionRequest: {
             /**
              * @description Identifiant unique de la borne
-             * @example kiosk_01
+             * @example 14141414-1414-4141-a141-141414141414
              */
             kioskId: string;
             /**
@@ -796,11 +796,6 @@ export interface components {
             /** Format: uuid */
             agencyId: string;
         };
-        /**
-         * @description État de l'imprimante de la borne
-         * @enum {string}
-         */
-        PrinterStatus: "OK" | "ERROR" | "OFFLINE";
         HeartbeatRequest: {
             printerStatus: components["schemas"]["PrinterStatus"];
             /**
@@ -971,7 +966,7 @@ export interface components {
              * @description Commentaire libre optionnel (≤ 500 caractères)
              * @example Service rapide, agent très professionnel.
              */
-            commentaire?: string | null;
+            comment?: string | null;
         };
         FeedbackResponse: {
             success: boolean;
@@ -1022,7 +1017,7 @@ export interface components {
             /**
              * Format: uri
              * @description URL PWA complète avec identifiant d'agence signé (encodée dans le QR)
-             * @example https://app.sigfa.ci/q/agency_01?sig=eyJhbGci...
+             * @example https://app.sigfa.ci/q/33333333-3333-4333-a333-333333333333?sig=eyJhbGci...
              */
             qrUrl: string;
             /**
@@ -1055,6 +1050,16 @@ export interface components {
                 };
             };
         };
+        /**
+         * @description Statut de l'imprimante de tickets d'une borne kiosque.
+         *     Schéma transverse référencé par CONTRACT-003 (public.yaml) et CONTRACT-006 (reporting.yaml).
+         *     - OK : imprimante opérationnelle
+         *     - PAPER_LOW : papier faible (intervention préventive recommandée)
+         *     - ERROR : erreur imprimante (intervention requise)
+         *     - OFFLINE : borne hors ligne ou imprimante déconnectée
+         * @enum {string}
+         */
+        PrinterStatus: "OK" | "PAPER_LOW" | "ERROR" | "OFFLINE";
         /**
          * @description États possibles d'un ticket dans la machine à états SIGFA.
          *     **Transitions légales** :

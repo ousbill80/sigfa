@@ -26,7 +26,7 @@ export interface paths {
                 query?: {
                     /**
                      * @description Filtrer par identifiant de ticket
-                     * @example ticket_42
+                     * @example ffffffff-ffff-4fff-afff-ffffffffffff
                      */
                     ticketId?: string;
                     /**
@@ -60,8 +60,8 @@ export interface paths {
                          * @example {
                          *       "data": [
                          *         {
-                         *           "id": "notif_01",
-                         *           "ticketId": "ticket_42",
+                         *           "id": "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1c",
+                         *           "ticketId": "ffffffff-ffff-4fff-afff-ffffffffffff",
                          *           "channel": "SMS",
                          *           "type": "TICKET_CONFIRMATION",
                          *           "status": "DELIVERED",
@@ -70,8 +70,8 @@ export interface paths {
                          *           "deliveredAt": "2026-07-11T09:00:07Z"
                          *         },
                          *         {
-                         *           "id": "notif_02",
-                         *           "ticketId": "ticket_43",
+                         *           "id": "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1d",
+                         *           "ticketId": "ffffffff-ffff-4fff-afff-fffffffffff0",
                          *           "channel": "WHATSAPP",
                          *           "type": "YOUR_TURN",
                          *           "status": "FAILED",
@@ -160,7 +160,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "notificationId": "notif_test_01",
+                         *       "notificationId": "1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1e",
                          *       "channel": "SMS",
                          *       "status": "SENT",
                          *       "sentAt": "2026-07-11T09:05:00Z"
@@ -251,8 +251,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "deviceId": "device_01",
-                         *       "deviceToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+                         *       "deviceId": "15151515-1515-4151-a151-151515151515",
                          *       "platform": "EXPO",
                          *       "registeredAt": "2026-07-10T08:00:00Z"
                          *     }
@@ -268,7 +267,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "deviceId": "device_01",
+                         *       "deviceId": "15151515-1515-4151-a151-151515151515",
                          *       "deviceToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
                          *       "platform": "EXPO",
                          *       "registeredAt": "2026-07-11T09:00:00Z"
@@ -316,7 +315,7 @@ export interface paths {
                 path: {
                     /**
                      * @description Identifiant du device push
-                     * @example device_01
+                     * @example 15151515-1515-4151-a151-151515151515
                      */
                     deviceId: string;
                 };
@@ -353,7 +352,7 @@ export interface paths {
                          * @example {
                          *       "error": {
                          *         "code": "DEVICE_NOT_FOUND",
-                         *         "message": "Le device 'device_01' est introuvable."
+                         *         "message": "Le device '15151515-1515-4151-a151-151515151515' est introuvable."
                          *       }
                          *     }
                          */
@@ -741,13 +740,13 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant unique de la notification
-             * @example notif_01
+             * @example 1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1c
              */
             id: string;
             /**
              * Format: uuid
              * @description Identifiant du ticket associé (optionnel si notification admin)
-             * @example ticket_42
+             * @example ffffffff-ffff-4fff-afff-ffffffffffff
              */
             ticketId?: string;
             channel: components["schemas"]["NotificationChannel"];
@@ -774,11 +773,8 @@ export interface components {
              * @example 2026-07-11T09:00:07Z
              */
             deliveredAt?: string;
-            /**
-             * @description Raison d'échec (null si livraison réussie ou en cours)
-             * @enum {string}
-             */
-            failureReason?: "PROVIDER_UNREACHABLE" | "INVALID_NUMBER" | "OPT_OUT" | "TEMPLATE_REJECTED" | "QUOTA_EXCEEDED" | "UNKNOWN";
+            /** @description Raison d'échec (null si livraison réussie ou en cours) */
+            failureReason?: components["schemas"]["NotificationFailureReason"];
         };
         /** @description Réponse paginée du journal d'envoi */
         NotificationLogResponse: {
@@ -807,7 +803,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant unique du device (à utiliser pour le DELETE)
-             * @example device_01
+             * @example 15151515-1515-4151-a151-151515151515
              */
             deviceId: string;
             /**
@@ -907,7 +903,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de la notification de test dans le journal
-             * @example notif_test_01
+             * @example 1c1c1c1c-1c1c-4c1c-a1c1-1c1c1c1c1c1e
              */
             notificationId: string;
             channel: components["schemas"]["NotificationChannel"];
@@ -938,7 +934,7 @@ export interface components {
             deliveredAt?: string;
             /**
              * @description Raison d'échec rapportée par le fournisseur (texte libre du provider)
-             * @example 2026-07-10T10:00:00Z
+             * @example PROVIDER_UNREACHABLE
              */
             failureReason?: string;
         };

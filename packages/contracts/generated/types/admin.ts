@@ -37,7 +37,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "logoUrl": "https://cdn.sigfa.ci/logos/bank_01/logo.png",
+                         *       "logoUrl": "https://cdn.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png",
                          *       "requestedColors": {
                          *         "primary": "#003f7f",
                          *         "secondary": "#e8a000",
@@ -124,7 +124,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "logoUrl": "https://cdn.sigfa.ci/logos/bank_01/logo.png",
+                         *       "logoUrl": "https://cdn.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png",
                          *       "requestedColors": {
                          *         "primary": "#003f7f",
                          *         "secondary": "#e8a000",
@@ -219,7 +219,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "presignedUrl": "https://r2.sigfa.ci/logos/bank_01/logo.png?X-Amz-Signature=abc123&X-Amz-Expires=300",
+                         *       "presignedUrl": "https://r2.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png?X-Amz-Signature=abc123&X-Amz-Expires=300",
                          *       "expiresIn": 300,
                          *       "maxSizeBytes": 2000000,
                          *       "minDimensionsPx": 200
@@ -820,13 +820,13 @@ export interface paths {
                          *       "data": [
                          *         {
                          *           "actor": {
-                         *             "id": "user_01",
+                         *             "id": "55555555-5555-4555-a555-555555555555",
                          *             "email": "admin@bnci.ci",
                          *             "role": "BANK_ADMIN"
                          *           },
-                         *           "action": "PATCH /banks/bank_01/theme",
+                         *           "action": "PATCH /banks/11111111-1111-4111-a111-111111111111/theme",
                          *           "entityType": "BankTheme",
-                         *           "entityId": "bank_01",
+                         *           "entityId": "11111111-1111-4111-a111-111111111111",
                          *           "timestamp": "2026-07-11T09:00:00Z",
                          *           "ip": "41.67.128.1",
                          *           "diff": {
@@ -1072,8 +1072,8 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "targetAgencyId": "agency_02",
-                         *       "templateAgencyId": "agency_01",
+                         *       "targetAgencyId": "44444444-4444-4444-a444-444444444444",
+                         *       "templateAgencyId": "33333333-3333-4333-a333-333333333333",
                          *       "clonedSections": [
                          *         "hours",
                          *         "smsTemplates",
@@ -1146,12 +1146,12 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "kioskId": "kiosk_01",
+                         *       "kioskId": "14141414-1414-4141-a141-141414141414",
                          *       "clientId": "kiosk_client_7f3a9b",
                          *       "clientSecret": "ksk_XzP9mQr2nLsT4vWyBjH6cKdF",
                          *       "qrCodeDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA...",
                          *       "label": "Borne entrée principale",
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "createdAt": "2026-07-11T10:05:00Z"
                          *     }
                          */
@@ -1169,96 +1169,6 @@ export interface paths {
             };
         };
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/agencies/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Supprimer une agence (soft delete)
-         * @description Désactivation logique (soft delete) d'une agence. L'agence est marquée
-         *     inactive mais ses données sont conservées.
-         *
-         *     **409 `AGENCY_HAS_OPEN_TICKETS`** : si l'agence possède des tickets ouverts
-         *     (état WAITING, CALLED ou SERVING), la suppression est refusée.
-         *     Il faut clore ou transférer tous les tickets ouverts avant la suppression.
-         *
-         *     **Précision CONTRACT-005** : le code 409 est `AGENCY_HAS_OPEN_TICKETS`
-         *     (conformément au PRD v2 — distinction des tickets « ouverts » vs « actifs »).
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Identifiant unique de la ressource (UUID v4) */
-                    id: components["parameters"]["IdParam"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Agence désactivée (soft delete) */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        /**
-                         * @example {
-                         *       "success": true
-                         *     }
-                         */
-                        "application/json": {
-                            /** @description Indique que la désactivation a réussi */
-                            success: boolean;
-                        };
-                    };
-                };
-                400: components["responses"]["BadRequest"];
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
-                /** @description Conflit — agence avec des tickets ouverts (WAITING, CALLED ou SERVING) */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        /**
-                         * @example {
-                         *       "error": {
-                         *         "code": "AGENCY_HAS_OPEN_TICKETS",
-                         *         "message": "Impossible de supprimer une agence avec des tickets ouverts. Closez ou transférez tous les tickets avant la suppression.",
-                         *         "details": {
-                         *           "openTicketsCount": 12,
-                         *           "statuses": [
-                         *             "WAITING",
-                         *             "CALLED",
-                         *             "SERVING"
-                         *           ]
-                         *         }
-                         *       }
-                         *     }
-                         */
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                422: components["responses"]["UnprocessableEntity"];
-                429: components["responses"]["TooManyRequests"];
-                500: components["responses"]["InternalServerError"];
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -1321,7 +1231,7 @@ export interface components {
             /**
              * Format: uri
              * @description URL publique du logo CDN (null si aucun logo uploadé)
-             * @example https://cdn.sigfa.ci/logos/bank_01/logo.png
+             * @example https://cdn.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png
              */
             logoUrl?: string | null;
             requestedColors: components["schemas"]["ColorSet"];
@@ -1338,7 +1248,7 @@ export interface components {
             /**
              * Format: uri
              * @description URL présignée R2 pour le PUT HTTP du logo
-             * @example https://r2.sigfa.ci/logos/bank_01/logo.png?X-Amz-Signature=abc123&X-Amz-Expires=300
+             * @example https://r2.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png?X-Amz-Signature=abc123&X-Amz-Expires=300
              */
             presignedUrl: string;
             /**
@@ -1497,7 +1407,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de l'utilisateur acteur
-             * @example user_01
+             * @example 55555555-5555-4555-a555-555555555555
              */
             id: string;
             /**
@@ -1515,8 +1425,8 @@ export interface components {
         AuditEntry: {
             actor: components["schemas"]["AuditActor"];
             /**
-             * @description Opération effectuée (ex. "PATCH /banks/bank_01/theme")
-             * @example PATCH /banks/bank_01/theme
+             * @description Opération effectuée (ex. "PATCH /banks/11111111-1111-4111-a111-111111111111/theme")
+             * @example PATCH /banks/11111111-1111-4111-a111-111111111111/theme
              */
             action: string;
             /**
@@ -1526,7 +1436,7 @@ export interface components {
             entityType: string;
             /**
              * @description Identifiant de l'entité modifiée
-             * @example bank_01
+             * @example 11111111-1111-4111-a111-111111111111
              */
             entityId: string;
             /**
@@ -1621,13 +1531,13 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de l'agence cible (celle qui reçoit la config)
-             * @example agency_02
+             * @example 44444444-4444-4444-a444-444444444444
              */
             targetAgencyId: string;
             /**
              * Format: uuid
              * @description Identifiant de l'agence template (source de la config)
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             templateAgencyId: string;
             /**
@@ -1660,7 +1570,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant unique de la borne
-             * @example kiosk_01
+             * @example 14141414-1414-4141-a141-141414141414
              */
             kioskId: string;
             /**
@@ -1686,7 +1596,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de l'agence à laquelle appartient la borne
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId: string;
             /**

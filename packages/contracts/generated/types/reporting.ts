@@ -195,7 +195,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "agencyId": "agency_01",
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "agencyName": "Agence Plateau",
                          *       "date": "2026-07-10",
                          *       "kpis": {
@@ -308,7 +308,7 @@ export interface paths {
                          *       "data": [
                          *         {
                          *           "rank": 1,
-                         *           "agencyId": "agency_01",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
                          *           "agencyName": "Agence Plateau",
                          *           "status": "VERT",
                          *           "tauxSLA": 92.1,
@@ -316,7 +316,7 @@ export interface paths {
                          *         },
                          *         {
                          *           "rank": 2,
-                         *           "agencyId": "agency_03",
+                         *           "agencyId": "55555555-5555-4555-a555-555555555580",
                          *           "agencyName": "Agence Cocody",
                          *           "status": "ORANGE",
                          *           "tauxSLA": 71.5,
@@ -324,7 +324,7 @@ export interface paths {
                          *         },
                          *         {
                          *           "rank": 3,
-                         *           "agencyId": "agency_02",
+                         *           "agencyId": "44444444-4444-4444-a444-444444444444",
                          *           "agencyName": "Agence Yopougon",
                          *           "status": "ROUGE",
                          *           "tauxSLA": 52,
@@ -565,22 +565,22 @@ export interface paths {
                          * @example {
                          *       "kiosks": [
                          *         {
-                         *           "kioskId": "kiosk_01",
-                         *           "agencyId": "agency_01",
+                         *           "kioskId": "14141414-1414-4141-a141-141414141414",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
                          *           "status": "ONLINE",
                          *           "lastSeen": "2026-07-11T08:58:00Z",
                          *           "printerStatus": "OK"
                          *         },
                          *         {
-                         *           "kioskId": "kiosk_02",
-                         *           "agencyId": "agency_01",
+                         *           "kioskId": "14141414-1414-4141-a141-141414141415",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
                          *           "status": "DEGRADED",
                          *           "lastSeen": "2026-07-11T08:45:00Z",
                          *           "printerStatus": "PAPER_LOW"
                          *         },
                          *         {
-                         *           "kioskId": "kiosk_03",
-                         *           "agencyId": "agency_01",
+                         *           "kioskId": "14141414-1414-4141-a141-141414141416",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
                          *           "status": "OFFLINE",
                          *           "lastSeen": "2026-07-11T06:00:00Z",
                          *           "printerStatus": "OFFLINE"
@@ -849,7 +849,7 @@ export interface components {
             /**
              * Format: uuid
              * @description Identifiant de l'agence
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId?: string;
             kpis: components["schemas"]["KpiSet"];
@@ -1016,21 +1016,16 @@ export interface components {
          * @enum {string}
          */
         KioskOnlineStatus: "ONLINE" | "OFFLINE" | "DEGRADED";
-        /**
-         * @description Statut de l'imprimante de tickets de la borne
-         * @enum {string}
-         */
-        PrinterStatus: "OK" | "PAPER_LOW" | "ERROR" | "OFFLINE";
         KioskStatusEntry: {
             /**
              * @description Identifiant unique de la borne kiosque
-             * @example kiosk_01
+             * @example 14141414-1414-4141-a141-141414141414
              */
             kioskId: string;
             /**
              * Format: uuid
              * @description Agence à laquelle la borne est rattachée
-             * @example agency_01
+             * @example 33333333-3333-4333-a333-333333333333
              */
             agencyId: string;
             status: components["schemas"]["KioskOnlineStatus"];
@@ -1097,6 +1092,16 @@ export interface components {
             /** @description Nombre total d'éléments */
             total: number;
         };
+        /**
+         * @description Statut de l'imprimante de tickets d'une borne kiosque.
+         *     Schéma transverse référencé par CONTRACT-003 (public.yaml) et CONTRACT-006 (reporting.yaml).
+         *     - OK : imprimante opérationnelle
+         *     - PAPER_LOW : papier faible (intervention préventive recommandée)
+         *     - ERROR : erreur imprimante (intervention requise)
+         *     - OFFLINE : borne hors ligne ou imprimante déconnectée
+         * @enum {string}
+         */
+        PrinterStatus: "OK" | "PAPER_LOW" | "ERROR" | "OFFLINE";
     };
     responses: {
         /** @description Requête invalide (validation échouée ou en-tête obligatoire absent) */
