@@ -1,0 +1,22 @@
+{
+  "common": {
+    "welcome": "Bienvenue",
+    "chooseLanguage": "Choisissez votre langue",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "retry": "Réessayer"
+  },
+  "home": {
+    "title": "Bienvenue",
+    "subtitle": "Veuillez sélectionner votre langue pour continuer",
+    "languageLabel": "Français"
+  },
+  "session": {
+    "expired": "Votre session a expiré",
+    "reconnecting": "Reconnexion en cours..."
+  },
+  "error": {
+    "offline": "Borne hors ligne",
+    "contactStaff": "Veuillez contacter un agent"
+  }
+}

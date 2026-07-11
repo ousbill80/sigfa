@@ -1,0 +1,29 @@
+/**
+ * KIOSK-001 — design-tokens.css
+ * Variables CSS tokens SIGFA kiosque.
+ * Seul fichier autorisé à contenir des valeurs hexadécimales.
+ * Toute utilisation dans le code doit référencer ces variables.
+ */
+
+:root {
+  /* ─── Surfaces kiosque ─────────────────────────────────────────────────────── */
+  --surface-kiosk: #0e1420;
+  --surface-screen: #0a0f1a;
+  --surface-0: #fafbfc;
+  --surface-1: #ffffff;
+
+  /* ─── Texte ───────────────────────────────────────────────────────────────── */
+  --ink-inverse: #f5f7fa;
+  --ink-strong: #101828;
+  --ink-soft: #475467;
+  --ink-muted-inv: #98a2b3;
+
+  /* ─── Marque (surcharge par tenant via --tenant-brand) ──────────────────── */
+  --brand: var(--tenant-brand, #1570ef);
+
+  /* ─── États sémantiques ─────────────────────────────────────────────────── */
+  --success: #12b76a;
+  --warning: #f79009;
+  --danger: #f04438;
+  --info: #2e90fa;
+}
