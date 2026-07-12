@@ -18,6 +18,10 @@
 
 import { useCallback } from "react";
 import { createSigfaClient } from "@sigfa/contracts";
+import {
+  ensureKioskSession,
+  getKioskSessionToken,
+} from "@/lib/kiosk-session-store";
 import type { PrinterStatus } from "@/hooks/useDegradedState";
 import {
   signalPrinterError,
@@ -75,7 +79,16 @@ export function useKioskHeartbeat(options: UseKioskHeartbeatOptions = {}): {
 
   const sendHeartbeat = useCallback(
     async (params: HeartbeatParams): Promise<HeartbeatResult> => {
-      const client = createSigfaClient("public", apiUrl);
+      // S5 : le heartbeat exige le token de session borne (contrat public,
+      // scope agency). Session garantie/RE-CRÉÉE avant l'appel ; sans session
+      // (borne dégradée), le POST part sans Bearer et échoue proprement.
+      await ensureKioskSession();
+      const token = getKioskSessionToken();
+      const client = createSigfaClient(
+        "public",
+        apiUrl,
+        token ? { token } : {}
+      );
 
       let ok = false;
       try {

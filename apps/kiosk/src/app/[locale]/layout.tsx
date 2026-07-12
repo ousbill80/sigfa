@@ -10,6 +10,7 @@
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
+import { KioskSessionProvider } from "@/components/KioskSessionProvider";
 // Design system v2 « Sérénité Premium » — source unique @sigfa/ui.
 // (design-tokens.css ré-importe @sigfa/ui/tokens.css + alias kiosque.)
 import "@sigfa/ui/fonts.css";
@@ -43,7 +44,9 @@ export default async function LocaleLayout(props: {
         }}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
+          {/* S5 : session borne câblée au démarrage (KIOSK-001), re-créée à
+              expiration, dégradée non bloquante en échec. */}
+          <KioskSessionProvider>{children}</KioskSessionProvider>
         </NextIntlClientProvider>
       </body>
     </html>

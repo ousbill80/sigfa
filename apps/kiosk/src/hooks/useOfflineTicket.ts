@@ -23,6 +23,10 @@ import {
   type OfflineTicketRow,
   type OfflineTicketDatabase,
 } from "@/lib/offline-db";
+import {
+  ensureKioskSession,
+  getKioskSessionToken,
+} from "@/lib/kiosk-session-store";
 
 /** Taille maximale d'un batch de synchronisation (contrat API-005). */
 export const MAX_SYNC_BATCH = 100;
@@ -117,7 +121,12 @@ async function persistOfflineTicket(
 async function syncBatch(
   rows: OfflineTicketRow[]
 ): Promise<{ syncedLocalUuids: string[]; skippedCount: number }> {
-  const client = createSigfaClient("core", apiBaseUrl());
+  // S5 : la route /tickets/sync exige le scope agency (contrat core) — le
+  // Bearer de la session borne est porté par chaque batch. Sans session
+  // (borne dégradée), l'appel part sans token : rien n'est purgé, rejeu au
+  // rétablissement de la session.
+  const token = getKioskSessionToken();
+  const client = createSigfaClient("core", apiBaseUrl(), token ? { token } : {});
   const { data, response } = await client.POST("/tickets/sync", {
     params: {
       header: {
@@ -191,6 +200,10 @@ export function useOfflineTicket() {
     if (pending.length === 0) {
       return { syncedCount: 0, skippedCount: 0 };
     }
+
+    // S5 : session borne garantie avant la sync — RE-CRÉÉE si expirée (12 h,
+    // non renouvelable). En échec : sync dégradée sans crash, rejeu plus tard.
+    await ensureKioskSession();
 
     let syncedCount = 0;
     let skippedCount = 0;
