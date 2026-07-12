@@ -1,7 +1,7 @@
 /**
  * KIOSK-005 — Tests de régression visuelle Playwright
  *
- * Captures RÉELLES ×4 langues pour chaque écran :
+ * Captures RÉELLES FR/EN pour chaque écran :
  *   - HomeScreen (KIOSK-002)     → home-{locale}.png
  *   - ServicesScreen (KIOSK-003) → services-{locale}.png
  *   - TicketScreen (KIOSK-005)   → ticket-{locale}.png
@@ -14,7 +14,7 @@
  */
 import { test, expect } from "@playwright/test";
 
-const LOCALES = ["fr", "dioula", "baoule", "en"] as const;
+const LOCALES = ["fr", "en"] as const;
 
 /**
  * Paramètres ticket par défaut — KIOSK-005

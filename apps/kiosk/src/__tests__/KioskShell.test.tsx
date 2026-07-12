@@ -18,26 +18,6 @@ const frMessages = {
   },
 };
 
-const dioulaMessages = {
-  common: {
-    welcome: "Bisimila",
-    chooseLanguage: "I kan kan ka sɛbɛn i ka kan",
-    loading: "A bɛ kɛ...",
-    error: "Fili kelen bɛ yen",
-    retry: "Mɔgɔ",
-  },
-};
-
-const baouleMessages = {
-  common: {
-    welcome: "Mian su",
-    chooseLanguage: "Klɛ n'gban su nun",
-    loading: "An bla...",
-    error: "Nzuɛ kulo bo'",
-    retry: "San yi klo",
-  },
-};
-
 const enMessages = {
   common: {
     welcome: "Welcome",
@@ -49,12 +29,10 @@ const enMessages = {
 };
 
 describe("KIOSK-001: KioskShell", () => {
-  it("KIOSK-001: next-intl charge les 4 locales sans erreur de clé manquante", async () => {
+  it("KIOSK-001: next-intl charge les 2 locales (FR/EN) sans erreur de clé manquante", async () => {
     const { KioskShell } = await import("../components/KioskShell");
     const locales = [
       { locale: "fr", messages: frMessages },
-      { locale: "dioula", messages: dioulaMessages },
-      { locale: "baoule", messages: baouleMessages },
       { locale: "en", messages: enMessages },
     ];
 
@@ -115,7 +93,7 @@ describe("KIOSK-001: KioskShell", () => {
     );
 
     // L'écran d'accueil doit afficher un message de bienvenue
-    const welcomeElement = screen.getByText(/Bienvenue|Welcome|Bisimila|Mian su/i);
+    const welcomeElement = screen.getByText(/Bienvenue|Welcome/i);
     expect(welcomeElement).toBeInTheDocument();
   });
 });

@@ -63,8 +63,6 @@ const homeMessages = {
     title: "Akwaba — Welcome",
     chooseLanguage: "Choose your language",
     languageFr: "Français",
-    languageDioula: "Dioula",
-    languageBaoule: "Baoulé",
     languageEn: "English",
     queueStatus: "Queue: {count} people — estimated wait: {minutes} min",
     queueUnavailable: "Queue unavailable",

@@ -19,6 +19,8 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   // Pas d'output export — le serveur dev Playwright doit fonctionner avec middleware
+  // @sigfa/ui : source-exported workspace package (CSS + fonts) → à transpiler.
+  transpilePackages: ["@sigfa/ui"],
   images: {
     unoptimized: true,
   },

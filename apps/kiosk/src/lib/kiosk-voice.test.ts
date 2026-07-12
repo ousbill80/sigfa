@@ -5,7 +5,7 @@
  * Couvre les critères EARS purs (indépendants du rendu React) :
  *   - registre SIGFA du texte annoncé,
  *   - mapping locale → BCP-47,
- *   - sélection de voix avec fallback FR (Dioula/Baoulé),
+ *   - sélection de voix avec fallback FR (locale sans voix native),
  *   - rate ralentie en mode accessibilité,
  *   - facteurs de font-size et de timeout en accessibilité.
  */
@@ -61,9 +61,11 @@ describe("KIOSK-008: mapping locale → BCP-47", () => {
     expect(localeToBcp47("en")).toBe("en-US");
   });
 
-  it("KIOSK-008: dioula/baoulé → fallback fr-FR (pas de voix native)", () => {
-    expect(localeToBcp47("dioula")).toBe("fr-FR");
-    expect(localeToBcp47("baoule")).toBe("fr-FR");
+  it("KIOSK-008: locale sans voix native → fallback fr-FR", () => {
+    // Décision PO : plus de Dioula/Baoulé. Toute locale hors table (ex. langue
+    // ivoirienne sans TTS) retombe explicitement sur le repli FR.
+    expect(localeToBcp47("dyu")).toBe("fr-FR");
+    expect(localeToBcp47("bci")).toBe("fr-FR");
   });
 
   it("KIOSK-008: locale inconnue → fallback fr-FR", () => {
@@ -78,20 +80,20 @@ describe("KIOSK-008: sélection de voix avec fallback FR", () => {
     expect(v?.lang).toBe("en-US");
   });
 
-  it("KIOSK-008: locale Dioula sans voix native → fallback voix FR", () => {
+  it("KIOSK-008: locale sans voix native → fallback voix FR", () => {
     const voices = [makeVoice("fr-FR"), makeVoice("en-US")];
-    const v = pickVoiceForLocale("dioula", voices);
+    const v = pickVoiceForLocale("dyu", voices);
     expect(v?.lang).toBe("fr-FR");
   });
 
-  it("KIOSK-008: locale Baoulé sans voix native → fallback voix FR", () => {
+  it("KIOSK-008: seconde locale sans voix native → fallback voix FR", () => {
     const voices = [makeVoice("fr-FR"), makeVoice("en-US")];
-    const v = pickVoiceForLocale("baoule", voices);
+    const v = pickVoiceForLocale("bci", voices);
     expect(v?.lang).toBe("fr-FR");
   });
 
   it("KIOSK-008: aucune voix disponible → null, sans lever d'erreur", () => {
-    expect(pickVoiceForLocale("dioula", [])).toBeNull();
+    expect(pickVoiceForLocale("dyu", [])).toBeNull();
   });
 
   it("KIOSK-008: correspondance de préfixe de langue (fr matche fr-CA)", () => {

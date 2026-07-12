@@ -1,7 +1,9 @@
 /**
  * KIOSK-005 — TicketScreen.tsx
- * Écran de confirmation du ticket.
- * Pulse 400ms CSS, voix Web Speech API, retour auto à 4s (8s en mode a11y).
+ * Le « Moment Ticket » — HÉROS de l'expérience client. Refonte v2 : numéro en
+ * --display or sur --night, halo doré, entrée « spring ». Composé avec le
+ * composant `TicketMoment` de @sigfa/ui. Voix Web Speech API, retour auto 4 s
+ * (8 s en accessibilité / dégradé).
  *
  * KIOSK-007 — États dégradés imprimante (bascule transparente) :
  *   - printerStatus dégradé (`PAPER_LOW | ERROR | OFFLINE`) OU réseau coupé
@@ -14,6 +16,7 @@
 import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
+import { TicketMoment } from "@sigfa/ui";
 import { deriveDegradedState, type PrinterStatus } from "@/hooks/useDegradedState";
 import { useVoiceAnnouncement } from "@/hooks/useVoiceAnnouncement";
 import { VoiceButton } from "@/components/VoiceButton";
@@ -107,10 +110,6 @@ export function TicketScreen({
 
   const reducedMotion = prefersReducedMotion();
 
-  const animationStyle = reducedMotion
-    ? {}
-    : { animation: "ticketPulse 400ms ease-out 1 forwards" };
-
   return (
     <main
       role="main"
@@ -121,28 +120,27 @@ export function TicketScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "2rem",
-        gap: "1.5rem",
+        padding: "var(--space-8)",
+        gap: "var(--space-6)",
       }}
     >
-      {/* Ticket number — 128px, --brand */}
-      <div
-        data-testid="ticket-number"
+      {/* Le HÉROS — numéro or sur night + halo, entrée spring (composant UI). */}
+      <TicketMoment
+        eyebrow={t("position", { position })}
+        ticketNumber={displayNumber}
+        message={t("waitEstimate", { minutes: estimatedWaitMinutes })}
         data-animate={reducedMotion ? undefined : "pulse"}
-        style={{
-          fontSize: "128px",
-          fontWeight: "bold",
-          color: "var(--brand)",
-          textAlign: "center",
-          lineHeight: 1,
-          ...animationStyle,
-        }}
-      >
-        {displayNumber}
-      </div>
+        style={{ width: "100%", maxWidth: "760px" }}
+        actions={
+          <VoiceButton
+            announcement={{ displayNumber, position, estimatedWaitMinutes }}
+            isAccessibilityMode={isAccessibilityMode}
+          />
+        }
+      />
 
-      {/* Position in queue — KIOSK-008 : texte de base (28 px nominal,
-          ≥ 34 px en accessibilité), contraste --ink-inverse/--surface-kiosk ≥ 7:1 */}
+      {/* Position (texte a11y, contraste ≥ 7:1) — porte data-a11y-text + le
+          facteur d'accessibilité attendus par KIOSK-008. */}
       <p
         data-testid="ticket-position"
         data-a11y-text="true"
@@ -150,13 +148,14 @@ export function TicketScreen({
           fontSize: `${baseTextPx}px`,
           color: "var(--ink-inverse)",
           textAlign: "center",
-          fontWeight: "bold",
+          fontWeight: 600,
+          margin: 0,
         }}
       >
         {t("position", { position })}
       </p>
 
-      {/* Estimated wait — KIOSK-008 : texte de base identique */}
+      {/* Estimated wait — texte de base identique */}
       <p
         data-testid="ticket-wait"
         data-a11y-text="true"
@@ -164,6 +163,7 @@ export function TicketScreen({
           fontSize: `${baseTextPx}px`,
           color: "var(--ink-inverse)",
           textAlign: "center",
+          margin: 0,
         }}
       >
         {t("waitEstimate", { minutes: estimatedWaitMinutes })}
@@ -177,6 +177,7 @@ export function TicketScreen({
             fontSize: "24px",
             color: "var(--success)",
             textAlign: "center",
+            margin: 0,
           }}
         >
           {t("printing")}
@@ -193,6 +194,7 @@ export function TicketScreen({
             fontSize: "24px",
             color: "var(--ink-inverse)",
             textAlign: "center",
+            margin: 0,
           }}
         >
           {tDeg("photographNumber")}
@@ -207,18 +209,12 @@ export function TicketScreen({
             fontSize: "20px",
             color: "var(--success)",
             textAlign: "center",
+            margin: 0,
           }}
         >
           {t("smsSent", { maskedPhone: maskPhoneNumber(phoneNumber) })}
         </p>
       )}
-
-      {/* KIOSK-008 — Bouton 🔊 permanent : relecture manuelle de l'écran
-          courant dans la langue de session (rate ralentie en accessibilité). */}
-      <VoiceButton
-        announcement={{ displayNumber, position, estimatedWaitMinutes }}
-        isAccessibilityMode={isAccessibilityMode}
-      />
     </main>
   );
 }

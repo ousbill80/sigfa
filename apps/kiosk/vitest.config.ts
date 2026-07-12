@@ -72,6 +72,20 @@ export default defineConfig({
         import.meta.dirname,
         "../../packages/contracts/dist/src/client.js"
       ),
+      // @sigfa/ui is source-exported (no dist) — resolve its barrel + css entries.
+      "@sigfa/ui/tokens.css": resolve(
+        import.meta.dirname,
+        "../../packages/ui/src/tokens.css"
+      ),
+      "@sigfa/ui/fonts.css": resolve(
+        import.meta.dirname,
+        "../../packages/ui/src/fonts.css"
+      ),
+      "@sigfa/ui/components.css": resolve(
+        import.meta.dirname,
+        "../../packages/ui/src/components/components.css"
+      ),
+      "@sigfa/ui": resolve(import.meta.dirname, "../../packages/ui/src/index.ts"),
       // Electron is only available in the Electron runtime — stub for tests
       electron: resolve(import.meta.dirname, "./__mocks__/electron.ts"),
     },

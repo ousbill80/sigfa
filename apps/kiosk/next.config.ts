@@ -29,6 +29,9 @@ const isPlaywrightMode = process.env.SIGFA_PLAYWRIGHT === "1";
 
 const nextConfig: NextConfig = {
   ...(isPlaywrightMode ? {} : { output: "export", trailingSlash: true }),
+  // @sigfa/ui ships TypeScript source (source-exported workspace package) plus
+  // CSS + self-hosted woff2 fonts; Next must transpile it (like apps/web).
+  transpilePackages: ["@sigfa/ui"],
   images: {
     unoptimized: true,
   },

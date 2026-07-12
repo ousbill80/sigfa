@@ -70,8 +70,6 @@ const homeMessages = {
     title: "Akwaba — Bienvenue",
     chooseLanguage: "Choisissez votre langue",
     languageFr: "Français",
-    languageDioula: "Dioula",
-    languageBaoule: "Baoulé",
     languageEn: "English",
     queueStatus: "File d'attente : {count} personnes — attente estimée : {minutes} min",
     queueUnavailable: "File d'attente non disponible",
@@ -177,7 +175,7 @@ describe("KIOSK-002: HomeScreen interactions", () => {
     );
 
     const cards = container.querySelectorAll("[data-testid='language-card']");
-    expect(cards.length).toBe(4);
+    expect(cards.length).toBe(2);
 
     // Click the first card (fr locale)
     fireEvent.click(cards[0]);
@@ -193,8 +191,8 @@ describe("KIOSK-002: HomeScreen interactions", () => {
     );
 
     const cards = container.querySelectorAll("[data-testid='language-card']");
-    // cards: fr, dioula, baoule, en — en is index 3
-    fireEvent.click(cards[3]);
+    // cards: fr, en — en is index 1 (Dioula/Baoulé retirés)
+    fireEvent.click(cards[1]);
 
     expect(mockPush).toHaveBeenCalledWith("/en/services");
   });

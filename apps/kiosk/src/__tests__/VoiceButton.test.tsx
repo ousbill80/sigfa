@@ -3,10 +3,10 @@
  * Écrits AVANT l'implémentation (phase rouge).
  *
  * Critères couverts :
- *   - bouton 🔊 ≥ 72×72 px présent (snapshot ×4 langues),
+ *   - bouton 🔊 ≥ 72×72 px présent (FR/EN),
  *   - clic → SpeechSynthesisUtterance déclenché dans la langue de session,
  *   - mode accessibilité → rate = 0.8 (Vitest spy),
- *   - Dioula/Baoulé sans voix native → fallback voix FR, zéro erreur visible/log.
+ *   - locale sans voix native → fallback voix FR, zéro erreur visible/log.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -83,19 +83,14 @@ const messagesByLocale: Record<string, Record<string, Record<string, string>>> =
     },
     voice008: { playLabel: "Listen" },
   },
-  dioula: {
+  // Locale synthétique SANS voix TTS native — sert à prouver le repli FR.
+  // (Décision PO : plus de Dioula/Baoulé ; le repli reste vérifié.)
+  dyu: {
     ticket005: {
       voiceAnnounce:
-        "Tikɛ {displayNumber}. I bɛ {position} la. {minutes} miniti ɲɔgɔn.",
+        "Ticket {displayNumber}. Position {position}. {minutes} minutes.",
     },
-    voice008: { playLabel: "Lamɛn" },
-  },
-  baoule: {
-    ticket005: {
-      voiceAnnounce:
-        "Tikɛ {displayNumber}. Wɔ sigi {position} nun. {minutes} miniti.",
-    },
-    voice008: { playLabel: "Tie" },
+    voice008: { playLabel: "Écouter" },
   },
 };
 
@@ -124,8 +119,8 @@ function renderButton(
 }
 
 describe("KIOSK-008: bouton 🔊 permanent", () => {
-  it("KIOSK-008: bouton 🔊 ≥ 72 px présent sur tous les écrans (snapshot ×4 langues)", () => {
-    for (const locale of ["fr", "en", "dioula", "baoule"]) {
+  it("KIOSK-008: bouton 🔊 ≥ 72 px présent sur tous les écrans (FR/EN)", () => {
+    for (const locale of ["fr", "en"]) {
       mockLocale = locale;
       const { unmount } = renderButton(locale);
       const btn = screen.getByTestId("voice-button");
@@ -167,31 +162,18 @@ describe("KIOSK-008: bouton 🔊 permanent", () => {
     expect(lastUtterance?.rate).toBe(1);
   });
 
-  it("KIOSK-008: locale Dioula sans voix native → fallback voix FR, zéro erreur visible", async () => {
+  it("KIOSK-008: locale sans voix native → fallback voix FR, zéro erreur visible", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const user = userEvent.setup();
-    mockLocale = "dioula";
-    renderButton("dioula");
+    mockLocale = "dyu";
+    renderButton("dyu");
     await user.click(screen.getByTestId("voice-button"));
 
     expect(speakSpy).toHaveBeenCalledTimes(1);
-    // Utterance émise avec langue FR de repli (aucune voix native dioula).
+    // Utterance émise avec langue FR de repli (aucune voix native disponible).
     expect(lastUtterance?.lang).toBe("fr-FR");
     expect(lastUtterance?.voice?.lang).toBe("fr-FR");
     // Aucun log d'erreur côté client.
-    expect(errorSpy).not.toHaveBeenCalled();
-    errorSpy.mockRestore();
-  });
-
-  it("KIOSK-008: locale Baoulé sans voix native → fallback voix FR, zéro erreur", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const user = userEvent.setup();
-    mockLocale = "baoule";
-    renderButton("baoule");
-    await user.click(screen.getByTestId("voice-button"));
-
-    expect(lastUtterance?.lang).toBe("fr-FR");
-    expect(lastUtterance?.voice?.lang).toBe("fr-FR");
     expect(errorSpy).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });

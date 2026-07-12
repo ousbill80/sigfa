@@ -86,44 +86,6 @@ const enMessages = {
   },
 };
 
-const dioulaMessages = {
-  services003: {
-    title: "Baara min ye i fe?",
-    backButton: "Segin",
-    waitEstimate: "~{minutes} min",
-    seeMore: "Baara wɛrɛw ye",
-    closedService: "Kɛnɛ tɛ — {schedule}",
-    accessibilityButton: "♿ Tɔgɔ Segin",
-    emptyTitle: "Baara si tɛ yen",
-    emptyMessage: "Taa accueil la — mɔgɔ dɔ bena i dɛmɛ.",
-    offlineBanner: "Mode hors connexion",
-  },
-  degraded007: {
-    longQueueTitle: "Mɔgɔ caman — {estimate} min ɲɔgɔn",
-    longQueueMessage: "SMS sɔrɔ ka segin i ka waati la.",
-    phoneFieldLabel: "I ka wolofɔn nimɔrɔ",
-  },
-};
-
-const baouleMessages = {
-  services003: {
-    title: "Sɛ bo nun a klɛ?",
-    backButton: "Wɔ sin",
-    waitEstimate: "~{minutes} min",
-    seeMore: "Sɛ wɛlɛ yɛ",
-    closedService: "Kpli — {schedule}",
-    accessibilityButton: "♿ Klo tafue",
-    emptyTitle: "Sɛ klɛ aman",
-    emptyMessage: "Kɔ accueil — mɔgɔ dɔ a su.",
-    offlineBanner: "Mode hors connexion",
-  },
-  degraded007: {
-    longQueueTitle: "Sran kpanngban — {estimate} min",
-    longQueueMessage: "Sɔ SMS naan sin blɛ wɔ blɛ nun.",
-    phoneFieldLabel: "Wɔ telefɔn nimɛro",
-  },
-};
-
 import { ServicesScreen } from "@/components/ServicesScreen";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
@@ -137,12 +99,10 @@ describe("KIOSK-003: ServicesScreen", () => {
     vi.useRealTimers();
   });
 
-  it("KIOSK-003: cards rendered height ≥ 96 px, icon 40 px + label 28 px (snapshot ×4 languages)", () => {
+  it("KIOSK-003: cards rendered height ≥ 96 px, icon 40 px + label 28 px (FR/EN)", () => {
     const locales = [
       { locale: "fr", messages: frMessages },
       { locale: "en", messages: enMessages },
-      { locale: "dioula", messages: dioulaMessages },
-      { locale: "baoule", messages: baouleMessages },
     ];
 
     for (const { locale, messages } of locales) {

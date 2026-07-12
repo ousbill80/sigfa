@@ -50,7 +50,7 @@ export function useVoiceAnnouncement(
       utterance.lang = localeToBcp47(locale);
       utterance.rate = voiceRate(isAccessibilityMode);
 
-      // Sélection de voix avec repli FR (Dioula/Baoulé sans voix native).
+      // Sélection de voix avec repli FR (locale sans voix native).
       const voices = window.speechSynthesis.getVoices?.() ?? [];
       const voice = pickVoiceForLocale(locale, voices);
       if (voice) utterance.voice = voice;

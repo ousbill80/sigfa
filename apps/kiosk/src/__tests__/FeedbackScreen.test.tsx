@@ -44,27 +44,6 @@ const enMessages = {
     thankYou: "Thank you for your feedback!",
   },
 };
-const dioulaMessages = {
-  feedback009: {
-    title: "I ka taama kɛra cogo di?",
-    starLabel: "Jate {n} / 5",
-    commentPlaceholder: "Kuma dɔ fara a kan (a ka kan)",
-    micLabel: "Kuma fɔ",
-    submitButton: "Ne ka miiriya ci",
-    thankYou: "I ni ce i ka miiriya la !",
-  },
-};
-const baouleMessages = {
-  feedback009: {
-    title: "Wɔ ba'n yoli sɛ?",
-    starLabel: "Jate {n} / 5",
-    commentPlaceholder: "Kan ndɛ (a kpli)",
-    micLabel: "Kan ndɛ",
-    submitButton: "Fa min angunndan'n mɛn",
-    thankYou: "N lɛ mɔ wɔ angunndan'n ti !",
-  },
-};
-
 const DONE_TRACKING = "V9k2mXpLqRwZsYn8fBjH";
 const props = { trackingId: DONE_TRACKING };
 
@@ -162,12 +141,10 @@ describe("KIOSK-009: FeedbackScreen", () => {
   });
 
   // ─── Critère 2 : 5 étoiles tactiles ≥ 72 px, label 28 px, ×4 langues ──────
-  it("KIOSK-009: 5 étoiles tactiles ≥ 72 px, label 28 px (snapshot Testing Library ×4 langues)", async () => {
+  it("KIOSK-009: 5 étoiles tactiles ≥ 72 px, label 28 px (Testing Library FR/EN)", async () => {
     const locales = [
       { locale: "fr", messages: frMessages },
       { locale: "en", messages: enMessages },
-      { locale: "dioula", messages: dioulaMessages },
-      { locale: "baoule", messages: baouleMessages },
     ];
     for (const { locale, messages } of locales) {
       mockGet(doneTicket(2));

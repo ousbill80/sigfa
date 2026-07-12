@@ -62,8 +62,8 @@ export function OfflineBanner({
       style={{
         backgroundColor: "var(--info)",
         color: "var(--ink-inverse)",
-        padding: "0.75rem 1rem",
-        borderRadius: "0.5rem",
+        padding: "var(--space-3) var(--space-4)",
+        borderRadius: "var(--r-md)",
         fontSize: "20px",
         textAlign: "center",
         opacity: fading ? 0 : 1,

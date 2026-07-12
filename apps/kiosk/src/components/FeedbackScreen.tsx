@@ -1,7 +1,8 @@
 /**
  * KIOSK-009 — FeedbackScreen.tsx
- * Feedback post-service sur borne : note 1-5 tactile + commentaire optionnel
- * (texte ou dictée vocale Web Speech API). Une décision par écran.
+ * Feedback post-service sur borne — refonte v2 : 5 étoiles OR premium sur
+ * --night, note 1-5 tactile + commentaire optionnel (texte ou dictée vocale
+ * Web Speech API). Une décision par écran.
  *
  * Règles :
  *  - Éligibilité : ticket DONE ET fenêtre < 24 h (via GET /public/tickets).
@@ -14,7 +15,7 @@
  *  - 422 TICKET_NOT_CLOSED | FEEDBACK_WINDOW_EXPIRED → retour accueil silencieux.
  *  - Bouton 🎤 masqué si SpeechRecognition absent (Electron).
  *  - Retour accueil auto après 30 s d'inactivité (60 s mode accessibilité).
- *  - Tokens CSS uniquement, cibles ≥ 72 px, contraste ≥ 7:1.
+ *  - Tokens @sigfa/ui uniquement, cibles ≥ 72 px, contraste ≥ 7:1.
  */
 "use client";
 
@@ -167,17 +168,23 @@ export function FeedbackScreen({
           backgroundColor: "var(--surface-kiosk)",
           minHeight: "100vh",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "2rem",
+          gap: "var(--space-6)",
+          padding: "var(--space-8)",
         }}
       >
+        <span aria-hidden="true" style={{ fontSize: "56px", color: "var(--gold)" }}>
+          ★
+        </span>
         <p
           data-testid="feedback-thankyou"
           style={{
             fontSize: `${labelFontPx}px`,
             color: "var(--ink-inverse)",
             textAlign: "center",
+            margin: 0,
           }}
         >
           {t("thankYou")}
@@ -195,23 +202,25 @@ export function FeedbackScreen({
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: "1.5rem",
-        padding: "2rem",
+        gap: "var(--space-6)",
+        padding: "var(--space-8)",
       }}
     >
       <h1
         data-testid="feedback-title"
         style={{
+          fontFamily: "var(--font-display)",
           fontSize: "28px",
-          fontWeight: "bold",
+          fontWeight: 600,
           color: "var(--ink-inverse)",
           textAlign: "center",
+          margin: 0,
         }}
       >
         {t("title")}
       </h1>
 
-      {/* Note 1-5 : 5 étoiles tactiles ≥ 72 px, espacement ≥ 16 px */}
+      {/* Note 1-5 : 5 étoiles OR tactiles ≥ 72 px, espacement ≥ 16 px */}
       <div
         data-testid="star-rating"
         role="radiogroup"
@@ -221,30 +230,35 @@ export function FeedbackScreen({
           justifyContent: "center",
         }}
       >
-        {[1, 2, 3, 4, 5].map((value) => (
-          <button
-            key={value}
-            type="button"
-            data-testid="feedback-star"
-            role="radio"
-            aria-checked={note === value}
-            aria-label={t("starLabel", { n: value })}
-            onClick={() => setNote(value)}
-            style={{
-              minWidth: "72px",
-              minHeight: "72px",
-              fontSize: `${labelFontPx}px`,
-              color:
-                value <= note ? "var(--warning)" : "var(--ink-muted-inv)",
-              backgroundColor: "var(--surface-kiosk)",
-              border: "2px solid var(--ink-inverse)",
-              borderRadius: "0.5rem",
-              cursor: "pointer",
-            }}
-          >
-            <span aria-hidden="true">{value <= note ? "★" : "☆"}</span>
-          </button>
-        ))}
+        {[1, 2, 3, 4, 5].map((value) => {
+          const active = value <= note;
+          return (
+            <button
+              key={value}
+              type="button"
+              data-testid="feedback-star"
+              role="radio"
+              aria-checked={note === value}
+              aria-label={t("starLabel", { n: value })}
+              onClick={() => setNote(value)}
+              style={{
+                minWidth: "72px",
+                minHeight: "72px",
+                fontSize: `${labelFontPx}px`,
+                color: active ? "var(--gold)" : "var(--ink-muted-inv)",
+                backgroundColor: active ? "var(--surface-1)" : "transparent",
+                border: active
+                  ? "2px solid var(--gold)"
+                  : "2px solid var(--ink-inverse)",
+                boxShadow: active ? "var(--shadow-gold)" : "none",
+                borderRadius: "var(--r-md)",
+                cursor: "pointer",
+              }}
+            >
+              <span aria-hidden="true">{active ? "★" : "☆"}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Commentaire optionnel (texte éditable ≤ 500 caractères) */}
@@ -261,9 +275,9 @@ export function FeedbackScreen({
           fontSize: "24px",
           color: "var(--ink-strong)",
           backgroundColor: "var(--surface-1)",
-          border: "none",
-          borderRadius: "0.5rem",
-          padding: "1rem",
+          border: "1px solid var(--hairline)",
+          borderRadius: "var(--r-md)",
+          padding: "var(--space-4)",
           resize: "none",
         }}
       />
@@ -281,14 +295,14 @@ export function FeedbackScreen({
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "0.5rem",
+            gap: "var(--space-2)",
             fontSize: `${labelFontPx}px`,
             color: "var(--ink-inverse)",
-            backgroundColor: "var(--surface-kiosk)",
+            backgroundColor: "transparent",
             border: "2px solid var(--ink-inverse)",
-            borderRadius: "0.5rem",
+            borderRadius: "var(--r-md)",
             cursor: "pointer",
-            padding: "0.5rem 1rem",
+            padding: "var(--space-2) var(--space-4)",
           }}
         >
           <span aria-hidden="true">🎤</span>
@@ -308,11 +322,12 @@ export function FeedbackScreen({
           width: "100%",
           maxWidth: "640px",
           backgroundColor: "var(--brand)",
-          color: "var(--ink-inverse)",
+          color: "var(--brand-contrast)",
           fontSize: "28px",
-          fontWeight: "bold",
+          fontWeight: 600,
           border: "none",
-          borderRadius: "0.75rem",
+          boxShadow: note < 1 ? "none" : "var(--shadow-brand)",
+          borderRadius: "var(--r-lg)",
           cursor: note < 1 ? "not-allowed" : "pointer",
           opacity: note < 1 ? 0.5 : 1,
         }}

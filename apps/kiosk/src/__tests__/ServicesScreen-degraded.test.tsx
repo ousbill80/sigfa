@@ -70,44 +70,6 @@ const enMessages = makeMessages(
   }
 );
 
-const dioulaMessages = makeMessages(
-  {
-    title: "Baara min ye i fe?",
-    backButton: "Segin",
-    waitEstimate: "~{minutes} min",
-    seeMore: "Baara wɛrɛw ye",
-    closedService: "Kɛnɛ tɛ — {schedule}",
-    accessibilityButton: "♿ Tɔgɔ Segin",
-    emptyTitle: "Baara si tɛ yen",
-    emptyMessage: "Taa accueil la — mɔgɔ dɔ bena i dɛmɛ.",
-    offlineBanner: "Mode hors connexion",
-  },
-  {
-    longQueueTitle: "Mɔgɔ caman — {estimate} min ɲɔgɔn",
-    longQueueMessage: "SMS sɔrɔ ka segin i ka waati la.",
-    phoneFieldLabel: "I ka wolofɔn nimɔrɔ",
-  }
-);
-
-const baouleMessages = makeMessages(
-  {
-    title: "Sɛ bo nun a klɛ?",
-    backButton: "Wɔ sin",
-    waitEstimate: "~{minutes} min",
-    seeMore: "Sɛ wɛlɛ yɛ",
-    closedService: "Kpli — {schedule}",
-    accessibilityButton: "♿ Klo tafue",
-    emptyTitle: "Sɛ klɛ aman",
-    emptyMessage: "Kɔ accueil — mɔgɔ dɔ a su.",
-    offlineBanner: "Mode hors connexion",
-  },
-  {
-    longQueueTitle: "Sran kpanngban — {estimate} min",
-    longQueueMessage: "Sɔ SMS naan sin blɛ wɔ blɛ nun.",
-    phoneFieldLabel: "Wɔ telefɔn nimɛro",
-  }
-);
-
 import { ServicesScreen } from "@/components/ServicesScreen";
 import type { ServiceItem } from "@/components/ServicesScreen";
 
@@ -174,8 +136,6 @@ describe("KIOSK-007: ServicesScreen file longue + service fermé", () => {
   it.each([
     { locale: "fr", messages: frMessages },
     { locale: "en", messages: enMessages },
-    { locale: "dioula", messages: dioulaMessages },
-    { locale: "baoule", messages: baouleMessages },
   ])(
     "KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot $locale)",
     ({ locale, messages }) => {

@@ -41,7 +41,8 @@ function getAllKeys(
 }
 
 describe("KIOSK-001: i18n", () => {
-  const SUPPORTED_LOCALES = ["fr", "dioula", "baoule", "en"];
+  // Décision PO : FR/EN uniquement (Dioula/Baoulé retirés).
+  const SUPPORTED_LOCALES = ["fr", "en"];
 
   it("KIOSK-001: tous les fichiers de messages ont les mêmes clés", () => {
     const allMessages = SUPPORTED_LOCALES.map((locale) => ({
@@ -69,13 +70,14 @@ describe("KIOSK-001: i18n", () => {
     }
   });
 
-  it("KIOSK-001: next-intl routing supporte fr, dioula, baoule, en", async () => {
+  it("KIOSK-001: next-intl routing supporte fr, en (Dioula/Baoulé retirés)", async () => {
     const { routing } = await import("../i18n/routing");
 
     expect(routing.locales).toContain("fr");
-    expect(routing.locales).toContain("dioula");
-    expect(routing.locales).toContain("baoule");
     expect(routing.locales).toContain("en");
+    expect(routing.locales).not.toContain("dioula");
+    expect(routing.locales).not.toContain("baoule");
+    expect(routing.locales).toHaveLength(2);
     expect(routing.defaultLocale).toBe("fr");
   });
 });

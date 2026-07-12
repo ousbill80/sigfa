@@ -1,29 +1,37 @@
 /**
- * KIOSK-001 — design-tokens.css
- * Variables CSS tokens SIGFA kiosque.
- * Seul fichier autorisé à contenir des valeurs hexadécimales.
- * Toute utilisation dans le code doit référencer ces variables.
+ * KIOSK — design-tokens.css (v2 « Sérénité Premium »).
+ *
+ * SOURCE UNIQUE : les valeurs hex vivent désormais dans `@sigfa/ui/tokens.css`
+ * (design system partagé). Ce fichier n'est plus qu'un PONT : il ré-exporte les
+ * tokens `@sigfa/ui` et déclare les ALIAS historiques du kiosque
+ * (`--surface-kiosk`, `--action-label`, `--ink-strong`, `--ink-muted-inv`) qui
+ * pointent vers les tokens v2. Aucune couleur propre au kiosque n'est inventée.
+ *
+ * Deux tokens (`--surface-kiosk`, `--ink-inverse`) sont écrits en hex littéral
+ * IDENTIQUE à `--night` / `--ink-inverse` de `@sigfa/ui` : ils constituent la
+ * paire texte/fond haut-contraste du kiosque (≥ 7:1) et sont lus tels quels par
+ * les preuves de contraste WCAG. Toute autre valeur reste `var(--token-ui)`.
  */
+@import "@sigfa/ui/tokens.css";
 
 :root {
-  /* ─── Surfaces kiosque ─────────────────────────────────────────────────────── */
-  --surface-kiosk: #0e1420;
-  --surface-screen: #0a0f1a;
-  --surface-0: #fafbfc;
-  --surface-1: #ffffff;
+  /* ─── Surfaces kiosque (fond « brun-nuit » v2 qui vibre l'or) ─────────────── */
+  --surface-kiosk: #16110b; /* = --night (@sigfa/ui) — fond plein soleil */
+  --surface-screen: var(--night-2);
+  --surface-0: var(--paper);
+  /* --surface-1 (cartes) : hérité tel quel de @sigfa/ui (#ffffff). */
 
-  /* ─── Texte ───────────────────────────────────────────────────────────────── */
-  --ink-inverse: #f5f7fa;
-  --ink-strong: #101828;
-  --ink-soft: #475467;
-  --ink-muted-inv: #98a2b3;
+  /* ─── Texte ──────────────────────────────────────────────────────────────── */
+  --ink-inverse: #fbf6ee; /* = --ink-inverse (@sigfa/ui) — blanc chaud ≥ 7:1 sur night */
+  --ink-strong: var(--ink); /* texte sur surface claire — brun-noir chaud */
+  --ink-muted-inv: var(--ink-inverse-soft); /* secondaire sur sombre */
+  /* --ink-soft : hérité de @sigfa/ui (taupe chaud, texte sur clair). */
 
-  /* ─── Marque (surcharge par tenant via --tenant-brand) ──────────────────── */
-  --brand: var(--tenant-brand, #1570ef);
+  /* Libellé d'action sur carte claire (contraste 18:1 sur --surface-1). */
+  --action-label: var(--brand-strong);
 
-  /* ─── États sémantiques ─────────────────────────────────────────────────── */
-  --success: #12b76a;
-  --warning: #f79009;
-  --danger: #f04438;
-  --info: #2e90fa;
+  /* ─── Marque : héritée de @sigfa/ui (terracotta/ambre + or & forêt). ──────── */
+  /* Le theming banque surcharge --brand en amont ; --forest/--gold restent. */
+
+  /* ─── États sémantiques : hérités de @sigfa/ui (harmonisés palette chaude). ── */
 }

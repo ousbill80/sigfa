@@ -1,7 +1,8 @@
 /**
  * KIOSK-004 — ConfirmationScreen.tsx
- * Saisie du numéro de téléphone + émission de ticket.
- * Clavier numérique natif (pas de clavier OS).
+ * Saisie du numéro de téléphone + émission de ticket — refonte v2.
+ * Clavier numérique natif (pas de clavier OS) sur --night, cibles ≥ 72px.
+ * Tokens @sigfa/ui uniquement, aucune valeur hex en dur.
  */
 "use client";
 
@@ -216,8 +217,11 @@ export function ConfirmationScreen({
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
-        padding: "2rem",
-        gap: "1.5rem",
+        padding: "var(--space-8)",
+        gap: "var(--space-6)",
+        maxWidth: "760px",
+        marginInline: "auto",
+        width: "100%",
       }}
     >
       {/* KIOSK-006 : bandeau offline discret (--info, non bloquant), fondu 250 ms au retour réseau */}
@@ -231,11 +235,12 @@ export function ConfirmationScreen({
           role="alert"
           style={{
             backgroundColor: "var(--surface-1)",
-            borderRadius: "0.75rem",
-            padding: "1.5rem",
+            borderRadius: "var(--r-lg)",
+            boxShadow: "var(--shadow-2)",
+            padding: "var(--space-6)",
             display: "flex",
             alignItems: "center",
-            gap: "1rem",
+            gap: "var(--space-4)",
           }}
         >
           <span
@@ -254,10 +259,12 @@ export function ConfirmationScreen({
       {/* Title */}
       <h1
         style={{
+          fontFamily: "var(--font-display)",
           fontSize: "24px",
           color: "var(--ink-inverse)",
-          fontWeight: "bold",
+          fontWeight: 600,
           textAlign: "center",
+          margin: 0,
         }}
       >
         {t("title")}
@@ -268,10 +275,11 @@ export function ConfirmationScreen({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.5rem",
+          gap: "var(--space-2)",
           backgroundColor: "var(--surface-1)",
-          borderRadius: "0.5rem",
-          padding: "1rem 1.5rem",
+          borderRadius: "var(--r-md)",
+          boxShadow: "var(--shadow-1)",
+          padding: "var(--space-4) var(--space-6)",
         }}
       >
         <span style={{ fontSize: "24px", color: "var(--ink-soft)" }}>
@@ -286,7 +294,7 @@ export function ConfirmationScreen({
           style={{
             flex: 1,
             fontSize: "24px",
-            color: "var(--ink-inverse)",
+            color: "var(--ink-strong)",
             background: "none",
             border: "none",
             outline: "none",
@@ -315,7 +323,7 @@ export function ConfirmationScreen({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "0.75rem",
+            gap: "var(--space-3)",
             fontSize: "20px",
             color: "var(--ink-inverse)",
             cursor: "pointer",
@@ -325,7 +333,7 @@ export function ConfirmationScreen({
             type="checkbox"
             checked={smsConsent}
             onChange={(e) => setSmsConsent(e.target.checked)}
-            style={{ width: "24px", height: "24px" }}
+            style={{ width: "24px", height: "24px", accentColor: "var(--brand)" }}
           />
           {t("smsConsent")}
         </label>
@@ -337,7 +345,7 @@ export function ConfirmationScreen({
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "1rem",
+          gap: "var(--space-4)",
           flex: 1,
         }}
       >
@@ -351,11 +359,12 @@ export function ConfirmationScreen({
               minWidth: "72px",
               minHeight: "72px",
               fontSize: "28px",
-              fontWeight: "bold",
-              color: "var(--ink-inverse)",
+              fontWeight: 600,
+              color: "var(--ink-strong)",
               backgroundColor: "var(--surface-1)",
-              border: "none",
-              borderRadius: "0.5rem",
+              border: "1px solid var(--hairline)",
+              boxShadow: "var(--shadow-1)",
+              borderRadius: "var(--r-md)",
               cursor: isLoading ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
@@ -375,11 +384,12 @@ export function ConfirmationScreen({
         style={{
           minHeight: "88px",
           backgroundColor: "var(--brand)",
-          color: "var(--ink-inverse)",
+          color: "var(--brand-contrast)",
           fontSize: "28px",
-          fontWeight: "bold",
+          fontWeight: 600,
           border: "none",
-          borderRadius: "0.75rem",
+          boxShadow: "var(--shadow-brand)",
+          borderRadius: "var(--r-lg)",
           cursor: isLoading ? "not-allowed" : "pointer",
         }}
       >
@@ -393,11 +403,11 @@ export function ConfirmationScreen({
         disabled={isLoading}
         style={{
           minHeight: "72px",
-          backgroundColor: "var(--surface-1)",
-          color: "var(--ink-soft)",
+          backgroundColor: "transparent",
+          color: "var(--ink-inverse)",
           fontSize: "28px",
-          border: "none",
-          borderRadius: "0.75rem",
+          border: "2px solid var(--ink-inverse)",
+          borderRadius: "var(--r-lg)",
           cursor: isLoading ? "not-allowed" : "pointer",
         }}
       >

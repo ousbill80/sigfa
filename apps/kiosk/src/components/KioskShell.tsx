@@ -27,18 +27,20 @@ export function KioskShell() {
     >
       <h1
         style={{
-          fontSize: "2rem",
-          fontWeight: "bold",
-          marginBottom: "1rem",
+          fontFamily: "var(--font-display)",
+          fontSize: "var(--text-3xl)",
+          fontWeight: 700,
+          letterSpacing: "var(--tracking-tight)",
+          marginBottom: "var(--space-4)",
         }}
       >
         {t("welcome")}
       </h1>
       <p
         style={{
-          fontSize: "1.25rem",
+          fontSize: "var(--text-xl)",
           color: "var(--ink-muted-inv)",
-          marginBottom: "2rem",
+          marginBottom: "var(--space-8)",
         }}
       >
         {t("chooseLanguage")}

@@ -21,7 +21,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@sigfa/contracts": ["../../packages/contracts/dist/src/client.d.ts"]
+      "@sigfa/contracts": ["../../packages/contracts/dist/src/client.d.ts"],
+      // Unifie les types React sur UNE seule copie (@types/react local) — évite
+      // le conflit de doublon @types/react (18 mobile / 19) quand tsc compile la
+      // source de @sigfa/ui (package source-exported). Même parade qu'apps/web.
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
     }
   },
   "include": [

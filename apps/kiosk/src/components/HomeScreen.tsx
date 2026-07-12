@@ -1,7 +1,8 @@
 /**
  * KIOSK-002 — HomeScreen.tsx
- * Écran d'accueil / sélection de langue.
- * Tokens CSS uniquement, 4 cartes de langue.
+ * Écran d'accueil / sélection de langue — refonte v2 « Sérénité Premium ».
+ * Fond --night qui vibre l'or, respiration généreuse, cartes chaudes.
+ * FR/EN uniquement (décision PO). Tokens @sigfa/ui, aucune valeur hex en dur.
  */
 "use client";
 
@@ -18,14 +19,12 @@ interface HomeScreenProps {
 
 interface LanguageCard {
   locale: string;
-  labelKey: "languageFr" | "languageDioula" | "languageBaoule" | "languageEn";
+  labelKey: "languageFr" | "languageEn";
   icon: string;
 }
 
 const LANGUAGE_CARDS: LanguageCard[] = [
   { locale: "fr", labelKey: "languageFr", icon: "🇫🇷" },
-  { locale: "dioula", labelKey: "languageDioula", icon: "🌍" },
-  { locale: "baoule", labelKey: "languageBaoule", icon: "🌿" },
   { locale: "en", labelKey: "languageEn", icon: "🇬🇧" },
 ];
 
@@ -64,23 +63,47 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "2rem",
+        justifyContent: "center",
+        padding: "var(--space-16) var(--space-8)",
+        gap: "var(--space-8)",
         position: "relative",
+        overflow: "hidden",
       }}
     >
-      {/* Offline banner */}
+      {/* Halo or discret — signature v2 sur night (décoratif, non interactif). */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: "-18%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "640px",
+          height: "640px",
+          borderRadius: "var(--r-full)",
+          background:
+            "radial-gradient(circle, var(--gold-soft) 0%, rgba(199,154,58,0.10) 42%, transparent 70%)",
+          opacity: 0.28,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Offline banner (--info doux) — conserve data-testid + token --info attendus. */}
       {isOffline && (
         <div
           data-testid="offline-banner"
+          role="status"
+          aria-live="polite"
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
+            top: "var(--space-6)",
+            left: "var(--space-6)",
+            right: "var(--space-6)",
             backgroundColor: "var(--info)",
             color: "var(--ink-inverse)",
             textAlign: "center",
-            padding: "0.75rem 1rem",
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--r-md)",
             fontSize: "20px",
           }}
         >
@@ -89,38 +112,48 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
       )}
 
       {/* Title */}
-      <h1
-        style={{
-          fontSize: "40px",
-          fontWeight: "bold",
-          textAlign: "center",
-          color: "var(--ink-inverse)",
-          marginTop: isOffline ? "4rem" : "2rem",
-          marginBottom: "0.5rem",
-        }}
-      >
-        {t("title")}
-      </h1>
-
-      <p
-        style={{
-          fontSize: "24px",
-          color: "var(--ink-soft)",
-          textAlign: "center",
-          marginBottom: "2rem",
-        }}
-      >
-        {t("chooseLanguage")}
-      </p>
-
-      {/* Language cards grid */}
       <div
         style={{
+          position: "relative",
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-3)",
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--text-4xl)",
+            fontWeight: 700,
+            letterSpacing: "var(--tracking-tight)",
+            lineHeight: "var(--leading-tight)",
+            color: "var(--ink-inverse)",
+            margin: 0,
+          }}
+        >
+          {t("title")}
+        </h1>
+        <p
+          style={{
+            fontSize: "var(--text-xl)",
+            color: "var(--ink-muted-inv)",
+            margin: 0,
+          }}
+        >
+          {t("chooseLanguage")}
+        </p>
+      </div>
+
+      {/* Language cards grid (FR/EN) — cibles généreuses ≥ 120px. */}
+      <div
+        style={{
+          position: "relative",
           display: "grid",
           gridTemplateColumns: "repeat(2, 1fr)",
-          gap: "1.5rem",
+          gap: "var(--space-6)",
           width: "100%",
-          maxWidth: "800px",
+          maxWidth: "760px",
         }}
       >
         {LANGUAGE_CARDS.map((card) => (
@@ -131,23 +164,22 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
             style={{
               minHeight: "120px",
               backgroundColor: "var(--surface-1)",
-              borderRadius: "1rem",
-              border: "none",
+              borderRadius: "var(--r-lg)",
+              border: "1px solid var(--hairline)",
+              boxShadow: "var(--shadow-2)",
               cursor: "pointer",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: "0.75rem",
-              padding: "1.5rem",
+              gap: "var(--space-3)",
+              padding: "var(--space-8)",
             }}
           >
             <span
               data-testid="card-icon"
-              style={{
-                fontSize: "40px",
-                lineHeight: 1,
-              }}
+              aria-hidden="true"
+              style={{ fontSize: "48px", lineHeight: 1 }}
             >
               {card.icon}
             </span>
@@ -155,7 +187,7 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
               data-testid="card-label"
               style={{
                 fontSize: "28px",
-                fontWeight: "bold",
+                fontWeight: 600,
                 color: "var(--action-label)",
               }}
             >
@@ -169,9 +201,9 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
       <div
         data-testid="queue-status"
         style={{
-          marginTop: "2rem",
+          position: "relative",
           fontSize: "20px",
-          color: "var(--ink-soft)",
+          color: "var(--ink-muted-inv)",
           textAlign: "center",
         }}
       >

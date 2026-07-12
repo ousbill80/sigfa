@@ -46,14 +46,14 @@ export function VoiceButton({
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "0.5rem",
+        gap: "var(--space-2)",
         fontSize: `${labelFontPx}px`,
         color: "var(--ink-inverse)",
-        backgroundColor: "var(--surface-kiosk)",
-        border: "2px solid var(--ink-inverse)",
-        borderRadius: "0.5rem",
+        backgroundColor: "transparent",
+        border: "2px solid var(--gold)",
+        borderRadius: "var(--r-md)",
         cursor: "pointer",
-        padding: "0.5rem 1rem",
+        padding: "var(--space-2) var(--space-4)",
       }}
     >
       <span aria-hidden="true">🔊</span>

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@sigfa/contracts": "workspace:*",
+    "@sigfa/ui": "workspace:*",
     "dexie": "^4.4.4",
     "next": "^15.0.0",
     "next-intl": "^3.0.0",

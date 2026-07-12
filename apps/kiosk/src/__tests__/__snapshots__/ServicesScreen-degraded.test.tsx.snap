@@ -1,172 +1,38 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'baoule') 1`] = `
-<main
-  role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
->
-  <header
-    style="display: flex; align-items: center; gap: 1rem;"
-  >
-    <button
-      data-testid="back-btn"
-      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: 0.5rem; min-width: 72px; min-height: 72px;"
-    >
-      ← 
-      Wɔ sin
-    </button>
-    <span
-      style="font-size: 28px; color: var(--ink-soft); margin-left: auto;"
-    >
-      FR
-    </span>
-  </header>
-  <h1
-    style="font-size: 32px; font-weight: bold; color: var(--ink-inverse); text-align: center;"
-  >
-    Sɛ bo nun a klɛ?
-  </h1>
-  <div
-    style="display: flex; flex-direction: column; gap: 1rem; flex: 1 1 0%;"
-  >
-    <button
-      aria-disabled="true"
-      data-testid="service-card"
-      style="min-height: 96px; background-color: var(--surface-1); border-radius: 0.75rem; cursor: not-allowed; display: flex; align-items: center; padding: 1rem 1.5rem; gap: 1.25rem; opacity: 0.4; text-align: left;"
-    >
-      <span
-        data-testid="service-icon"
-        style="font-size: 40px; line-height: 1;"
-      >
-        💸
-      </span>
-      <div
-        style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 0%;"
-      >
-        <span
-          data-testid="service-label"
-          style="font-size: 28px; font-weight: bold; color: var(--action-label);"
-        >
-          Virement international
-        </span>
-        <span
-          data-testid="service-schedule"
-          style="font-size: 20px; color: var(--ink-soft);"
-        >
-          Kpli — lundi 08h00
-        </span>
-      </div>
-    </button>
-  </div>
-  <button
-    data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-soft); background: none; cursor: pointer; padding: 0.5rem; min-height: 72px; align-self: center;"
-  >
-    ♿ Klo tafue
-  </button>
-</main>
-`;
-
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'dioula') 1`] = `
-<main
-  role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
->
-  <header
-    style="display: flex; align-items: center; gap: 1rem;"
-  >
-    <button
-      data-testid="back-btn"
-      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: 0.5rem; min-width: 72px; min-height: 72px;"
-    >
-      ← 
-      Segin
-    </button>
-    <span
-      style="font-size: 28px; color: var(--ink-soft); margin-left: auto;"
-    >
-      FR
-    </span>
-  </header>
-  <h1
-    style="font-size: 32px; font-weight: bold; color: var(--ink-inverse); text-align: center;"
-  >
-    Baara min ye i fe?
-  </h1>
-  <div
-    style="display: flex; flex-direction: column; gap: 1rem; flex: 1 1 0%;"
-  >
-    <button
-      aria-disabled="true"
-      data-testid="service-card"
-      style="min-height: 96px; background-color: var(--surface-1); border-radius: 0.75rem; cursor: not-allowed; display: flex; align-items: center; padding: 1rem 1.5rem; gap: 1.25rem; opacity: 0.4; text-align: left;"
-    >
-      <span
-        data-testid="service-icon"
-        style="font-size: 40px; line-height: 1;"
-      >
-        💸
-      </span>
-      <div
-        style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 0%;"
-      >
-        <span
-          data-testid="service-label"
-          style="font-size: 28px; font-weight: bold; color: var(--action-label);"
-        >
-          Virement international
-        </span>
-        <span
-          data-testid="service-schedule"
-          style="font-size: 20px; color: var(--ink-soft);"
-        >
-          Kɛnɛ tɛ — lundi 08h00
-        </span>
-      </div>
-    </button>
-  </div>
-  <button
-    data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-soft); background: none; cursor: pointer; padding: 0.5rem; min-height: 72px; align-self: center;"
-  >
-    ♿ Tɔgɔ Segin
-  </button>
-</main>
-`;
-
 exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'en') 1`] = `
 <main
   role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
+  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-8); gap: var(--space-6);"
 >
   <header
-    style="display: flex; align-items: center; gap: 1rem;"
+    style="display: flex; align-items: center; gap: var(--space-4);"
   >
     <button
       data-testid="back-btn"
-      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: 0.5rem; min-width: 72px; min-height: 72px;"
+      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: var(--space-2); min-width: 72px; min-height: 72px;"
     >
       ← 
       Back
     </button>
     <span
-      style="font-size: 28px; color: var(--ink-soft); margin-left: auto;"
+      style="font-size: 28px; color: var(--ink-muted-inv); margin-left: auto;"
     >
       FR
     </span>
   </header>
   <h1
-    style="font-size: 32px; font-weight: bold; color: var(--ink-inverse); text-align: center;"
+    style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); text-align: center; margin: 0px;"
   >
     Which service do you need?
   </h1>
   <div
-    style="display: flex; flex-direction: column; gap: 1rem; flex: 1 1 0%;"
+    style="display: flex; flex-direction: column; gap: var(--space-4); flex: 1 1 0%;"
   >
     <button
       aria-disabled="true"
       data-testid="service-card"
-      style="min-height: 96px; background-color: var(--surface-1); border-radius: 0.75rem; cursor: not-allowed; display: flex; align-items: center; padding: 1rem 1.5rem; gap: 1.25rem; opacity: 0.4; text-align: left;"
+      style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
     >
       <span
         data-testid="service-icon"
@@ -175,11 +41,11 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
         💸
       </span>
       <div
-        style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 0%;"
+        style="display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 0%;"
       >
         <span
           data-testid="service-label"
-          style="font-size: 28px; font-weight: bold; color: var(--action-label);"
+          style="font-size: 28px; font-weight: 600; color: var(--action-label);"
         >
           Virement international
         </span>
@@ -194,7 +60,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
   </div>
   <button
     data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-soft); background: none; cursor: pointer; padding: 0.5rem; min-height: 72px; align-self: center;"
+    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center;"
   >
     ♿ Priority access
   </button>
@@ -204,36 +70,36 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
 exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'fr') 1`] = `
 <main
   role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
+  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-8); gap: var(--space-6);"
 >
   <header
-    style="display: flex; align-items: center; gap: 1rem;"
+    style="display: flex; align-items: center; gap: var(--space-4);"
   >
     <button
       data-testid="back-btn"
-      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: 0.5rem; min-width: 72px; min-height: 72px;"
+      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: var(--space-2); min-width: 72px; min-height: 72px;"
     >
       ← 
       Retour
     </button>
     <span
-      style="font-size: 28px; color: var(--ink-soft); margin-left: auto;"
+      style="font-size: 28px; color: var(--ink-muted-inv); margin-left: auto;"
     >
       FR
     </span>
   </header>
   <h1
-    style="font-size: 32px; font-weight: bold; color: var(--ink-inverse); text-align: center;"
+    style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); text-align: center; margin: 0px;"
   >
     Quel service souhaitez-vous ?
   </h1>
   <div
-    style="display: flex; flex-direction: column; gap: 1rem; flex: 1 1 0%;"
+    style="display: flex; flex-direction: column; gap: var(--space-4); flex: 1 1 0%;"
   >
     <button
       aria-disabled="true"
       data-testid="service-card"
-      style="min-height: 96px; background-color: var(--surface-1); border-radius: 0.75rem; cursor: not-allowed; display: flex; align-items: center; padding: 1rem 1.5rem; gap: 1.25rem; opacity: 0.4; text-align: left;"
+      style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
     >
       <span
         data-testid="service-icon"
@@ -242,11 +108,11 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
         💸
       </span>
       <div
-        style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 0%;"
+        style="display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 0%;"
       >
         <span
           data-testid="service-label"
-          style="font-size: 28px; font-weight: bold; color: var(--action-label);"
+          style="font-size: 28px; font-weight: 600; color: var(--action-label);"
         >
           Virement international
         </span>
@@ -261,7 +127,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
   </div>
   <button
     data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-soft); background: none; cursor: pointer; padding: 0.5rem; min-height: 72px; align-self: center;"
+    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center;"
   >
     ♿ Accès prioritaire
   </button>

@@ -96,42 +96,6 @@ const enMessages = {
   },
 };
 
-const dioulaMessages = {
-  ticket005: {
-    position: "I sigi ka file kɔnɔ: {position}",
-    waitEstimate: "Lododon: {minutes} min",
-    printing: "I ka tikɛ bɛ printi...",
-    smsSent: "SMS tɛmɛna {maskedPhone} ma",
-    returning: "Segin bɛ kɛ {seconds} sigandin kɔnɔ",
-    voiceAnnounce: "I ka nimɔrɔ ye {displayNumber}. I bɛ position {position} la. Lododon: {minutes} miniti.",
-    offlineBanner: "Mode hors connexion — tikɛ sɔgɔsɔgɔ",
-    offlineInfo: "Tikɛ local — sync bɛna kɛ reconnexion ma",
-    printerError: "Imprimante tɛ baara kɛ — mɔgɔ dɔ bena i ka tikɛ d'i ma",
-  },
-  voice008: { playLabel: "Écouter" },
-  degraded007: {
-    photographNumber: "I ka nimɔrɔ foto ta walima a sɔrɔ SMS la",
-  },
-};
-
-const baouleMessages = {
-  ticket005: {
-    position: "Wɔ sigi file nun: {position}",
-    waitEstimate: "Lododon: {minutes} min",
-    printing: "Wɔ tikɛ'n bla printi...",
-    smsSent: "SMS kɔ {maskedPhone}",
-    returning: "Wɔ sin bɛ {seconds} sigandin nun",
-    voiceAnnounce: "Wɔ nimɛro yɛ {displayNumber}. Wɔ sigi {position} nun. Lododon: {minutes} miniti.",
-    offlineBanner: "Mode hors connexion — tikɛ sɔgɔsɔgɔ",
-    offlineInfo: "Tikɛ local — sync reconnexion ma",
-    printerError: "Printi aman — mɔgɔ dɔ a su tikɛ'n man",
-  },
-  voice008: { playLabel: "Écouter" },
-  degraded007: {
-    photographNumber: "Foto wɔ nimɛro annzɛ sɔ SMS nun",
-  },
-};
-
 import { TicketScreen } from "@/components/TicketScreen";
 
 const defaultProps = {
@@ -150,12 +114,13 @@ describe("KIOSK-005: TicketScreen", () => {
     vi.useRealTimers();
   });
 
-  it("KIOSK-005: number rendered at 128 px, token --brand, in 4 languages without overflow (snapshot)", () => {
+  it("KIOSK-005: number rendered as TicketMoment hero (--display or), FR/EN without overflow", () => {
+    // Refonte v2 : le numéro est le HÉROS, rendu par le composant TicketMoment
+    // de @sigfa/ui (--display en --gold sur --night, halo doré). Le style vient
+    // de la classe `.sig-ticket__number` (tokens design system), plus d'inline.
     const locales = [
       { locale: "fr", messages: frMessages },
       { locale: "en", messages: enMessages },
-      { locale: "dioula", messages: dioulaMessages },
-      { locale: "baoule", messages: baouleMessages },
     ];
 
     for (const { locale, messages } of locales) {
@@ -167,8 +132,8 @@ describe("KIOSK-005: TicketScreen", () => {
 
       const numberEl = container.querySelector("[data-testid='ticket-number']") as HTMLElement;
       expect(numberEl, `Ticket number element for ${locale}`).toBeInTheDocument();
-      expect(numberEl.style.fontSize, `Font size for ${locale}`).toBe("128px");
-      expect(numberEl.style.color, `Color for ${locale}`).toBe("var(--brand)");
+      // Porté par le composant TicketMoment (classe design system, tokens or).
+      expect(numberEl.className, `Ticket number class for ${locale}`).toContain("sig-ticket__number");
       expect(numberEl.textContent, `Text for ${locale}`).toBe("A007");
 
       unmount();

@@ -3,8 +3,8 @@
  *
  * Regroupe la logique métier indépendante du rendu React :
  *   - registre SIGFA du texte annoncé (via traduction injectée) ;
- *   - mapping locale de session → BCP-47, avec fallback FR pour Dioula/Baoulé
- *     (aucune voix native disponible — fallback explicitement documenté) ;
+ *   - mapping locale de session → BCP-47 (FR/EN), avec repli FR pour toute
+ *     locale sans voix native (fallback explicitement documenté) ;
  *   - sélection d'une voix `SpeechSynthesisVoice` avec repli FR ;
  *   - `rate` ralentie (0.8) en mode accessibilité ;
  *   - facteurs de taille de police (28 px × 1.2) et de délais (× 2) ;
@@ -32,15 +32,12 @@ export const NOMINAL_TICKET_RETURN_MS = 4000 as const;
 export const A11Y_TICKET_RETURN_MS = 8000 as const;
 
 /**
- * BCP-47 des locales disposant d'une voix synthétique.
- * Dioula et Baoulé n'ont pas de voix native → fallback FR (documenté).
+ * BCP-47 des locales disposant d'une voix synthétique (FR/EN).
+ * Toute locale absente de cette table retombe sur le repli FR (documenté).
  */
 const LOCALE_BCP47: Record<string, string> = {
   fr: "fr-FR",
   en: "en-US",
-  // Fallback explicite : aucune voix native pour ces langues.
-  dioula: "fr-FR",
-  baoule: "fr-FR",
 };
 
 /** Locale BCP-47 de repli lorsqu'aucune voix native n'existe. */
@@ -83,7 +80,7 @@ export function buildVoiceAnnouncement(
  * Mappe une locale de session vers un tag BCP-47 pour la synthèse vocale.
  * Locale inconnue ou sans voix native → repli FR.
  *
- * @param locale - Locale de session (`fr` | `en` | `dioula` | `baoule` | …).
+ * @param locale - Locale de session (`fr` | `en` | …).
  * @returns Le tag BCP-47 cible.
  */
 export function localeToBcp47(locale: string): string {
@@ -117,7 +114,7 @@ export function pickVoiceForLocale(
   );
   if (byPrefix) return byPrefix;
 
-  // Repli FR explicite (Dioula/Baoulé sans voix native).
+  // Repli FR explicite (toute locale sans voix native disponible).
   const frFallback = voices.find((v) => v.lang.split("-")[0] === "fr");
   return frFallback ?? null;
 }

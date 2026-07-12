@@ -63,40 +63,6 @@ const enMessages = {
   },
 };
 
-const dioulaMessages = {
-  confirmation004: {
-    title: "I ka wolofɔn nimɔrɔ (a ka kan)",
-    phonePrefix: "+225",
-    phonePlaceholder: "07 __ __ __ __ __",
-    smsConsent: "Ne b'a fɛ ka ne ka tikɛ sɔrɔ SMS la (a ka kan)",
-    ctaButton: "NE KA TIKƐ SƆRƆ",
-    skipButton: "Tɛmɛ (wolofɔn tɛ)",
-    errorPhone: "I ka wolofɔn tɛ yen — walima dili Tɛmɛ",
-    loadingMessage: "I ka tikɛ bɛ kɛ...",
-    offlineBanner: "Mode hors connexion — tikɛ local kɛra",
-  },
-  degraded007: {
-    systemError: "Kunnafoni dɔ bɛ yen. Taa accueil la, an bɛna i mara.",
-  },
-};
-
-const baouleMessages = {
-  confirmation004: {
-    title: "Wɔ telefɔn nimɛro (a kpli)",
-    phonePrefix: "+225",
-    phonePlaceholder: "07 __ __ __ __ __",
-    smsConsent: "N klɛ ka min tikɛ'n sɔ SMS nun (a kpli)",
-    ctaButton: "MIN TIKƐ'N NUN",
-    skipButton: "Wɔ sin (telefɔn aman)",
-    errorPhone: "Wɔ nimɛro klɛ aman — annzɛ dili Wɔ sin",
-    loadingMessage: "Wɔ tikɛ'n bla...",
-    offlineBanner: "Mode hors connexion — tikɛ local kɛli",
-  },
-  degraded007: {
-    systemError: "Nzuɛ kun bo'. Kɔ accueil, é su wɔ.",
-  },
-};
-
 import { ConfirmationScreen } from "@/components/ConfirmationScreen";
 import { useOfflineTicket } from "@/hooks/useOfflineTicket";
 
@@ -284,12 +250,10 @@ describe("KIOSK-004: ConfirmationScreen", () => {
     });
   });
 
-  it("KIOSK-004: invalid number → inline message SIGFA register (Testing Library ×4 languages)", async () => {
+  it("KIOSK-004: invalid number → inline message SIGFA register (Testing Library FR/EN)", async () => {
     const locales = [
       { locale: "fr", messages: frMessages, errorMsg: "Il manque votre numéro — ou touchez Passer" },
       { locale: "en", messages: enMessages, errorMsg: "Phone number missing — or tap Skip" },
-      { locale: "dioula", messages: dioulaMessages, errorMsg: "I ka wolofɔn tɛ yen — walima dili Tɛmɛ" },
-      { locale: "baoule", messages: baouleMessages, errorMsg: "Wɔ nimɛro klɛ aman — annzɛ dili Wɔ sin" },
     ];
 
     for (const { locale, messages, errorMsg } of locales) {

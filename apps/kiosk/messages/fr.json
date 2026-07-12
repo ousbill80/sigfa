@@ -23,8 +23,6 @@
     "title": "Akwaba — Bienvenue",
     "chooseLanguage": "Choisissez votre langue",
     "languageFr": "Français",
-    "languageDioula": "Dioula",
-    "languageBaoule": "Baoulé",
     "languageEn": "English",
     "queueStatus": "File d'attente : {count} personnes — attente estimée : {minutes} min",
     "queueUnavailable": "File d'attente non disponible",

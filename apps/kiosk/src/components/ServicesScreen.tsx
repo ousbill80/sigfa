@@ -1,13 +1,15 @@
 /**
  * KIOSK-003 — ServicesScreen.tsx
- * Écran de sélection de service.
- * Tokens CSS uniquement, max 4 cartes + "Voir plus".
+ * Écran de sélection de service — refonte v2 « Sérénité Premium ».
+ * Grille de cartes chaudes sur --night, cibles ≥ 96px, max 4 + « Voir plus ».
+ * Tokens @sigfa/ui uniquement, aucune valeur hex en dur.
  */
 "use client";
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
+import { EmptyState } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { DEFAULT_LONG_QUEUE_THRESHOLD_MIN } from "@/hooks/useDegradedState";
@@ -76,30 +78,16 @@ export function ServicesScreen({
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "2rem",
-          gap: "1rem",
+          padding: "var(--space-8)",
+          color: "var(--ink-inverse)",
         }}
       >
-        <span style={{ fontSize: "64px" }}>🤷</span>
-        <h2
-          style={{
-            fontSize: "32px",
-            fontWeight: "bold",
-            color: "var(--ink-inverse)",
-            textAlign: "center",
-          }}
-        >
-          {t("emptyTitle")}
-        </h2>
-        <p
-          style={{
-            fontSize: "24px",
-            color: "var(--ink-soft)",
-            textAlign: "center",
-          }}
-        >
-          {t("emptyMessage")}
-        </p>
+        <EmptyState
+          icon={<span style={{ fontSize: "40px", lineHeight: 1 }}>🗂️</span>}
+          title={t("emptyTitle")}
+          description={t("emptyMessage")}
+          style={{ color: "var(--ink-inverse)" }}
+        />
       </main>
     );
   }
@@ -112,8 +100,8 @@ export function ServicesScreen({
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
-        padding: "2rem",
-        gap: "1.5rem",
+        padding: "var(--space-8)",
+        gap: "var(--space-6)",
       }}
     >
       {/* Header */}
@@ -121,7 +109,7 @@ export function ServicesScreen({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "1rem",
+          gap: "var(--space-4)",
         }}
       >
         <button
@@ -133,7 +121,7 @@ export function ServicesScreen({
             background: "none",
             border: "none",
             cursor: "pointer",
-            padding: "0.5rem",
+            padding: "var(--space-2)",
             minWidth: "72px",
             minHeight: "72px",
           }}
@@ -143,7 +131,7 @@ export function ServicesScreen({
         <span
           style={{
             fontSize: "28px",
-            color: "var(--ink-soft)",
+            color: "var(--ink-muted-inv)",
             marginLeft: "auto",
           }}
         >
@@ -154,10 +142,13 @@ export function ServicesScreen({
       {/* Title */}
       <h1
         style={{
-          fontSize: "32px",
-          fontWeight: "bold",
+          fontFamily: "var(--font-display)",
+          fontSize: "var(--text-2xl)",
+          fontWeight: 700,
+          letterSpacing: "var(--tracking-tight)",
           color: "var(--ink-inverse)",
           textAlign: "center",
+          margin: 0,
         }}
       >
         {t("title")}
@@ -171,14 +162,15 @@ export function ServicesScreen({
           aria-live="polite"
           style={{
             backgroundColor: "var(--surface-1)",
-            borderRadius: "0.75rem",
-            padding: "1rem 1.5rem",
+            borderRadius: "var(--r-lg)",
+            boxShadow: "var(--shadow-2)",
+            padding: "var(--space-4) var(--space-6)",
             display: "flex",
             flexDirection: "column",
-            gap: "0.75rem",
+            gap: "var(--space-3)",
           }}
         >
-          <span style={{ fontSize: "28px", fontWeight: "bold", color: "var(--ink-strong)" }}>
+          <span style={{ fontSize: "28px", fontWeight: 600, color: "var(--ink-strong)" }}>
             {tDeg("longQueueTitle", { estimate: longestOpenWait })}
           </span>
           <span style={{ fontSize: "24px", color: "var(--ink-soft)" }}>
@@ -193,11 +185,12 @@ export function ServicesScreen({
             style={{
               minHeight: "72px",
               fontSize: "28px",
-              fontWeight: "bold",
-              color: "var(--ink-inverse)",
+              fontWeight: 600,
+              color: "var(--brand-contrast)",
               backgroundColor: "var(--brand)",
+              boxShadow: "var(--shadow-brand)",
               border: "none",
-              borderRadius: "0.5rem",
+              borderRadius: "var(--r-md)",
               cursor: "pointer",
             }}
           >
@@ -211,7 +204,7 @@ export function ServicesScreen({
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: "1rem",
+          gap: "var(--space-4)",
           flex: 1,
         }}
       >
@@ -224,13 +217,14 @@ export function ServicesScreen({
             style={{
               minHeight: "96px",
               backgroundColor: "var(--surface-1)",
-              borderRadius: "0.75rem",
-              border: "none",
+              borderRadius: "var(--r-lg)",
+              border: "1px solid var(--hairline)",
+              boxShadow: service.isOpen ? "var(--shadow-2)" : "var(--shadow-1)",
               cursor: service.isOpen ? "pointer" : "not-allowed",
               display: "flex",
               alignItems: "center",
-              padding: "1rem 1.5rem",
-              gap: "1.25rem",
+              padding: "var(--space-4) var(--space-6)",
+              gap: "var(--space-6)",
               opacity: service.isOpen ? 1 : 0.4,
               textAlign: "left",
             }}
@@ -245,7 +239,7 @@ export function ServicesScreen({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.25rem",
+                gap: "var(--space-1)",
                 flex: 1,
               }}
             >
@@ -253,7 +247,7 @@ export function ServicesScreen({
                 data-testid="service-label"
                 style={{
                   fontSize: "28px",
-                  fontWeight: "bold",
+                  fontWeight: 600,
                   color: "var(--action-label)",
                 }}
               >
@@ -286,12 +280,12 @@ export function ServicesScreen({
           onClick={() => setShowAll(true)}
           style={{
             fontSize: "24px",
-            color: "var(--action-label)",
+            color: "var(--ink-inverse)",
             background: "none",
-            border: "2px solid var(--action-label)",
-            borderRadius: "0.5rem",
+            border: "2px solid var(--ink-inverse)",
+            borderRadius: "var(--r-md)",
             cursor: "pointer",
-            padding: "1rem",
+            padding: "var(--space-4)",
             minHeight: "72px",
             textAlign: "center",
           }}
@@ -306,11 +300,11 @@ export function ServicesScreen({
         onClick={toggleAccessibilityMode}
         style={{
           fontSize: isAccessibilityMode ? "28px" : "24px",
-          color: "var(--ink-soft)",
+          color: "var(--ink-muted-inv)",
           background: "none",
           border: "none",
           cursor: "pointer",
-          padding: "0.5rem",
+          padding: "var(--space-2)",
           minHeight: "72px",
           alignSelf: "center",
         }}
