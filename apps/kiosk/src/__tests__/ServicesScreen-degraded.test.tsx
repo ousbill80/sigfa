@@ -5,8 +5,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
+// KIOSK-007 : on étend `expect` avec les matchers jest-dom directement depuis
+// l'instance vitest du runner (via `import * as matchers` + `expect.extend`),
+// au lieu de `import "@testing-library/jest-dom/vitest"`. Ce dernier appelle
+// `expect.extend` sur une COPIE dupliquée de vitest présente dans le store pnpm,
+// ce qui casse l'initialisation du SnapshotClient et fait échouer tout
+// `toMatchSnapshot` de ce fichier (« The snapshot state ... is not found »).
+import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
 import { NextIntlClientProvider } from "next-intl";
+
+expect.extend(jestDomMatchers);
 
 const mockPush = vi.fn();
 const mockBack = vi.fn();
@@ -163,17 +171,16 @@ describe("KIOSK-007: ServicesScreen file longue + service fermé", () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it("KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot ×4 langues)", () => {
-    const langs = [
-      { locale: "fr", messages: frMessages },
-      { locale: "en", messages: enMessages },
-      { locale: "dioula", messages: dioulaMessages },
-      { locale: "baoule", messages: baouleMessages },
-    ];
-    for (const { locale, messages } of langs) {
-      const { container, unmount } = renderServices([closedService], messages, locale);
-      expect(container.firstChild).toMatchSnapshot(`services-closed-${locale}`);
-      unmount();
+  it.each([
+    { locale: "fr", messages: frMessages },
+    { locale: "en", messages: enMessages },
+    { locale: "dioula", messages: dioulaMessages },
+    { locale: "baoule", messages: baouleMessages },
+  ])(
+    "KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot $locale)",
+    ({ locale, messages }) => {
+      const { container } = renderServices([closedService], messages, locale);
+      expect(container.firstChild).toMatchSnapshot();
     }
-  });
+  );
 });

@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot ×4 langues) > services-closed-baoule 1`] = `
+exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'baoule') 1`] = `
 <main
   role="main"
   style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
@@ -67,7 +67,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
 </main>
 `;
 
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot ×4 langues) > services-closed-dioula 1`] = `
+exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'dioula') 1`] = `
 <main
   role="main"
   style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
@@ -134,7 +134,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
 </main>
 `;
 
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot ×4 langues) > services-closed-en 1`] = `
+exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'en') 1`] = `
 <main
   role="main"
   style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
@@ -201,7 +201,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
 </main>
 `;
 
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot ×4 langues) > services-closed-fr 1`] = `
+exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'fr') 1`] = `
 <main
   role="main"
   style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: 2rem; gap: 1.5rem;"
