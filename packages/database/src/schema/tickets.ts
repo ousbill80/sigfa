@@ -15,6 +15,7 @@ import {
 import { banks } from "./banks.js";
 import { agencies } from "./agencies.js";
 import { services } from "./services.js";
+import { operations } from "./operations.js";
 import { queues } from "./queues.js";
 import { counters } from "./counters.js";
 import { users } from "./users.js";
@@ -57,6 +58,13 @@ export const tickets = pgTable(
       .notNull()
       /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
       .references(() => services.id, { onDelete: "restrict" }),
+    /**
+     * Opération demandée (FK RESTRICT, NULLABLE — MODEL-DB-A, D1).
+     * Additif : `service_id` reste NOT NULL (dérivé applicativement de
+     * `operations.service_id` quand `operation_id` est fourni). NULL = F2/F3 inchangé.
+     */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
+    operationId: uuid("operation_id").references(() => operations.id, { onDelete: "restrict" }),
     /** Guichet de traitement (FK RESTRICT, optionnel). */
     /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     counterId: uuid("counter_id").references(() => counters.id, { onDelete: "restrict" }),
@@ -124,6 +132,7 @@ export const tickets = pgTable(
   (table) => [
     index("tickets_bank_id_agency_id_idx").on(table.bankId, table.agencyId),
     index("tickets_bank_id_phone_hash_idx").on(table.bankId, table.phoneHash),
+    index("tickets_operation_id_idx").on(table.operationId),
     unique("tickets_queue_id_number_issued_day_key").on(
       table.queueId,
       table.number,

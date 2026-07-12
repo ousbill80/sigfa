@@ -3,6 +3,7 @@ export * from "./banks.js";
 export * from "./public-holidays.js";
 export * from "./agencies.js";
 export * from "./services.js";
+export * from "./operations.js";
 export * from "./queues.js";
 export * from "./counters.js";
 export * from "./kiosks.js";

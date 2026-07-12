@@ -314,6 +314,65 @@ async function seedDemoServices(query: QueryFn, agencyId: string): Promise<void>
 }
 
 /**
+ * Catalogue d'opérations de démo (MODEL-DB-A) — démontre le modèle 2 niveaux
+ * Service → Opération. `serviceCode` cible le service parent (par agence).
+ * `slaMinutes = null` → hérite du SLA du service (D4). Codes conformes `^[A-Z0-9]{2,6}$`,
+ * uniques par service. ≥2 opérations sous ≥1 service (ici : OC et OA).
+ */
+const DEMO_OPERATIONS: ReadonlyArray<{
+  serviceCode: string;
+  code: string;
+  name: string;
+  slaMinutes: number | null;
+  displayOrder: number;
+}> = [
+  // Service OC (Opérations courantes) — 3 opérations (démontre la granularité fine)
+  { serviceCode: "OC", code: "OCDEP", name: "Dépôt d'espèces", slaMinutes: null, displayOrder: 0 },
+  { serviceCode: "OC", code: "OCRET", name: "Retrait d'espèces", slaMinutes: 5, displayOrder: 1 },
+  { serviceCode: "OC", code: "OCVIR", name: "Virement", slaMinutes: null, displayOrder: 2 },
+  // Service OA (Ouverture de compte) — 2 opérations
+  { serviceCode: "OA", code: "OAPART", name: "Compte particulier", slaMinutes: null, displayOrder: 0 },
+  { serviceCode: "OA", code: "OAPRO", name: "Compte professionnel", slaMinutes: 40, displayOrder: 1 },
+] as const;
+
+/**
+ * Génère un UUID déterministe pour une opération de démo.
+ *
+ * @param agencyId - UUID de l'agence
+ * @param code     - Code de l'opération
+ */
+function generateDemoOperationId(agencyId: string, code: string): string {
+  const hash = createHash("sha256")
+    .update(`demo-operation-${agencyId}-${code}`)
+    .digest("hex");
+  return hexToUuid(hash);
+}
+
+/**
+ * Insère les opérations de démo sous les services d'une agence (idempotent).
+ * Démontre le modèle 2 niveaux (MODEL-DB-A). `sla_minutes` NULL → hérite du service.
+ *
+ * @param query    - Connexion migrateur (BYPASSRLS)
+ * @param agencyId - UUID de l'agence cible
+ */
+async function seedDemoOperations(query: QueryFn, agencyId: string): Promise<void> {
+  for (const op of DEMO_OPERATIONS) {
+    const serviceId = generateDemoServiceId(agencyId, op.serviceCode);
+    const operationId = generateDemoOperationId(agencyId, op.code);
+    const sla = op.slaMinutes === null ? "NULL" : String(op.slaMinutes);
+    await query(`
+      INSERT INTO operations (id, bank_id, agency_id, service_id, code, name, sla_minutes, display_order)
+      VALUES (
+        '${operationId}', '${DEMO_BANK_ID}', '${agencyId}', '${serviceId}',
+        '${op.code}', '${op.name.replace(/'/g, "''")}',
+        ${sla}, ${op.displayOrder}
+      )
+      ON CONFLICT (service_id, code) DO NOTHING
+    `);
+  }
+}
+
+/**
  * Insère les guichets et le kiosque de démo (idempotent).
  *
  * @param query - Connexion migrateur (BYPASSRLS)
@@ -500,6 +559,7 @@ async function seedDemoTenant(query: QueryFn): Promise<void> {
 
   for (const agencyId of [DEMO_AGENCY_1_ID, DEMO_AGENCY_2_ID]) {
     await seedDemoServices(query, agencyId);
+    await seedDemoOperations(query, agencyId);
   }
 
   await seedDemoCountersAndKiosk(query);
