@@ -46,8 +46,9 @@ import {
 } from "src/services/queue-estimation.js";
 import {
   requireIdempotencyKey,
-  findReplay,
+  acquireIdempotency,
   storeReplay,
+  releaseIdempotencyLock,
 } from "src/services/idempotency.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
 import {
@@ -201,10 +202,20 @@ function registerCreate(router: Hono<TicketEnv>): void {
         return c.json(buildError("VALIDATION_ERROR", "Corps invalide.", { issues: parsed.error.issues }), 400);
       }
       const scope = `tickets:${tenant.bankId ?? "_"}`;
-      const replay = await findReplay(redis, scope, key, parsed.data);
-      if (replay) return replayResponse(c, replay);
-      const result = await issueTicket(db, redis, tenant, parsed.data, getBus(c));
-      const bodyStr = JSON.stringify(result);
+      // Idempotence ATOMIQUE (Boucle 3 F3) : verrou in-flight SET NX PX pour
+      // qu'une seule requête concurrente crée le ticket ; les autres rejouent la
+      // réponse mémorisée (ou 409 IDEMPOTENCY_IN_PROGRESS).
+      const outcome = await acquireIdempotency(redis, scope, key, parsed.data);
+      if (outcome.kind === "replay") return replayResponse(c, outcome.result);
+      let bodyStr: string;
+      try {
+        const result = await issueTicket(db, redis, tenant, parsed.data, getBus(c));
+        bodyStr = JSON.stringify(result);
+      } catch (processErr) {
+        // Échec du traitement : libérer le verrou pour permettre un nouvel essai.
+        await releaseIdempotencyLock(redis, scope, key);
+        throw processErr;
+      }
       await storeReplay(redis, scope, key, parsed.data, 201, bodyStr);
       return replayResponse(c, { status: 201, body: bodyStr });
     } catch (err) {

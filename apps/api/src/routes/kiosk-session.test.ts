@@ -120,6 +120,28 @@ describe("API-009: session borne — login credentials → JWT 12h utilisable pu
     expect(body.error.code).toBe("KIOSK_SESSION_REVOKED");
   });
 
+  it("SEC-F3: heartbeat cross-borne → REFUSÉ (JWT borne A ne peut pas écrire borne B)", async () => {
+    // Deux bornes distinctes dans la même agence.
+    const kA = await provisionKiosk();
+    const kB = await provisionKiosk();
+    const sessionA = await openSession(kA);
+    // Borne A peut rafraîchir SA propre borne.
+    const own = await req("POST", `/kiosks/${kA.kioskId}/heartbeat`, sessionA.accessToken, {
+      printerStatus: "OK",
+      appVersion: "1.4.2",
+      uptimeSeconds: 5,
+    });
+    expect(own.status).toBe(200);
+    // Borne A NE PEUT PAS écrire le statut de la borne B (cross-kiosk).
+    const cross = await req("POST", `/kiosks/${kB.kioskId}/heartbeat`, sessionA.accessToken, {
+      printerStatus: "ERROR",
+      appVersion: "6.6.6",
+      uptimeSeconds: 9,
+    });
+    expect([403, 404]).toContain(cross.status);
+    expect(cross.status).not.toBe(200);
+  });
+
   it("API-009: credentials invalides → 401 KIOSK_AUTH_FAILED", async () => {
     const k = await provisionKiosk();
     const res = await req("POST", "/kiosk/session", null, {

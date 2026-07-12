@@ -175,7 +175,7 @@ function registerPatchTheme(router: Hono<ThemeEnv>): void {
         action: "PATCH /banks/:id/theme",
         entityType: "bank_theme",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff(
           { requestedColors: before.requestedColors ?? null },
           { requestedColors: merged.requestedColors ?? null }

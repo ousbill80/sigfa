@@ -28,6 +28,7 @@ import {
   cancelDisconnect,
   processDisconnect,
 } from "src/services/agent-disconnect.js";
+import { assertKioskSessionActive } from "src/services/kiosk-session.service.js";
 
 /** SLA réception ticket:called en millisecondes. */
 export const TICKET_CALLED_SLA_MS = 500 as const;
@@ -41,6 +42,10 @@ interface JwtSocketPayload {
   bankId?: string | null;
   agencyIds?: string[];
   role?: string;
+  /** Claim borne (session kiosk) — présent uniquement sur les JWT de borne. */
+  kioskId?: string;
+  /** Claim session borne — présent uniquement sur les JWT de borne. */
+  sessionId?: string;
 }
 
 /** Options d'injection pour le serveur Socket.io. */
@@ -103,8 +108,18 @@ export function createSocketServer(
     }
 
     try {
-      const { payload } = await jwtVerify(token, jwtSecret);
+      const { payload } = await jwtVerify(token, jwtSecret, {
+        algorithms: ["HS256"],
+      });
       const jwtPayload = payload as JwtSocketPayload;
+
+      // Session borne : refuser un JWT dont la session a été révoquée (API-009),
+      // MÊME si `exp` est encore valide. Sans cette garde, une borne révoquée
+      // continuerait d'ouvrir un WS jusqu'à l'expiration du token (Boucle 3 F3).
+      if (jwtPayload.kioskId && jwtPayload.sessionId) {
+        await assertKioskSessionActive(db, jwtPayload.kioskId, jwtPayload.sessionId);
+      }
+
       socket.data["userId"] = jwtPayload.sub ?? null;
       socket.data["bankId"] = jwtPayload.bankId ?? null;
       socket.data["agencyIds"] = jwtPayload.agencyIds ?? [];

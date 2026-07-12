@@ -167,7 +167,7 @@ function registerCreateService(router: Hono<ServiceEnv>): void {
         action: "POST /services",
         entityType: "service",
         entityId: created.id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({}, { code: created.code, name: created.name }),
       });
       return c.json(toService(created), 201);
@@ -229,7 +229,7 @@ function registerPatchService(router: Hono<ServiceEnv>): void {
         action: "PATCH /services/:id",
         entityType: "service",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff(
           { name: before.name, slaMinutes: before.sla_minutes, active: before.is_active, order: before.display_order },
           { name: after.name, slaMinutes: after.sla_minutes, active: after.is_active, order: after.display_order }

@@ -16,6 +16,7 @@
 import type { Redis } from "ioredis";
 import type { Context, Next } from "hono";
 import { buildError } from "src/lib/errors.js";
+import { resolveClientIp } from "src/lib/client-ip.js";
 
 /** Résultat d'une vérification de débit. */
 export interface RateLimitResult {
@@ -82,15 +83,16 @@ export interface RateLimitRule {
 }
 
 /**
- * Extrait l'IP cliente depuis les en-têtes de proxy (jamais de PII loggée).
- * Repli `unknown` : ne bloque jamais faute d'IP, mais isole la dimension.
+ * Extrait l'IP cliente pour la dimension de rate-limit (jamais de PII loggée).
+ * Délègue à `resolveClientIp` : les en-têtes `X-Forwarded-For`/`X-Real-IP` ne
+ * sont pris en compte que si `TRUST_PROXY` est activé (défaut `false`), sinon
+ * l'IP de connexion réelle est utilisée. Empêche un attaquant de réinitialiser
+ * sa fenêtre via un XFF falsifié (Boucle 3 F3). Repli `unknown` sinon.
  *
  * @param c - Contexte Hono
  */
 export function clientIp(c: Context): string {
-  const fwd = c.req.header("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return c.req.header("x-real-ip") ?? "unknown";
+  return resolveClientIp(c);
 }
 
 /**

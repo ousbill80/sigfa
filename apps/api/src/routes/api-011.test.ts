@@ -359,4 +359,25 @@ describe("API-011: tenant-isolation (audit-logs/kiosks-status/devices cross-scop
     const body = (await res.json()) as { kiosks: { agencyId: string }[] };
     expect(body.kiosks.every((k) => k.agencyId === bankA.agencyId)).toBe(true);
   });
+
+  it("SEC-F3: MANAGER ne voit PAS les bornes d'une autre agence de SA banque (sans query agencyId)", async () => {
+    // Deuxième agence de la MÊME banque A, avec sa propre borne.
+    const otherAgency = await h.db.query(
+      `INSERT INTO agencies (bank_id, name) VALUES ($1,'Agence B interne') RETURNING id`,
+      [bankA.bankId]
+    );
+    const otherAgencyId = (otherAgency.rows[0] as { id: string }).id;
+    await h.db.query(
+      `INSERT INTO kiosks (bank_id, agency_id, label, credentials_hash, printer_status, last_seen)
+       VALUES ($1, $2, 'BX', 'x', 'OK'::printer_status, now())`,
+      [bankA.bankId, otherAgencyId]
+    );
+    // MANAGER de l'agence A (agencyIds=[agencyA]) sans query → ne voit QUE son agence.
+    const res = await fetch(`${baseUrl}/kiosks/status`, {
+      headers: { Authorization: `Bearer ${managerAToken}` },
+    });
+    const body = (await res.json()) as { kiosks: { agencyId: string }[] };
+    expect(body.kiosks.some((k) => k.agencyId === otherAgencyId)).toBe(false);
+    expect(body.kiosks.every((k) => k.agencyId === bankA.agencyId)).toBe(true);
+  });
 });

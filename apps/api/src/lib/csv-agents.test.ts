@@ -103,3 +103,42 @@ describe("API-009: CSV agents — validation par ligne", () => {
     expect(result.errors[0]?.line).toBe(3);
   });
 });
+
+describe("SEC-F3: CSV agents — anti-escalade de privilèges à l'import", () => {
+  it("SEC-F3: AGENCY_DIRECTOR importe BANK_ADMIN → rejeté ROLE_NOT_ALLOWED, AGENT créé", () => {
+    const result = parseAgentCsv(
+      build(["admin@b.ci,A,B,BANK_ADMIN,,FR,", "agent@b.ci,C,D,AGENT,,FR,"]),
+      "AGENCY_DIRECTOR"
+    );
+    // La ligne AGENT (rôle inférieur) passe.
+    expect(result.rows.map((r) => r.email)).toEqual(["agent@b.ci"]);
+    // La ligne BANK_ADMIN (rôle strictement supérieur) est rejetée.
+    expect(result.errors).toEqual([
+      expect.objectContaining({ line: 2, field: "role", code: "ROLE_NOT_ALLOWED" }),
+    ]);
+  });
+
+  it("SEC-F3: SUPER_ADMIN INTERDIT en import de banque, quel que soit l'importateur", () => {
+    const result = parseAgentCsv(
+      build(["su@b.ci,A,B,SUPER_ADMIN,,FR,"]),
+      "BANK_ADMIN"
+    );
+    expect(result.rows).toHaveLength(0);
+    expect(result.errors[0]).toMatchObject({ line: 2, field: "role", code: "ROLE_NOT_ALLOWED" });
+  });
+
+  it("SEC-F3: AGENCY_DIRECTOR peut importer MANAGER/AGENT (rôles ≤ lui)", () => {
+    const result = parseAgentCsv(
+      build(["m@b.ci,A,B,MANAGER,,FR,", "a@b.ci,C,D,AGENT,,FR,", "au@b.ci,E,F,AUDITOR,,FR,"]),
+      "AGENCY_DIRECTOR"
+    );
+    expect(result.rows.map((r) => r.role).sort()).toEqual(["AGENT", "AUDITOR", "MANAGER"]);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("SEC-F3: sans importerRole (rétro-compat) → aucun filtrage hiérarchique", () => {
+    const result = parseAgentCsv(build(["a@b.ci,A,B,BANK_ADMIN,,FR,"]));
+    expect(result.rows).toHaveLength(1);
+    expect(result.errors).toHaveLength(0);
+  });
+});

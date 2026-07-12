@@ -21,6 +21,18 @@ export const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60;
 /** Préfixe des clés Redis d'idempotence (scopé par tenant + route). */
 const KEY_PREFIX = "idem:";
 
+/** Préfixe des verrous « in-flight » (traitement en cours d'une clé). */
+const LOCK_PREFIX = "idem-lock:";
+
+/** TTL du verrou in-flight (ms) : borne le blocage si un worker meurt en cours. */
+const LOCK_TTL_MS = 10_000;
+
+/** Fenêtre d'attente courte qu'un traitement concurrent publie sa réponse (ms). */
+const WAIT_TOTAL_MS = 5_000;
+
+/** Intervalle de polling de la réponse concurrente (ms). */
+const WAIT_STEP_MS = 50;
+
 /** Enregistrement persisté pour une clé d'idempotence. */
 interface IdempotencyRecord {
   /** Empreinte SHA-256 du payload de la requête originale. */
@@ -59,6 +71,11 @@ function stableStringify(value: unknown): string {
 /** Construit la clé Redis scopée (tenant + route + clé cliente). */
 function redisKey(scope: string, key: string): string {
   return `${KEY_PREFIX}${scope}:${key}`;
+}
+
+/** Construit la clé du verrou in-flight scopé. */
+function lockKey(scope: string, key: string): string {
+  return `${LOCK_PREFIX}${scope}:${key}`;
 }
 
 /**
@@ -127,4 +144,115 @@ export async function storeReplay(
 ): Promise<void> {
   const record: IdempotencyRecord = { payloadHash: hashPayload(payload), status, body };
   await redis.set(redisKey(scope, key), JSON.stringify(record), "EX", IDEMPOTENCY_TTL_SECONDS);
+  // Le résultat est mémorisé : libérer le verrou in-flight pour débloquer les
+  // requêtes concurrentes en attente (elles liront la réponse mémorisée).
+  await redis.del(lockKey(scope, key));
+}
+
+/** Issue de l'acquisition atomique d'idempotence. */
+export type IdempotencyOutcome =
+  | { kind: "replay"; result: ReplayResult }
+  | { kind: "proceed" };
+
+/**
+ * Point d'entrée ATOMIQUE de l'idempotence (Boucle 3 F3).
+ *
+ * Empêche deux requêtes concurrentes de MÊME clé de créer deux ressources :
+ *   1. Si une réponse est déjà mémorisée (payload identique) → rejeu.
+ *      (payload différent → 409 IDEMPOTENCY_CONFLICT via `findReplay`.)
+ *   2. Sinon, on tente de poser un verrou `SET NX PX` (marqueur in-flight) :
+ *      - verrou OBTENU → `proceed` : l'appelant traite puis appelle `storeReplay`
+ *        (qui libère le verrou).
+ *      - verrou DÉJÀ pris → un traitement concurrent est en cours : on attend
+ *        brièvement sa réponse mémorisée (rejeu) ; à défaut → 409 IN_PROGRESS.
+ *
+ * @param redis   - Client Redis
+ * @param scope   - Scope (ex. `tickets:{bankId}`)
+ * @param key     - Clé d'idempotence cliente
+ * @param payload - Payload courant de la requête
+ * @returns `replay` (réponse à rejouer) ou `proceed` (traiter puis storeReplay)
+ * @throws {SigfaError} 409 IDEMPOTENCY_CONFLICT (payload différent) ou 409
+ *   IDEMPOTENCY_IN_PROGRESS (traitement concurrent non résolu à temps)
+ */
+export async function acquireIdempotency(
+  redis: Redis,
+  scope: string,
+  key: string,
+  payload: unknown
+): Promise<IdempotencyOutcome> {
+  const existing = await findReplay(redis, scope, key, payload);
+  if (existing) return { kind: "replay", result: existing };
+
+  // Verrou in-flight atomique : un SEUL gagnant traite la requête.
+  const acquired = await redis.set(
+    lockKey(scope, key),
+    hashPayload(payload),
+    "PX",
+    LOCK_TTL_MS,
+    "NX"
+  );
+  if (acquired !== null) return { kind: "proceed" };
+
+  // Un traitement concurrent détient le verrou : attendre sa réponse mémorisée.
+  const replay = await waitForReplay(redis, scope, key, payload);
+  if (replay) return { kind: "replay", result: replay };
+
+  throw new SigfaError(
+    "IDEMPOTENCY_IN_PROGRESS",
+    "Une requête concurrente avec la même clé d'idempotence est en cours de traitement.",
+    409
+  );
+}
+
+/**
+ * Attend (polling court) qu'un traitement concurrent publie sa réponse mémorisée.
+ * S'arrête dès qu'une réponse est disponible OU que le verrou in-flight disparaît.
+ *
+ * @param redis   - Client Redis
+ * @param scope   - Scope de la clé
+ * @param key     - Clé d'idempotence
+ * @param payload - Payload courant (pour la garde de conflit)
+ * @returns La réponse à rejouer, ou `null` si rien n'est publié à temps
+ */
+async function waitForReplay(
+  redis: Redis,
+  scope: string,
+  key: string,
+  payload: unknown
+): Promise<ReplayResult | null> {
+  const deadline = Date.now() + WAIT_TOTAL_MS;
+  while (Date.now() < deadline) {
+    await sleep(WAIT_STEP_MS);
+    const replay = await findReplay(redis, scope, key, payload);
+    if (replay) return replay;
+    // Le verrou a disparu SANS réponse mémorisée (worker mort/échec) → abandon.
+    const stillLocked = await redis.exists(lockKey(scope, key));
+    if (stillLocked === 0) {
+      const late = await findReplay(redis, scope, key, payload);
+      return late;
+    }
+  }
+  return null;
+}
+
+/**
+ * Libère le verrou in-flight sans mémoriser de réponse (échec du traitement) :
+ * une future requête de même clé pourra retenter. À appeler dans le `catch` du
+ * traitement après une acquisition `proceed`.
+ *
+ * @param redis - Client Redis
+ * @param scope - Scope de la clé
+ * @param key   - Clé d'idempotence
+ */
+export async function releaseIdempotencyLock(
+  redis: Redis,
+  scope: string,
+  key: string
+): Promise<void> {
+  await redis.del(lockKey(scope, key));
+}
+
+/** Pause asynchrone (polling d'idempotence). */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

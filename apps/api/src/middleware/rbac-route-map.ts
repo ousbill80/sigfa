@@ -43,44 +43,69 @@ export interface RouteRbacEntry {
 /**
  * Hiérarchie des rôles SIGFA (du plus large au plus restreint).
  * Un rôle supérieur peut effectuer toutes les actions d'un rôle inférieur.
+ *
+ * ⚠️ AUDITOR est ABSENT de cette hiérarchie : c'est un rôle ORTHOGONAL (lecture
+ * seule), il ne dérive JAMAIS un accès de la hiérarchie numérique (cf.
+ * `hasRequiredRole`). Le placer ici (ex. AUDITOR > AGENT) rouvrirait l'escalade
+ * de privilèges vers les routes mutantes AGENT (Boucle 3 F3 — BLOCKER).
  */
-const ROLE_HIERARCHY: Record<string, number> = {
+export const ROLE_HIERARCHY: Record<string, number> = {
   SUPER_ADMIN: 100,
   BANK_ADMIN: 80,
   AGENCY_DIRECTOR: 60,
   MANAGER: 40,
   AGENT: 20,
-  AUDITOR: 30,
   AUTHENTICATED: 1,
   NONE: 0,
 };
 
+/** Méthodes HTTP de LECTURE (idempotentes, sans effet de bord d'écriture). */
+const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
+
 /**
- * Vérifie si le rôle utilisateur satisfait le rôle requis.
+ * Vérifie si le rôle utilisateur satisfait le rôle requis pour une méthode donnée.
+ *
+ * Règles clés (Boucle 3 F3) :
+ *   - SUPER_ADMIN passe toujours.
+ *   - AUDITOR est ORTHOGONAL et LECTURE SEULE : il n'autorise QUE les routes en
+ *     lecture (GET/HEAD/OPTIONS), qu'elles soient `requiredRole:"AGENT"`,
+ *     `"MANAGER"`, `"AUDITOR"`, etc. Toute route mutante (POST/PATCH/PUT/DELETE)
+ *     lui est REFUSÉE (403), même celles marquées `requiredRole:"AUDITOR"`.
+ *   - Les routes `requiredRole:"AUDITOR"` ne sont accessibles qu'à AUDITOR (en
+ *     lecture) et SUPER_ADMIN — jamais à AGENT/MANAGER via la hiérarchie.
+ *   - Les autres rôles suivent la hiérarchie numérique inchangée.
  *
  * @param userRole     - Rôle du JWT
  * @param requiredRole - Rôle requis par la route
+ * @param method       - Méthode HTTP de la requête (défaut « GET » : lecture)
  */
 export function hasRequiredRole(
   userRole: string,
-  requiredRole: RequiredRole
+  requiredRole: RequiredRole,
+  method = "GET"
 ): boolean {
   if (requiredRole === "NONE") return true;
   if (requiredRole === "AUTHENTICATED") return userRole !== "NONE";
 
-  const userLevel = ROLE_HIERARCHY[userRole] ?? 0;
-  const requiredLevel = ROLE_HIERARCHY[requiredRole] ?? 999;
-
-  // AUDITOR a un accès spécial aux rapports et audit-logs
-  // mais n'est pas "supérieur" à AGENT dans la hiérarchie générale
-  // Le SUPER_ADMIN passe toujours
+  // Le SUPER_ADMIN passe toujours (toutes méthodes, tous scopes).
   if (userRole === "SUPER_ADMIN") return true;
 
-  // Pour AUDITOR : peut accéder aux routes AUDITOR uniquement
-  if (requiredRole === "AUDITOR") {
-    return userRole === "SUPER_ADMIN" || userRole === "AUDITOR";
+  const isRead = READ_METHODS.has(method.toUpperCase());
+
+  // AUDITOR : rôle ORTHOGONAL, LECTURE SEULE. Jamais de mutation, jamais dérivé
+  // de la hiérarchie AGENT/MANAGER. Autorisé uniquement sur les lectures.
+  if (userRole === "AUDITOR") {
+    return isRead;
   }
 
+  // Routes `requiredRole:"AUDITOR"` : réservées à AUDITOR (traité ci-dessus) et
+  // SUPER_ADMIN (traité ci-dessus). Aucun autre rôle ne les satisfait.
+  if (requiredRole === "AUDITOR") {
+    return false;
+  }
+
+  const userLevel = ROLE_HIERARCHY[userRole] ?? 0;
+  const requiredLevel = ROLE_HIERARCHY[requiredRole] ?? 999;
   return userLevel >= requiredLevel;
 }
 

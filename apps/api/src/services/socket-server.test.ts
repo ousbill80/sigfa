@@ -21,6 +21,7 @@ import pg from "pg";
 import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { SignJWT } from "jose";
+import { randomUUID } from "node:crypto";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import type { AddressInfo } from "net";
 import { createApp } from "src/app.js";
@@ -141,6 +142,14 @@ async function runMigrations(client: pg.Client): Promise<void> {
       ticket_id UUID NOT NULL REFERENCES tickets(id), from_counter_id UUID, from_service_id UUID NOT NULL REFERENCES services(id),
       to_service_id UUID NOT NULL REFERENCES services(id), to_counter_id UUID, reason TEXT,
       transferred_by UUID NOT NULL, transferred_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+  `);
+  // Table borne minimale : colonnes lues par assertKioskSessionActive (révocation WS).
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS kiosks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
+      agency_id UUID NOT NULL REFERENCES agencies(id),
+      current_session_id UUID, session_revoked_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
 }
 
@@ -332,6 +341,69 @@ describe("API-006: wiring — route HTTP et upgrade WS coexistent sur le même p
           socket.on("connect", () => {
             socket.disconnect();
             reject(new Error("Should have been rejected"));
+          });
+          socket.on("connect_error", () => resolve());
+          setTimeout(() => reject(new Error("Timeout")), 10_000);
+        })
+      ).resolves.toBeUndefined();
+    },
+    30_000
+  );
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// SEC-F3 : révocation de session borne appliquée AUSSI au handshake Socket.io
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Provisionne une borne + une session active (session_id) et renvoie un JWT WS. */
+async function forgeKioskWsToken(revoked: boolean): Promise<string> {
+  const sessionId = randomUUID();
+  const kiosk = await db.query(
+    `INSERT INTO kiosks (bank_id, agency_id, current_session_id, session_revoked_at)
+     VALUES ($1, $2, $3, $4) RETURNING id`,
+    [ids.bankId, ids.agencyId, sessionId, revoked ? new Date() : null]
+  );
+  const kioskId = (kiosk.rows[0] as { id: string }).id;
+  return new SignJWT({
+    role: "AUTHENTICATED",
+    bankId: ids.bankId,
+    agencyIds: [ids.agencyId],
+    kioskId,
+    sessionId,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(kioskId)
+    .setIssuedAt()
+    .setExpirationTime("12h")
+    .sign(jwtSecretBytes);
+}
+
+describe("SEC-F3: session borne révoquée → handshake WS refusé (malgré exp valide)", () => {
+  it(
+    "SEC-F3: JWT borne à session ACTIVE → handshake WS accepté",
+    async () => {
+      const token = await forgeKioskWsToken(false);
+      const socket = await connectClient(token);
+      expect(socket.connected).toBe(true);
+      socket.disconnect();
+    },
+    30_000
+  );
+
+  it(
+    "SEC-F3: JWT borne à session RÉVOQUÉE → handshake WS refusé (connect_error) malgré exp encore valide",
+    async () => {
+      const token = await forgeKioskWsToken(true);
+      const socket: ClientSocket = ioClient(serverUrl, {
+        transports: ["websocket"],
+        auth: { token },
+        reconnection: false,
+      });
+      await expect(
+        new Promise<void>((resolve, reject) => {
+          socket.on("connect", () => {
+            socket.disconnect();
+            reject(new Error("La borne révoquée n'aurait PAS dû se connecter"));
           });
           socket.on("connect_error", () => resolve());
           setTimeout(() => reject(new Error("Timeout")), 10_000);
@@ -608,19 +680,25 @@ describe("API-006: sync:request avec DB cassée → socket:sync:error loggé, au
 // Critère 3 : course 20 paires call-next → zéro double-attribution
 // ────────────────────────────────────────────────────────────────────────────
 
-describe("API-006: course 20 paires call-next → zéro double-attribution", () => {
+describe("API-006: course call-next → zéro double-attribution (COV-02 durci)", () => {
   it(
-    "API-006: course 20 paires call-next → zéro double-attribution, perdant obtient ticket suivant",
+    "API-006: course call-next concurrente → statuts ∈ {200,404}, count(CALLED)==count(200)==min(tickets,appels)",
     async () => {
-      const PAIRS = 20;
-      // Insérer PAIRS*2 tickets (assez pour que chaque perdant obtienne le suivant)
-      for (let i = 0; i < PAIRS * 2 + 5; i++) {
+      // Moins de tickets que d'appels : certains appels perdent (404), aucun ne
+      // double-attribue, et CHAQUE ticket disponible est attribué exactement une
+      // fois → count(200) == min(nbTickets, nbAppels).
+      const NB_TICKETS = 15;
+      const NB_CALLS = 40;
+      for (let i = 0; i < NB_TICKETS; i++) {
         await insertTicket(`race${i}`.padEnd(10, "0"));
       }
 
-      // Créer PAIRS+1 connexions PG indépendantes (2 par paire + 1 partagée)
+      // Course RÉELLE : chaque appel concurrent utilise sa PROPRE connexion PG
+      // (et sa propre app) — les transactions call-next sont ainsi isolées et
+      // `FOR UPDATE SKIP LOCKED` empêche toute double-attribution. Un seul `db`
+      // partagé sérialiserait/corromprait les BEGIN/COMMIT concurrents.
       const clients = await Promise.all(
-        Array.from({ length: PAIRS * 2 }, async () => {
+        Array.from({ length: NB_CALLS }, async () => {
           const c = new pg.Client({
             connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test`,
           });
@@ -628,42 +706,62 @@ describe("API-006: course 20 paires call-next → zéro double-attribution", () 
           return c;
         })
       );
+      try {
+        const servers = clients.map((c) => {
+          const a = createApp({ db: c, redis, jwtSecret: jwtSecretBytes });
+          const s = serve({ fetch: a.fetch, port: 0 }) as unknown as http.Server;
+          return s;
+        });
+        await Promise.all(
+          servers.map(
+            (s) => new Promise<void>((resolve) => s.once("listening", resolve))
+          )
+        );
+        const urls = servers.map((s) => {
+          const addr = s.address() as AddressInfo;
+          return `http://127.0.0.1:${addr.port}`;
+        });
 
-      // Simuler 20 paires d'agents faisant call-next simultanément
-      const callNextViaHttp = async (): Promise<number> => {
-        const res = await fetch(
-          `${serverUrl}/api/v1/counters/${ids.counterId}/call-next`,
-          {
+        const callNext = async (url: string): Promise<number> => {
+          const res = await fetch(`${url}/api/v1/counters/${ids.counterId}/call-next`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${agentToken}`,
             },
-          }
+          });
+          return res.status;
+        };
+
+        // Lancer TOUS les appels simultanément (course réelle, connexions isolées).
+        const results = await Promise.all(urls.map((u) => callNext(u)));
+
+        // (1) Aucun statut inattendu : exclusivement 200 (ticket) ou 404 (vide).
+        expect(results.every((s) => s === 200 || s === 404)).toBe(true);
+
+        // (2) Zéro double-attribution : chaque ticket CALLED est unique.
+        const calledRes = await db.query(
+          `SELECT id FROM tickets WHERE status = 'CALLED' AND agency_id = $1`,
+          [ids.agencyId]
         );
-        return res.status;
-      };
+        const calledIds = calledRes.rows.map((r: { id: string }) => r.id);
+        expect(new Set(calledIds).size).toBe(calledIds.length);
 
-      // Lancer toutes les paires simultanément
-      const results = await Promise.all(
-        Array.from({ length: PAIRS * 2 }, () => callNextViaHttp())
-      );
+        // (3) count(tickets CALLED) == count(200) : chaque 200 = exactement un CALLED.
+        const nb200 = results.filter((s) => s === 200).length;
+        expect(calledIds.length).toBe(nb200);
 
-      // Zéro double-attribution : chaque ticket ne doit être dans CALLED qu'une fois
-      const calledRes = await db.query(
-        `SELECT id FROM tickets WHERE status = 'CALLED' AND agency_id = $1`,
-        [ids.agencyId]
-      );
-      const calledIds = calledRes.rows.map((r: { id: string }) => r.id);
-      const uniqueIds = new Set(calledIds);
-      expect(uniqueIds.size).toBe(calledIds.length); // zéro doublon
+        // (4) count(200) == min(nbTickets, nbAppels) : chaque perdant obtient le
+        //     suivant tant qu'il reste des tickets ; au-delà → 404.
+        expect(nb200).toBe(Math.min(NB_TICKETS, NB_CALLS));
+        expect(results.filter((s) => s === 404).length).toBe(NB_CALLS - nb200);
 
-      // Tous les appels HTTP réussis sont soit 200 (ticket obtenu) ou 404 (file vide)
-      const successes = results.filter((s) => s === 200);
-      expect(successes.length).toBeGreaterThan(0);
-
-      // Nettoyer les clients PG
-      await Promise.all(clients.map((c) => c.end()));
+        await Promise.all(
+          servers.map((s) => new Promise<void>((resolve) => s.close(() => resolve())))
+        );
+      } finally {
+        await Promise.all(clients.map((c) => c.end()));
+      }
     },
     120_000
   );

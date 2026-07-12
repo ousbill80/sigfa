@@ -34,6 +34,8 @@ export interface TenantContext {
   role: string;
   /** IDs des agences accessibles */
   agencyIds: string[];
+  /** Identifiant de la borne (claim `kioskId`) — présent pour un JWT de session borne. */
+  kioskId?: string;
 }
 
 /** Variables Hono étendues avec le contexte tenant */
@@ -128,6 +130,7 @@ export async function tenantMiddleware(
   const role = payload.role;
   const agencyIds = (payload.agencyIds as string[]) ?? [];
   const userId = payload.sub ?? "";
+  const jwtKioskId = payload["kioskId"] as string | undefined;
 
   const tenant: TenantContext = {
     requestId,
@@ -135,6 +138,7 @@ export async function tenantMiddleware(
     bankId,
     role,
     agencyIds,
+    ...(jwtKioskId ? { kioskId: jwtKioskId } : {}),
   };
 
   // Log structuré : requestId + bankId (jamais le token ni le téléphone)
@@ -144,7 +148,7 @@ export async function tenantMiddleware(
   if (routeEntry) {
     const requiredRole = routeEntry.requiredRole;
 
-    if (!hasRequiredRole(role, requiredRole)) {
+    if (!hasRequiredRole(role, requiredRole, method)) {
       logger.warn(
         { requestId, bankId, role, requiredRole, path },
         "rbac:forbidden"

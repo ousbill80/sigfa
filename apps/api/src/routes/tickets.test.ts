@@ -306,6 +306,34 @@ describe("API-003: cycle de vie du ticket", () => {
     expect((conflict.data as { error: { code: string } }).error.code).toBe("IDEMPOTENCY_CONFLICT");
   });
 
+  it("SEC-F3: 2 requêtes CONCURRENTES même X-Idempotency-Key → UN SEUL ticket créé (idempotence atomique)", async () => {
+    const key = `race-${nano()}`;
+    const body = { serviceId: ids.serviceId, channel: "KIOSK" };
+    // Lancer les deux requêtes VRAIMENT simultanément (même clé, même payload).
+    const [a, b] = await Promise.all([
+      post("/tickets", body, { "X-Idempotency-Key": key }),
+      post("/tickets", body, { "X-Idempotency-Key": key }),
+    ]);
+    // Zéro doublon en base : UN SEUL ticket créé malgré la course.
+    const count = await db.query(`SELECT COUNT(*)::int AS n FROM tickets`);
+    expect((count.rows[0] as { n: number }).n).toBe(1);
+    // Exactement UNE réponse 201 (création) ; l'autre = même réponse (rejeu 201)
+    // OU 409 IDEMPOTENCY_IN_PROGRESS. Jamais deux créations distinctes.
+    const has201 = [a.status, b.status].includes(201);
+    expect(has201).toBe(true);
+    for (const r of [a, b]) {
+      expect([201, 409]).toContain(r.status);
+      if (r.status === 409) {
+        const code = (r.data as { error: { code: string } }).error.code;
+        expect(["IDEMPOTENCY_IN_PROGRESS", "IDEMPOTENCY_CONFLICT"]).toContain(code);
+      }
+    }
+    // Si les deux répondent 201, elles sont byte-identiques (même ticket rejoué).
+    if (a.status === 201 && b.status === 201) {
+      expect(a.text).toBe(b.text);
+    }
+  }, 30_000);
+
   it("API-003: clé absente sur POST /tickets → 400 IDEMPOTENCY_KEY_REQUIRED", async () => {
     const res = await app.fetch(new Request("http://localhost/api/v1/tickets", {
       method: "POST",

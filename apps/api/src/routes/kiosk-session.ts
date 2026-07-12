@@ -121,8 +121,10 @@ interface HeartbeatRow {
 function registerHeartbeat(router: Hono<KioskEnv>): void {
   router.post("/kiosks/:kioskId/heartbeat", async (c) => {
     const db = c.get("db");
+    const tenant = c.get("tenant");
     try {
       const kioskId = c.req.param("kioskId");
+      assertOwnKiosk(tenant, kioskId);
       const input = parseStrict(heartbeatSchema, await parseJson(c));
       const row = await applyHeartbeat(db, kioskId, input.printerStatus, input.appVersion);
       maybeEmitPrinterError(c.get("bus"), row);
@@ -131,6 +133,25 @@ function registerHeartbeat(router: Hono<KioskEnv>): void {
       return errorResponse(c, err);
     }
   });
+}
+
+/**
+ * Interdit l'écriture cross-borne : un JWT de session borne ne peut rafraîchir
+ * QUE sa propre borne. Le `kioskId` du path DOIT correspondre au claim `kioskId`
+ * du JWT. Sinon 404 opaque (jamais de fuite d'existence d'une borne d'un autre
+ * tenant/agence — Boucle 3 F3).
+ *
+ * @param tenant  - Contexte tenant (porte `kioskId` pour un JWT borne)
+ * @param kioskId - Borne ciblée par le path
+ * @throws {SigfaError} 404 KIOSK_NOT_FOUND si le kioskId du path ≠ claim JWT
+ */
+function assertOwnKiosk(tenant: TenantContext, kioskId: string): void {
+  // Un JWT de session borne PORTE toujours `kioskId`. Un JWT dépourvu de ce claim
+  // (utilisateur humain AUTHENTICATED) n'est pas une borne : la route est réservée
+  // aux bornes (self-heartbeat), donc refus opaque.
+  if (!tenant.kioskId || tenant.kioskId !== kioskId) {
+    throw new SigfaError("KIOSK_NOT_FOUND", "Borne introuvable.", 404);
+  }
 }
 
 /**

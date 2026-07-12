@@ -433,6 +433,40 @@ describe("API-002: RBAC enforcement", () => {
   );
 
   it(
+    "SEC-F3: AUDITOR (lecture seule) → POST /tickets = 403 (escalade AGENT bloquée)",
+    async () => {
+      const auditorToken = await makeJwt({
+        sub: USER_BANK_A_ID,
+        bankId: BANK_A_ID,
+        role: "AUDITOR",
+        agencyIds: [AGENCY_A_ID],
+      });
+      // POST /tickets exige AGENT ; un AUDITOR ne doit JAMAIS le muter (403 RBAC).
+      const resp = await post(app, `/tickets`, { serviceId: AGENCY_A_ID, channel: "KIOSK" }, auditorToken);
+      expect(resp.status).toBe(403);
+      expect((resp.data as { error: { code: string } }).error.code).toBe("FORBIDDEN");
+    },
+    30_000
+  );
+
+  it(
+    "SEC-F3: AGENT conserve POST /tickets (matrice inchangée, pas de 403 RBAC)",
+    async () => {
+      const agentToken = await makeJwt({
+        sub: USER_BANK_A_ID,
+        bankId: BANK_A_ID,
+        role: "AGENT",
+        agencyIds: [AGENCY_A_ID],
+      });
+      const resp = await post(app, `/tickets`, { serviceId: AGENCY_A_ID, channel: "KIOSK" }, agentToken);
+      // L'AGENT passe le RBAC (pas de 403) ; le code final dépend de la couche
+      // métier (404/422/500 possible dans ce harnais minimal), jamais 403.
+      expect(resp.status).not.toBe(403);
+    },
+    30_000
+  );
+
+  it(
     "API-002: SI le token est expiré/invalide → 401 UNAUTHORIZED (test)",
     async () => {
       // Token invalide
@@ -454,6 +488,29 @@ describe("API-002: RBAC enforcement", () => {
 
       const expiredResp = await get(app, `/banks/${BANK_A_ID}`, expiredToken);
       expect(expiredResp.status).toBe(401);
+    },
+    30_000
+  );
+
+  it(
+    "SEC-F3: JWT signé avec un algorithme non autorisé (HS512) → 401 (restriction HS256)",
+    async () => {
+      // Token techniquement valide (même secret) mais alg ≠ HS256 → doit être
+      // rejeté par la restriction d'algorithme (anti-confusion d'algorithme).
+      const otherAlgToken = await new SignJWT({
+        bankId: BANK_A_ID,
+        role: "BANK_ADMIN",
+        agencyIds: [AGENCY_A_ID],
+      })
+        .setProtectedHeader({ alg: "HS512" })
+        .setSubject(USER_BANK_A_ID)
+        .setIssuedAt()
+        .setExpirationTime("15m")
+        .sign(jwtSecretBytes);
+
+      const resp = await get(app, `/banks/${BANK_A_ID}`, otherAlgToken);
+      expect(resp.status).toBe(401);
+      expect((resp.data as { error: { code: string } }).error.code).toBe("UNAUTHORIZED");
     },
     30_000
   );

@@ -93,7 +93,7 @@ function registerClone(router: Hono<OnboardingEnv>): void {
         action: "POST /agencies/:id/clone-from/:templateId",
         entityType: "agency",
         entityId: targetId,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({}, { clonedFrom: templateId }),
       });
       return c.json(
@@ -270,7 +270,7 @@ function registerKioskAccess(router: Hono<OnboardingEnv>): void {
         action: "POST /agencies/:id/kiosk-access",
         entityType: "kiosk",
         entityId: creds.kioskId,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({}, { kioskId: creds.kioskId }),
       });
       return c.json(creds, 201);

@@ -188,7 +188,7 @@ function registerPatchHours(router: Hono<HoursEnv>): void {
         action: "PATCH /agencies/:id/hours",
         entityType: "agency_hours",
         entityId: agencyId,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({ weeklySchedule: before }, { weeklySchedule: merged }),
       });
       return c.json(await composeHours(db, bankId, agencyId, merged), 200);

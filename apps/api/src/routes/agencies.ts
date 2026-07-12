@@ -156,7 +156,7 @@ function registerCreateAgency(router: Hono<AgencyEnv>): void {
         action: "POST /agencies",
         entityType: "agency",
         entityId: created.id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({}, { name: created.name }),
       });
       return c.json(toAgency(created), 201);
@@ -231,7 +231,7 @@ function registerPatchAgency(router: Hono<AgencyEnv>): void {
         action: "PATCH /agencies/:id",
         entityType: "agency",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff(
           { name: before.name, active: before.is_active, address: before.address, phone: before.phone },
           { name: after.name, active: after.is_active, address: after.address, phone: after.phone }
@@ -288,7 +288,7 @@ function registerDeleteAgency(router: Hono<AgencyEnv>): void {
         action: "DELETE /agencies/:id",
         entityType: "agency",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({ deleted: false }, { deleted: true }),
       });
       return c.json({ success: true }, 200);

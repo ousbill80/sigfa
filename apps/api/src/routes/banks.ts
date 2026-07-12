@@ -132,7 +132,7 @@ function registerCreateBank(router: Hono<BankEnv>): void {
         action: "POST /banks",
         entityType: "bank",
         entityId: created.id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({}, { name: created.name, slug: created.slug }),
       });
       return c.json(toBank(created), 201);
@@ -204,7 +204,7 @@ function registerPatchBank(router: Hono<BankEnv>): void {
         action: "PATCH /banks/:id",
         entityType: "bank",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff(
           { name: before.name, active: before.is_active },
           { name: after.name, active: after.is_active }

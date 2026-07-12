@@ -68,9 +68,21 @@ export function createKioskStatusRouter(): Hono<KioskStatusEnv> {
   return router;
 }
 
+/** Rôles à portée BANQUE : voient toutes les agences de leur banque (sans filtre agence). */
+const BANK_SCOPED_ROLES: ReadonlySet<string> = new Set([
+  "SUPER_ADMIN",
+  "BANK_ADMIN",
+]);
+
 /**
  * Construit la portée tenant de la requête : bornes de la banque du JWT, filtrées
  * par agence si `agencyId` est fourni (et dans le scope du JWT).
+ *
+ * Durcissement Boucle 3 F3 : pour les rôles NON bank-scoped (MANAGER,
+ * AGENCY_DIRECTOR, …), en l'ABSENCE de query `agencyId`, la portée est restreinte
+ * aux `tenant.agencyIds` du JWT — un MANAGER de l'agence A ne voit donc jamais les
+ * bornes d'une autre agence de sa banque. SUPER_ADMIN/BANK_ADMIN conservent la
+ * vue banque complète.
  *
  * @param tenant   - Contexte tenant
  * @param agencyId - Agence demandée (optionnelle)
@@ -90,6 +102,11 @@ function buildScope(
     assertAgencyScope(tenant, agencyId);
     params.push(agencyId);
     clauses.push(`agency_id = $${params.length}`);
+  } else if (!BANK_SCOPED_ROLES.has(tenant.role)) {
+    // Rôle à portée agence sans agencyId explicite → borner aux agences du JWT.
+    // `= ANY($n)` sur un tableau vide ne matche rien → aucune fuite hors scope.
+    params.push(tenant.agencyIds);
+    clauses.push(`agency_id = ANY($${params.length}::uuid[])`);
   }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   return { where, params };

@@ -59,7 +59,9 @@ export function createAgentImportRouter(): Hono<ImportEnv> {
     try {
       const bankId = requireBankId(tenant);
       const csv = await readCsvFile(c.req.raw);
-      const parsed = parseAgentCsv(csv);
+      // Anti-escalade (Boucle 3 F3) : une ligne ne peut pas provisionner un rôle
+      // strictement supérieur à l'importateur, et jamais un SUPER_ADMIN.
+      const parsed = parseAgentCsv(csv, tenant.role);
       const report = await importRows(db, bankId, parsed.rows, parsed.errors);
       return c.json(report, 200);
     } catch (err) {

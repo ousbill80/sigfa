@@ -144,6 +144,28 @@ describe("API-009: import CSV — 500 OK, 501 → 422, lignes invalides précise
     expect(body.errors[0]).toMatchObject({ field: "agencyCode", code: "AGENCY_NOT_FOUND" });
   });
 
+  it("SEC-F3: AGENCY_DIRECTOR importe BANK_ADMIN → rejeté ROLE_NOT_ALLOWED, AGENT créé", async () => {
+    const adminEmail = uniqueEmail("escalade-admin");
+    const agentEmail = uniqueEmail("escalade-agent");
+    const res = await importCsv(
+      build([`${adminEmail},E,F,BANK_ADMIN,,FR,`, `${agentEmail},G,H,AGENT,,FR,`])
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      created: number;
+      errors: Array<{ line: number; field: string; code: string }>;
+    };
+    // Seul l'AGENT est créé ; la ligne BANK_ADMIN est rejetée.
+    expect(body.created).toBe(1);
+    expect(body.errors.some((e) => e.line === 2 && e.field === "role" && e.code === "ROLE_NOT_ALLOWED")).toBe(true);
+    // Le BANK_ADMIN n'existe PAS en base (pas d'escalade).
+    const admin = await h.db.query(`SELECT 1 FROM users WHERE email=$1`, [adminEmail]);
+    expect(admin.rows).toHaveLength(0);
+    const agent = await h.db.query(`SELECT role FROM users WHERE email=$1`, [agentEmail]);
+    expect(agent.rows).toHaveLength(1);
+    expect((agent.rows[0] as { role: string }).role).toBe("AGENT");
+  });
+
   it("API-009: multipart sans champ 'file' → 400 BAD_REQUEST", async () => {
     const form = new FormData();
     form.append("other", "x");

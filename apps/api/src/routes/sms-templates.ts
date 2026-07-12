@@ -163,7 +163,7 @@ function registerPatchTemplates(router: Hono<SmsEnv>): void {
         action: "PATCH /banks/:id/sms-templates",
         entityType: "sms_templates",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({ templates: before }, { templates: after }),
       });
       return c.json({ templates: after }, 200);

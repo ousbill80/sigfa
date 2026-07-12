@@ -16,6 +16,7 @@
  */
 
 import { SigfaError } from "src/lib/errors.js";
+import { ROLE_HIERARCHY } from "src/middleware/rbac-route-map.js";
 
 /** Nombre maximal de lignes de données (hors en-tête). */
 export const MAX_IMPORT_LINES = 500;
@@ -132,11 +133,15 @@ function toLines(csv: string): string[] {
 /**
  * Parse et valide le CSV d'import d'agents.
  *
- * @param csv - Contenu texte UTF-8 du fichier
+ * @param csv          - Contenu texte UTF-8 du fichier
+ * @param importerRole - Rôle de l'importateur (facultatif). Si fourni, toute ligne
+ *   dont le `role` est STRICTEMENT supérieur à l'importateur est rejetée
+ *   (`ROLE_NOT_ALLOWED`) et `SUPER_ADMIN` est TOUJOURS interdit à l'import de
+ *   banque (anti-escalade de privilèges — Boucle 3 F3).
  * @returns Lignes valides + erreurs de format
  * @throws {SigfaError} 422 IMPORT_TOO_LARGE (> 500 lignes) ou INVALID_CSV_FORMAT
  */
-export function parseAgentCsv(csv: string): ParseResult {
+export function parseAgentCsv(csv: string, importerRole?: string): ParseResult {
   const lines = toLines(csv);
   if (lines.length === 0) {
     throw new SigfaError("INVALID_CSV_FORMAT", "Fichier CSV vide.", 422);
@@ -152,21 +157,70 @@ export function parseAgentCsv(csv: string): ParseResult {
       { maxLines: MAX_IMPORT_LINES, receivedLines: dataLines.length }
     );
   }
-  return validateRows(header, dataLines);
+  return validateRows(header, dataLines, importerRole);
 }
 
 /** Valide chaque ligne de données et sépare lignes valides / erreurs. */
-function validateRows(header: string[], dataLines: string[]): ParseResult {
+function validateRows(
+  header: string[],
+  dataLines: string[],
+  importerRole?: string
+): ParseResult {
   const rows: ParsedAgentRow[] = [];
   const errors: ImportError[] = [];
   dataLines.forEach((raw, index) => {
     const lineNo = index + 2;
     const record = toRecord(header, splitCsvLine(raw));
-    const rowErrors = validateRecord(lineNo, record);
+    const rowErrors = validateRecord(lineNo, record, importerRole);
     if (rowErrors.length > 0) errors.push(...rowErrors);
     else rows.push(buildRow(lineNo, record));
   });
   return { rows, errors };
+}
+
+/**
+ * Niveau hiérarchique d'un rôle pour la comparaison d'import. AUDITOR est
+ * ORTHOGONAL (absent de `ROLE_HIERARCHY`) mais LECTURE SEULE : il ne représente
+ * aucune escalade et est traité au niveau le plus bas des rôles opérationnels
+ * (importable par tout importateur non-agent). Les autres rôles suivent la
+ * hiérarchie numérique standard.
+ *
+ * @param role - Rôle de la ligne (déjà validé comme rôle connu)
+ */
+function importRoleLevel(role: string): number {
+  if (role === "AUDITOR") return ROLE_HIERARCHY["AGENT"] ?? 20;
+  return ROLE_HIERARCHY[role] ?? Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Vérifie que le rôle d'une ligne est autorisé pour l'importateur.
+ * Refuse `SUPER_ADMIN` (jamais importable en banque) et tout rôle STRICTEMENT
+ * supérieur à l'importateur dans la hiérarchie. `null` si autorisé.
+ *
+ * @param line         - Numéro de ligne CSV
+ * @param role         - Rôle demandé (déjà validé comme rôle connu)
+ * @param importerRole - Rôle de l'importateur
+ */
+function checkRoleAllowed(
+  line: number,
+  role: string,
+  importerRole: string
+): ImportError | null {
+  // SUPER_ADMIN n'est jamais provisionnable via un import de banque.
+  if (role === "SUPER_ADMIN") {
+    return err(line, "role", "ROLE_NOT_ALLOWED", "Le rôle 'SUPER_ADMIN' n'est pas autorisé à l'import.");
+  }
+  const importerLevel = ROLE_HIERARCHY[importerRole] ?? 0;
+  const rowLevel = importRoleLevel(role);
+  if (rowLevel > importerLevel) {
+    return err(
+      line,
+      "role",
+      "ROLE_NOT_ALLOWED",
+      `Le rôle '${role}' est supérieur à vos droits et ne peut pas être importé.`
+    );
+  }
+  return null;
 }
 
 /** Associe les valeurs aux noms de colonnes de l'en-tête. */
@@ -181,7 +235,8 @@ function toRecord(header: string[], values: string[]): Record<string, string> {
 /** Valide un enregistrement : retourne les erreurs de format (ordre stable). */
 function validateRecord(
   line: number,
-  record: Record<string, string>
+  record: Record<string, string>,
+  importerRole?: string
 ): ImportError[] {
   const errors: ImportError[] = [];
   if (!EMAIL_REGEX.test(record["email"] ?? "")) {
@@ -193,10 +248,15 @@ function validateRecord(
   if (!(record["lastName"] ?? "").trim()) {
     errors.push(err(line, "lastName", "MISSING_FIELD", "Le nom est obligatoire."));
   }
-  if (!VALID_ROLES.has(record["role"] ?? "")) {
+  const role = record["role"] ?? "";
+  if (!VALID_ROLES.has(role)) {
     errors.push(
-      err(line, "role", "INVALID_ROLE", `La valeur '${record["role"] ?? ""}' n'est pas un rôle valide.`)
+      err(line, "role", "INVALID_ROLE", `La valeur '${role}' n'est pas un rôle valide.`)
     );
+  } else if (importerRole) {
+    // Rôle connu : appliquer la garde anti-escalade si l'importateur est fourni.
+    const roleErr = checkRoleAllowed(line, role, importerRole);
+    if (roleErr) errors.push(roleErr);
   }
   const phone = (record["phone"] ?? "").trim();
   if (phone && !E164_REGEX.test(phone)) {

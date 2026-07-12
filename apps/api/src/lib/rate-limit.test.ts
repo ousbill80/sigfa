@@ -110,10 +110,48 @@ describe("API-010: rate-limit middleware générique (montage global API-011)", 
     expect(((await res.json()) as { ip: string }).ip).toBe("unknown");
   });
 
-  it("API-010: clientIp — x-real-ip utilisé à défaut de x-forwarded-for", async () => {
+  it("SEC-F3: clientIp — X-Forwarded-For IGNORÉ quand TRUST_PROXY off", async () => {
+    delete process.env["TRUST_PROXY"];
     const app = new Hono();
     app.get("/ip", (c) => c.json({ ip: clientIp(c) }));
-    const res = await app.request("/ip", { headers: { "x-real-ip": "203.0.113.5" } });
+    const r1 = await app.request("/ip", { headers: { "x-forwarded-for": "1.1.1.1" } });
+    const r2 = await app.request("/ip", { headers: { "x-forwarded-for": "2.2.2.2" } });
+    const ip1 = ((await r1.json()) as { ip: string }).ip;
+    const ip2 = ((await r2.json()) as { ip: string }).ip;
+    // XFF falsifié ignoré → même dimension (repli), jamais l'IP du header.
+    expect(ip1).not.toBe("1.1.1.1");
+    expect(ip2).not.toBe("2.2.2.2");
+    expect(ip1).toBe(ip2);
+  });
+
+  it("SEC-F3: rate-limit — XFF différents mais TRUST_PROXY off → même client → 429 au dépassement", async () => {
+    delete process.env["TRUST_PROXY"];
+    const runId = `xff-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const app = new Hono<{ Variables: { redis: Redis } }>();
+    app.use("*", async (c, next) => {
+      c.set("redis", redis);
+      await next();
+    });
+    app.use(
+      "*",
+      rateLimitMiddleware([
+        { keyFn: (c) => `mw:${runId}:${clientIp(c)}`, limit: 2, windowSeconds: 60 },
+      ])
+    );
+    app.get("/ping", (c) => c.json({ ok: true }));
+    // 3 requêtes avec des XFF DIFFÉRENTS mais même IP réelle → comptent comme
+    // un seul client : la 3e est 429 (l'attaquant ne peut pas contourner via XFF).
+    expect((await app.request("/ping", { headers: { "x-forwarded-for": "9.9.9.1" } })).status).toBe(200);
+    expect((await app.request("/ping", { headers: { "x-forwarded-for": "9.9.9.2" } })).status).toBe(200);
+    expect((await app.request("/ping", { headers: { "x-forwarded-for": "9.9.9.3" } })).status).toBe(429);
+  });
+
+  it("SEC-F3: clientIp — X-Forwarded-For pris en compte quand TRUST_PROXY on", async () => {
+    process.env["TRUST_PROXY"] = "true";
+    const app = new Hono();
+    app.get("/ip", (c) => c.json({ ip: clientIp(c) }));
+    const res = await app.request("/ip", { headers: { "x-forwarded-for": "203.0.113.5" } });
     expect(((await res.json()) as { ip: string }).ip).toBe("203.0.113.5");
+    delete process.env["TRUST_PROXY"];
   });
 });

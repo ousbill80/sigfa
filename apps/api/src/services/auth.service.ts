@@ -427,7 +427,9 @@ export async function verifyAccessToken(
   token: string
 ): Promise<JwtAccessPayload> {
   try {
-    const { payload } = await jwtVerify(token, secret);
+    // Restriction d'algorithme : n'accepter QUE HS256 (nos tokens sont signés
+    // HS256). Empêche les attaques de confusion d'algorithme (ex. alg forgé).
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     return payload as JwtAccessPayload;
   } catch {
     throw new SigfaError("UNAUTHORIZED", "Token invalide ou expiré.", 401);

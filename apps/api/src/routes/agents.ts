@@ -299,7 +299,7 @@ function registerPatchProfile(router: Hono<AgentEnv>): void {
         action: "PATCH /agents/:id",
         entityType: "user",
         entityId: agentId,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff(
           { languages: before["languages"], serviceIds: before["serviceIds"], agencyIds: before["agencyIds"], workSchedule: before["workSchedule"] },
           { languages: after["languages"], serviceIds: after["serviceIds"], agencyIds: after["agencyIds"], workSchedule: after["workSchedule"] }

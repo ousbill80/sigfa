@@ -4,7 +4,8 @@
  * @module
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { Hono } from "hono";
 import {
   toActorRole,
   extractIp,
@@ -12,6 +13,18 @@ import {
   recordAudit,
 } from "src/lib/audit-context.js";
 import type { TenantContext } from "src/middleware/tenant.js";
+
+/** Résout l'IP d'audit pour un jeu d'en-têtes via une app Hono minimale. */
+async function auditIp(headers: Record<string, string>): Promise<string | null> {
+  const app = new Hono();
+  app.get("/x", (c) => c.json({ ip: extractIp(c) }));
+  const res = await app.request("/x", { headers });
+  return ((await res.json()) as { ip: string | null }).ip;
+}
+
+afterEach(() => {
+  delete process.env["TRUST_PROXY"];
+});
 
 const tenant: TenantContext = {
   requestId: "req-1",
@@ -29,17 +42,22 @@ describe("API-008: audit-context helpers", () => {
     expect(toActorRole("AUTHENTICATED")).toBeNull();
   });
 
-  it("API-008: extractIp prend le premier hop de x-forwarded-for", () => {
-    const lookup = (n: string): string | undefined =>
-      n === "x-forwarded-for" ? "41.67.128.1, 10.0.0.1" : undefined;
-    expect(extractIp(lookup)).toBe("41.67.128.1");
+  it("API-008: extractIp prend le premier hop de x-forwarded-for quand TRUST_PROXY on", async () => {
+    process.env["TRUST_PROXY"] = "true";
+    expect(await auditIp({ "x-forwarded-for": "41.67.128.1, 10.0.0.1" })).toBe("41.67.128.1");
   });
 
-  it("API-008: extractIp retombe sur x-real-ip puis null", () => {
-    expect(extractIp((n) => (n === "x-real-ip" ? "8.8.8.8" : undefined))).toBe(
-      "8.8.8.8"
-    );
-    expect(extractIp(() => undefined)).toBeNull();
+  it("API-008: extractIp retombe sur x-real-ip (TRUST_PROXY on) puis null", async () => {
+    process.env["TRUST_PROXY"] = "1";
+    expect(await auditIp({ "x-real-ip": "8.8.8.8" })).toBe("8.8.8.8");
+    expect(await auditIp({})).toBeNull();
+  });
+
+  it("SEC-F3: extractIp IGNORE x-forwarded-for falsifié quand TRUST_PROXY off", async () => {
+    delete process.env["TRUST_PROXY"];
+    // XFF forgé ignoré → jamais l'IP du header (audit non falsifiable).
+    expect(await auditIp({ "x-forwarded-for": "6.6.6.6" })).not.toBe("6.6.6.6");
+    expect(await auditIp({ "x-real-ip": "6.6.6.6" })).not.toBe("6.6.6.6");
   });
 
   it("API-008: buildDiff ne retient que les clés modifiées", () => {

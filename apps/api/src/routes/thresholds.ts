@@ -117,7 +117,7 @@ function registerPatchThresholds(router: Hono<ThresholdsEnv>): void {
         action: "PATCH /banks/:id/thresholds",
         entityType: "bank_thresholds",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff(toThresholds(before), toThresholds(after)),
       });
       return c.json(toThresholds(after), 200);

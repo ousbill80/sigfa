@@ -156,7 +156,7 @@ function registerCreateCounter(router: Hono<CounterEnv>): void {
         action: "POST /counters",
         entityType: "counter",
         entityId: created.id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff({}, { label: created.label, serviceIds: input.serviceIds ?? [] }),
       });
       return c.json(toCounter(created), 201);
@@ -242,7 +242,7 @@ function registerPatchCounter(router: Hono<CounterEnv>): void {
         action: "PATCH /counters/:id",
         entityType: "counter",
         entityId: id,
-        ip: extractIp((n) => c.req.header(n)),
+        ip: extractIp(c),
         diff: buildDiff(
           { status: before.status, agentId: before.agent_id },
           { status: after.status, agentId: after.agent_id }

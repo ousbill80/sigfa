@@ -13,12 +13,14 @@
  */
 
 import type { Client } from "pg";
+import type { Context } from "hono";
 import {
   insertAuditEntry,
   type ActorRole,
   type AuditEntryRow,
 } from "@sigfa/database";
 import type { TenantContext } from "src/middleware/tenant.js";
+import { resolveClientIp } from "src/lib/client-ip.js";
 
 /** Rôles RBAC persistés en base (LA LOI `Role` \ {NONE}, sans sentinelles). */
 const PERSISTED_ROLES: ReadonlySet<string> = new Set([
@@ -42,21 +44,18 @@ export function toActorRole(role: string): ActorRole | null {
 }
 
 /**
- * Extrait l'adresse IP de l'appelant depuis les en-têtes usuels, ou `null`.
- * Prend le premier hop de `x-forwarded-for` si présent.
+ * Extrait l'adresse IP de l'appelant pour l'audit, ou `null`.
+ * Délègue à `resolveClientIp` : `X-Forwarded-For`/`X-Real-IP` ne sont pris en
+ * compte que si `TRUST_PROXY` est activé (défaut `false`) — sinon l'IP de
+ * connexion réelle est utilisée. Empêche la falsification de l'IP d'audit via un
+ * en-tête `X-Forwarded-For` forgé (Boucle 3 F3). `null` si indéterminable.
  *
- * @param headerLookup - Fonction d'accès aux en-têtes de la requête
+ * @param c - Contexte Hono de la requête
  * @returns Adresse IP ou null
  */
-export function extractIp(
-  headerLookup: (name: string) => string | undefined
-): string | null {
-  const forwarded = headerLookup("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return headerLookup("x-real-ip") ?? null;
+export function extractIp(c: Context): string | null {
+  const ip = resolveClientIp(c);
+  return ip === "unknown" ? null : ip;
 }
 
 /** Paramètres d'écriture d'une entrée d'audit de mutation. */
