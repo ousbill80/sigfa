@@ -1,8 +1,9 @@
-// offline-queue.ts — MOB-002
-// File d'attente offline basée sur MMKV
-import { MMKV } from 'react-native-mmkv';
+// offline-queue.ts — MOB-002 (+ S8 Boucle 2 F4)
+// File d'attente offline basée sur MMKV — store CHIFFRÉ au repos (S8) :
+// l'instance MMKV est fournie par secure-storage.ts (encryptionKey issue du
+// trousseau système). Tout accès avant initSecureStorage() échoue fermé.
+import { getOfflineQueueStorage } from '@/services/secure-storage';
 
-const storage = new MMKV({ id: 'sigfa-offline-queue' });
 const PENDING_KEY = 'pending_tickets';
 
 export interface PendingTicket {
@@ -21,7 +22,7 @@ export interface PendingTicket {
 export function enqueue(ticket: PendingTicket): PendingTicket[] {
   const existing = getPendingTickets();
   const updated = [...existing, ticket];
-  storage.set(PENDING_KEY, JSON.stringify(updated));
+  getOfflineQueueStorage().set(PENDING_KEY, JSON.stringify(updated));
   return updated;
 }
 
@@ -29,7 +30,7 @@ export function enqueue(ticket: PendingTicket): PendingTicket[] {
  * Récupère tous les tickets en attente.
  */
 export function getPendingTickets(): PendingTicket[] {
-  const raw = storage.getString(PENDING_KEY);
+  const raw = getOfflineQueueStorage().getString(PENDING_KEY);
   if (!raw) return [];
   try {
     return JSON.parse(raw) as PendingTicket[];
@@ -44,7 +45,7 @@ export function getPendingTickets(): PendingTicket[] {
 export function dequeue(idempotencyKey: string): PendingTicket[] {
   const existing = getPendingTickets();
   const updated = existing.filter(t => t.idempotencyKey !== idempotencyKey);
-  storage.set(PENDING_KEY, JSON.stringify(updated));
+  getOfflineQueueStorage().set(PENDING_KEY, JSON.stringify(updated));
   return updated;
 }
 
@@ -52,5 +53,5 @@ export function dequeue(idempotencyKey: string): PendingTicket[] {
  * Vide complètement la file.
  */
 export function clearQueue(): void {
-  storage.delete(PENDING_KEY);
+  getOfflineQueueStorage().delete(PENDING_KEY);
 }

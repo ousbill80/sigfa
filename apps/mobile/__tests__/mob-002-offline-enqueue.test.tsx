@@ -1,8 +1,10 @@
 // __tests__/mob-002-offline-enqueue.test.tsx
 // MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV
+// (S8 : le store est chiffré derrière le gate initSecureStorage())
 import { enqueue, getPendingTickets, clearQueue, dequeue, type PendingTicket } from '../src/services/offline-queue';
+import { initSecureStorage, resetSecureStorageForTests } from '../src/services/secure-storage';
 
-// Mock MMKV storage
+// Mock MMKV storage (recrypt requis par le gate S8)
 const mockStorage: Record<string, string> = {};
 jest.mock('react-native-mmkv', () => ({
   MMKV: jest.fn().mockImplementation(() => ({
@@ -10,13 +12,16 @@ jest.mock('react-native-mmkv', () => ({
     getString: jest.fn((key: string) => mockStorage[key]),
     delete: jest.fn((key: string) => { delete mockStorage[key]; }),
     contains: jest.fn((key: string) => key in mockStorage),
+    recrypt: jest.fn(),
   })),
 }));
 
 describe('MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV', () => {
-  beforeEach(() => {
-    // Clear mock storage before each test
+  beforeEach(async () => {
+    // Clear mock storage before each test + passage du gate S8
     Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    resetSecureStorageForTests();
+    await initSecureStorage();
   });
 
   test('enqueue() ajoute un ticket dans MMKV', () => {

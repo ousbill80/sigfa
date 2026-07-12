@@ -1,9 +1,12 @@
-// ticket-mmkv.ts — MOB-004
+// ticket-mmkv.ts — MOB-004 (+ S8 Boucle 2 F4)
 // Persistance MMKV: trackingId, position, estimatedWaitMinutes, lastSyncAt
 // TTL = durée de vie du ticket (clôture = purge MMKV)
-import { MMKV } from 'react-native-mmkv';
-
-const storage = new MMKV({ id: 'sigfa-ticket-state' });
+// S8 : les stores MMKV sont CHIFFRÉS au repos et fournis par secure-storage.ts
+// (encryptionKey issue du trousseau système) — plus aucune instance locale.
+import {
+  getOfflineQueueStorage,
+  getTicketStateStorage,
+} from '@/services/secure-storage';
 
 const TICKET_STATE_KEY = 'ticket_state';
 
@@ -20,7 +23,7 @@ export interface TicketMMKVState {
  * Écrit l'état du ticket en MMKV après chaque polling réussi.
  */
 export function writeTicketState(state: TicketMMKVState): void {
-  storage.set(TICKET_STATE_KEY, JSON.stringify(state));
+  getTicketStateStorage().set(TICKET_STATE_KEY, JSON.stringify(state));
 }
 
 /**
@@ -28,7 +31,7 @@ export function writeTicketState(state: TicketMMKVState): void {
  * Retourne null si aucun état stocké.
  */
 export function readTicketState(): TicketMMKVState | null {
-  const raw = storage.getString(TICKET_STATE_KEY);
+  const raw = getTicketStateStorage().getString(TICKET_STATE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as TicketMMKVState;
@@ -41,7 +44,7 @@ export function readTicketState(): TicketMMKVState | null {
  * Purge l'état du ticket (clôture du ticket ou TTL expirée).
  */
 export function purgeTicketState(): void {
-  storage.delete(TICKET_STATE_KEY);
+  getTicketStateStorage().delete(TICKET_STATE_KEY);
 }
 
 // ============================================================
@@ -61,11 +64,10 @@ interface PendingTicketWithStatus {
   status?: string;
 }
 
-const pendingStorage = new MMKV({ id: 'sigfa-offline-queue' });
 const PENDING_KEY = 'pending_tickets';
 
 function getPendingTickets(): PendingTicketWithStatus[] {
-  const raw = pendingStorage.getString(PENDING_KEY);
+  const raw = getOfflineQueueStorage().getString(PENDING_KEY);
   if (!raw) return [];
   try {
     return JSON.parse(raw) as PendingTicketWithStatus[];
@@ -75,7 +77,7 @@ function getPendingTickets(): PendingTicketWithStatus[] {
 }
 
 function setPendingTickets(tickets: PendingTicketWithStatus[]): void {
-  pendingStorage.set(PENDING_KEY, JSON.stringify(tickets));
+  getOfflineQueueStorage().set(PENDING_KEY, JSON.stringify(tickets));
 }
 
 export interface FlushOptions {
@@ -140,6 +142,6 @@ export async function flush({ apiBaseUrl }: FlushOptions): Promise<void> {
   if (remaining.length > 0) {
     setPendingTickets(remaining);
   } else {
-    pendingStorage.delete(PENDING_KEY);
+    getOfflineQueueStorage().delete(PENDING_KEY);
   }
 }

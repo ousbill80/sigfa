@@ -1,8 +1,10 @@
 // __tests__/mob-002-step2-flow.test.tsx
 // MOB-002: Step2 flow — confirmation téléphone + opt-in UEMOA complet
+// (S8 : la confirmation enqueue dans le store chiffré → gate initSecureStorage())
 import React from 'react';
 import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import Step2Screen from '../app/(app)/new-ticket/step-2';
+import { initSecureStorage, resetSecureStorageForTests } from '../src/services/secure-storage';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -20,9 +22,11 @@ jest.mock('expo-router', () => ({
 
 // Use fake timers to prevent TouchableOpacity's Animated.timing (requestAnimationFrame →
 // setTimeout(0)) from firing outside of act() and producing "not wrapped in act(...)" warnings.
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   mockPush.mockClear();
+  resetSecureStorageForTests();
+  await initSecureStorage();
   jest.useFakeTimers();
 });
 

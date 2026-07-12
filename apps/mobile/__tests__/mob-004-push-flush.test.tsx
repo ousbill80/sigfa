@@ -15,6 +15,10 @@ import {
   purgeTicketState,
   type TicketMMKVState,
 } from '../src/services/ticket-mmkv';
+import {
+  initSecureStorage,
+  resetSecureStorageForTests,
+} from '../src/services/secure-storage';
 
 // Mock MMKV — note: mock factory cannot reference out-of-scope vars,
 // so we use a global storage pattern compatible with jest hoisting.
@@ -30,12 +34,16 @@ jest.mock('react-native-mmkv', () => ({
     getString: jest.fn((key: string) => mockStorage[key] ?? undefined),
     delete: jest.fn((key: string) => { delete mockStorage[key]; }),
     contains: jest.fn((key: string) => key in mockStorage),
+    recrypt: jest.fn(),
   })),
 }));
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   mockStorage = {};
+  // Gate S8 : les stores MMKV chiffrés doivent être initialisés avant accès
+  resetSecureStorageForTests();
+  await initSecureStorage();
 });
 
 describe('MOB-004: POST /notifications/devices — appel au démarrage app, idempotent', () => {
