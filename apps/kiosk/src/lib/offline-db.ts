@@ -31,6 +31,12 @@ export interface OfflineTicketRow {
    * reste stocké (rétrocompat + dérivation serveur). Absent = parcours 1 niveau.
    */
   operationId?: string;
+  /**
+   * MODEL-KIOSK-B : conseiller ciblé (additif, optionnel). Présent = parcours
+   * « voir mon conseiller » → à la synchro, le ticket rejoint la file du
+   * conseiller (MODEL-API-B/D6). `serviceId` reste stocké (requis contrat).
+   */
+  targetManagerId?: string;
   /** Agence dérivée de la session kiosque. */
   agencyId: string;
   /** Canal d'émission (toujours KIOSK). */

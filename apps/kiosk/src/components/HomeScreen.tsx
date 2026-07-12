@@ -51,7 +51,9 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
       utterance.lang = locale === "fr" ? "fr-FR" : "en-US";
       window.speechSynthesis.speak(utterance);
     }
-    router.push(`/${locale}/services`);
+    // MODEL-KIOSK-B : après la langue, la borne offre DEUX chemins clairs
+    // (« Une opération » / « Voir mon conseiller ») via l'écran de choix.
+    router.push(`/${locale}/choice`);
   };
 
   return (

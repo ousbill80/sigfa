@@ -244,6 +244,88 @@ describe("KIOSK-004: ConfirmationScreen", () => {
     expect(capturedBody).not.toHaveProperty("operationId");
   });
 
+  it("MODEL-KIOSK-B: targetManagerId prop → envoyé dans le body POST /public/tickets (serviceId reste requis)", async () => {
+    let capturedBody: Record<string, unknown> = {};
+    server.use(
+      http.post("*/public/tickets", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          {
+            trackingId: "TRK-00042",
+            number: 42,
+            displayNumber: "C042",
+            position: 1,
+            estimatedWaitMinutes: 5,
+            queueLength: 2,
+            serviceId: "svc-conseiller",
+            targetManagerId: "rm-1",
+            agencyId: "agt-001",
+            channel: "KIOSK",
+            createdAt: new Date().toISOString(),
+            status: "WAITING",
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <ConfirmationScreen
+          serviceId="svc-conseiller"
+          targetManagerId="rm-1"
+          agencyId="agt-001"
+        />
+      </NextIntlClientProvider>
+    );
+
+    fireEvent.click(screen.getByText("Passer (sans numéro de téléphone)"));
+
+    await waitFor(() => {
+      expect(capturedBody.targetManagerId).toBe("rm-1");
+    });
+    // serviceId reste requis par le contrat (file conseiller = filtre logique).
+    expect(capturedBody.serviceId).toBe("svc-conseiller");
+  });
+
+  it("MODEL-KIOSK-B: sans targetManagerId → body ne contient PAS targetManagerId", async () => {
+    let capturedBody: Record<string, unknown> = {};
+    server.use(
+      http.post("*/public/tickets", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          {
+            trackingId: "TRK-00043",
+            number: 43,
+            displayNumber: "A043",
+            position: 1,
+            estimatedWaitMinutes: 4,
+            queueLength: 1,
+            serviceId: "svc-1",
+            agencyId: "agt-001",
+            channel: "KIOSK",
+            createdAt: new Date().toISOString(),
+            status: "WAITING",
+          },
+          { status: 201 }
+        );
+      })
+    );
+
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <ConfirmationScreen serviceId="svc-1" agencyId="agt-001" />
+      </NextIntlClientProvider>
+    );
+
+    fireEvent.click(screen.getByText("Passer (sans numéro de téléphone)"));
+
+    await waitFor(() => {
+      expect(capturedBody.serviceId).toBe("svc-1");
+    });
+    expect(capturedBody).not.toHaveProperty("targetManagerId");
+  });
+
   it("KIOSK-004: POST 201 → navigation KIOSK-005 with trackingId, displayNumber, position, estimatedWaitMinutes", async () => {
     render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>

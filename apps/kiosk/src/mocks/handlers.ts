@@ -34,6 +34,23 @@ export const handlers = [
       { status: 200 }
     );
   }),
+  // MODEL-KIOSK-B: GET /public/agencies/{agencyId}/relationship-managers
+  // Liste NOMINATIVE (zéro PII) des conseillers actifs d'une agence, pour le
+  // chemin « voir mon conseiller ». Démo : 3 conseillers réalistes — 2 avec une
+  // photo LOCALE (aucune image réseau externe), 1 sans photo (rendu en initiales
+  // côté écran). Le wildcard `:agencyId` matche l'agence transmise par l'écran.
+  http.get("*/public/agencies/:agencyId/relationship-managers", () => {
+    return HttpResponse.json(
+      {
+        data: [
+          { id: "rm-kofi", displayName: "Kofi Aké", photoUrl: "/mock/rm/kofi.svg" },
+          { id: "rm-awa", displayName: "Awa Diallo" },
+          { id: "rm-yao", displayName: "Yao Kouassi", photoUrl: "/mock/rm/yao.svg" },
+        ],
+      },
+      { status: 200 }
+    );
+  }),
   // KIOSK-004: POST /public/tickets handler
   http.post("*/public/tickets", () => {
     return HttpResponse.json(

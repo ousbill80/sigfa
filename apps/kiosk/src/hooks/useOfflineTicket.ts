@@ -45,6 +45,8 @@ export interface CreateOfflineTicketOptions {
   serviceId?: string;
   /** MODEL-KIOSK-A : opération choisie (additif). `serviceId` reste porté. */
   operationId?: string;
+  /** MODEL-KIOSK-B : conseiller ciblé (additif). `serviceId` reste porté. */
+  targetManagerId?: string;
   agencyId?: string;
 }
 
@@ -95,6 +97,7 @@ async function persistOfflineTicket(
     localUuid,
     serviceId: options.serviceId ?? "",
     ...(options.operationId ? { operationId: options.operationId } : {}),
+    ...(options.targetManagerId ? { targetManagerId: options.targetManagerId } : {}),
     agencyId: options.agencyId ?? "",
     channel: KIOSK_CHANNEL,
     localSequence,
@@ -142,6 +145,8 @@ async function syncBatch(
         serviceId: r.serviceId,
         // MODEL-KIOSK-A : operationId additif si présent (serviceId reste porté).
         ...(r.operationId ? { operationId: r.operationId } : {}),
+        // MODEL-KIOSK-B : targetManagerId additif → file conseiller (D6).
+        ...(r.targetManagerId ? { targetManagerId: r.targetManagerId } : {}),
         channel: "KIOSK" as const,
         createdOfflineAt: r.createdOfflineAt,
       })),

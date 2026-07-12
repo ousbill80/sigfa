@@ -12,12 +12,15 @@ export function ConfirmationPageClient() {
   const serviceId = searchParams.get("serviceId") ?? "";
   // MODEL-KIOSK-A : opération choisie (parcours 2 niveaux) — optionnelle.
   const operationId = searchParams.get("operationId") ?? undefined;
+  // MODEL-KIOSK-B : conseiller ciblé (parcours « voir mon conseiller ») — optionnel.
+  const targetManagerId = searchParams.get("targetManagerId") ?? undefined;
   const agencyId = searchParams.get("agencyId") ?? "";
 
   return (
     <ConfirmationScreen
       serviceId={serviceId}
       operationId={operationId}
+      targetManagerId={targetManagerId}
       agencyId={agencyId}
     />
   );

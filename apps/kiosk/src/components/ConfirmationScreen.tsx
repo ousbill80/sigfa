@@ -28,6 +28,12 @@ interface ConfirmationScreenProps {
    * dérivation serveur). Absente pour un parcours 1 niveau (service direct).
    */
   operationId?: string;
+  /**
+   * MODEL-KIOSK-B : conseiller ciblé (parcours « voir mon conseiller », additif).
+   * Envoyé au serveur avec le ticket → il rejoint la file personnelle du
+   * conseiller (MODEL-API-B/D6). `serviceId` reste requis par le contrat.
+   */
+  targetManagerId?: string;
   agencyId: string;
   /**
    * KIOSK-007 : sink d'événement simulé (F4) pour `alert:manager
@@ -53,6 +59,7 @@ const KEYPAD_ROWS = [
 export function ConfirmationScreen({
   serviceId,
   operationId,
+  targetManagerId,
   agencyId,
   systemErrorSink = noopDegradedSink,
 }: ConfirmationScreenProps) {
@@ -170,6 +177,8 @@ export function ConfirmationScreen({
             // MODEL-KIOSK-A : operationId additif si présent (le serveur dérive
             // serviceId = operation.serviceId). serviceId reste envoyé (rétrocompat).
             ...(operationId ? { operationId } : {}),
+            // MODEL-KIOSK-B : targetManagerId additif → file conseiller (D6).
+            ...(targetManagerId ? { targetManagerId } : {}),
             channel: "KIOSK",
             phoneNumber: finalPhone,
             smsConsent: finalConsent,
@@ -211,7 +220,7 @@ export function ConfirmationScreen({
 
       // Autres non-201 (4xx…) : repli offline pour ne pas bloquer l'usager.
       setIsOffline(true);
-      const offlineTicket = await createOfflineTicket({ serviceId, ...(operationId ? { operationId } : {}), agencyId });
+      const offlineTicket = await createOfflineTicket({ serviceId, ...(operationId ? { operationId } : {}), ...(targetManagerId ? { targetManagerId } : {}), agencyId });
       router.push(buildTicketUrl(
         {
           trackingId: offlineTicket.trackingId,
@@ -225,7 +234,7 @@ export function ConfirmationScreen({
     } catch {
       // Network error: use offline fallback
       setIsOffline(true);
-      const offlineTicket = await createOfflineTicket({ serviceId, ...(operationId ? { operationId } : {}), agencyId });
+      const offlineTicket = await createOfflineTicket({ serviceId, ...(operationId ? { operationId } : {}), ...(targetManagerId ? { targetManagerId } : {}), agencyId });
       router.push(buildTicketUrl(
         {
           trackingId: offlineTicket.trackingId,

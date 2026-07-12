@@ -40,6 +40,27 @@
     "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
     "offlineBanner": "Mode hors connexion"
   },
+  "choiceModelB": {
+    "title": "Que souhaitez-vous ?",
+    "backButton": "Retour",
+    "operationCard": "Une opération",
+    "operationHint": "Dépôt, retrait, virement…",
+    "managerCard": "Voir mon conseiller",
+    "managerHint": "Rencontrer un chargé de clientèle"
+  },
+  "managersModelB": {
+    "title": "Quel conseiller souhaitez-vous voir ?",
+    "backButton": "Retour",
+    "accessibilityButton": "Accès prioritaire",
+    "loadingMessage": "Chargement des conseillers...",
+    "emptyTitle": "Aucun conseiller disponible",
+    "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
+    "errorTitle": "Conseillers indisponibles",
+    "errorMessage": "Impossible de charger les conseillers. Réessayez ou adressez-vous à l'accueil.",
+    "retryButton": "Réessayer",
+    "offlineBanner": "Mode hors connexion",
+    "avatarAlt": "Photo de {name}"
+  },
   "operationsModelA": {
     "title": "Quelle opération souhaitez-vous ?",
     "backButton": "Retour",

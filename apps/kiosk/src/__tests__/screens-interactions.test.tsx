@@ -168,7 +168,7 @@ describe("KIOSK-002: HomeScreen interactions", () => {
     }));
   });
 
-  it("KIOSK-002: handleLanguageSelect — clicking a language card navigates to /{locale}/services", () => {
+  it("MODEL-KIOSK-B: handleLanguageSelect — clicking a language card navigates to /{locale}/choice (point d'entrée 2 chemins)", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={homeMessages}>
         <HomeScreen />
@@ -181,10 +181,10 @@ describe("KIOSK-002: HomeScreen interactions", () => {
     // Click the first card (fr locale)
     fireEvent.click(cards[0]);
 
-    expect(mockPush).toHaveBeenCalledWith("/fr/services");
+    expect(mockPush).toHaveBeenCalledWith("/fr/choice");
   });
 
-  it("KIOSK-002: handleLanguageSelect — clicking 'en' card navigates to /en/services", () => {
+  it("MODEL-KIOSK-B: handleLanguageSelect — clicking 'en' card navigates to /en/choice", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={homeMessages}>
         <HomeScreen />
@@ -195,7 +195,7 @@ describe("KIOSK-002: HomeScreen interactions", () => {
     // cards: fr, en — en is index 1 (Dioula/Baoulé retirés)
     fireEvent.click(cards[1]);
 
-    expect(mockPush).toHaveBeenCalledWith("/en/services");
+    expect(mockPush).toHaveBeenCalledWith("/en/choice");
   });
 
   it("KIOSK-002: handleLanguageSelect — speechSynthesis.speak called when available", () => {

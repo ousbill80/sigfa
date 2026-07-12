@@ -40,6 +40,27 @@
     "emptyMessage": "Please go to reception — a staff member will assist you.",
     "offlineBanner": "Offline mode"
   },
+  "choiceModelB": {
+    "title": "What would you like to do?",
+    "backButton": "Back",
+    "operationCard": "An operation",
+    "operationHint": "Deposit, withdrawal, transfer…",
+    "managerCard": "See my advisor",
+    "managerHint": "Meet a relationship manager"
+  },
+  "managersModelB": {
+    "title": "Which advisor would you like to see?",
+    "backButton": "Back",
+    "accessibilityButton": "Priority access",
+    "loadingMessage": "Loading advisors...",
+    "emptyTitle": "No advisors available",
+    "emptyMessage": "Please go to reception — a staff member will assist you.",
+    "errorTitle": "Advisors unavailable",
+    "errorMessage": "Unable to load advisors. Retry or go to reception.",
+    "retryButton": "Retry",
+    "offlineBanner": "Offline mode",
+    "avatarAlt": "Photo of {name}"
+  },
   "operationsModelA": {
     "title": "Which operation do you need?",
     "backButton": "Back",
