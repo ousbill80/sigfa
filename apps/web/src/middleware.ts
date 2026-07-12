@@ -1,45 +1,28 @@
 /**
  * Next.js middleware — JWT auth verification and RBAC enforcement.
+ *
+ * S1 (Boucle 2 F4) : la signature du JWT est VÉRIFIÉE (jose `jwtVerify`,
+ * HS256 explicite — même politique que l'API, SEC-F3-09) AVANT toute
+ * extraction de rôle. Un cookie forgé, signé avec un autre secret/algorithme,
+ * expiré ou malformé = non authentifié → redirection /login. Fail-closed :
+ * sans JWT_SECRET configuré, aucun token n'est accepté.
+ *
+ * Runtime edge : jose y est compatible (raison de son choix).
  * @module middleware
  */
 import { NextRequest, NextResponse } from "next/server";
-import type { Role } from "@/lib/roles";
 import { checkAccess } from "@/lib/middleware-utils";
-
-/**
- * Extracts and decodes JWT payload from request cookies (without full verification).
- * Real verification uses jose in API routes.
- * @param request - Incoming Next.js request
- * @returns User role or null
- */
-function getRoleFromCookie(request: NextRequest): Role | null {
-  const token = request.cookies.get("access_token")?.value;
-  if (!token) return null;
-
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = parts[1];
-    if (!payload) return null;
-    const decoded = JSON.parse(
-      Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8")
-    ) as { role?: string; exp?: number };
-
-    // Check expiry
-    if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
-      return null;
-    }
-
-    return (decoded.role as Role) ?? null;
-  } catch {
-    return null;
-  }
-}
+import { getJwtSecret, verifySessionToken } from "@/lib/session";
 
 /** Next.js middleware handler */
-export function middleware(request: NextRequest): NextResponse {
+export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
-  const role = getRoleFromCookie(request);
+
+  // Vérification cryptographique AVANT lecture du rôle (S1).
+  const token = request.cookies.get("access_token")?.value;
+  const claims = await verifySessionToken(token, getJwtSecret());
+  const role = claims?.role ?? null;
+
   const result = checkAccess(pathname, role);
 
   if (result.action === "redirect") {
