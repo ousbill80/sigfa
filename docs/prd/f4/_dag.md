@@ -27,8 +27,10 @@ CONTRACT-012 est prérequis de : KIOSK-007, TV-002
 | Piste | Stories | Agent | Statut |
 |---|---|---|---|
 | Kiosque | KIOSK-001..009 **TOUS DONE** | agent-kiosk | **DONE** |
-| TV + Dashboards | TV+WEB-001-002-003 DONE | agent-web | EN COURS |
+| TV + Dashboards | TV-001/002 + WEB-001..006 **TOUS DONE** | agent-web | **DONE** |
 | Mobile | MOB-001..005 | agent-mobile | DONE |
+
+**VAGUE F4 COMPLÈTE (2026-07-12)** : les 3 pistes DONE (Kiosque KIOSK-001..009, TV+Web TV-001/002 + WEB-001..006, Mobile MOB-001..005). Tous les clients codés contre le mock Prism ; la bascule réel = RT-001 (déjà branché : serveur + web/kiosk ; mobile socket PENDING, polling). Suivi : câblage token web dans le layout (couture RT-003), `POST /public/tickets` handler serveur, écrans consommant le réel validés en E2E (RT-003).
 
 ## Décisions d'arbitrage pré-critiques (issues des notes rédacteurs)
 - **MOB-001 node-linker** : option retenue = `node-linker=hoisted` scopé ? NON — `.npmrc` racine est global au monorepo (risque sur les autres workspaces). Décision : **metro.config.js** (watchFolders + extraNodeModules) d'abord ; si échec documenté en story → bascule hoisted avec gate orchestrateur.

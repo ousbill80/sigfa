@@ -17,3 +17,4 @@ test-results/
 tsconfig.tsbuildinfo
 .claude/worktrees/
 apps/mobile/.expo/
+apps/mobile/ios/
