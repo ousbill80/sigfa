@@ -21,6 +21,8 @@ F2 DONE ──► API-001 (auth) ──► API-002 (middleware tenant+withPlatfo
 
 **Note withPlatform (API-002)** : connexion `withPlatform` ajoutée à `@sigfa/database` — couture consignée, périmètre étendu de la story ; jamais de SET bank_id vide.
 
+**Frontière API-006 → RT-001** : API-006 livre le serveur Socket.io (`services/socket-server.ts`), l'émetteur typé `emitTicketCalled` et le verrou durci — les 7 critères sont testés (harness Supertest + socket.io-client, PG+Redis réels). NON câblé en prod : `index.ts` ne capture pas encore le serveur HTTP retourné par `serve()` pour appeler `createSocketServer`, et `createApp` utilise `createNoopBus()` (les émissions des routes n'atteignent pas `io`). L'attachement `index.ts` + l'adossement `RealtimeBus`↔`io` = **branchement réel = RT-001** (cohérent avec le hors-scope « Clients socket F4/RT-001 »).
+
 ## Conventions communes F3
 - **Hono 4** dans `apps/api/src/` : `routes/` (un routeur par périmètre), `middleware/`, `services/` (logique), `realtime/` — kebab-case, fonctions ≤30 lignes, JSDoc.
 - **LA LOI est exécutoire** : chaque handler valide entrée/sortie contre les schémas du contrat (zod depuis @sigfa/schemas + types generated) ; toute réponse d'erreur = `{ error: { code, message, details? } }` avec les codes EXACTS du YAML ; chaque story dont les routes changent AJOUTE sa cible Schemathesis (harness F0) contre l'API réelle démarrée sur Testcontainers — c'est le gate T4.
@@ -35,10 +37,10 @@ F2 DONE ──► API-001 (auth) ──► API-002 (middleware tenant+withPlatfo
 |---|---|---|---|
 | API-001 | Auth : login/refresh/logout/me, JWT 15min+refresh 7j rotation, bcrypt 12, blocage 5/15min | F2 | DONE |
 | API-002 | Middleware tenant : JWT → withTenant sur chaque requête, x-required-role enforcé (rbac-matrix) | 001 | DONE |
-| API-003 | Cycle de vie ticket : émission idempotente, call-next/call/serve/close/no-show/transfer/abandon | 002 | TODO |
+| API-003 | Cycle de vie ticket : émission idempotente, call-next/call/serve/close/no-show/transfer/abandon | 002 | DONE |
 | API-004 | Moteur de file : priorités 5 niveaux, routage compétence+langue, débordement, pause de file | 003 | DONE |
 | API-005 | Sync offline : batch ≤100, idempotence local_uuid, résolution numéros | 003 | TODO |
-| API-006 | Socket.io serveur conforme contrat + lock d'appel (2 agents → 1 gagnant) | 003 | TODO |
+| API-006 | Socket.io serveur conforme contrat + lock d'appel (2 agents → 1 gagnant) | 003 | DONE |
 | API-007 | Agents : statuts+history, chrono, alertes (inactif, SLA, déconnexion→WAITING PRIORITY) | 004, 006 | TODO |
 | API-008 | CRUD admin : banks/agencies/services/counters/queues/hours+fériés, RBAC 6 rôles, audit branché | 002 | TODO |
 | API-009 | Templates & onboarding : clone-from, kiosk-access+session borne, import CSV agents, theming+purge-phone | 008 | TODO |
