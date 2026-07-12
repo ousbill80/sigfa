@@ -79,7 +79,37 @@ export type TranslationKey =
   | "comex.offline"
   | "comex.error"
   | "comex.tv_on"
-  | "comex.tv_off";
+  | "comex.tv_off"
+  | "admin.title"
+  | "admin.section.identity"
+  | "admin.section.agencies"
+  | "admin.section.services"
+  | "admin.section.counters"
+  | "admin.section.agents"
+  | "admin.section.sms_templates"
+  | "admin.section.thresholds"
+  | "admin.section.onboarding"
+  | "admin.forbidden"
+  | "admin.offline"
+  | "admin.error"
+  | "admin.save"
+  | "admin.cancel"
+  | "admin.confirm"
+  | "admin.brand_label"
+  | "admin.brand_warning"
+  | "admin.brand_corrected"
+  | "admin.deactivate"
+  | "admin.deactivate_tickets_title"
+  | "admin.import_csv"
+  | "admin.import_summary"
+  | "admin.preview"
+  | "admin.unknown_variable"
+  | "admin.empty_agencies"
+  | "admin.wizard_step"
+  | "admin.wizard_next"
+  | "admin.wizard_back"
+  | "admin.wizard_generate_qr"
+  | "admin.wizard_done";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -153,6 +183,36 @@ export const FR: TranslationDict = {
   "comex.error": "Impossible de charger le tableau de bord COMEX. Veuillez réessayer.",
   "comex.tv_on": "Activer le mode TV",
   "comex.tv_off": "Quitter le mode TV",
+  "admin.title": "CONSOLE D'ADMINISTRATION",
+  "admin.section.identity": "Identité banque",
+  "admin.section.agencies": "Agences",
+  "admin.section.services": "Services",
+  "admin.section.counters": "Guichets",
+  "admin.section.agents": "Agents",
+  "admin.section.sms_templates": "Templates SMS",
+  "admin.section.thresholds": "Seuils d'alerte",
+  "admin.section.onboarding": "Onboarding agence",
+  "admin.forbidden": "Vous n'avez pas les droits pour accéder à la console d'administration.",
+  "admin.offline": "Connexion requise pour configurer",
+  "admin.error": "Une erreur est survenue. Veuillez réessayer.",
+  "admin.save": "Sauvegarder",
+  "admin.cancel": "Annuler",
+  "admin.confirm": "Confirmer",
+  "admin.brand_label": "Couleur principale (--brand)",
+  "admin.brand_warning": "Contraste insuffisant sur le fond clair (< 4,5:1).",
+  "admin.brand_corrected": "Valeur corrigée appliquée",
+  "admin.deactivate": "Désactiver",
+  "admin.deactivate_tickets_title": "Tickets ouverts sur cette agence",
+  "admin.import_csv": "Importer un CSV",
+  "admin.import_summary": "Résumé de l'import",
+  "admin.preview": "Aperçu",
+  "admin.unknown_variable": "Variable non autorisée",
+  "admin.empty_agencies": "Aucune agence configurée",
+  "admin.wizard_step": "Étape",
+  "admin.wizard_next": "Suivant",
+  "admin.wizard_back": "Précédent",
+  "admin.wizard_generate_qr": "Générer le QR d'installation",
+  "admin.wizard_done": "Onboarding terminé",
 };
 
 /** English translations */
@@ -224,6 +284,36 @@ export const EN: TranslationDict = {
   "comex.error": "Unable to load the COMEX dashboard. Please try again.",
   "comex.tv_on": "Enable TV mode",
   "comex.tv_off": "Exit TV mode",
+  "admin.title": "ADMINISTRATION CONSOLE",
+  "admin.section.identity": "Bank identity",
+  "admin.section.agencies": "Agencies",
+  "admin.section.services": "Services",
+  "admin.section.counters": "Counters",
+  "admin.section.agents": "Agents",
+  "admin.section.sms_templates": "SMS templates",
+  "admin.section.thresholds": "Alert thresholds",
+  "admin.section.onboarding": "Agency onboarding",
+  "admin.forbidden": "You do not have permission to access the administration console.",
+  "admin.offline": "Connection required to configure",
+  "admin.error": "An error occurred. Please try again.",
+  "admin.save": "Save",
+  "admin.cancel": "Cancel",
+  "admin.confirm": "Confirm",
+  "admin.brand_label": "Primary color (--brand)",
+  "admin.brand_warning": "Insufficient contrast on light surface (< 4.5:1).",
+  "admin.brand_corrected": "Corrected value applied",
+  "admin.deactivate": "Deactivate",
+  "admin.deactivate_tickets_title": "Open tickets on this agency",
+  "admin.import_csv": "Import CSV",
+  "admin.import_summary": "Import summary",
+  "admin.preview": "Preview",
+  "admin.unknown_variable": "Variable not allowed",
+  "admin.empty_agencies": "No agency configured",
+  "admin.wizard_step": "Step",
+  "admin.wizard_next": "Next",
+  "admin.wizard_back": "Back",
+  "admin.wizard_generate_qr": "Generate installation QR",
+  "admin.wizard_done": "Onboarding complete",
 };
 
 /** Dioula translations (Mandé language, Burkina Faso / Côte d'Ivoire) */
@@ -295,6 +385,36 @@ export const DIOULA: TranslationDict = {
   "comex.error": "COMEX tableau tɛ se ka yɛlɛ. I ka segin.",
   "comex.tv_on": "TV cogo daminɛ",
   "comex.tv_off": "TV cogo bɔ",
+  "admin.title": "ƝƐMƆGƆYA KONSƆLI",
+  "admin.section.identity": "Banki tɔgɔ",
+  "admin.section.agencies": "Agencew",
+  "admin.section.services": "Baaraw",
+  "admin.section.counters": "Guichetw",
+  "admin.section.agents": "Baarakɛlaw",
+  "admin.section.sms_templates": "SMS modɛlw",
+  "admin.section.thresholds": "Lasɔminɛ dan",
+  "admin.section.onboarding": "Agence sigilan",
+  "admin.forbidden": "I tɛ se ka don ɲɛmɔgɔya konsɔli la.",
+  "admin.offline": "Internet ka kan walisa ka labɛn",
+  "admin.error": "Fili dɔ kɛra. I ka segin.",
+  "admin.save": "A mara",
+  "admin.cancel": "A dabila",
+  "admin.confirm": "A sɛmɛntiya",
+  "admin.brand_label": "Kulɛri fɔlɔ (--brand)",
+  "admin.brand_warning": "Contraste man ɲɛ fɔnbaga jɛlen kan (< 4,5:1).",
+  "admin.brand_corrected": "Kulɛri ladilalen sɛmɛntiyalen",
+  "admin.deactivate": "A jɔ",
+  "admin.deactivate_tickets_title": "Tikɛti dayɛlɛlenw nin agence in kan",
+  "admin.import_csv": "CSV don",
+  "admin.import_summary": "Don kunnafoni",
+  "admin.preview": "Filɛli",
+  "admin.unknown_variable": "Variable tɛ sɔn",
+  "admin.empty_agencies": "Agence si ma sigi",
+  "admin.wizard_step": "Sen",
+  "admin.wizard_next": "Ɲɛfɛ",
+  "admin.wizard_back": "Kɔfɛ",
+  "admin.wizard_generate_qr": "QR sigilan dilan",
+  "admin.wizard_done": "Sigilan banna",
 };
 
 /** Baoulé translations (Akan language, Côte d'Ivoire) */
@@ -366,6 +486,36 @@ export const BAOULE: TranslationDict = {
   "comex.error": "COMEX tableau'n kwlá nianman. Sɛ i ekun.",
   "comex.tv_on": "TV atin'n bo i bo",
   "comex.tv_off": "Fite TV atin'n nun",
+  "admin.title": "SIESIE KONSƆLI",
+  "admin.section.identity": "Banki dunman",
+  "admin.section.agencies": "Agencew",
+  "admin.section.services": "Junman'n mun",
+  "admin.section.counters": "Guichetw",
+  "admin.section.agents": "Junmanfuɛ'n mun",
+  "admin.section.sms_templates": "SMS modɛl'n mun",
+  "admin.section.thresholds": "Afɔtuɛ dan",
+  "admin.section.onboarding": "Agence sielɛ",
+  "admin.forbidden": "Amun wunman ase ka wlu siesie konsɔli'n nun.",
+  "admin.offline": "Internet'n ti cinnjin naan be siesie",
+  "admin.error": "Sa kpa'n juman. Sɛ i ekun.",
+  "admin.save": "Sie i",
+  "admin.cancel": "Yaci",
+  "admin.confirm": "Kle kɛ ɔ ti su",
+  "admin.brand_label": "Kulɛ klikli'n (--brand)",
+  "admin.brand_warning": "Contraste'n timan kpa fɔnbaga ufue'n su (< 4,5:1).",
+  "admin.brand_corrected": "Kulɛ nga be siesie'n be fa su",
+  "admin.deactivate": "Jran i",
+  "admin.deactivate_tickets_title": "Tikɛ nga be tike'n agence nga su",
+  "admin.import_csv": "CSV wlɛ",
+  "admin.import_summary": "Wlɛ ndɛ'n",
+  "admin.preview": "Nian",
+  "admin.unknown_variable": "Variable'n nunman",
+  "admin.empty_agencies": "Agence fi nunman",
+  "admin.wizard_step": "Ajrɛ",
+  "admin.wizard_next": "Ɲrun",
+  "admin.wizard_back": "Sin",
+  "admin.wizard_generate_qr": "Yi QR sielɛ'n",
+  "admin.wizard_done": "Sielɛ'n wieli",
 };
 
 /** All locales map */
