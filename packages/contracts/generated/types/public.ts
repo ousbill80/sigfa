@@ -433,7 +433,19 @@ export interface paths {
                 };
                 401: components["responses"]["Unauthorized"];
                 403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
+                /**
+                 * @description Ressource ciblée introuvable — service, opération ou conseiller
+                 *     (`targetManagerId`, MODEL-CONTRACT-B/D6). **Réponse opaque** sur les routes
+                 *     publiques (aucune information distinctive au-delà du code).
+                 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description Conflit d'idempotence (même clé, payload différent) */
                 409: {
                     headers: {
@@ -916,6 +928,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/agencies/{agencyId}/relationship-managers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lister les conseillers d'une agence (liste publique nominative)
+         * @description Retourne la liste **nominative** des conseillers clientèle actifs d'une agence,
+         *     pour le choix client (borne + web). Filtre implicite :
+         *     `is_relationship_manager AND is_active AND deleted_at IS NULL`.
+         *
+         *     **Zéro PII (D5)** : chaque entrée expose UNIQUEMENT `{ id, displayName, photoUrl? }`.
+         *     JAMAIS d'email, de rôle, de téléphone, ni de lien client↔conseiller attitré
+         *     (respecte le hors-scope DÉFINITIF « CRM bancaire » — CLAUDE.md §5). Le client
+         *     choisit librement dans la liste.
+         *
+         *     **Sans authentification** (role NONE).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant UUID de l'agence */
+                    agencyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Liste nominative des conseillers actifs (zéro PII) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "data": [
+                         *         {
+                         *           "id": "55555555-5555-4555-a555-555555555555",
+                         *           "displayName": "Kofi A.",
+                         *           "photoUrl": "https://cdn.sigfa.ci/rm/kofi.jpg"
+                         *         },
+                         *         {
+                         *           "id": "66666666-6666-4666-a666-666666666666",
+                         *           "displayName": "Awa D."
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["PublicRelationshipManagerListResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /** @description Agence introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "AGENCY_NOT_FOUND",
+                         *         "message": "Agence introuvable pour cet identifiant."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agencies/{id}/qr": {
         parameters: {
             query?: never;
@@ -1084,6 +1186,13 @@ export interface components {
             operationId?: string;
             /**
              * Format: uuid
+             * @description Conseiller ciblé (optionnel, additif — MODEL-CONTRACT-B/D6). Si fourni, le ticket
+             *     rejoint la file personnelle du conseiller. Inconnu/non-conseiller/hors agence →
+             *     404 opaque `RELATIONSHIP_MANAGER_NOT_FOUND`. `serviceId` reste requis.
+             */
+            targetManagerId?: string;
+            /**
+             * Format: uuid
              * @description Identifiant de l'agence
              */
             agencyId: string;
@@ -1185,6 +1294,11 @@ export interface components {
              * @description Opération résolue du ticket (additif, nullable).
              */
             operationId?: string | null;
+            /**
+             * Format: uuid
+             * @description Conseiller ciblé par le ticket (additif, nullable — MODEL-CONTRACT-B/D6).
+             */
+            targetManagerId?: string | null;
             /** Format: uuid */
             agencyId: string;
             /** Format: date-time */
@@ -1221,6 +1335,11 @@ export interface components {
              * @description Opération résolue du ticket (additif, nullable).
              */
             operationId?: string | null;
+            /**
+             * Format: uuid
+             * @description Conseiller ciblé par le ticket (additif, nullable — MODEL-CONTRACT-B/D6).
+             */
+            targetManagerId?: string | null;
             /**
              * Format: date-time
              * @description Heure d'appel (null si pas encore appelé)
@@ -1328,6 +1447,32 @@ export interface components {
         };
         PublicOperationListResponse: {
             data: components["schemas"]["PublicOperation"][];
+        };
+        /**
+         * @description Vue publique NOMINATIVE d'un conseiller clientèle actif (D5). Expose UNIQUEMENT
+         *     `{ id, displayName, photoUrl? }` — **zéro PII** : ni email, ni rôle, ni téléphone,
+         *     ni lien client↔conseiller attitré (hors-scope CRM — CLAUDE.md §5).
+         *     `additionalProperties: false` garantit qu'aucune donnée sensible ne peut fuir.
+         */
+        PublicRelationshipManager: {
+            /**
+             * Format: uuid
+             * @description Identifiant du conseiller (utilisable comme targetManagerId d'un ticket).
+             */
+            id: string;
+            /**
+             * @description Nom d'affichage public du conseiller.
+             * @example Kofi A.
+             */
+            displayName: string;
+            /**
+             * Format: uri
+             * @description URL de la photo du conseiller (optionnel).
+             */
+            photoUrl?: string | null;
+        };
+        PublicRelationshipManagerListResponse: {
+            data: components["schemas"]["PublicRelationshipManager"][];
         };
         ErrorResponse: {
             error: {

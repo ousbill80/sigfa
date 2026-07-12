@@ -1960,7 +1960,7 @@ export interface paths {
                 };
                 401: components["responses"]["Unauthorized"];
                 403: components["responses"]["Forbidden"];
-                /** @description Service ou opération introuvable */
+                /** @description Service, opération ou conseiller introuvable */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2920,6 +2920,18 @@ export interface components {
             bankId: string;
             /** Format: uuid */
             agencyId?: string;
+            /**
+             * @description Conseiller clientèle (MODEL-CONTRACT-B, additif — D5). Additif, non-breaking.
+             * @default false
+             */
+            isRelationshipManager: boolean;
+            /** @description Nom d'affichage public du conseiller (MODEL-CONTRACT-B, additif — D5). */
+            displayName?: string;
+            /**
+             * Format: uri
+             * @description URL de la photo du conseiller (optionnel, MODEL-CONTRACT-B).
+             */
+            photoUrl?: string | null;
         };
         Bank: {
             /** Format: uuid */
@@ -3146,6 +3158,12 @@ export interface components {
              *     émis par service sans opération.
              */
             operationId?: string | null;
+            /**
+             * Format: uuid
+             * @description Conseiller ciblé par le ticket (additif, nullable — MODEL-CONTRACT-B/D6).
+             *     `null` si le ticket n'est adressé à aucun conseiller (file de service).
+             */
+            targetManagerId?: string | null;
             /** Format: uuid */
             agencyId: string;
             channel: components["schemas"]["TicketChannel"];
@@ -3197,6 +3215,12 @@ export interface components {
              * @description Opération résolue du ticket (additif, nullable). `null` si émis par service seul.
              */
             operationId?: string | null;
+            /**
+             * Format: uuid
+             * @description Conseiller ciblé par le ticket (additif, nullable — MODEL-CONTRACT-B/D6).
+             *     `null` si aucun conseiller ciblé.
+             */
+            targetManagerId?: string | null;
             /** Format: uuid */
             agencyId: string;
             channel: components["schemas"]["TicketChannel"];
@@ -3250,6 +3274,12 @@ export interface components {
          *     si `serviceId` est aussi fourni et incohérent → 422 `SERVICE_OPERATION_MISMATCH`.
          *     `serviceId` **reste requis** (rétrocompat totale) : en l'absence d'`operationId`,
          *     il est utilisé tel quel.
+         *
+         *     **Ciblage conseiller (MODEL-CONTRACT-B, additif — D6)** : `targetManagerId` est
+         *     **optionnel**. S'il est fourni, le ticket rejoint la file personnelle du conseiller
+         *     (priorité absolue, routage mono-agent — logique en API-B). `serviceId` reste requis
+         *     (l'opération/service reste indicatif). `targetManagerId` inconnu / non-conseiller /
+         *     hors agence → 404 `RELATIONSHIP_MANAGER_NOT_FOUND`.
          */
         CreateTicketRequest: {
             /** Format: uuid */
@@ -3261,6 +3291,13 @@ export interface components {
              *     `SERVICE_OPERATION_MISMATCH`.
              */
             operationId?: string;
+            /**
+             * Format: uuid
+             * @description Conseiller ciblé (optionnel, additif — MODEL-CONTRACT-B/D6). Si fourni, le ticket
+             *     rejoint la file personnelle de ce conseiller. Inconnu/non-conseiller/hors agence →
+             *     404 `RELATIONSHIP_MANAGER_NOT_FOUND`.
+             */
+            targetManagerId?: string;
             channel: components["schemas"]["TicketChannel"];
             /**
              * @description Numéro de téléphone E.164 pour les notifications SMS/WhatsApp (ex: +2250700000001)
@@ -3302,6 +3339,12 @@ export interface components {
              *     `SERVICE_OPERATION_MISMATCH`. `serviceId` reste requis (rétrocompat).
              */
             operationId?: string;
+            /**
+             * Format: uuid
+             * @description Conseiller ciblé (optionnel, additif — MODEL-CONTRACT-B/D6). Inconnu/non-conseiller/
+             *     hors agence → skip `RELATIONSHIP_MANAGER_NOT_FOUND`. `serviceId` reste requis.
+             */
+            targetManagerId?: string;
             channel: components["schemas"]["TicketChannel"];
             /** Format: date-time */
             createdOfflineAt: string;

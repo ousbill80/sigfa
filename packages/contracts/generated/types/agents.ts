@@ -95,6 +95,10 @@ export interface paths {
          *     langues parlées (FR | DIOULA | BAOULE | EN), agences d'affectation (agencyIds)
          *     et horaires de travail (workSchedule).
          *
+         *     **Marquage conseiller (MODEL-CONTRACT-B, additif — D5)** : `isRelationshipManager`,
+         *     `displayName` et `photoUrl` permettent de marquer/démarquer l'agent comme conseiller
+         *     clientèle et de configurer son affichage public. Réservé à AGENCY_DIRECTOR+.
+         *
          *     Scope **agency** — AGENCY_DIRECTOR minimum pour modifier les compétences.
          *     L'agent lui-même (self) peut mettre à jour ses préférences de langue.
          *
@@ -574,6 +578,24 @@ export interface components {
              * @example +225 07 *** ** 01
              */
             phoneMasked?: string;
+            /**
+             * @description Conseiller clientèle (MODEL-CONTRACT-B, additif — D5). Si `true`, l'agent apparaît
+             *     dans la liste publique nominative `GET /public/agencies/{agencyId}/relationship-managers`
+             *     et peut être ciblé par un ticket (`targetManagerId`). Défaut : false.
+             * @default false
+             */
+            isRelationshipManager: boolean;
+            /**
+             * @description Nom d'affichage public du conseiller (MODEL-CONTRACT-B, additif — D5). Seul champ
+             *     nominatif exposé publiquement. Aucun lien client↔conseiller attitré (hors-scope CRM).
+             * @example Kofi A.
+             */
+            displayName?: string;
+            /**
+             * Format: uri
+             * @description URL de la photo du conseiller (optionnel, MODEL-CONTRACT-B).
+             */
+            photoUrl?: string | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -588,6 +610,21 @@ export interface components {
             workSchedule?: components["schemas"]["WorkSchedule"];
             /** @description Numéro de téléphone masqué (conformité UEMOA) */
             phoneMasked?: string;
+            /**
+             * @description Marquer/démarquer l'agent comme conseiller clientèle (MODEL-CONTRACT-B, additif — D5).
+             *     Réservé à AGENCY_DIRECTOR+ (RBAC de la route PATCH /agents/{id}).
+             */
+            isRelationshipManager?: boolean;
+            /**
+             * @description Nom d'affichage public du conseiller (MODEL-CONTRACT-B, additif — D5).
+             * @example Kofi A.
+             */
+            displayName?: string;
+            /**
+             * Format: uri
+             * @description URL de la photo du conseiller (optionnel, MODEL-CONTRACT-B).
+             */
+            photoUrl?: string | null;
         };
         UpdateAgentStatusRequest: {
             status: components["schemas"]["AgentStatus"];

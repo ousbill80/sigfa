@@ -1502,7 +1502,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          description: Service ou opération introuvable
+          description: Service, opération ou conseiller introuvable
           content:
             application/json:
               schema:
@@ -1520,6 +1520,12 @@ paths:
                     error:
                       code: OPERATION_NOT_FOUND
                       message: Opération introuvable pour cet identifiant.
+                relationship_manager_not_found:
+                  summary: Conseiller inconnu / non-conseiller / hors agence (MODEL-CONTRACT-B/D6)
+                  value:
+                    error:
+                      code: RELATIONSHIP_MANAGER_NOT_FOUND
+                      message: Conseiller introuvable pour cet identifiant.
         '409':
           description: Conflit d'idempotence (même clé, payload différent)
           content:
@@ -2389,6 +2395,20 @@ components:
         agencyId:
           type: string
           format: uuid
+        isRelationshipManager:
+          type: boolean
+          description: |
+            Conseiller clientèle (MODEL-CONTRACT-B, additif — D5). Additif, non-breaking.
+          default: false
+        displayName:
+          type: string
+          description: Nom d'affichage public du conseiller (MODEL-CONTRACT-B, additif — D5).
+        photoUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+          description: URL de la photo du conseiller (optionnel, MODEL-CONTRACT-B).
     Bank:
       type: object
       required:
@@ -2856,6 +2876,14 @@ components:
           description: |
             Opération résolue du ticket (additif, nullable). `null` si le ticket a été
             émis par service sans opération.
+        targetManagerId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: |
+            Conseiller ciblé par le ticket (additif, nullable — MODEL-CONTRACT-B/D6).
+            `null` si le ticket n'est adressé à aucun conseiller (file de service).
         agencyId:
           type: string
           format: uuid
@@ -2941,6 +2969,14 @@ components:
           format: uuid
           description: |
             Opération résolue du ticket (additif, nullable). `null` si émis par service seul.
+        targetManagerId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: |
+            Conseiller ciblé par le ticket (additif, nullable — MODEL-CONTRACT-B/D6).
+            `null` si aucun conseiller ciblé.
         agencyId:
           type: string
           format: uuid
@@ -3041,6 +3077,12 @@ components:
         si `serviceId` est aussi fourni et incohérent → 422 `SERVICE_OPERATION_MISMATCH`.
         `serviceId` **reste requis** (rétrocompat totale) : en l'absence d'`operationId`,
         il est utilisé tel quel.
+
+        **Ciblage conseiller (MODEL-CONTRACT-B, additif — D6)** : `targetManagerId` est
+        **optionnel**. S'il est fourni, le ticket rejoint la file personnelle du conseiller
+        (priorité absolue, routage mono-agent — logique en API-B). `serviceId` reste requis
+        (l'opération/service reste indicatif). `targetManagerId` inconnu / non-conseiller /
+        hors agence → 404 `RELATIONSHIP_MANAGER_NOT_FOUND`.
       required:
         - serviceId
         - channel
@@ -3056,6 +3098,13 @@ components:
             Opération choisie (optionnel, additif). Si fourni, le serveur dérive
             `serviceId = operation.serviceId`. Incohérence serviceId/operationId → 422
             `SERVICE_OPERATION_MISMATCH`.
+        targetManagerId:
+          type: string
+          format: uuid
+          description: |
+            Conseiller ciblé (optionnel, additif — MODEL-CONTRACT-B/D6). Si fourni, le ticket
+            rejoint la file personnelle de ce conseiller. Inconnu/non-conseiller/hors agence →
+            404 `RELATIONSHIP_MANAGER_NOT_FOUND`.
         channel:
           $ref: '#/components/schemas/TicketChannel'
         phoneNumber:
@@ -3119,6 +3168,12 @@ components:
             Opération choisie (optionnel, additif — offline-sync D8). Si fourni, le serveur
             dérive `serviceId = operation.serviceId` ; incohérence → skip
             `SERVICE_OPERATION_MISMATCH`. `serviceId` reste requis (rétrocompat).
+        targetManagerId:
+          type: string
+          format: uuid
+          description: |
+            Conseiller ciblé (optionnel, additif — MODEL-CONTRACT-B/D6). Inconnu/non-conseiller/
+            hors agence → skip `RELATIONSHIP_MANAGER_NOT_FOUND`. `serviceId` reste requis.
         channel:
           $ref: '#/components/schemas/TicketChannel'
         createdOfflineAt:
