@@ -32,6 +32,7 @@ import { createOnboardingRouter } from "src/routes/onboarding.js";
 import { createKioskSessionRouter } from "src/routes/kiosk-session.js";
 import { createAgentImportRouter } from "src/routes/agents-import.js";
 import { createDataPrivacyRouter } from "src/routes/data-privacy.js";
+import { createPublicTicketRouter } from "src/routes/public-tickets.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
@@ -155,6 +156,11 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   app.route("/api/v1", agentImportRouter);
   const dataPrivacyRouter = createDataPrivacyRouter();
   app.route("/api/v1", dataPrivacyRouter);
+
+  // Routes PUBLIQUES (API-010, public.yaml) — suivi & feedback client SANS JWT.
+  // Anti-spam Redis, fenêtre 24 h UTC, NPS incrémental, 404 opaque anti-énumération.
+  const publicTicketRouter = createPublicTicketRouter();
+  app.route("/api/v1", publicTicketRouter);
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>
