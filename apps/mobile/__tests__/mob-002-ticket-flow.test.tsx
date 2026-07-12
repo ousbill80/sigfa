@@ -1,7 +1,14 @@
 // __tests__/mob-002-ticket-flow.test.tsx
 // MOB-002: useTicketFlow — hook de logique 3 étapes
+// (S8 : enqueue passe par le store chiffré → gate initSecureStorage())
 import { renderHook, act } from '@testing-library/react-native';
 import { useTicketFlow } from '../src/hooks/useTicketFlow';
+import { initSecureStorage, resetSecureStorageForTests } from '../src/services/secure-storage';
+
+beforeEach(async () => {
+  resetSecureStorageForTests();
+  await initSecureStorage();
+});
 
 describe('MOB-002: useTicketFlow — hook de logique 3 étapes', () => {
   test('état initial est étape 1', () => {
