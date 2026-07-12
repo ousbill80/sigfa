@@ -41,6 +41,9 @@ const frMessages = {
     loadingMessage: "Émission de votre ticket...",
     offlineBanner: "Mode hors connexion — ticket local généré",
   },
+  degraded007: {
+    systemError: "Un problème est survenu. Adressez-vous à l'accueil, on s'occupe de vous.",
+  },
 };
 
 const enMessages = {
@@ -54,6 +57,9 @@ const enMessages = {
     errorPhone: "Phone number missing — or tap Skip",
     loadingMessage: "Issuing your ticket...",
     offlineBanner: "Offline mode — local ticket generated",
+  },
+  degraded007: {
+    systemError: "Something went wrong. Please see reception, we will take care of you.",
   },
 };
 
@@ -69,6 +75,9 @@ const dioulaMessages = {
     loadingMessage: "I ka tikɛ bɛ kɛ...",
     offlineBanner: "Mode hors connexion — tikɛ local kɛra",
   },
+  degraded007: {
+    systemError: "Kunnafoni dɔ bɛ yen. Taa accueil la, an bɛna i mara.",
+  },
 };
 
 const baouleMessages = {
@@ -82,6 +91,9 @@ const baouleMessages = {
     errorPhone: "Wɔ nimɛro klɛ aman — annzɛ dili Wɔ sin",
     loadingMessage: "Wɔ tikɛ'n bla...",
     offlineBanner: "Mode hors connexion — tikɛ local kɛli",
+  },
+  degraded007: {
+    systemError: "Nzuɛ kun bo'. Kɔ accueil, é su wɔ.",
   },
 };
 

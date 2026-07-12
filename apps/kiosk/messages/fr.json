@@ -63,5 +63,15 @@
     "offlineBanner": "Mode hors connexion — ticket temporaire",
     "offlineInfo": "Ticket local — synchronisation dès reconnexion",
     "printerError": "Imprimante indisponible — un agent vous remettra votre ticket"
+  },
+  "degraded007": {
+    "photographNumber": "Photographiez votre numéro ou recevez-le par SMS",
+    "photographNumberShort": "Photographiez votre numéro",
+    "longQueueTitle": "Forte affluence — environ {estimate} min",
+    "longQueueMessage": "Recevez un SMS et revenez à l'heure de votre passage.",
+    "phoneFieldLabel": "Votre numéro de téléphone",
+    "closedTomorrow": "Ouvre demain à 8h00",
+    "closedAt": "Ouvre {schedule}",
+    "systemError": "Un problème est survenu. Adressez-vous à l'accueil, on s'occupe de vous."
   }
 }

@@ -63,5 +63,15 @@
     "offlineBanner": "Mode hors connexion — tikɛ sɔgɔsɔgɔ",
     "offlineInfo": "Tikɛ local — sync reconnexion ma",
     "printerError": "Printi aman — mɔgɔ dɔ a su tikɛ'n man"
+  },
+  "degraded007": {
+    "photographNumber": "Foto wɔ nimɛro annzɛ sɔ SMS nun",
+    "photographNumberShort": "Foto wɔ nimɛro",
+    "longQueueTitle": "Sran kpanngban — {estimate} min",
+    "longQueueMessage": "Sɔ SMS naan sin blɛ wɔ blɛ nun.",
+    "phoneFieldLabel": "Wɔ telefɔn nimɛro",
+    "closedTomorrow": "Tike aliɛ 8h00",
+    "closedAt": "Tike {schedule}",
+    "systemError": "Nzuɛ kun bo'. Kɔ accueil, é su wɔ."
   }
 }

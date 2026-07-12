@@ -63,5 +63,15 @@
     "offlineBanner": "Mode hors connexion — tikɛ sɔgɔsɔgɔ",
     "offlineInfo": "Tikɛ local — sync bɛna kɛ reconnexion ma",
     "printerError": "Imprimante tɛ baara kɛ — mɔgɔ dɔ bena i ka tikɛ d'i ma"
+  },
+  "degraded007": {
+    "photographNumber": "I ka nimɔrɔ foto ta walima a sɔrɔ SMS la",
+    "photographNumberShort": "I ka nimɔrɔ foto ta",
+    "longQueueTitle": "Mɔgɔ caman — {estimate} min ɲɔgɔn",
+    "longQueueMessage": "SMS sɔrɔ ka segin i ka waati la.",
+    "phoneFieldLabel": "I ka wolofɔn nimɔrɔ",
+    "closedTomorrow": "Bɛ da yen sini 8h00",
+    "closedAt": "Bɛ da yen {schedule}",
+    "systemError": "Kunnafoni dɔ bɛ yen. Taa accueil la, an bɛna i mara."
   }
 }

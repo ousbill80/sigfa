@@ -2,21 +2,34 @@
  * KIOSK-005 — TicketScreen.tsx
  * Écran de confirmation du ticket.
  * Pulse 400ms CSS, voix Web Speech API, retour auto à 4s (8s en mode a11y).
+ *
+ * KIOSK-007 — États dégradés imprimante (bascule transparente) :
+ *   - printerStatus dégradé (`PAPER_LOW | ERROR | OFFLINE`) OU réseau coupé
+ *     après le 201 avant confirmation imprimante → affichage prolongé à 8 s +
+ *     message « Photographiez votre numéro ou recevez-le par SMS ». AUCUNE
+ *     mention de panne côté client (bascule invisible pour l'usager).
  */
 "use client";
 
 import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
+import { deriveDegradedState, type PrinterStatus } from "@/hooks/useDegradedState";
 
 interface TicketScreenProps {
   displayNumber: string;
   position: number;
   estimatedWaitMinutes: number;
-  printerStatus?: "OK" | "ERROR";
+  /** Statut imprimante remonté par le heartbeat. */
+  printerStatus?: PrinterStatus;
   phoneNumber?: string;
   smsConsent?: boolean;
   isAccessibilityMode?: boolean;
+  /**
+   * KIOSK-007 : vrai si le réseau a été coupé APRÈS le 201 mais AVANT
+   * confirmation imprimante → bascule dégradée identique (affichage 8 s).
+   */
+  networkLostBeforePrinterConfirm?: boolean;
 }
 
 /**
@@ -45,14 +58,23 @@ export function TicketScreen({
   phoneNumber,
   smsConsent,
   isAccessibilityMode = false,
+  networkLostBeforePrinterConfirm = false,
 }: TicketScreenProps) {
   const t = useTranslations("ticket005");
+  const tDeg = useTranslations("degraded007");
   const router = useRouter();
   const params = useParams();
   const currentLocale = (params?.locale as string) ?? "fr";
   const hasAnnouncedRef = useRef(false);
 
-  const returnDelay = isAccessibilityMode ? 8000 : 4000;
+  // KIOSK-007 : bascule transparente. L'affichage dégradé prolonge à 8 s ;
+  // le mode accessibilité prolonge lui aussi à 8 s → on prend le max.
+  const degraded = deriveDegradedState({
+    printerStatus,
+    networkLostBeforePrinterConfirm,
+  });
+  const returnDelay =
+    isAccessibilityMode || degraded.isDisplayDegraded ? 8000 : 4000;
 
   // Auto-return to home
   useEffect(() => {
@@ -142,8 +164,8 @@ export function TicketScreen({
         {t("waitEstimate", { minutes: estimatedWaitMinutes })}
       </p>
 
-      {/* Printer status OK */}
-      {printerStatus === "OK" && (
+      {/* Printer status OK — message d'impression (aucun état dégradé) */}
+      {printerStatus === "OK" && !degraded.isDisplayDegraded && (
         <p
           data-testid="print-message"
           style={{
@@ -156,17 +178,19 @@ export function TicketScreen({
         </p>
       )}
 
-      {/* Printer status ERROR */}
-      {printerStatus === "ERROR" && (
+      {/* KIOSK-007 — Bascule transparente : imprimante dégradée OU réseau coupé.
+          AUCUNE mention de panne ; on invite simplement à photographier le
+          numéro ou à recevoir un SMS. Token neutre (--ink-inverse). */}
+      {degraded.isDisplayDegraded && (
         <p
-          data-testid="print-error"
+          data-testid="degraded-photo-message"
           style={{
             fontSize: "24px",
-            color: "var(--danger)",
+            color: "var(--ink-inverse)",
             textAlign: "center",
           }}
         >
-          {t("printerError")}
+          {tDeg("photographNumber")}
         </p>
       )}
 

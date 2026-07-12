@@ -44,6 +44,9 @@ const messages = {
     voiceAnnounce: "Votre numéro est {displayNumber}.",
     printerError: "Imprimante indisponible",
   },
+  degraded007: {
+    photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
+  },
 };
 
 /** Remplace les valeurs variables par des placeholders pour comparer la structure. */

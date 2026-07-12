@@ -12,11 +12,25 @@ import { createSigfaClient } from "@sigfa/contracts";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useOfflineTicket } from "@/hooks/useOfflineTicket";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import {
+  signalKioskSystemError,
+  noopDegradedSink,
+  type DegradedEventSink,
+} from "@/lib/kiosk-degraded-emitter";
 
 interface ConfirmationScreenProps {
   serviceId: string;
   agencyId: string;
+  /**
+   * KIOSK-007 : sink d'événement simulé (F4) pour `alert:manager
+   * KIOSK_SYSTEM_ERROR`. Défaut : no-op — l'émission RÉELLE appartient au
+   * serveur. Injecté par les tests pour vérifier l'intention d'émission.
+   */
+  systemErrorSink?: DegradedEventSink;
 }
+
+/** KIOSK-007 : nombre total de tentatives POST /public/tickets avant erreur système. */
+const MAX_TICKET_ATTEMPTS = 2;
 
 // Validate CI phone number: 10 digits starting with 0
 const CI_PHONE_REGEX = /^0[0-9]{9}$/;
@@ -28,8 +42,13 @@ const KEYPAD_ROWS = [
   ["*", "0", "⌫"],
 ];
 
-export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenProps) {
+export function ConfirmationScreen({
+  serviceId,
+  agencyId,
+  systemErrorSink = noopDegradedSink,
+}: ConfirmationScreenProps) {
   const t = useTranslations("confirmation004");
+  const tDeg = useTranslations("degraded007");
   const router = useRouter();
   const params = useParams();
   const currentLocale = (params?.locale as string) ?? "fr";
@@ -40,6 +59,8 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
   const [isLoading, setIsLoading] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [isOffline, setIsOffline] = useState(false);
+  // KIOSK-007 : erreur système (500 ×2) → message humain, pas de bascule offline.
+  const [isSystemError, setIsSystemError] = useState(false);
 
   useInactivityTimeout(() => {
     router.push(`/${currentLocale}`);
@@ -99,54 +120,76 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
 
     setIsLoading(true);
     setPhoneError("");
+    setIsSystemError(false);
 
     const finalPhone = skipPhone ? undefined : (phoneDigits || undefined);
     const finalConsent = finalPhone ? smsConsent : undefined;
 
+    const client = createSigfaClient(
+      "public",
+      // RT-001b : défaut mock canonique unifié web/kiosk (mock Prism :4010).
+      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4010"
+    );
+
+    let lastStatus = 0;
     try {
-      const client = createSigfaClient(
-        "public",
-        // RT-001b : défaut mock canonique unifié web/kiosk (mock Prism :4010).
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4010"
-      );
-
-      const { data, response } = await client.POST("/public/tickets", {
-        params: {
-          header: {
-            "X-Idempotency-Key": crypto.randomUUID(),
+      // KIOSK-007 : jusqu'à MAX_TICKET_ATTEMPTS tentatives. Un 5xx est réessayé ;
+      // un 201 navigue ; un échec réseau (exception) bascule en offline.
+      for (let attempt = 1; attempt <= MAX_TICKET_ATTEMPTS; attempt += 1) {
+        const { data, response } = await client.POST("/public/tickets", {
+          params: {
+            header: {
+              "X-Idempotency-Key": crypto.randomUUID(),
+            },
           },
-        },
-        body: {
-          serviceId,
-          channel: "KIOSK",
-          phoneNumber: finalPhone,
-          smsConsent: finalConsent,
-          agencyId,
-        },
-      });
+          body: {
+            serviceId,
+            channel: "KIOSK",
+            phoneNumber: finalPhone,
+            smsConsent: finalConsent,
+            agencyId,
+          },
+        });
+        lastStatus = response.status;
 
-      if (response.status === 201 && data) {
-        router.push(buildTicketUrl({
-          trackingId: data.trackingId,
-          displayNumber: data.displayNumber ?? data.number,
-          position: data.position,
-          estimatedWaitMinutes: data.estimatedWaitMinutes,
-        }));
+        if (response.status === 201 && data) {
+          router.push(buildTicketUrl({
+            trackingId: data.trackingId,
+            displayNumber: data.displayNumber ?? data.number,
+            position: data.position,
+            estimatedWaitMinutes: data.estimatedWaitMinutes,
+          }));
+          return;
+        }
+
+        // 5xx : on réessaie tant qu'il reste des tentatives.
+        if (response.status >= 500 && attempt < MAX_TICKET_ATTEMPTS) {
+          continue;
+        }
+        break;
+      }
+
+      // KIOSK-007 : 5xx après épuisement des tentatives → erreur système.
+      // Message humain + alerte silencieuse KIOSK_SYSTEM_ERROR (jamais offline).
+      if (lastStatus >= 500) {
+        setIsSystemError(true);
+        signalKioskSystemError(
+          { serviceId, agencyId, status: lastStatus },
+          systemErrorSink
+        );
         return;
       }
 
-      // Non-201 response: use offline fallback to avoid blocking user
-      if (response.status !== 201) {
-        setIsOffline(true);
-        const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
-        router.push(buildTicketUrl({
-          trackingId: offlineTicket.trackingId,
-          displayNumber: offlineTicket.displayNumber,
-          position: offlineTicket.position,
-          estimatedWaitMinutes: offlineTicket.estimatedWaitMinutes,
-        }));
-        return;
-      }
+      // Autres non-201 (4xx…) : repli offline pour ne pas bloquer l'usager.
+      setIsOffline(true);
+      const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
+      router.push(buildTicketUrl({
+        trackingId: offlineTicket.trackingId,
+        displayNumber: offlineTicket.displayNumber,
+        position: offlineTicket.position,
+        estimatedWaitMinutes: offlineTicket.estimatedWaitMinutes,
+      }));
+      return;
     } catch {
       // Network error: use offline fallback
       setIsOffline(true);
@@ -179,6 +222,34 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
     >
       {/* KIOSK-006 : bandeau offline discret (--info, non bloquant), fondu 250 ms au retour réseau */}
       <OfflineBanner isOffline={isOffline} />
+
+      {/* KIOSK-007 — Erreur système (500 ×2). Message humain, registre SIGFA.
+          Token --danger sur le PICTOGRAMME UNIQUEMENT, jamais le fond. */}
+      {isSystemError && (
+        <section
+          data-testid="system-error"
+          role="alert"
+          style={{
+            backgroundColor: "var(--surface-1)",
+            borderRadius: "0.75rem",
+            padding: "1.5rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+          }}
+        >
+          <span
+            data-testid="system-error-pictogram"
+            aria-hidden="true"
+            style={{ fontSize: "40px", color: "var(--danger)", lineHeight: 1 }}
+          >
+            ⚠
+          </span>
+          <span style={{ fontSize: "24px", color: "var(--ink-strong)" }}>
+            {tDeg("systemError")}
+          </span>
+        </section>
+      )}
 
       {/* Title */}
       <h1

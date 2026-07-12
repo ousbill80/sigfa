@@ -60,6 +60,11 @@ const frMessages = {
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
     offlineBanner: "Mode hors connexion",
   },
+  degraded007: {
+    longQueueTitle: "Forte affluence — environ {estimate} min",
+    longQueueMessage: "Recevez un SMS et revenez à l'heure de votre passage.",
+    phoneFieldLabel: "Votre numéro de téléphone",
+  },
 };
 
 const enMessages = {
@@ -73,6 +78,11 @@ const enMessages = {
     emptyTitle: "No services available",
     emptyMessage: "Please go to reception — a staff member will assist you.",
     offlineBanner: "Offline mode",
+  },
+  degraded007: {
+    longQueueTitle: "High volume — about {estimate} min",
+    longQueueMessage: "Receive an SMS and come back at your turn.",
+    phoneFieldLabel: "Your phone number",
   },
 };
 
@@ -88,6 +98,11 @@ const dioulaMessages = {
     emptyMessage: "Taa accueil la — mɔgɔ dɔ bena i dɛmɛ.",
     offlineBanner: "Mode hors connexion",
   },
+  degraded007: {
+    longQueueTitle: "Mɔgɔ caman — {estimate} min ɲɔgɔn",
+    longQueueMessage: "SMS sɔrɔ ka segin i ka waati la.",
+    phoneFieldLabel: "I ka wolofɔn nimɔrɔ",
+  },
 };
 
 const baouleMessages = {
@@ -101,6 +116,11 @@ const baouleMessages = {
     emptyTitle: "Sɛ klɛ aman",
     emptyMessage: "Kɔ accueil — mɔgɔ dɔ a su.",
     offlineBanner: "Mode hors connexion",
+  },
+  degraded007: {
+    longQueueTitle: "Sran kpanngban — {estimate} min",
+    longQueueMessage: "Sɔ SMS naan sin blɛ wɔ blɛ nun.",
+    phoneFieldLabel: "Wɔ telefɔn nimɛro",
   },
 };
 

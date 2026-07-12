@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
+import { DEFAULT_LONG_QUEUE_THRESHOLD_MIN } from "@/hooks/useDegradedState";
 
 export interface ServiceItem {
   id: string;
@@ -23,12 +24,19 @@ export interface ServiceItem {
 interface ServicesScreenProps {
   services: ServiceItem[];
   agencyId: string;
+  /** KIOSK-007 : seuil « file longue » en minutes (configurable). */
+  longQueueThresholdMinutes?: number;
 }
 
 const MAX_VISIBLE = 4;
 
-export function ServicesScreen({ services, agencyId }: ServicesScreenProps) {
+export function ServicesScreen({
+  services,
+  agencyId,
+  longQueueThresholdMinutes = DEFAULT_LONG_QUEUE_THRESHOLD_MIN,
+}: ServicesScreenProps) {
   const t = useTranslations("services003");
+  const tDeg = useTranslations("degraded007");
   const router = useRouter();
   const params = useParams();
   const currentLocale = (params?.locale as string) ?? "fr";
@@ -44,6 +52,13 @@ export function ServicesScreen({ services, agencyId }: ServicesScreenProps) {
 
   const visibleServices = showAll ? services : services.slice(0, MAX_VISIBLE);
   const hasMore = services.length > MAX_VISIBLE;
+
+  // KIOSK-007 : file longue si l'attente d'un service ouvert dépasse le seuil.
+  // On affiche proactivement un message d'affluence + met en avant le SMS.
+  const longestOpenWait = services
+    .filter((s) => s.isOpen)
+    .reduce((max, s) => Math.max(max, s.estimatedMinutes), 0);
+  const isLongQueue = longestOpenWait >= longQueueThresholdMinutes;
 
   const handleServiceSelect = (service: ServiceItem) => {
     if (!service.isOpen) return;
@@ -147,6 +162,49 @@ export function ServicesScreen({ services, agencyId }: ServicesScreenProps) {
       >
         {t("title")}
       </h1>
+
+      {/* KIOSK-007 — Bannière file longue : message d'affluence + champ
+          téléphone mis en avant (SMS non optionnel visuellement ici). */}
+      {isLongQueue && (
+        <section
+          data-testid="long-queue-banner"
+          aria-live="polite"
+          style={{
+            backgroundColor: "var(--surface-1)",
+            borderRadius: "0.75rem",
+            padding: "1rem 1.5rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+          }}
+        >
+          <span style={{ fontSize: "28px", fontWeight: "bold", color: "var(--ink-strong)" }}>
+            {tDeg("longQueueTitle", { estimate: longestOpenWait })}
+          </span>
+          <span style={{ fontSize: "24px", color: "var(--ink-soft)" }}>
+            {tDeg("longQueueMessage")}
+          </span>
+          {/* Champ téléphone mis en avant — CTA menant à la saisie du numéro. */}
+          <button
+            data-testid="long-queue-phone-cta"
+            onClick={() =>
+              router.push(`/${currentLocale}/confirmation?agencyId=${agencyId}`)
+            }
+            style={{
+              minHeight: "72px",
+              fontSize: "28px",
+              fontWeight: "bold",
+              color: "var(--ink-inverse)",
+              backgroundColor: "var(--brand)",
+              border: "none",
+              borderRadius: "0.5rem",
+              cursor: "pointer",
+            }}
+          >
+            📱 {tDeg("phoneFieldLabel")}
+          </button>
+        </section>
+      )}
 
       {/* Service cards */}
       <div

@@ -15,6 +15,17 @@ export function TicketPageClient() {
   const phoneNumber = searchParams.get("phoneNumber") ?? undefined;
   const smsConsentStr = searchParams.get("smsConsent");
   const smsConsent = smsConsentStr === "true";
+  // KIOSK-007 : statut imprimante + réseau coupé après 201 propagés par l'URL.
+  const printerStatusParam = searchParams.get("printerStatus");
+  const printerStatus =
+    printerStatusParam === "OK" ||
+    printerStatusParam === "PAPER_LOW" ||
+    printerStatusParam === "ERROR" ||
+    printerStatusParam === "OFFLINE"
+      ? printerStatusParam
+      : undefined;
+  const networkLostBeforePrinterConfirm =
+    searchParams.get("networkLostBeforePrinterConfirm") === "true";
 
   return (
     <TicketScreen
@@ -23,6 +34,8 @@ export function TicketPageClient() {
       estimatedWaitMinutes={estimatedWaitMinutes}
       phoneNumber={phoneNumber}
       smsConsent={smsConsent}
+      printerStatus={printerStatus}
+      networkLostBeforePrinterConfirm={networkLostBeforePrinterConfirm}
     />
   );
 }

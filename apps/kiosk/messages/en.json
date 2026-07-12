@@ -63,5 +63,15 @@
     "offlineBanner": "Offline mode — temporary ticket",
     "offlineInfo": "Local ticket — sync on reconnection",
     "printerError": "Printer unavailable — a staff member will give you your ticket"
+  },
+  "degraded007": {
+    "photographNumber": "Take a photo of your number or receive it by SMS",
+    "photographNumberShort": "Take a photo of your number",
+    "longQueueTitle": "High volume — about {estimate} min",
+    "longQueueMessage": "Receive an SMS and come back at your turn.",
+    "phoneFieldLabel": "Your phone number",
+    "closedTomorrow": "Opens tomorrow at 8:00 am",
+    "closedAt": "Opens {schedule}",
+    "systemError": "Something went wrong. Please see reception, we will take care of you."
   }
 }

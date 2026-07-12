@@ -85,6 +85,9 @@ const ticketMessages = {
     offlineInfo: "Local ticket — sync on reconnection",
     printerError: "Printer unavailable — a staff member will give you your ticket",
   },
+  degraded007: {
+    photographNumber: "Take a photo of your number or receive it by SMS",
+  },
 };
 
 import { HomeScreen } from "@/components/HomeScreen";

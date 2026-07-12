@@ -92,6 +92,11 @@ const servicesMessages = {
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
     offlineBanner: "Mode hors connexion",
   },
+  degraded007: {
+    longQueueTitle: "Forte affluence — environ {estimate} min",
+    longQueueMessage: "Recevez un SMS et revenez à l'heure de votre passage.",
+    phoneFieldLabel: "Votre numéro de téléphone",
+  },
 };
 
 const confirmationMessages = {
@@ -106,6 +111,9 @@ const confirmationMessages = {
     loadingMessage: "Émission de votre ticket...",
     offlineBanner: "Mode hors connexion — ticket local généré",
   },
+  degraded007: {
+    systemError: "Un problème est survenu. Adressez-vous à l'accueil, on s'occupe de vous.",
+  },
 };
 
 const ticketMessages = {
@@ -119,6 +127,10 @@ const ticketMessages = {
     offlineBanner: "Mode hors connexion — ticket temporaire",
     offlineInfo: "Ticket local — synchronisation dès reconnexion",
     printerError: "Imprimante indisponible — un agent vous remettra votre ticket",
+  },
+  degraded007: {
+    photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
+    photographNumberShort: "Photographiez votre numéro",
   },
 };
 
@@ -511,10 +523,13 @@ describe("KIOSK-004: ConfirmationScreen additional branches", () => {
     expect(pushedUrl).toContain("smsConsent=true");
   });
 
-  it("KIOSK-004: non-201 response → isOffline state set, offline banner visible", async () => {
+  // KIOSK-007 : les 5xx sont désormais traités comme ERREUR SYSTÈME (message
+  // humain + alert:manager), plus comme un repli offline silencieux. Le repli
+  // offline reste déclenché par une COUPURE RÉSEAU réelle (exception fetch).
+  it("KIOSK-004: coupure réseau → isOffline state set, offline banner visible", async () => {
     server.use(
       http.post("*/public/tickets", () => {
-        return HttpResponse.json({ error: "Service unavailable" }, { status: 503 });
+        return HttpResponse.error();
       })
     );
 
@@ -590,7 +605,10 @@ describe("KIOSK-005: TicketScreen additional branches", () => {
     vi.useRealTimers();
   });
 
-  it("KIOSK-005: printerStatus ERROR → error message visible with --danger token", () => {
+  // KIOSK-007 (arbitrage 19) OVERRIDE de l'ancien comportement KIOSK-005 :
+  // printerStatus ERROR ne montre PLUS de message de panne. Bascule transparente
+  // → message « Photographiez votre numéro », AUCUNE mention d'imprimante HS.
+  it("KIOSK-007: printerStatus ERROR → bascule transparente, aucun message de panne (override KIOSK-005)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={ticketMessages}>
         <TicketScreen
@@ -602,10 +620,11 @@ describe("KIOSK-005: TicketScreen additional branches", () => {
       </NextIntlClientProvider>
     );
 
-    const errorEl = screen.getByTestId("print-error");
-    expect(errorEl).toBeInTheDocument();
-    expect(errorEl.textContent).toBe("Imprimante indisponible — un agent vous remettra votre ticket");
-    expect((errorEl as HTMLElement).style.color).toBe("var(--danger)");
+    // Plus de message de panne (--danger) à l'écran client.
+    expect(screen.queryByTestId("print-error")).not.toBeInTheDocument();
+    expect(screen.queryByText(/indisponible|panne/i)).not.toBeInTheDocument();
+    // Bascule transparente : message « Photographiez votre numéro ».
+    expect(screen.getByTestId("degraded-photo-message")).toBeInTheDocument();
   });
 
   it("KIOSK-005: no printerStatus → neither print-message nor print-error shown", () => {

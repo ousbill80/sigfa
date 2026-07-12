@@ -72,6 +72,9 @@ const frMessages = {
     offlineInfo: "Ticket local — synchronisation dès reconnexion",
     printerError: "Imprimante indisponible — un agent vous remettra votre ticket",
   },
+  degraded007: {
+    photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
+  },
 };
 
 const enMessages = {
@@ -85,6 +88,9 @@ const enMessages = {
     offlineBanner: "Offline mode — temporary ticket",
     offlineInfo: "Local ticket — sync on reconnection",
     printerError: "Printer unavailable — a staff member will give you your ticket",
+  },
+  degraded007: {
+    photographNumber: "Take a photo of your number or receive it by SMS",
   },
 };
 
@@ -100,6 +106,9 @@ const dioulaMessages = {
     offlineInfo: "Tikɛ local — sync bɛna kɛ reconnexion ma",
     printerError: "Imprimante tɛ baara kɛ — mɔgɔ dɔ bena i ka tikɛ d'i ma",
   },
+  degraded007: {
+    photographNumber: "I ka nimɔrɔ foto ta walima a sɔrɔ SMS la",
+  },
 };
 
 const baouleMessages = {
@@ -113,6 +122,9 @@ const baouleMessages = {
     offlineBanner: "Mode hors connexion — tikɛ sɔgɔsɔgɔ",
     offlineInfo: "Tikɛ local — sync reconnexion ma",
     printerError: "Printi aman — mɔgɔ dɔ a su tikɛ'n man",
+  },
+  degraded007: {
+    photographNumber: "Foto wɔ nimɛro annzɛ sɔ SMS nun",
   },
 };
 
