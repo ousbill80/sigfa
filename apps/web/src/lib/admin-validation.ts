@@ -28,6 +28,20 @@ export interface ServiceDraft {
   order: number;
 }
 
+/**
+ * Draft shape for an operation create/update form (MODEL-WEB-A).
+ * `slaMinutes` is nullable: `null` (or empty) means "inherit the service SLA".
+ * There is intentionally NO priority field (D4).
+ */
+export interface OperationDraft {
+  code: string;
+  name: string;
+  /** Own SLA in minutes; `null` → inherits the parent service SLA (D4). */
+  slaMinutes: number | null;
+  displayOrder: number;
+  iconKey?: string;
+}
+
 /** Draft shape for the bank thresholds form. */
 export interface ThresholdsDraft {
   queueCriticalThreshold: number;
@@ -36,6 +50,9 @@ export interface ThresholdsDraft {
 }
 
 const SERVICE_CODE_RE = /^[A-Z]{2,4}$/;
+
+/** Operation code — 2 to 6 chars A-Z/0-9, unique per service (MODEL-CONTRACT-A / D10). */
+const OPERATION_CODE_RE = /^[A-Z0-9]{2,6}$/;
 
 /** Whether a value is an integer within [min, max] (inclusive). */
 function isIntInRange(v: number, min: number, max: number): boolean {
@@ -60,6 +77,31 @@ export function validateService(draft: ServiceDraft): FieldErrors {
   }
   if (!Number.isInteger(draft.order) || draft.order < 1) {
     errors.order = "La priorité doit être un entier ≥ 1.";
+  }
+  return errors;
+}
+
+/**
+ * Validates an operation draft against the contract constraints (MODEL-CONTRACT-A).
+ * `slaMinutes === null` is VALID → the operation inherits the service SLA (D4).
+ * No priority field is validated (D4 — priority stays on the ticket enum).
+ * @param draft - The operation form values.
+ * @returns Inline field errors ({} when valid).
+ */
+export function validateOperation(draft: OperationDraft): FieldErrors {
+  const errors: FieldErrors = {};
+  if (draft.name.trim().length === 0) {
+    errors.name = "Le nom de l'opération est obligatoire.";
+  }
+  if (!OPERATION_CODE_RE.test(draft.code)) {
+    errors.code = "Le code doit comporter 2 à 6 caractères A-Z ou 0-9 (ex. DEP, RET1).";
+  }
+  // slaMinutes nullable: null → hérite du service ; sinon entier ≥ 1.
+  if (draft.slaMinutes !== null && (!Number.isInteger(draft.slaMinutes) || draft.slaMinutes < 1)) {
+    errors.slaMinutes = "Le SLA doit être vide (hérite du service) ou un entier ≥ 1 minute.";
+  }
+  if (!Number.isInteger(draft.displayOrder) || draft.displayOrder < 1) {
+    errors.displayOrder = "L'ordre d'affichage doit être un entier ≥ 1.";
   }
   return errors;
 }

@@ -24,6 +24,22 @@ describe("admin-errors — traduction", () => {
     expect(msg).not.toContain("AGENCY_HAS_OPEN_TICKETS");
   });
 
+  it("MODEL-WEB-A: OPERATION_CODE_DUPLICATE (409) → message humain dédié", () => {
+    const msg = translateApiError({ error: { code: "OPERATION_CODE_DUPLICATE" } }, true);
+    expect(msg).toBe("Ce code d'opération existe déjà pour ce service.");
+    expect(msg).not.toContain("OPERATION_CODE_DUPLICATE");
+    expect(msg).not.toContain("_");
+  });
+
+  it("MODEL-WEB-A: OPERATION_NOT_FOUND / SERVICE_NOT_FOUND → message humain sans code brut", () => {
+    const op = translateApiError({ error: { code: "OPERATION_NOT_FOUND" } }, false);
+    expect(op).toContain("opération");
+    expect(op).not.toContain("OPERATION_NOT_FOUND");
+    const svc = translateApiError({ error: { code: "SERVICE_NOT_FOUND" } }, false);
+    expect(svc).toContain("service");
+    expect(svc).not.toContain("SERVICE_NOT_FOUND");
+  });
+
   it("WEB-006: code inconnu → fallback humain 409 (jamais le code brut)", () => {
     const msg = translateApiError({ error: { code: "SOME_UNKNOWN_CODE" } }, true);
     expect(msg).toBe(GENERIC_CONFLICT_MESSAGE);

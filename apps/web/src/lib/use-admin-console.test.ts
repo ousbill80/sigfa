@@ -221,3 +221,99 @@ describe("useAdminConsole — routes canoniques", () => {
     expect(seen).toContainEqual({ method: "PATCH", path: `/banks/${BANK_ID}/sms-templates` });
   });
 });
+
+describe("useAdminConsole — opérations (MODEL-WEB-A, routes canoniques)", () => {
+  it("MODEL-WEB-A: CRUD opérations sur routes canoniques (POST/GET /services/{id}/operations, PATCH/DELETE /operations/{id})", async () => {
+    const seen: { method: string; path: string }[] = [];
+    server.use(
+      http.get(`${BASE}/services/:sid/operations`, ({ request }) => {
+        seen.push({ method: "GET", path: new URL(request.url).pathname });
+        return HttpResponse.json({
+          data: [{ id: "op-1", serviceId: "svc-1", code: "DEP", name: "Dépôt", slaMinutes: null, displayOrder: 1, isActive: true }],
+          meta: { page: 1, limit: 20, total: 1 },
+        });
+      }),
+      http.post(`${BASE}/services/:sid/operations`, ({ request }) => {
+        seen.push({ method: "POST", path: new URL(request.url).pathname });
+        return HttpResponse.json({ id: "op-2", serviceId: "svc-1", code: "RET", name: "Retrait", slaMinutes: 5, displayOrder: 2, isActive: true }, { status: 201 });
+      }),
+      http.patch(`${BASE}/operations/:id`, ({ request }) => {
+        seen.push({ method: "PATCH", path: new URL(request.url).pathname });
+        return HttpResponse.json({ id: "op-2", serviceId: "svc-1", code: "RET", name: "Retrait", slaMinutes: null, displayOrder: 2, isActive: true });
+      }),
+      http.delete(`${BASE}/operations/:id`, ({ request }) => {
+        seen.push({ method: "DELETE", path: new URL(request.url).pathname });
+        return HttpResponse.json({ success: true });
+      }),
+    );
+    const { result } = makeConsole();
+    let list!: unknown[];
+    const results: { ok: boolean }[] = [];
+    await act(async () => {
+      list = await result.current.listOperations("svc-1");
+      results.push(await result.current.createOperation("svc-1", { code: "RET", name: "Retrait", slaMinutes: 5, displayOrder: 2, isActive: true }));
+      results.push(await result.current.updateOperation("op-2", { slaMinutes: null }));
+      results.push(await result.current.deleteOperation("op-2"));
+    });
+    expect(list).toHaveLength(1);
+    expect(results.every((r) => r.ok)).toBe(true);
+    expect(seen).toContainEqual({ method: "GET", path: "/services/svc-1/operations" });
+    expect(seen).toContainEqual({ method: "POST", path: "/services/svc-1/operations" });
+    expect(seen).toContainEqual({ method: "PATCH", path: "/operations/op-2" });
+    expect(seen).toContainEqual({ method: "DELETE", path: "/operations/op-2" });
+  });
+
+  it("MODEL-WEB-A: code dupliqué (409 OPERATION_CODE_DUPLICATE) → message humain, jamais le code brut", async () => {
+    server.use(
+      http.post(`${BASE}/services/:sid/operations`, () =>
+        HttpResponse.json({ error: { code: "OPERATION_CODE_DUPLICATE", message: "raw" } }, { status: 409 }),
+      ),
+    );
+    const { result } = makeConsole();
+    let res!: { ok: boolean; message?: string };
+    await act(async () => {
+      res = await result.current.createOperation("svc-1", { code: "DEP", name: "Dépôt", displayOrder: 1, isActive: true });
+    });
+    expect(res.ok).toBe(false);
+    expect(res.message).toBe("Ce code d'opération existe déjà pour ce service.");
+    expect(res.message).not.toContain("OPERATION_CODE_DUPLICATE");
+  });
+
+  it("MODEL-WEB-A: liste opérations — erreur serveur → liste vide (défensif)", async () => {
+    server.use(http.get(`${BASE}/services/:sid/operations`, () => HttpResponse.json({ error: { code: "X" } }, { status: 500 })));
+    const { result } = makeConsole();
+    let list!: unknown[];
+    await act(async () => {
+      list = await result.current.listOperations("svc-1");
+    });
+    expect(list).toEqual([]);
+  });
+
+  it("MODEL-WEB-A: liste services — GET /services (route canonique parente)", async () => {
+    server.use(
+      http.get(`${BASE}/services`, () =>
+        HttpResponse.json({ data: [{ id: "svc-1", name: "OC", code: "OC", agencyId: AGENCY_ID, slaMinutes: 15, active: true, order: 1 }], meta: { page: 1, limit: 20, total: 1 } }),
+      ),
+    );
+    const { result } = makeConsole();
+    let list!: unknown[];
+    await act(async () => {
+      list = await result.current.listServices();
+    });
+    expect(list).toHaveLength(1);
+  });
+
+  it("MODEL-WEB-A: état offline — mutations opérations bloquées", async () => {
+    const { result } = makeConsole();
+    act(() => result.current.setConnection("offline"));
+    let create!: { ok: boolean; message?: string };
+    let del!: { ok: boolean; message?: string };
+    await act(async () => {
+      create = await result.current.createOperation("svc-1", { code: "DEP", name: "Dépôt", displayOrder: 1, isActive: true });
+      del = await result.current.deleteOperation("op-1");
+    });
+    expect(create.ok).toBe(false);
+    expect(create.message).toBe("Connexion requise pour configurer");
+    expect(del.ok).toBe(false);
+  });
+});

@@ -10,19 +10,19 @@
  */
 "use client";
 
-import { useMemo, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
 import { createSigfaClient } from "@sigfa/contracts";
 import { AdminConsole } from "@/components/admin/admin-console";
 import { IdentitySection } from "@/components/admin/identity-section";
 import { AgenciesSection } from "@/components/admin/agencies-section";
-import { ServiceForm } from "@/components/admin/service-form";
+import { ServicesSection } from "@/components/admin/services-section";
 import { SmsTemplateEditor } from "@/components/admin/sms-template-editor";
 import { AgentsImport } from "@/components/admin/agents-import-panel";
 import { OnboardingWizard } from "@/components/admin/onboarding-wizard";
 import { ThresholdsForm } from "@/components/admin/thresholds-form";
 import { CounterForm } from "@/components/admin/counter-form";
 import { OfflineBanner } from "@/components/ui/offline-banner";
-import { useAdminConsole } from "@/lib/use-admin-console";
+import { useAdminConsole, type OperationRow, type ServiceRow } from "@/lib/use-admin-console";
 import type { ImportSummary } from "@/lib/agents-import";
 import type { AdminSection } from "@/lib/admin-rbac";
 import type { Role } from "@/lib/roles";
@@ -50,6 +50,48 @@ export function AdminPageClient({ apiBase, bankId, agencyId, role }: AdminPageCl
   const agents = useMemo(() => createSigfaClient("agents", apiBase), [apiBase]);
   const adminConsole = useAdminConsole({ core, admin, agents, bankId, agencyId });
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [services, setServices] = useState<ServiceRow[]>([]);
+  const [operationsByService, setOperationsByService] = useState<Record<string, OperationRow[]>>({});
+  const [operationServerError, setOperationServerError] = useState<string | undefined>();
+
+  const { listServices, listOperations, createOperation, deleteOperation } = adminConsole;
+
+  useEffect(() => {
+    void listServices().then(setServices);
+  }, [listServices]);
+
+  const refreshOperations = useCallback(
+    async (serviceId: string): Promise<void> => {
+      const ops = await listOperations(serviceId);
+      setOperationsByService((prev) => ({ ...prev, [serviceId]: ops }));
+    },
+    [listOperations],
+  );
+
+  const handleCreateOperation = useCallback(
+    (serviceId: string, draft: { code: string; name: string; slaMinutes: number | null; displayOrder: number; iconKey?: string }): void => {
+      setOperationServerError(undefined);
+      void createOperation(serviceId, { ...draft, isActive: true }).then((r) => {
+        if (r.ok) void refreshOperations(serviceId);
+        else setOperationServerError(r.message);
+      });
+    },
+    [createOperation, refreshOperations],
+  );
+
+  const handleDeactivateOperation = useCallback(
+    (operationId: string): void => {
+      void deleteOperation(operationId).then((r) => {
+        if (r.ok) {
+          // Re-fetch every currently loaded service to reflect the deactivation.
+          Object.keys(operationsByService).forEach((sid) => void refreshOperations(sid));
+        } else {
+          setOperationServerError(r.message);
+        }
+      });
+    },
+    [deleteOperation, refreshOperations, operationsByService],
+  );
 
   function renderSection(section: AdminSection): ReactElement | null {
     switch (section) {
@@ -58,7 +100,17 @@ export function AdminPageClient({ apiBase, bankId, agencyId, role }: AdminPageCl
       case "agencies":
         return <AgenciesSection agencies={[]} openTickets={{}} onConfirmDeactivate={(id) => void adminConsole.deleteAgency(id)} />;
       case "services":
-        return <ServiceForm onSubmit={(draft) => void adminConsole.createService(draft)} />;
+        return (
+          <ServicesSection
+            services={services}
+            operationsByService={operationsByService}
+            onCreateService={(draft) => void adminConsole.createService(draft)}
+            onCreateOperation={handleCreateOperation}
+            onDeactivateOperation={handleDeactivateOperation}
+            onExpandService={(serviceId) => void refreshOperations(serviceId)}
+            operationServerError={operationServerError}
+          />
+        );
       case "counters":
         return <CounterForm services={[]} onSubmit={(draft) => void adminConsole.createCounter(draft)} />;
       case "thresholds":

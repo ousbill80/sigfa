@@ -51,6 +51,52 @@ export interface MutationResult {
   message?: string;
 }
 
+/**
+ * An operation row (child of a service) as exposed by the admin console.
+ * `slaMinutes === null` means the operation inherits the parent service SLA (D4).
+ * There is NO priority field (D4).
+ */
+export interface OperationRow {
+  id: string;
+  serviceId: string;
+  code: string;
+  name: string;
+  slaMinutes: number | null;
+  displayOrder: number;
+  isActive: boolean;
+  iconKey?: string;
+}
+
+/** Create payload for an operation (serviceId comes from the path). */
+export interface CreateOperationBody {
+  code: string;
+  name: string;
+  slaMinutes?: number | null;
+  displayOrder: number;
+  isActive: boolean;
+  iconKey?: string;
+}
+
+/** A service row (parent of operations) as exposed by the admin console. */
+export interface ServiceRow {
+  id: string;
+  name: string;
+  code?: string;
+  slaMinutes: number;
+  active: boolean;
+  order: number;
+}
+
+/** Partial update payload for an operation. */
+export interface UpdateOperationBody {
+  code?: string;
+  name?: string;
+  slaMinutes?: number | null;
+  displayOrder?: number;
+  isActive?: boolean;
+  iconKey?: string;
+}
+
 /** Options for {@link useAdminConsole}. */
 export interface UseAdminConsoleOptions {
   core: CoreClient;
@@ -78,6 +124,16 @@ export interface UseAdminConsoleResult {
   createService: (body: { name: string; code?: string; slaMinutes: number; order?: number }) => Promise<MutationResult>;
   /** Update a service (PATCH /services/{id}). */
   updateService: (id: string, body: { slaMinutes?: number; active?: boolean; order?: number }) => Promise<MutationResult>;
+  /** List the agency services (GET /services). */
+  listServices: () => Promise<ServiceRow[]>;
+  /** List a service's operations (GET /services/{serviceId}/operations). */
+  listOperations: (serviceId: string) => Promise<OperationRow[]>;
+  /** Create an operation under a service (POST /services/{serviceId}/operations). */
+  createOperation: (serviceId: string, body: CreateOperationBody) => Promise<MutationResult>;
+  /** Update an operation (PATCH /operations/{id}); slaMinutes:null re-inherits the service. */
+  updateOperation: (id: string, body: UpdateOperationBody) => Promise<MutationResult>;
+  /** Deactivate (soft-delete) an operation (DELETE /operations/{id}). */
+  deleteOperation: (id: string) => Promise<MutationResult>;
   /** Create a counter (POST /counters). */
   createCounter: (body: { label: string; serviceIds?: string[] }) => Promise<MutationResult>;
   /** Import agents CSV (POST /agents/import, multipart). */
@@ -175,6 +231,63 @@ export function useAdminConsole(options: UseAdminConsoleOptions): UseAdminConsol
     [core, offlineGuard],
   );
 
+  const listServices = useCallback<UseAdminConsoleResult["listServices"]>(async () => {
+    const { data, error } = await core.GET("/services", { params: { query: {} } });
+    if (error || !data) return [];
+    const list = (data as { data?: unknown[] }).data;
+    return Array.isArray(list) ? (list as ServiceRow[]) : [];
+  }, [core]);
+
+  const listOperations = useCallback<UseAdminConsoleResult["listOperations"]>(
+    async (serviceId) => {
+      const { data, error } = await core.GET("/services/{serviceId}/operations", {
+        params: { path: { serviceId }, query: {} },
+      });
+      if (error || !data) return [];
+      const list = (data as { data?: unknown[] }).data;
+      return Array.isArray(list) ? (list as OperationRow[]) : [];
+    },
+    [core],
+  );
+
+  const createOperation = useCallback<UseAdminConsoleResult["createOperation"]>(
+    async (serviceId, body) => {
+      const blocked = offlineGuard();
+      if (blocked) return blocked;
+      const { error, response } = await core.POST("/services/{serviceId}/operations", {
+        params: { path: { serviceId } },
+        body,
+      });
+      return error ? { ok: false, message: humanError(error, response) } : { ok: true };
+    },
+    [core, offlineGuard],
+  );
+
+  const updateOperation = useCallback<UseAdminConsoleResult["updateOperation"]>(
+    async (id, body) => {
+      const blocked = offlineGuard();
+      if (blocked) return blocked;
+      const { error, response } = await core.PATCH("/operations/{id}", {
+        params: { path: { id } },
+        body,
+      });
+      return error ? { ok: false, message: humanError(error, response) } : { ok: true };
+    },
+    [core, offlineGuard],
+  );
+
+  const deleteOperation = useCallback<UseAdminConsoleResult["deleteOperation"]>(
+    async (id) => {
+      const blocked = offlineGuard();
+      if (blocked) return blocked;
+      const { error, response } = await core.DELETE("/operations/{id}", {
+        params: { path: { id } },
+      });
+      return error ? { ok: false, message: humanError(error, response) } : { ok: true };
+    },
+    [core, offlineGuard],
+  );
+
   const createCounter = useCallback<UseAdminConsoleResult["createCounter"]>(
     async (body) => {
       const blocked = offlineGuard();
@@ -263,6 +376,11 @@ export function useAdminConsole(options: UseAdminConsoleOptions): UseAdminConsol
       deleteAgency,
       createService,
       updateService,
+      listServices,
+      listOperations,
+      createOperation,
+      updateOperation,
+      deleteOperation,
       createCounter,
       importAgents,
       saveSmsTemplates,
@@ -279,6 +397,11 @@ export function useAdminConsole(options: UseAdminConsoleOptions): UseAdminConsol
       deleteAgency,
       createService,
       updateService,
+      listServices,
+      listOperations,
+      createOperation,
+      updateOperation,
+      deleteOperation,
       createCounter,
       importAgents,
       saveSmsTemplates,

@@ -21,6 +21,10 @@ const CODE_MESSAGES: Record<string, string> = {
   DUPLICATE_SERVICE_CODE: "Ce code de service existe déjà dans cette agence.",
   // core.yaml — DELETE /agencies/{id} with open tickets.
   AGENCY_HAS_OPEN_TICKETS: "Cette agence a des tickets ouverts et ne peut pas être fermée.",
+  // core.yaml — operations CRUD (MODEL-CONTRACT-A).
+  OPERATION_CODE_DUPLICATE: "Ce code d'opération existe déjà pour ce service.",
+  OPERATION_NOT_FOUND: "Cette opération est introuvable.",
+  SERVICE_NOT_FOUND: "Ce service est introuvable.",
   // Generic uniqueness conflict.
   CONFLICT: "Cette valeur existe déjà.",
   DUPLICATE_EMAIL: "Cette adresse email est déjà enregistrée.",

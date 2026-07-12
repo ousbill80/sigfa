@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   validateService,
+  validateOperation,
   validateThresholds,
   validateAgencyName,
   isValid,
@@ -32,6 +33,40 @@ describe("admin-validation — service", () => {
     // Nom vide → erreur inline sur `name`.
     const badName = validateService({ name: "   ", code: "OC", slaMinutes: 5, order: 1 });
     expect(badName.name).toBeDefined();
+  });
+});
+
+describe("admin-validation — operation (MODEL-WEB-A)", () => {
+  it("MODEL-WEB-A: opération valide (code ^[A-Z0-9]{2,6}$, SLA propre) → aucune erreur", () => {
+    expect(isValid(validateOperation({ code: "DEP", name: "Dépôt espèces", slaMinutes: 8, displayOrder: 1 }))).toBe(true);
+    expect(isValid(validateOperation({ code: "RET1", name: "Retrait", slaMinutes: 12, displayOrder: 2 }))).toBe(true);
+    // 6 chars max, chiffres autorisés.
+    expect(isValid(validateOperation({ code: "AB12CD", name: "X", slaMinutes: 5, displayOrder: 1 }))).toBe(true);
+  });
+
+  it("MODEL-WEB-A: SLA vide (null) est VALIDE → hérite du service (D4)", () => {
+    const ok = validateOperation({ code: "DEP", name: "Dépôt", slaMinutes: null, displayOrder: 1 });
+    expect(isValid(ok)).toBe(true);
+    expect(ok.slaMinutes).toBeUndefined();
+  });
+
+  it("MODEL-WEB-A: code hors regex ^[A-Z0-9]{2,6}$ → erreur inline sur code", () => {
+    expect(validateOperation({ code: "d", name: "X", slaMinutes: null, displayOrder: 1 }).code).toBeDefined();
+    expect(validateOperation({ code: "dep", name: "X", slaMinutes: null, displayOrder: 1 }).code).toBeDefined();
+    expect(validateOperation({ code: "TOOLONG", name: "X", slaMinutes: null, displayOrder: 1 }).code).toBeDefined();
+    expect(validateOperation({ code: "DE-P", name: "X", slaMinutes: null, displayOrder: 1 }).code).toBeDefined();
+  });
+
+  it("MODEL-WEB-A: SLA renseigné < 1 → erreur ; nom vide → erreur ; ordre < 1 → erreur", () => {
+    expect(validateOperation({ code: "DEP", name: "X", slaMinutes: 0, displayOrder: 1 }).slaMinutes).toBeDefined();
+    expect(validateOperation({ code: "DEP", name: "  ", slaMinutes: null, displayOrder: 1 }).name).toBeDefined();
+    expect(validateOperation({ code: "DEP", name: "X", slaMinutes: null, displayOrder: 0 }).displayOrder).toBeDefined();
+  });
+
+  it("MODEL-WEB-A: PAS de champ priorité sur l'opération (D4)", () => {
+    // Le draft n'a aucune notion de priorité ; seul displayOrder existe.
+    const draft = validateOperation({ code: "DEP", name: "Dépôt", slaMinutes: null, displayOrder: 1 });
+    expect(Object.keys(draft)).not.toContain("priority");
   });
 });
 

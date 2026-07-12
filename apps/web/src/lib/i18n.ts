@@ -117,7 +117,22 @@ export type TranslationKey =
   | "admin.wizard_next"
   | "admin.wizard_back"
   | "admin.wizard_generate_qr"
-  | "admin.wizard_done";
+  | "admin.wizard_done"
+  | "admin.operations.title"
+  | "admin.operations.add"
+  | "admin.operations.empty"
+  | "admin.operations.code"
+  | "admin.operations.name"
+  | "admin.operations.sla"
+  | "admin.operations.sla_placeholder"
+  | "admin.operations.sla_inherited"
+  | "admin.operations.display_order"
+  | "admin.operations.icon_key"
+  | "admin.operations.active"
+  | "admin.operations.inactive"
+  | "admin.operations.edit"
+  | "admin.operations.deactivate"
+  | "admin.operations.manage";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -229,6 +244,21 @@ export const FR: TranslationDict = {
   "admin.wizard_back": "Précédent",
   "admin.wizard_generate_qr": "Générer le QR d'installation",
   "admin.wizard_done": "Onboarding terminé",
+  "admin.operations.title": "Opérations",
+  "admin.operations.add": "Ajouter une opération",
+  "admin.operations.empty": "Aucune opération configurée pour ce service.",
+  "admin.operations.code": "Code",
+  "admin.operations.name": "Nom",
+  "admin.operations.sla": "SLA (min)",
+  "admin.operations.sla_placeholder": "Hérite du service",
+  "admin.operations.sla_inherited": "Hérite du SLA du service",
+  "admin.operations.display_order": "Ordre d'affichage",
+  "admin.operations.icon_key": "Icône (clé)",
+  "admin.operations.active": "Active",
+  "admin.operations.inactive": "Inactive",
+  "admin.operations.edit": "Modifier",
+  "admin.operations.deactivate": "Désactiver",
+  "admin.operations.manage": "Gérer les opérations",
 };
 
 /** English translations */
@@ -338,6 +368,21 @@ export const EN: TranslationDict = {
   "admin.wizard_back": "Back",
   "admin.wizard_generate_qr": "Generate installation QR",
   "admin.wizard_done": "Onboarding complete",
+  "admin.operations.title": "Operations",
+  "admin.operations.add": "Add an operation",
+  "admin.operations.empty": "No operation configured for this service.",
+  "admin.operations.code": "Code",
+  "admin.operations.name": "Name",
+  "admin.operations.sla": "SLA (min)",
+  "admin.operations.sla_placeholder": "Inherits from service",
+  "admin.operations.sla_inherited": "Inherits the service SLA",
+  "admin.operations.display_order": "Display order",
+  "admin.operations.icon_key": "Icon (key)",
+  "admin.operations.active": "Active",
+  "admin.operations.inactive": "Inactive",
+  "admin.operations.edit": "Edit",
+  "admin.operations.deactivate": "Deactivate",
+  "admin.operations.manage": "Manage operations",
 };
 
 /** All locales map */
