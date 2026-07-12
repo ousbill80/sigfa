@@ -72,6 +72,7 @@ export default defineConfig({
         // API-specific exclusions
         "src/index.ts", // Point d'entrée serveur — non testable unitairement (démarre le serveur)
         "src/routes/admin-test-harness.ts", // Support de test partagé API-008 (Testcontainers)
+        "src/services/rt002-test-harness.ts", // Support de test partagé RT-002 (Testcontainers realtime)
       ],
     },
   },
