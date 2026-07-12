@@ -40,6 +40,21 @@ describe("TvScreen — TV-001 layout", () => {
     }
   });
 
+  it("TV-001: rail latéral persistant — derniers appelés + longueur de file", () => {
+    render(<TvScreen state={nominal} />);
+    const rail = screen.getByTestId("tv-rail");
+    expect(within(rail).getByTestId("tv-previous")).toBeInTheDocument();
+    const count = screen.getByTestId("tv-queue-count");
+    expect(count).toHaveTextContent(String(nominal.queue.length));
+    expect(count.getAttribute("style")).toContain("var(--display-tv-counter)");
+  });
+
+  it("TV-001: en-tête banque — pastille logo sur --brand (thémable tenant)", () => {
+    render(<TvScreen state={nominal} tenantName="Banque du Commerce" />);
+    const mark = screen.getByTestId("tv-brand-mark");
+    expect(mark.getAttribute("style")).toContain("var(--brand)");
+  });
+
   it("TV-001: header affiche label APPELS EN COURS + horloge + tenant", () => {
     render(<TvScreen state={nominal} tenantName="Banque du Commerce" clock="14:37:22" />);
     const header = screen.getByTestId("tv-header");
@@ -70,8 +85,10 @@ describe("TvScreen — 5 états", () => {
     expect(screen.queryByTestId("tv-hero-number")).not.toBeInTheDocument();
   });
 
-  it("TV-001: état empty — message lisible + --display-tv maintenu, structure préservée", () => {
-    render(<TvScreen state={initialTvState} />);
+  it("TV-001: état empty (scène d'appel forcée) — message lisible + structure préservée", () => {
+    // En scène d'appel (mode=call) sans héros, la structure est préservée et le
+    // message empty reste lisible. Le repos par défaut est couvert par l'AdZone.
+    render(<TvScreen state={initialTvState} mode="call" />);
     expect(screen.getByTestId("tv-screen")).toHaveAttribute("data-state", "empty");
     const empty = screen.getByTestId("tv-empty");
     expect(empty).toHaveTextContent(t("tv.empty", "fr"));
@@ -147,5 +164,46 @@ describe("TvScreen — TV-002 flash & motion", () => {
     render(<TvScreen state={nominal} reducedMotion />);
     const heroStyle = screen.getByTestId("tv-hero").getAttribute("style") ?? "";
     expect(heroStyle).toContain("transition: none");
+  });
+});
+
+describe("TvScreen — mode repos↔appel + AdZone", () => {
+  it("AdZone: repos par défaut sans héros — carrousel plein écran, pas de scène d'appel", () => {
+    render(<TvScreen state={initialTvState} tenantName="Banque du Commerce" />);
+    expect(screen.getByTestId("tv-screen")).toHaveAttribute("data-mode", "rest");
+    expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
+    expect(screen.queryByTestId("tv-hero")).not.toBeInTheDocument();
+  });
+
+  it("AdZone: mode=call — bascule sur la scène d'appel, AdZone masquée", () => {
+    render(<TvScreen state={nominal} mode="call" />);
+    expect(screen.getByTestId("tv-screen")).toHaveAttribute("data-mode", "call");
+    expect(screen.getByTestId("tv-hero")).toBeInTheDocument();
+    expect(screen.queryByTestId("tv-adzone")).not.toBeInTheDocument();
+  });
+
+  it("AdZone: mode=rest explicite malgré un héros — repos prioritaire (fin de fenêtre)", () => {
+    render(<TvScreen state={nominal} mode="rest" />);
+    expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
+    expect(screen.queryByTestId("tv-hero-number")).not.toBeInTheDocument();
+  });
+
+  it("AdZone: héros présent sans mode → scène d'appel (rétro-compatible TV-001)", () => {
+    render(<TvScreen state={nominal} />);
+    expect(screen.getByTestId("tv-screen")).toHaveAttribute("data-mode", "call");
+    expect(screen.getByTestId("tv-hero-number")).toHaveTextContent("OC-047");
+  });
+
+  it("AdZone: loading prioritaire sur le repos — skeleton, pas de carrousel", () => {
+    render(<TvScreen state={initialTvState} loading />);
+    expect(screen.getByTestId("tv-skeleton")).toBeInTheDocument();
+    expect(screen.queryByTestId("tv-adzone")).not.toBeInTheDocument();
+  });
+
+  it("AdZone: bandeau offline conservé au repos (dernier état réseau)", () => {
+    const offline: TvState = { ...initialTvState, connection: "offline" };
+    render(<TvScreen state={offline} />);
+    expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
+    expect(screen.getByTestId("tv-offline-banner")).toBeInTheDocument();
   });
 });

@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { TvScreen } from "@/components/tv/tv-screen";
 import { useTvClock } from "@/lib/use-tv-clock";
 import { useTvSimulation } from "@/lib/use-tv-simulation";
+import { useTvMode } from "@/lib/use-tv-mode";
 import { useSocket } from "@/lib/socket-provider";
 import { autoCorrectedBrand } from "@/lib/theme";
 import { TV_SEED_STATE } from "@/lib/tv-fixtures";
@@ -57,6 +58,11 @@ export default function TvPage(): ReactElement {
     return { ...socket.tv, connection };
   }, [isRealtime, simState, socket.tv, socket.connected, online]);
 
+  // Machine d'états repos↔appel : un appel actif (héros) bascule sur la scène
+  // d'appel pendant une fenêtre ; sinon l'AdZone (zone de pub) prend l'écran.
+  // Ne consomme AUCUN événement — dérive seulement de l'état temps réel existant.
+  const mode = useTvMode({ hasActiveCall: state.hero !== null });
+
   // Contrast auto-correction : le --brand tenant est foncé si son ratio sur
   // le fond nuit (--night-2, très sombre) est insuffisant côté clair.
   const brand = autoCorrectedBrand(TENANT.brand);
@@ -79,6 +85,7 @@ export default function TvPage(): ReactElement {
         tenantName={TENANT.name}
         clock={clock}
         celebration={isRealtime ? false : celebration}
+        mode={mode}
       />
     </div>
   );

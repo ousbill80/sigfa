@@ -38,6 +38,14 @@ export type TranslationKey =
   | "tv.waiting"
   | "tv.empty"
   | "tv.offline"
+  | "tv.welcome"
+  | "tv.queue_in_progress"
+  | "tv.ad.account.title"
+  | "tv.ad.account.subtitle"
+  | "tv.ad.credit.title"
+  | "tv.ad.credit.subtitle"
+  | "tv.ad.app.title"
+  | "tv.ad.app.subtitle"
   | "agent.current_ticket"
   | "agent.timer"
   | "agent.call_next"
@@ -141,6 +149,14 @@ export const FR: TranslationDict = {
   "tv.waiting": "EN ATTENTE",
   "tv.empty": "Aucun appel en cours",
   "tv.offline": "Hors ligne — reconnexion…",
+  "tv.welcome": "Bienvenue",
+  "tv.queue_in_progress": "File d'attente en cours",
+  "tv.ad.account.title": "Ouvrez un compte en 10 minutes",
+  "tv.ad.account.subtitle": "Sans frais de dossier, directement en agence.",
+  "tv.ad.credit.title": "Crédit auto à taux préférentiel",
+  "tv.ad.credit.subtitle": "Financez votre véhicule en toute sérénité.",
+  "tv.ad.app.title": "Votre banque dans la poche",
+  "tv.ad.app.subtitle": "Découvrez la nouvelle application mobile.",
   "agent.current_ticket": "TICKET EN COURS",
   "agent.timer": "CHRONOMÈTRE",
   "agent.call_next": "APPELER LE SUIVANT",
@@ -242,6 +258,14 @@ export const EN: TranslationDict = {
   "tv.waiting": "WAITING",
   "tv.empty": "No call in progress",
   "tv.offline": "Offline — reconnecting…",
+  "tv.welcome": "Welcome",
+  "tv.queue_in_progress": "Queue in progress",
+  "tv.ad.account.title": "Open an account in 10 minutes",
+  "tv.ad.account.subtitle": "No processing fees, right at the branch.",
+  "tv.ad.credit.title": "Car loan at a preferential rate",
+  "tv.ad.credit.subtitle": "Finance your vehicle with peace of mind.",
+  "tv.ad.app.title": "Your bank in your pocket",
+  "tv.ad.app.subtitle": "Discover the new mobile app.",
   "agent.current_ticket": "CURRENT TICKET",
   "agent.timer": "TIMER",
   "agent.call_next": "CALL NEXT",
