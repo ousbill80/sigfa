@@ -15,6 +15,7 @@ import {
   createNoopBus,
   validateEvent,
   queueUpdatedSchema,
+  alertManagerSchema,
 } from "src/services/realtime.js";
 import { SigfaError } from "src/lib/errors.js";
 
@@ -87,5 +88,72 @@ describe("API-003: realtime bus (typé Zod, injectable)", () => {
     expect(() =>
       bus.emit("queue:updated", { queueId: QUEUE_ID, length: 0, estimate: 0 })
     ).not.toThrow();
+  });
+});
+
+describe("API-007: alert:manager convergé sur la forme contractuelle unique { type, payload }", () => {
+  it("API-007: QUEUE_CRITICAL émis en { type, payload } (union héritée supprimée)", () => {
+    const bus = createCaptureBus();
+    bus.emit("alert:manager", {
+      type: "QUEUE_CRITICAL",
+      payload: {
+        queueId: QUEUE_ID,
+        serviceId: "55555555-5555-4555-a555-555555555555",
+        length: 12,
+        overflowQueueIds: [],
+      },
+    });
+    const alert = bus.ofType("alert:manager")[0]?.payload as {
+      type: string;
+      payload: Record<string, unknown>;
+    };
+    expect(alert.type).toBe("QUEUE_CRITICAL");
+    expect(alert.payload["queueId"]).toBe(QUEUE_ID);
+  });
+
+  it("API-007: les 5 types d'alerte API-007/004/005 sont acceptés sous { type, payload }", () => {
+    for (const type of [
+      "AGENT_INACTIVE",
+      "AGENT_DISCONNECTED_WITH_TICKET",
+      "SLA_BREACH",
+      "QUEUE_CRITICAL",
+      "KIOSK_SYSTEM_ERROR",
+    ] as const) {
+      expect(
+        alertManagerSchema.safeParse({ type, payload: { any: 1 } }).success
+      ).toBe(true);
+    }
+  });
+
+  it("API-007: forme héritée { event: QUEUE_CRITICAL, … } REJETÉE (plus d'union)", () => {
+    const legacy = alertManagerSchema.safeParse({
+      event: "QUEUE_CRITICAL",
+      queueId: QUEUE_ID,
+      serviceId: QUEUE_ID,
+      length: 3,
+      overflowQueueIds: [],
+    });
+    expect(legacy.success).toBe(false);
+    expect(() =>
+      validateEvent("alert:manager", {
+        event: "QUEUE_CRITICAL",
+      } as never)
+    ).toThrowError(SigfaError);
+  });
+
+  it("API-007: counter:status accepte OPEN|PAUSED|CLOSED (LA LOI CONTRACT-002)", () => {
+    const bus = createCaptureBus();
+    bus.emit("counter:status", {
+      counterId: COUNTER_ID,
+      status: "CLOSED",
+      agentId: "66666666-6666-4666-a666-666666666666",
+    });
+    expect(bus.ofType("counter:status")).toHaveLength(1);
+    expect(() =>
+      validateEvent("counter:status", {
+        counterId: COUNTER_ID,
+        status: "OFFLINE" as never,
+      })
+    ).toThrowError(SigfaError);
   });
 });

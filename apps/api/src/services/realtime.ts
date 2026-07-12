@@ -57,41 +57,35 @@ export const queueUpdatedSchema = z
   .strict();
 
 /**
- * Schéma du payload `alert:manager` — variante API-004 (QUEUE_CRITICAL + débordement).
- * `overflowQueueIds` liste les files de services compatibles pour absorber.
+ * Types d'alertes manager — LA LOI `alertManagerEvent.payloadSchema`
+ * (packages/contracts/events/realtime.ts). Énuméré fermé : aucune fuite hors
+ * contrat. QUEUE_CRITICAL (API-004), KIOSK_SYSTEM_ERROR (API-005),
+ * AGENT_INACTIVE / AGENT_DISCONNECTED_WITH_TICKET / SLA_BREACH (API-007).
  */
-export const alertManagerOverflowSchema = z.object({
-  event: z.literal("QUEUE_CRITICAL"),
-  queueId: z.string().uuid(),
-  serviceId: z.string().uuid(),
-  length: z.number().int().nonnegative(),
-  overflowQueueIds: z.array(z.string().uuid()),
-});
+export const alertManagerTypeSchema = z.enum([
+  "AGENT_INACTIVE",
+  "AGENT_DISCONNECTED_WITH_TICKET",
+  "SLA_BREACH",
+  "QUEUE_CRITICAL",
+  "KIOSK_SYSTEM_ERROR",
+]);
 
 /**
- * Schéma du payload `alert:manager` — variante CONTRACT-012 (`{ type, payload }`).
- * Aligné sur `alertManagerEvent.payloadSchema` du contrat : `type` énuméré +
- * `payload` contextuel libre. Utilisé par API-005 pour `KIOSK_SYSTEM_ERROR`.
+ * Schéma UNIQUE du payload `alert:manager` — forme contractuelle `{ type, payload }`.
+ * API-007 : l'union héritée (`alertManagerOverflowSchema`) est SUPPRIMÉE ; toutes
+ * les alertes (dont QUEUE_CRITICAL migrée) transitent désormais par cette forme.
  */
-export const alertManagerTypedSchema = z.object({
-  type: z.enum([
-    "AGENT_INACTIVE",
-    "AGENT_DISCONNECTED_WITH_TICKET",
-    "SLA_BREACH",
-    "QUEUE_CRITICAL",
-    "KIOSK_SYSTEM_ERROR",
-  ]),
+export const alertManagerSchema = z.object({
+  type: alertManagerTypeSchema,
   payload: z.record(z.string(), z.unknown()),
 });
 
-/**
- * Schéma du payload `alert:manager` — union des deux variantes acceptées :
- * la forme héritée API-004 et la forme contractuelle `{ type, payload }`.
- */
-export const alertManagerSchema = z.union([
-  alertManagerOverflowSchema,
-  alertManagerTypedSchema,
-]);
+/** Schéma du payload `counter:status` (LA LOI CONTRACT-002 `counterStatusEvent`). */
+export const counterStatusSchema = z.object({
+  counterId: z.string().uuid(),
+  status: z.enum(["OPEN", "PAUSED", "CLOSED"]),
+  agentId: z.string().uuid().optional(),
+});
 
 /** Association nom d'événement → schéma Zod du payload. */
 const EVENT_SCHEMAS = {
@@ -99,6 +93,7 @@ const EVENT_SCHEMAS = {
   "ticket:called": ticketCalledSchema,
   "ticket:closed": ticketClosedSchema,
   "queue:updated": queueUpdatedSchema,
+  "counter:status": counterStatusSchema,
   "alert:manager": alertManagerSchema,
 } as const;
 

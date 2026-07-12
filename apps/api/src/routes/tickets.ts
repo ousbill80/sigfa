@@ -50,6 +50,10 @@ import {
   storeReplay,
 } from "src/services/idempotency.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import {
+  changeAgentStatus,
+  getCurrentStatus,
+} from "src/services/agent-status.js";
 
 /** Variables de contexte Hono injectées par app.ts. */
 interface TicketEnv {
@@ -510,12 +514,15 @@ async function checkAndEmitOverflow(
   const doAlert = await shouldAlertOverflow(queueId, length, bankId, db, redis);
   if (!doAlert) return;
   const overflowQueues = await findOverflowQueues(serviceId, bankId, db);
+  // API-007 : forme CONTRACTUELLE unique `{ type, payload }` (union supprimée).
   bus.emit("alert:manager", {
-    event: "QUEUE_CRITICAL",
-    queueId,
-    serviceId,
-    length,
-    overflowQueueIds: overflowQueues.map((q) => q.queueId),
+    type: "QUEUE_CRITICAL",
+    payload: {
+      queueId,
+      serviceId,
+      length,
+      overflowQueueIds: overflowQueues.map((q) => q.queueId),
+    },
   });
 }
 
@@ -676,11 +683,54 @@ function registerTransition(router: Hono<TicketEnv>, action: "serve"): void {
         `UPDATE tickets SET status = $1, served_at = COALESCE(served_at, NOW()), updated_at = NOW() WHERE id = $2`,
         [target, row.id]
       );
+      // API-007 : le cycle ticket PILOTE le statut agent (AVAILABLE → SERVING).
+      await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "SERVING");
       return c.json({ id: row.id, status: target, counterId: row.counter_id ?? undefined }, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
   });
+}
+
+/**
+ * Pilote le statut de l'agent du guichet via le cycle ticket (API-007).
+ * Tolérant : sans guichet, sans agent affecté, ou si la transition n'est plus
+ * légale (statut déjà à la cible), l'appel est sans effet — jamais d'erreur 5xx.
+ *
+ * @param db        - Connexion PG
+ * @param bus       - Bus temps réel
+ * @param tenant    - Contexte tenant
+ * @param counterId - Guichet du ticket (peut être null)
+ * @param target    - Statut cible piloté (SERVING au serve, AVAILABLE au close)
+ */
+async function driveAgentCycle(
+  db: Client,
+  bus: RealtimeBus,
+  tenant: TenantContext,
+  counterId: string | null,
+  target: "SERVING" | "AVAILABLE"
+): Promise<void> {
+  if (!counterId || !tenant.bankId) return;
+  const res = await db.query(
+    `SELECT agent_id FROM counters WHERE id = $1 AND bank_id = $2`,
+    [counterId, tenant.bankId]
+  );
+  const agentId = (res.rows[0] as { agent_id: string | null } | undefined)?.agent_id;
+  if (!agentId) return;
+  const from = await getCurrentStatus(db, agentId);
+  if (from === target) return;
+  try {
+    await changeAgentStatus({
+      db,
+      bus,
+      bankId: tenant.bankId,
+      agentId,
+      target,
+      cycle: true,
+    });
+  } catch {
+    // Transition non légale dans l'état courant (ex: agent PAUSED) → ignorée.
+  }
 }
 
 // ── POST /tickets/:id/close ──────────────────────────────────────────────────
@@ -695,6 +745,8 @@ function registerClose(router: Hono<TicketEnv>): void {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       nextStatus(row.status, "close");
       const result = await closeTicket(db, redis, row, getBus(c));
+      // API-007 : clôture → l'agent repasse AVAILABLE (piloté par le cycle).
+      await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "AVAILABLE");
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -744,6 +796,8 @@ function registerNoShow(router: Hono<TicketEnv>): void {
         [row.id]
       );
       await emitQueueUpdated(getBus(c), c.get("redis"), db, row.queue_id);
+      // API-007 : no-show → l'agent repasse AVAILABLE (piloté par le cycle).
+      await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "AVAILABLE");
       return c.json({ id: row.id, status: "NO_SHOW" }, 200);
     } catch (err) {
       return errorResponse(c, err);

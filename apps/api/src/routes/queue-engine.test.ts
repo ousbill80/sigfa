@@ -416,9 +416,10 @@ describe("API-004: seuil franchi → débordement actif + UNE alerte QUEUE_CRITI
     await post(`/counters/${ids.counterId}/call-next`, {});
     const alerts = bus.ofType("alert:manager");
     expect(alerts.length).toBeGreaterThanOrEqual(1);
-    const payload = alerts[0]?.payload as { event: string; queueId: string };
-    expect(payload.event).toBe("QUEUE_CRITICAL");
-    expect(payload.queueId).toBe(ids.queueId);
+    // API-007 : forme contractuelle unique `{ type, payload }` (union supprimée).
+    const alert = alerts[0]?.payload as { type: string; payload: { queueId: string } };
+    expect(alert.type).toBe("QUEUE_CRITICAL");
+    expect(alert.payload.queueId).toBe(ids.queueId);
   });
 
   it("API-004: deuxième call-next sans redescente → PAS de deuxième alerte (pas de rafale)", async () => {

@@ -21,6 +21,13 @@ import type http from "http";
 import { jwtVerify } from "jose";
 import { z } from "zod";
 import { logger } from "src/lib/logger.js";
+import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import { getAlertingConfig } from "src/config/alerting.js";
+import {
+  markDisconnect,
+  cancelDisconnect,
+  processDisconnect,
+} from "src/services/agent-disconnect.js";
 
 /** SLA réception ticket:called en millisecondes. */
 export const TICKET_CALLED_SLA_MS = 500 as const;
@@ -44,6 +51,10 @@ export interface SocketServerOptions {
   redis: Redis;
   /** Secret JWT (Uint8Array) */
   jwtSecret: Uint8Array;
+  /** Bus temps réel (émission alertes/counter:status). Défaut : no-op validant. */
+  bus?: RealtimeBus;
+  /** bankId → indispensable au traitement de déconnexion (multi-tenant). */
+  bankIdOf?: (socket: Socket) => string | null;
 }
 
 /** Schéma du payload sync:request. */
@@ -65,6 +76,9 @@ export function createSocketServer(
   options: SocketServerOptions
 ): Server {
   const { db, redis, jwtSecret } = options;
+  const bus = options.bus ?? createNoopBus();
+  const bankIdOf =
+    options.bankIdOf ?? ((s: Socket) => (s.data["bankId"] as string | null) ?? null);
 
   // Adapter Redis pub/sub (multi-instance ready)
   const pubClient = redis.duplicate();
@@ -103,7 +117,11 @@ export function createSocketServer(
   });
 
   io.on("connection", (socket) => {
-    logger.info({ socketId: socket.id, userId: socket.data["userId"] as string }, "socket:connected");
+    const userId = socket.data["userId"] as string | null;
+    logger.info({ socketId: socket.id, userId }, "socket:connected");
+
+    // Anti-flap : une reconnexion dans la fenêtre annule la déconnexion en attente.
+    if (userId) void cancelDisconnect(redis, userId);
 
     socket.on("join:agency", (payload: unknown) => {
       handleJoinAgency(socket, payload);
@@ -115,10 +133,51 @@ export function createSocketServer(
 
     socket.on("disconnect", () => {
       logger.info({ socketId: socket.id }, "socket:disconnected");
+      void scheduleDisconnect(socket, { db, redis, bus, bankIdOf });
     });
   });
 
   return io;
+}
+
+/** Dépendances du planning de déconnexion anti-flap. */
+interface ScheduleDeps {
+  db: Client;
+  redis: Redis;
+  bus: RealtimeBus;
+  bankIdOf: (socket: Socket) => string | null;
+}
+
+/**
+ * Planifie le traitement d'une déconnexion socket avec grâce anti-flap.
+ * Pose la marque Redis puis, après `AGENT_DISCONNECT_GRACE_S`, traite la
+ * déconnexion SI aucune reconnexion ne l'a annulée entre-temps.
+ *
+ * @param socket - Socket déconnecté
+ * @param deps   - Dépendances (db, redis, bus, bankIdOf)
+ */
+async function scheduleDisconnect(
+  socket: Socket,
+  deps: ScheduleDeps
+): Promise<void> {
+  const agentId = socket.data["userId"] as string | null;
+  const bankId = deps.bankIdOf(socket);
+  if (!agentId || !bankId) return;
+
+  await markDisconnect(deps.redis, agentId);
+  const graceMs = getAlertingConfig().agentDisconnectGraceS * 1000;
+
+  setTimeout(() => {
+    void processDisconnect({
+      db: deps.db,
+      redis: deps.redis,
+      bus: deps.bus,
+      bankId,
+      agentId,
+    }).catch((err: unknown) => {
+      logger.error({ err, agentId }, "socket:disconnect:process-error");
+    });
+  }, graceMs).unref();
 }
 
 /**

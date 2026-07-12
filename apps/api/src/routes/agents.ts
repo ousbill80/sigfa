@@ -1,0 +1,333 @@
+/**
+ * Routes agents — API-007 (agents.yaml).
+ *
+ * GET  /agents/:id         — profil de l'agent (§23, MANAGER+).
+ * POST /agents/:id/status  — machine à états de disponibilité (§164, AGENT+ self).
+ * GET  /agents/:id/stats   — statistiques de performance (§243, AGENT self / MANAGER+ scope).
+ *
+ * (POST /agents/import est HORS scope — API-009.)
+ *
+ * Règle « self » (§164, §243) : un AGENT n'agit/ne lit QUE ses propres données ;
+ * MANAGER+ agit/lit dans son scope d'agence. Le RBAC de route autorise AGENT ;
+ * la restriction fine self-vs-scope est appliquée ici.
+ *
+ * @module
+ */
+
+import { Hono, type Context } from "hono";
+import { z } from "zod";
+import type { Client } from "pg";
+import type { Redis } from "ioredis";
+import { SigfaError, buildError } from "src/lib/errors.js";
+import type { TenantContext } from "src/middleware/tenant.js";
+import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import {
+  changeAgentStatus,
+  getCurrentStatus,
+  type AgentStatus,
+} from "src/services/agent-status.js";
+import { computeAgentStats, type StatsPeriod } from "src/services/agent-stats.js";
+
+/** Variables de contexte Hono du routeur agents (bus injecté par app.ts). */
+interface AgentEnv {
+  Variables: {
+    db: Client;
+    redis: Redis;
+    jwtSecret: Uint8Array;
+    tenant: TenantContext;
+    bus: RealtimeBus;
+  };
+}
+
+/** Rôles considérés « manager et plus » (lecture/écriture dans le scope agence). */
+const MANAGER_PLUS = new Set([
+  "MANAGER",
+  "AGENCY_DIRECTOR",
+  "BANK_ADMIN",
+  "SUPER_ADMIN",
+]);
+
+/** Regex UUID canonique pour valider les paramètres de chemin. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Contexte Hono typé pour ce routeur. */
+type AgentCtx = Context<AgentEnv>;
+
+/** Corps de POST /agents/:id/status (LA LOI UpdateAgentStatusRequest). */
+const statusSchema = z.object({
+  status: z.enum(["AVAILABLE", "SERVING", "PAUSED", "ABSENT", "OFFLINE"]),
+  reason: z.string().max(255).nullish(),
+});
+
+/** Query de GET /agents/:id/stats. */
+const periodSchema = z.enum(["day", "week", "month"]).default("day");
+
+/**
+ * Crée le routeur agents (monté sous /api/v1).
+ *
+ * @returns Routeur Hono des routes agents API-007
+ */
+export function createAgentRouter(): Hono<AgentEnv> {
+  const router = new Hono<AgentEnv>();
+  registerGetProfile(router);
+  registerPostStatus(router);
+  registerGetStats(router);
+  return router;
+}
+
+/** Résout le bus depuis le contexte, ou fournit un no-op validant. */
+function getBus(c: AgentCtx): RealtimeBus {
+  return (c.get("bus") as RealtimeBus | undefined) ?? createNoopBus();
+}
+
+/** Lit et valide un paramètre de chemin UUID, sinon 404. */
+function paramUuid(c: AgentCtx, name: string): string {
+  const value = c.req.param(name);
+  if (!value || !UUID_RE.test(value)) {
+    throw new SigfaError("NOT_FOUND", "Ressource introuvable.", 404);
+  }
+  return value;
+}
+
+/** Émet une réponse d'erreur SigfaError au format LA LOI. */
+function errorResponse(c: AgentCtx, err: unknown): Response {
+  if (err instanceof SigfaError) {
+    return c.json(
+      buildError(err.code, err.message, err.details),
+      err.httpStatus as 400 | 401 | 403 | 404 | 409 | 422
+    );
+  }
+  throw err;
+}
+
+/**
+ * Applique la règle « self / scope » : un AGENT ne peut cibler que lui-même ;
+ * MANAGER+ peut cibler tout agent de son scope d'agence.
+ *
+ * @param db      - Connexion PG
+ * @param tenant  - Contexte tenant courant
+ * @param agentId - Agent ciblé par la requête
+ * @throws {SigfaError} 403 FORBIDDEN si un AGENT cible un autre agent ;
+ *                      404 NOT_FOUND si l'agent est hors du scope tenant.
+ */
+async function assertSelfOrScope(
+  db: Client,
+  tenant: TenantContext,
+  agentId: string
+): Promise<void> {
+  const isManagerPlus = MANAGER_PLUS.has(tenant.role);
+  if (!isManagerPlus) {
+    if (agentId !== tenant.userId) {
+      throw new SigfaError(
+        "FORBIDDEN",
+        "Un agent ne peut accéder qu'à ses propres données.",
+        403
+      );
+    }
+    return;
+  }
+  await assertAgentInTenantScope(db, tenant, agentId);
+}
+
+/**
+ * Vérifie que l'agent cible appartient au tenant (banque) et, pour un rôle
+ * agence, à une agence du scope JWT. Sinon 404 (ne révèle pas l'existence).
+ */
+async function assertAgentInTenantScope(
+  db: Client,
+  tenant: TenantContext,
+  agentId: string
+): Promise<void> {
+  if (tenant.role === "SUPER_ADMIN") return;
+  const res = await db.query(
+    `SELECT au.agency_id
+       FROM users u
+       LEFT JOIN agency_users au ON au.user_id = u.id
+      WHERE u.id = $1 AND u.bank_id = $2`,
+    [agentId, tenant.bankId]
+  );
+  if (res.rows.length === 0) {
+    throw new SigfaError("NOT_FOUND", "Agent introuvable.", 404);
+  }
+  const agencyIds = (res.rows as Array<{ agency_id: string | null }>)
+    .map((r) => r.agency_id)
+    .filter((a): a is string => a !== null);
+  const inScope =
+    tenant.agencyIds.length === 0 ||
+    agencyIds.some((a) => tenant.agencyIds.includes(a));
+  if (!inScope) {
+    throw new SigfaError("NOT_FOUND", "Agent introuvable.", 404);
+  }
+}
+
+// ── GET /agents/:id — profil (§23) ───────────────────────────────────────────
+
+/** Enregistre GET /agents/:id (profil complet). */
+function registerGetProfile(router: Hono<AgentEnv>): void {
+  router.get("/agents/:id", async (c) => {
+    const db = c.get("db");
+    const tenant = c.get("tenant");
+    try {
+      const agentId = paramUuid(c, "id");
+      await assertAgentInTenantScope(db, tenant, agentId);
+      const profile = await loadAgentProfile(db, tenant, agentId);
+      return c.json(profile, 200);
+    } catch (err) {
+      return errorResponse(c, err);
+    }
+  });
+}
+
+/** Charge et compose le profil agent (LA LOI AgentProfile). */
+async function loadAgentProfile(
+  db: Client,
+  tenant: TenantContext,
+  agentId: string
+): Promise<Record<string, unknown>> {
+  const res = await db.query(
+    `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.bank_id,
+            u.languages, u.work_schedule, u.created_at
+       FROM users u
+      WHERE u.id = $1 AND u.bank_id = $2`,
+    [agentId, tenant.bankId]
+  );
+  const row = res.rows[0] as
+    | {
+        id: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        role: string;
+        bank_id: string;
+        languages: string[];
+        work_schedule: unknown;
+        created_at: Date;
+      }
+    | undefined;
+  if (!row) throw new SigfaError("NOT_FOUND", "Agent introuvable.", 404);
+
+  const agencies = await listAgencyIds(db, agentId);
+  const services = await listServiceIds(db, agentId);
+  const status = await getCurrentStatus(db, agentId);
+
+  return {
+    id: row.id,
+    email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    role: row.role,
+    bankId: row.bank_id,
+    agencyId: agencies[0] ?? row.bank_id,
+    status,
+    languages: row.languages.length > 0 ? row.languages : ["FR"],
+    serviceIds: services,
+    agencyIds: agencies,
+    ...(row.work_schedule ? { workSchedule: row.work_schedule } : {}),
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
+/** Liste les agences d'affectation d'un agent. */
+async function listAgencyIds(db: Client, agentId: string): Promise<string[]> {
+  const res = await db.query(
+    `SELECT agency_id FROM agency_users WHERE user_id = $1 ORDER BY created_at ASC`,
+    [agentId]
+  );
+  return (res.rows as Array<{ agency_id: string }>).map((r) => r.agency_id);
+}
+
+/** Liste les services traitables d'un agent. */
+async function listServiceIds(db: Client, agentId: string): Promise<string[]> {
+  const res = await db.query(
+    `SELECT service_id FROM user_services WHERE user_id = $1 ORDER BY created_at ASC`,
+    [agentId]
+  );
+  return (res.rows as Array<{ service_id: string }>).map((r) => r.service_id);
+}
+
+// ── POST /agents/:id/status — machine à états (§164) ─────────────────────────
+
+/** Enregistre POST /agents/:id/status. */
+function registerPostStatus(router: Hono<AgentEnv>): void {
+  router.post("/agents/:id/status", async (c) => {
+    const db = c.get("db");
+    const tenant = c.get("tenant");
+    try {
+      const agentId = paramUuid(c, "id");
+      await assertSelfOrScope(db, tenant, agentId);
+      const parsed = statusSchema.safeParse(await parseJson(c));
+      if (!parsed.success) {
+        return c.json(
+          buildError("VALIDATION_ERROR", "Corps invalide.", {
+            issues: parsed.error.issues,
+          }),
+          400
+        );
+      }
+      const result = await changeAgentStatus({
+        db,
+        bus: getBus(c),
+        bankId: requireBankId(tenant),
+        agentId,
+        target: parsed.data.status as AgentStatus,
+      });
+      return c.json(result, 200);
+    } catch (err) {
+      return errorResponse(c, err);
+    }
+  });
+}
+
+// ── GET /agents/:id/stats — statistiques (§243) ──────────────────────────────
+
+/** Enregistre GET /agents/:id/stats. */
+function registerGetStats(router: Hono<AgentEnv>): void {
+  router.get("/agents/:id/stats", async (c) => {
+    const db = c.get("db");
+    const tenant = c.get("tenant");
+    try {
+      const agentId = paramUuid(c, "id");
+      await assertSelfOrScope(db, tenant, agentId);
+      const parsedPeriod = periodSchema.safeParse(
+        c.req.query("period") ?? "day"
+      );
+      if (!parsedPeriod.success) {
+        return c.json(
+          buildError("VALIDATION_ERROR", "Paramètre period invalide."),
+          400
+        );
+      }
+      const stats = await computeAgentStats(
+        db,
+        agentId,
+        requireBankId(tenant),
+        parsedPeriod.data as StatsPeriod
+      );
+      return c.json(stats, 200);
+    } catch (err) {
+      return errorResponse(c, err);
+    }
+  });
+}
+
+/** Parse le corps JSON, `null` si malformé. */
+async function parseJson(c: AgentCtx): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Extrait le bankId requis (jamais null pour ces routes agency). */
+function requireBankId(tenant: TenantContext): string {
+  if (!tenant.bankId) {
+    throw new SigfaError(
+      "FORBIDDEN",
+      "Contexte de banque requis pour cette opération.",
+      403
+    );
+  }
+  return tenant.bankId;
+}
