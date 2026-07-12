@@ -29,7 +29,9 @@ F4 (partiel) ─┘
 | ID | Story | Dépend de | Agent | Statut |
 |---|---|---|---|---|
 | RT-001a | Serveur : bootstrap câblé + adaptateur bus↔contrat (`createSocketBus`, `emit(event,agencyId,payload)`, 7 événements) + retouche sites d'émission F3 + graceful shutdown | F3 DONE | agent-api | **DONE** (`bbbfc54`, 476 tests, parité contrat 7 événements, intégration route→socket réel) |
-| RT-001b | Clients : web `SocketProvider` activé + kiosk socket créé + convergence resync + états d'échec ; mobile PENDING (polling) | RT-001a ; F4 partiel | agent-web/kiosk | TODO |
+| RT-001b | Clients : web `SocketProvider` activé + kiosk socket créé + convergence resync + états d'échec ; mobile PENDING (polling) | RT-001a ; F4 partiel | agent-web/kiosk | **DONE** (`6b353f5`, web 216 + kiosk 98 tests, resync snapshot, états error/offline bornés, défaut :4010 unifié) |
+
+> **Couture RT-001b → RT-003** : le `SocketProvider` web prend token/url/agencyId/mode en props (JWT = cookie httpOnly invisible au JS) ; le **câblage dans le layout web réel** (server component injectant le token) reste à faire — nécessaire pour l'E2E RT-003 (parcours navigateur sur app réelle). Kiosk idem si applicable.
 | RT-002 | Suite `realtime-guarantees` : `ticket:called` p95 <500 ms bout-en-bout, reconnexion WS → resync, course 2 agents | RT-001 | agent-api + agent-web | TODO |
 | RT-003 | E2E Playwright : borne → appel TV → service agent → feedback, coupure réseau mi-parcours (+ run Electron kiosk réel différé de F4) | RT-002 | direct | TODO |
 
