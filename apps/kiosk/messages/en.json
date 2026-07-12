@@ -67,6 +67,14 @@
   "voice008": {
     "playLabel": "Listen"
   },
+  "feedback009": {
+    "title": "How was your visit?",
+    "starLabel": "Rating {n} out of 5",
+    "commentPlaceholder": "Add a comment (optional)",
+    "micLabel": "Dictate a comment",
+    "submitButton": "Send my feedback",
+    "thankYou": "Thank you for your feedback!"
+  },
   "degraded007": {
     "photographNumber": "Take a photo of your number or receive it by SMS",
     "photographNumberShort": "Take a photo of your number",

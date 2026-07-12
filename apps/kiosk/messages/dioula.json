@@ -67,6 +67,14 @@
   "voice008": {
     "playLabel": "Lamɛn"
   },
+  "feedback009": {
+    "title": "I ka taama kɛra cogo di?",
+    "starLabel": "Jate {n} / 5",
+    "commentPlaceholder": "Kuma dɔ fara a kan (a ka kan)",
+    "micLabel": "Kuma fɔ",
+    "submitButton": "Ne ka miiriya ci",
+    "thankYou": "I ni ce i ka miiriya la !"
+  },
   "degraded007": {
     "photographNumber": "I ka nimɔrɔ foto ta walima a sɔrɔ SMS la",
     "photographNumberShort": "I ka nimɔrɔ foto ta",

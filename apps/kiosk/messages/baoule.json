@@ -67,6 +67,14 @@
   "voice008": {
     "playLabel": "Tie"
   },
+  "feedback009": {
+    "title": "Wɔ ba'n yoli sɛ?",
+    "starLabel": "Jate {n} / 5",
+    "commentPlaceholder": "Kan ndɛ (a kpli)",
+    "micLabel": "Kan ndɛ",
+    "submitButton": "Fa min angunndan'n mɛn",
+    "thankYou": "N lɛ mɔ wɔ angunndan'n ti !"
+  },
   "degraded007": {
     "photographNumber": "Foto wɔ nimɛro annzɛ sɔ SMS nun",
     "photographNumberShort": "Foto wɔ nimɛro",
