@@ -11,6 +11,9 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { KioskSessionProvider } from "@/components/KioskSessionProvider";
+// Worker MSW navigateur — DÉMARRÉ EN DÉVELOPPEMENT UNIQUEMENT (garde interne au
+// composant). Inerte en production / Electron (static export).
+import { MswProvider } from "@/components/MswProvider";
 // Design system v2 « Sérénité Premium » — source unique @sigfa/ui.
 // (design-tokens.css ré-importe @sigfa/ui/tokens.css + alias kiosque.)
 import "@sigfa/ui/fonts.css";
@@ -44,9 +47,13 @@ export default async function LocaleLayout(props: {
         }}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {/* S5 : session borne câblée au démarrage (KIOSK-001), re-créée à
-              expiration, dégradée non bloquante en échec. */}
-          <KioskSessionProvider>{children}</KioskSessionProvider>
+          {/* MswProvider : en DEV + NEXT_PUBLIC_ENABLE_MSW=1, démarre le worker
+              MSW pour peupler le parcours sans backend. Inerte en prod. */}
+          <MswProvider>
+            {/* S5 : session borne câblée au démarrage (KIOSK-001), re-créée à
+                expiration, dégradée non bloquante en échec. */}
+            <KioskSessionProvider>{children}</KioskSessionProvider>
+          </MswProvider>
         </NextIntlClientProvider>
       </body>
     </html>

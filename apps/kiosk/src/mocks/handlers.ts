@@ -18,12 +18,17 @@ export const handlers = [
   }),
   // MODEL-KIOSK-A: GET /public/agencies/{agencyId}/operations?serviceId=
   // Liste des opérations actives d'un service (SLA résolu) pour la grille borne.
+  // Démo : ≥3 opérations réalistes (data only) pour peupler la grille sans
+  // déclencher le saut « opération unique ». Le wildcard `:agencyId` matche
+  // n'importe quel identifiant d'agence transmis par l'écran services.
   http.get("*/public/agencies/:agencyId/operations", () => {
     return HttpResponse.json(
       {
         data: [
           { id: "op-dep", code: "DEP", name: "Dépôt espèces", slaMinutes: 8, iconKey: "deposit" },
-          { id: "op-ret", code: "RET", name: "Retrait espèces", slaMinutes: 10 },
+          { id: "op-ret", code: "RET", name: "Retrait espèces", slaMinutes: 10, iconKey: "withdrawal" },
+          { id: "op-vir", code: "VIR", name: "Virement", slaMinutes: 12, iconKey: "transfer" },
+          { id: "op-chq", code: "CHQ", name: "Remise de chèque", slaMinutes: 6, iconKey: "deposit" },
         ],
       },
       { status: 200 }
