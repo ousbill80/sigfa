@@ -28,7 +28,7 @@ import {
   kioskPrinterErrorEvent,
 } from "@sigfa/contracts/events/realtime.js";
 import { createSocketBus } from "src/services/socket-bus.js";
-import type { EventName } from "src/services/realtime.js";
+import { isDisplayEvent, type EventName } from "src/services/realtime.js";
 import { logger } from "src/lib/logger.js";
 
 const AGENCY_ID = "00000000-0000-4000-a000-0000000000aa";
@@ -135,9 +135,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Room attendue par événement (F-SEC-TV-01) : affichage → publique, staff → :staff. */
+function expectedRoom(event: EventName, agencyId: string): string {
+  return isDisplayEvent(event) ? `agency:${agencyId}` : `agency:${agencyId}:staff`;
+}
+
 describe("RT-001a: createSocketBus — adaptateur bus↔contrat (7 événements)", () => {
   it.each(ALL)(
-    "RT-001a: %s — diffusé sur agency:{agencyId}, payload conforme au payloadSchema du CONTRAT (parité)",
+    "RT-001a: %s — diffusé dans la room ségrégée par rôle, payload conforme au payloadSchema du CONTRAT (parité)",
     (event) => {
       const { io, toCalls, emitCalls } = makeFakeIo();
       const errorSpy = vi
@@ -148,8 +153,8 @@ describe("RT-001a: createSocketBus — adaptateur bus↔contrat (7 événements)
 
       bus.emit(event, AGENCY_ID, payload as never);
 
-      // Diffusion dans la bonne room, une seule fois, event correct
-      expect(toCalls).toEqual([`agency:${AGENCY_ID}`]);
+      // Diffusion dans la ROOM SÉGRÉGÉE (F-SEC-TV-01), une seule fois, event correct
+      expect(toCalls).toEqual([expectedRoom(event, AGENCY_ID)]);
       expect(emitCalls).toHaveLength(1);
       expect(emitCalls[0]?.event).toBe(event);
       // PARITÉ : le payload diffusé valide le schéma du CONTRAT
@@ -160,10 +165,54 @@ describe("RT-001a: createSocketBus — adaptateur bus↔contrat (7 événements)
     }
   );
 
+  // ── F-SEC-TV-01 : ségrégation par rôle — allowlist stricte ──
+  it("F-SEC-TV-01: événements d'AFFICHAGE → room publique agency:{id} (DISPLAY inclus)", () => {
+    const displayEvents: EventName[] = ["ticket:called", "queue:updated"];
+    for (const event of displayEvents) {
+      const { io, toCalls } = makeFakeIo();
+      const bus = createSocketBus(io);
+      bus.emit(event, AGENCY_ID, CONTRACT_PAYLOADS[event] as never);
+      expect(toCalls).toEqual([`agency:${AGENCY_ID}`]);
+      expect(isDisplayEvent(event)).toBe(true);
+    }
+  });
+
+  it("F-SEC-TV-01: événements STAFF → room réservée agency:{id}:staff (DISPLAY JAMAIS destinataire)", () => {
+    const staffEvents: EventName[] = [
+      "ticket:created",
+      "ticket:closed",
+      "counter:status",
+      "alert:manager",
+      "kiosk:printer-error",
+    ];
+    for (const event of staffEvents) {
+      const { io, toCalls } = makeFakeIo();
+      const bus = createSocketBus(io);
+      bus.emit(event, AGENCY_ID, CONTRACT_PAYLOADS[event] as never);
+      // JAMAIS diffusé dans la room publique agency:{id} (que rejoint DISPLAY).
+      expect(toCalls).toEqual([`agency:${AGENCY_ID}:staff`]);
+      expect(toCalls).not.toContain(`agency:${AGENCY_ID}`);
+      expect(isDisplayEvent(event)).toBe(false);
+    }
+  });
+
+  it("F-SEC-TV-01: alert:manager (métriques SLA/agentId) ne part JAMAIS vers la room publique", () => {
+    const { io, toCalls, emitCalls } = makeFakeIo();
+    const bus = createSocketBus(io);
+    bus.emit("alert:manager", AGENCY_ID, {
+      type: "AGENT_INACTIVE",
+      payload: { agentId: "a1", inactiveMinutes: 12 },
+    } as never);
+    expect(toCalls).toEqual([`agency:${AGENCY_ID}:staff`]);
+    expect(emitCalls).toHaveLength(1);
+    expect(emitCalls[0]?.event).toBe("alert:manager");
+  });
+
   it("RT-001a: diffuse dans la room de l'agencyId PASSÉ (2e argument), pas d'un champ du payload", () => {
     const { io, toCalls } = makeFakeIo();
     const bus = createSocketBus(io);
     // agencyId d'émission ≠ agencyId embarqué éventuellement dans le payload
+    // (queue:updated = événement d'affichage → room publique).
     bus.emit("queue:updated", OTHER_ID, {
       queueId: "00000000-0000-4000-a000-000000000004",
       length: 1,

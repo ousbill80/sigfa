@@ -8,7 +8,11 @@
  *        par `socket-bus.test.ts` / `contract-parity.test.ts`) ;
  *     2. payload invalide → NON diffusé + log d'erreur (JAMAIS de throw : une
  *        émission fautive ne casse ni la requête ni les émissions valides) ;
- *     3. payload valide → `io.to('agency:'+agencyId).emit(event, payload)`.
+ *     3. payload valide → diffusion vers la room SÉGRÉGÉE PAR RÔLE (F-SEC-TV-01) :
+ *        - événement d'AFFICHAGE (allowlist `isDisplayEvent`) → `agency:{id}`
+ *          (room publique que rejoint aussi l'écran mural DISPLAY) ;
+ *        - événement STAFF (tout le reste, fail-closed) → `agency:{id}:staff`
+ *          (room réservée aux sockets authentifiées staff — DISPLAY exclu).
  *
  * Ce module ABSORBE l'ancien `emitTicketCalled` : c'est désormais le chemin
  * d'émission UNIQUE de `ticket:called` (fin de la double forme). Il couvre les
@@ -23,6 +27,9 @@ import type { Server } from "socket.io";
 import { logger } from "src/lib/logger.js";
 import {
   EVENT_SCHEMAS,
+  isDisplayEvent,
+  displayRoom,
+  staffRoom,
   type EventName,
   type EventPayload,
   type RealtimeBus,
@@ -51,7 +58,11 @@ export function createSocketBus(io: Server): RealtimeBus {
         );
         return;
       }
-      io.to(`agency:${agencyId}`).emit(event, result.data);
+      // Ségrégation par rôle (F-SEC-TV-01) : les signaux d'affichage vont vers la
+      // room publique `agency:{id}` (écran mural DISPLAY inclus) ; TOUT le reste
+      // (staff/supervision, fail-closed) vers `agency:{id}:staff` (DISPLAY exclu).
+      const room = isDisplayEvent(event) ? displayRoom(agencyId) : staffRoom(agencyId);
+      io.to(room).emit(event, result.data);
     },
   };
 }
