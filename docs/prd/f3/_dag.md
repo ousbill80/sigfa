@@ -45,7 +45,12 @@ F2 DONE ──► API-001 (auth) ──► API-002 (middleware tenant+withPlatfo
 | API-008 | CRUD admin : banks/agencies/services/counters/queues/hours+fériés, RBAC 6 rôles, audit branché | 002 | DONE |
 | API-009 | Templates & onboarding : clone-from, kiosk-access+session borne, import CSV agents, theming+purge-phone | 008 | DONE |
 | API-010 | Feedback public par trackingId : fenêtres 422/409, agrégation NPS, anti-spam | 003 | DONE |
-| API-011 | Rate limiting routes publiques, /health, heartbeat+kiosks/status, audit-logs lecture | 002 | TODO |
+| API-011 | Rate limiting routes publiques, /health, heartbeat+kiosks/status, audit-logs lecture | 002 | DONE |
 
 ## Gate de sortie de vague
 Schemathesis PASS sur les 7 modules contre l'API réelle · suites tenant-isolation par route PASS · sla-engine machine à états exhaustive PASS · realtime <500 ms local PASS · CI verte. Puis RT-001 (bascule mock→réel des clients F4).
+
+**VAGUE F3 : 11/11 stories DONE (2026-07-12)** — API-001→011 implémentées, gate sérialisé 17/17, Schemathesis F3 PASS (`/ai/*` exclus → F10). Reste avant clôture définitive :
+1. **Panel Boucle 3** (fan-out `security-reviewer` + `test-coverage-checker` + `style-conformance`) sur le lot F3 — inclut le durcissement Schemathesis `response-schema-conformance` (cf. API-011).
+2. **Frontière RT-001** (branchement réel différé, cumulé) : câblage `index.ts` prod pour `createSocketServer` (API-006) + `startAlertScheduler` BullMQ (API-007) + adossement `RealtimeBus`↔`io` (les émissions des routes atteignent les sockets) — F4 utilise des sockets simulés jusque-là.
+3. Dette contrat mineure à surveiller : `kiosks/status` renvoie `OFFLINE` (le libellé story `SILENT` a été mappé) ; forme `alert:manager` unifiée `{type,payload}`.
