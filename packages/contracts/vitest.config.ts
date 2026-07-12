@@ -73,6 +73,10 @@ export default defineConfig({
         ...vitestDefaultCoverageExcludes,
         "generated/**",
         "scripts/**",
+        // Fichiers de configuration Vitest (ex. vitest.runtime.config.ts) : non testables,
+        // le pattern vitest default ne couvre que vitest.config.* (nom simple).
+        // vitest.*.config.ts (ex. vitest.runtime.config.ts) doit être exclu explicitement.
+        "vitest.*.config.ts",
         // Fichiers exercés uniquement par les tests runtime (docker, generate, prism)
         // L'instrumentation V8 ne couvre pas les processus fils.
         // Testés de bout en bout via test:runtime — T8 contention CI.
