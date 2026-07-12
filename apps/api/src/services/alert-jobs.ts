@@ -108,7 +108,7 @@ export async function scanInactiveAgents(
     const flagKey = `agent_inactive_alerted:${row.agent_id}`;
     const already = await redis.set(flagKey, "1", "NX");
     if (already !== "OK") continue;
-    bus.emit("alert:manager", {
+    bus.emit("alert:manager", row.agency_id, {
       type: "AGENT_INACTIVE",
       payload: {
         agentId: row.agent_id,
@@ -172,7 +172,7 @@ export async function scanSlaBreaches(
       : `sla_alerted:${row.ticket_id}`;
     const fresh = await redis.set(flagKey, "1", "NX");
     if (fresh !== "OK") continue;
-    bus.emit("alert:manager", {
+    bus.emit("alert:manager", row.agency_id, {
       type: "SLA_BREACH",
       payload: {
         ticketId: row.ticket_id,

@@ -269,16 +269,27 @@ describe("API-003: cycle de vie du ticket", () => {
     expect(d["position"]).toBe(1);
     expect(typeof d["estimatedWaitMinutes"]).toBe("number");
 
-    // (b) L'événement ticket:created EST émis dans le bus avec le bon payload — assertion dure sur le contenu.
+    // (b) L'événement ticket:created EST émis dans le bus (forme CONTRAT :
+    // { ticket:{…}, position, estimate }) + agencyId d'émission — assertion dure.
     const createdEvents = bus.ofType("ticket:created");
     expect(createdEvents).toHaveLength(1);
-    const createdPayload = createdEvents[0]?.payload as Record<string, unknown>;
-    expect(createdPayload["displayNumber"]).toBe("OC-001");
-    expect(createdPayload["status"]).toBe("WAITING");
-    expect(typeof createdPayload["ticketId"]).toBe("string");
-    expect(typeof createdPayload["queueId"]).toBe("string");
+    expect(createdEvents[0]?.agencyId).toBe(ids.agencyId);
+    const createdPayload = createdEvents[0]?.payload as {
+      ticket: Record<string, unknown>;
+      position: number;
+      estimate: number;
+    };
+    expect(createdPayload.ticket["number"]).toBe("A001");
+    expect(createdPayload.ticket["status"]).toBe("WAITING");
+    expect(createdPayload.ticket["agencyId"]).toBe(ids.agencyId);
+    expect(createdPayload.ticket["channel"]).toBe("KIOSK");
+    expect(typeof createdPayload.ticket["id"]).toBe("string");
+    expect(typeof createdPayload.ticket["serviceId"]).toBe("string");
+    expect(typeof createdPayload.ticket["createdAt"]).toBe("string");
+    expect(typeof createdPayload.position).toBe("number");
 
     expect(bus.ofType("queue:updated")).toHaveLength(1);
+    expect(bus.ofType("queue:updated")[0]?.agencyId).toBe(ids.agencyId);
 
     // (c) Latence de production de l'événement dans le bus (hors I/O réseau).
     // On mesure le temps entre le début de la requête et l'horodatage d'émission
@@ -446,7 +457,19 @@ describe("API-003: cycle de vie du ticket", () => {
     const called = await post(`/counters/${ids.counterId}/call-next`, {});
     expect(called.status).toBe(200);
     expect((called.data as { status: string }).status).toBe("CALLED");
-    expect(bus.ofType("ticket:called")).toHaveLength(1);
+    const calledEvents = bus.ofType("ticket:called");
+    expect(calledEvents).toHaveLength(1);
+    // Forme CONTRAT + agencyId d'émission (room cible).
+    expect(calledEvents[0]?.agencyId).toBe(ids.agencyId);
+    const calledPayload = calledEvents[0]?.payload as {
+      ticket: Record<string, unknown>;
+      counter: Record<string, unknown>;
+    };
+    expect(calledPayload.ticket["status"]).toBe("CALLED");
+    expect(calledPayload.ticket["agencyId"]).toBe(ids.agencyId);
+    expect(typeof calledPayload.ticket["number"]).toBe("string");
+    expect(calledPayload.counter["id"]).toBe(ids.counterId);
+    expect(typeof calledPayload.counter["label"]).toBe("string");
   });
 
   it("API-003: appel ciblé — deuxième guichet → 409 TICKET_ALREADY_CLAIMED (verrou Redis SET NX)", async () => {

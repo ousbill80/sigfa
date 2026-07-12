@@ -341,54 +341,6 @@ async function buildSyncState(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Émetteur typé avec validation Zod
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Schéma du payload ticket:called (extrait du contrat). */
-const ticketCalledPayloadSchema = z.object({
-  ticket: z.object({
-    id: z.string().uuid(),
-    number: z.string().min(1),
-    status: z.string(),
-    serviceId: z.string().uuid(),
-    agencyId: z.string().uuid(),
-    channel: z.string(),
-    createdAt: z.string().datetime(),
-  }),
-  counter: z.object({
-    id: z.string().uuid(),
-    label: z.string().min(1),
-  }),
-});
-
-/** Type du payload ticket:called validé. */
-export type TicketCalledPayload = z.infer<typeof ticketCalledPayloadSchema>;
-
-/**
- * Émet `ticket:called` dans la room de l'agence après validation Zod.
- * Payload invalide → NON émis + log d'erreur.
- *
- * @param io       - Instance Socket.io
- * @param agencyId - Identifiant de l'agence (room cible)
- * @param payload  - Payload à valider et émettre
- */
-export function emitTicketCalled(
-  io: Server,
-  agencyId: string,
-  payload: unknown
-): void {
-  const result = ticketCalledPayloadSchema.safeParse(payload);
-  if (!result.success) {
-    logger.error(
-      { issues: result.error.issues, agencyId },
-      "socket:emit:ticket:called:invalid-payload"
-    );
-    return;
-  }
-  io.to(`agency:${agencyId}`).emit("ticket:called", result.data);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Serveur de test éphémère (suite realtime-guarantees)
 // ─────────────────────────────────────────────────────────────────────────────
 

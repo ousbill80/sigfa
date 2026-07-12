@@ -128,15 +128,35 @@ export async function processDisconnect(
   if (openTicketId) {
     await requeueTicketAsPriority(db, openTicketId);
     await forceOffline(db, bus, bankId, agentId);
-    bus.emit("alert:manager", {
-      type: "AGENT_DISCONNECTED_WITH_TICKET",
-      payload: { agentId, ticketId: openTicketId, requeuedPriority: "PRIORITY" },
-    });
+    // RT-001a : l'agencyId (room cible de l'alerte) est résolu depuis
+    // l'affectation d'agence de l'agent (agency_users), scope tenant.
+    const agencyId = await resolveAgentAgencyId(db, agentId, bankId);
+    if (agencyId) {
+      bus.emit("alert:manager", agencyId, {
+        type: "AGENT_DISCONNECTED_WITH_TICKET",
+        payload: { agentId, ticketId: openTicketId, requeuedPriority: "PRIORITY" },
+      });
+    }
     return { processed: true, requeuedTicketId: openTicketId };
   }
 
   await forceOffline(db, bus, bankId, agentId);
   return { processed: true, requeuedTicketId: null };
+}
+
+/** Résout l'agence de contexte d'un agent (agency_users) — `null` si absente. */
+async function resolveAgentAgencyId(
+  db: Db,
+  agentId: string,
+  bankId: string
+): Promise<string | null> {
+  const res = await db.query(
+    `SELECT agency_id FROM agency_users WHERE user_id = $1 AND bank_id = $2
+      ORDER BY created_at ASC LIMIT 1`,
+    [agentId, bankId]
+  );
+  const row = res.rows[0] as { agency_id: string } | undefined;
+  return row?.agency_id ?? null;
 }
 
 /**

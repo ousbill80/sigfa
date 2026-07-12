@@ -258,24 +258,26 @@ export async function emitCounterStatus(
   agentId: string,
   status: AgentStatus
 ): Promise<void> {
-  const counterId = await resolveAgentCounter(db, agentId);
-  if (!counterId) return;
-  bus.emit("counter:status", {
-    counterId,
+  const counter = await resolveAgentCounter(db, agentId);
+  if (!counter) return;
+  // RT-001a : l'agencyId (room cible) est résolu DANS la requête du guichet —
+  // aucun aller-retour DB séparé.
+  bus.emit("counter:status", counter.agencyId, {
+    counterId: counter.counterId,
     status: agentStatusToCounterStatus(status),
     agentId,
   });
 }
 
-/** Résout le guichet affecté à un agent (ou null). */
+/** Résout le guichet + l'agence affectés à un agent (ou null). */
 async function resolveAgentCounter(
   db: Db,
   agentId: string
-): Promise<string | null> {
+): Promise<{ counterId: string; agencyId: string } | null> {
   const res = await db.query(
-    `SELECT id FROM counters WHERE agent_id = $1 ORDER BY created_at ASC LIMIT 1`,
+    `SELECT id, agency_id FROM counters WHERE agent_id = $1 ORDER BY created_at ASC LIMIT 1`,
     [agentId]
   );
-  const row = res.rows[0] as { id: string } | undefined;
-  return row?.id ?? null;
+  const row = res.rows[0] as { id: string; agency_id: string } | undefined;
+  return row ? { counterId: row.id, agencyId: row.agency_id } : null;
 }

@@ -173,7 +173,7 @@ async function patchQueue(
   await invalidateEstimate(redis, queueId);
   const length = await queueLength(queueId, db);
   const estimate = await estimateWaitMinutes(length, queue.service_id, db);
-  bus.emit("queue:updated", { queueId, length, estimate });
+  bus.emit("queue:updated", queue.agency_id, { queueId, length, estimate });
 
   return {
     id: queueId,

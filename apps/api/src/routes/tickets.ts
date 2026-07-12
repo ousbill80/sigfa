@@ -265,7 +265,14 @@ async function issueTicket(
     const position = await computePositionPriority(inserted.id, db);
     const estimate = await estimateWaitMinutes(position, input.serviceId, db);
     await db.query("COMMIT");
-    await emitCreated(bus, redis, db, { inserted, ctx, tenant, displayNumber });
+    await emitCreated(bus, redis, db, {
+      inserted,
+      ctx,
+      input,
+      number,
+      position,
+      estimate,
+    });
     return {
       id: inserted.id,
       number: `A${String(number).padStart(3, "0")}`,
@@ -389,36 +396,53 @@ async function insertTicket(
   return res.rows[0] as { id: string; issued_at: Date };
 }
 
-/** Émet ticket:created + queue:updated après commit. */
+/** Émet ticket:created (forme CONTRAT) + queue:updated après commit. */
 async function emitCreated(
   bus: RealtimeBus,
   redis: Redis,
   db: Client,
   args: {
-    inserted: { id: string };
-    ctx: { queueId: string };
-    tenant: TenantContext;
-    displayNumber: string;
+    inserted: { id: string; issued_at: Date };
+    ctx: { queueId: string; agencyId: string };
+    input: CreateInput;
+    number: number;
+    position: number;
+    estimate: number;
   }
 ): Promise<void> {
-  bus.emit("ticket:created", {
-    ticketId: args.inserted.id,
-    queueId: args.ctx.queueId,
-    agencyId: args.tenant.agencyIds[0] ?? "",
-    displayNumber: args.displayNumber,
-    status: "WAITING",
+  const agencyId = args.ctx.agencyId;
+  // Forme CONTRAT ticket:created : { ticket: {…}, position, estimate }.
+  // Tous les champs sont DÉJÀ en scope de la transaction (aucun lookup ajouté).
+  bus.emit("ticket:created", agencyId, {
+    ticket: {
+      id: args.inserted.id,
+      number: `A${String(args.number).padStart(3, "0")}`,
+      status: "WAITING",
+      serviceId: args.input.serviceId,
+      agencyId,
+      channel: args.input.channel,
+      createdAt: args.inserted.issued_at.toISOString(),
+    },
+    position: args.position,
+    estimate: args.estimate,
   });
-  await emitQueueUpdated(bus, redis, db, args.ctx.queueId);
+  await emitQueueUpdated(bus, redis, db, agencyId, args.ctx.queueId);
 }
 
 /** Recalcule et émet queue:updated {length, estimate}, invalide le cache. */
-async function emitQueueUpdated(bus: RealtimeBus, redis: Redis, db: Tx, queueId: string): Promise<void> {
+async function emitQueueUpdated(
+  bus: RealtimeBus,
+  redis: Redis,
+  db: Tx,
+  agencyId: string,
+  queueId: string
+): Promise<void> {
   await invalidateEstimate(redis, queueId);
   const length = await queueLength(queueId, db);
   const serviceRes = await db.query(`SELECT service_id FROM queues WHERE id = $1`, [queueId]);
   const serviceId = (serviceRes.rows[0] as { service_id: string } | undefined)?.service_id;
   const estimate = serviceId ? await estimateWaitMinutes(length, serviceId, db) : 0;
-  bus.emit("queue:updated", { queueId, length, estimate });
+  bus.emit("queue:updated", agencyId, { queueId, length, estimate });
 }
 
 // ── GET /tickets/:id ─────────────────────────────────────────────────────────
@@ -490,7 +514,7 @@ async function callNext(
 ): Promise<Record<string, unknown>> {
   await db.query("BEGIN");
   try {
-    const { queueId, serviceId, bankId } = await counterQueueFull(db, tenant, counterId);
+    const { queueId, serviceId, bankId, agencyId } = await counterQueueFull(db, tenant, counterId);
     const selected = await selector(queueId, counterId, db);
     if (!selected) throw new SigfaError("QUEUE_EMPTY", "Aucun ticket éligible dans la file.", 404);
     const now = new Date();
@@ -501,7 +525,7 @@ async function callNext(
     await db.query("COMMIT");
     await afterCall(bus, redis, db, { ticketId: selected.id, queueId, counterId });
     // API-004 : vérification débordement après chaque appel
-    await checkAndEmitOverflow(db, redis, bus, queueId, serviceId, bankId);
+    await checkAndEmitOverflow(db, redis, bus, { queueId, serviceId, bankId, agencyId });
     return callView(selected.id, selected.serviceId, counterId, now);
   } catch (err) {
     await db.query("ROLLBACK");
@@ -517,16 +541,15 @@ async function checkAndEmitOverflow(
   db: Client,
   redis: Redis,
   bus: RealtimeBus,
-  queueId: string,
-  serviceId: string,
-  bankId: string
+  ctx: { queueId: string; serviceId: string; bankId: string; agencyId: string }
 ): Promise<void> {
+  const { queueId, serviceId, bankId, agencyId } = ctx;
   const length = await queueLength(queueId, db);
   const doAlert = await shouldAlertOverflow(queueId, length, bankId, db, redis);
   if (!doAlert) return;
   const overflowQueues = await findOverflowQueues(serviceId, bankId, db);
   // API-007 : forme CONTRACTUELLE unique `{ type, payload }` (union supprimée).
-  bus.emit("alert:manager", {
+  bus.emit("alert:manager", agencyId, {
     type: "QUEUE_CRITICAL",
     payload: {
       queueId,
@@ -537,14 +560,14 @@ async function checkAndEmitOverflow(
   });
 }
 
-/** Résout la file + serviceId + bankId desservis par un guichet. */
+/** Résout la file + serviceId + bankId + agencyId desservis par un guichet. */
 async function counterQueueFull(
   db: Client,
   tenant: TenantContext,
   counterId: string
-): Promise<{ queueId: string; serviceId: string; bankId: string }> {
+): Promise<{ queueId: string; serviceId: string; bankId: string; agencyId: string }> {
   const res = await db.query(
-    `SELECT q.id AS queue_id, q.service_id, q.bank_id
+    `SELECT q.id AS queue_id, q.service_id, q.bank_id, c.agency_id
        FROM counters c
        JOIN queues q ON q.agency_id = c.agency_id
       WHERE c.id = $1 AND c.bank_id = $2
@@ -553,29 +576,60 @@ async function counterQueueFull(
     [counterId, tenant.bankId]
   );
   const row = res.rows[0] as
-    | { queue_id: string; service_id: string; bank_id: string }
+    | { queue_id: string; service_id: string; bank_id: string; agency_id: string }
     | undefined;
   if (!row) throw new SigfaError("NOT_FOUND", "Guichet ou file introuvable.", 404);
-  return { queueId: row.queue_id, serviceId: row.service_id, bankId: row.bank_id };
+  return {
+    queueId: row.queue_id,
+    serviceId: row.service_id,
+    bankId: row.bank_id,
+    agencyId: row.agency_id,
+  };
 }
 
-/** Émet ticket:called + queue:updated après un appel. */
+/**
+ * Émet ticket:called (forme CONTRAT) + queue:updated après un appel.
+ *
+ * RT-001a : le payload contrat exige le résumé complet du ticket + le libellé du
+ * guichet. On charge ces champs en UNE requête (JOIN counters) — elle REMPLACE
+ * l'ancienne requête `display_number` : AUCUN aller-retour DB ajouté sur ce
+ * chemin d'émission latence-sensible (`ticket:called`).
+ */
 async function afterCall(
   bus: RealtimeBus,
   redis: Redis,
   db: Client,
   args: { ticketId: string; queueId: string; counterId: string }
 ): Promise<void> {
-  const res = await db.query(`SELECT display_number FROM tickets WHERE id = $1`, [args.ticketId]);
-  const displayNumber = (res.rows[0] as { display_number: string }).display_number;
-  bus.emit("ticket:called", {
-    ticketId: args.ticketId,
-    queueId: args.queueId,
-    counterId: args.counterId,
-    displayNumber,
-    status: "CALLED",
+  const res = await db.query(
+    `SELECT t.agency_id, t.number, t.service_id, t.channel, t.issued_at,
+            c.label AS counter_label
+       FROM tickets t
+       LEFT JOIN counters c ON c.id = $2
+      WHERE t.id = $1`,
+    [args.ticketId, args.counterId]
+  );
+  const row = res.rows[0] as {
+    agency_id: string;
+    number: number;
+    service_id: string;
+    channel: "KIOSK" | "QR" | "MOBILE" | "WHATSAPP";
+    issued_at: Date;
+    counter_label: string | null;
+  };
+  bus.emit("ticket:called", row.agency_id, {
+    ticket: {
+      id: args.ticketId,
+      number: `A${String(row.number).padStart(3, "0")}`,
+      status: "CALLED",
+      serviceId: row.service_id,
+      agencyId: row.agency_id,
+      channel: row.channel,
+      createdAt: row.issued_at.toISOString(),
+    },
+    counter: { id: args.counterId, label: row.counter_label ?? "Guichet" },
   });
-  await emitQueueUpdated(bus, redis, db, args.queueId);
+  await emitQueueUpdated(bus, redis, db, row.agency_id, args.queueId);
 }
 
 /** Vue de réponse d'un appel. */
@@ -779,15 +833,13 @@ async function closeTicket(
     `UPDATE tickets SET status = 'DONE', closed_at = $1, wait_time_seconds = $2, service_time_seconds = $3, updated_at = NOW() WHERE id = $4`,
     [closedAt, waitTime, serviceTime, row.id]
   );
-  bus.emit("ticket:closed", {
+  // Forme CONTRAT ticket:closed : { ticketId, waitTime, serviceTime }.
+  bus.emit("ticket:closed", row.agency_id, {
     ticketId: row.id,
-    queueId: row.queue_id,
-    counterId: row.counter_id ?? row.id,
-    status: "DONE",
     waitTime,
     serviceTime,
   });
-  await emitQueueUpdated(bus, redis, db, row.queue_id);
+  await emitQueueUpdated(bus, redis, db, row.agency_id, row.queue_id);
   return { id: row.id, status: "DONE", counterId: row.counter_id ?? undefined, waitTime, serviceTime, closedAt: closedAt.toISOString() };
 }
 
@@ -806,7 +858,7 @@ function registerNoShow(router: Hono<TicketEnv>): void {
         `UPDATE tickets SET status = 'NO_SHOW', no_show_at = NOW(), updated_at = NOW() WHERE id = $1`,
         [row.id]
       );
-      await emitQueueUpdated(getBus(c), c.get("redis"), db, row.queue_id);
+      await emitQueueUpdated(getBus(c), c.get("redis"), db, row.agency_id, row.queue_id);
       // API-007 : no-show → l'agent repasse AVAILABLE (piloté par le cycle).
       await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "AVAILABLE");
       return c.json({ id: row.id, status: "NO_SHOW" }, 200);
@@ -876,8 +928,9 @@ async function transferTicket(
     );
     const target = await reinsertTarget(db, tenant, row, input.targetServiceId);
     await db.query("COMMIT");
-    await emitQueueUpdated(bus, redis, db, row.queue_id);
-    await emitQueueUpdated(bus, redis, db, target.queueId);
+    // La réinsertion cible copie l'agency_id source → même agence pour les deux files.
+    await emitQueueUpdated(bus, redis, db, row.agency_id, row.queue_id);
+    await emitQueueUpdated(bus, redis, db, row.agency_id, target.queueId);
     return { id: row.id, status: "TRANSFERRED", targetTicketId: target.ticketId, targetServiceId: input.targetServiceId };
   } catch (err) {
     await db.query("ROLLBACK");
@@ -916,7 +969,7 @@ function registerAbandon(router: Hono<TicketEnv>): void {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       nextStatus(row.status, "abandon");
       await db.query(`UPDATE tickets SET status = 'ABANDONED', updated_at = NOW() WHERE id = $1`, [row.id]);
-      await emitQueueUpdated(getBus(c), c.get("redis"), db, row.queue_id);
+      await emitQueueUpdated(getBus(c), c.get("redis"), db, row.agency_id, row.queue_id);
       return c.json({ id: row.id, status: "ABANDONED" }, 200);
     } catch (err) {
       return errorResponse(c, err);

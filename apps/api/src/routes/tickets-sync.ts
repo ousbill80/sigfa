@@ -177,7 +177,9 @@ async function processBatch(
     }
   }
   await emitAffectedQueues(bus, redis, db, affectedQueues);
-  emitSkipAlert(bus, skipped);
+  // Toutes les files du batch sont dans l'agence du scope tenant (resolveQueue
+  // borne sur tenant.agencyIds[0]) → agencyId de l'alerte = ce scope.
+  emitSkipAlert(bus, tenant.agencyIds[0] ?? "", skipped);
   return { synced, skipped };
 }
 
@@ -315,7 +317,11 @@ async function insertRow(
   return res.rows[0] as { id: string } | undefined;
 }
 
-/** Émet un `queue:updated` par file affectée (recalcul longueur + estimation). */
+/**
+ * Émet un `queue:updated` par file affectée (recalcul longueur + estimation).
+ * L'`agency_id` de chaque file est chargé dans la requête existante (service_id)
+ * — aucun aller-retour DB ajouté.
+ */
 async function emitAffectedQueues(
   bus: RealtimeBus,
   redis: Redis,
@@ -325,22 +331,33 @@ async function emitAffectedQueues(
   for (const queueId of queueIds) {
     await invalidateEstimate(redis, queueId);
     const length = await queueLength(queueId, db);
-    const svc = await db.query(`SELECT service_id FROM queues WHERE id = $1`, [queueId]);
-    const serviceId = (svc.rows[0] as { service_id: string } | undefined)?.service_id;
-    const estimate = serviceId ? await estimateWaitMinutes(length, serviceId, db) : 0;
-    bus.emit("queue:updated", { queueId, length, estimate });
+    const svc = await db.query(
+      `SELECT service_id, agency_id FROM queues WHERE id = $1`,
+      [queueId]
+    );
+    const svcRow = svc.rows[0] as
+      | { service_id: string; agency_id: string }
+      | undefined;
+    if (!svcRow) continue;
+    const estimate = await estimateWaitMinutes(length, svcRow.service_id, db);
+    bus.emit("queue:updated", svcRow.agency_id, { queueId, length, estimate });
   }
 }
 
 /**
  * Émet UNE alerte `alert:manager` KIOSK_SYSTEM_ERROR par batch dès qu'au moins
- * une ligne est skipped. Payload = compte + raisons agrégées.
+ * une ligne est skipped. Payload = compte + raisons agrégées. L'`agencyId` est
+ * celui du scope tenant du batch (toutes les files sont de cette agence).
  */
-function emitSkipAlert(bus: RealtimeBus, skipped: SkippedTicket[]): void {
+function emitSkipAlert(
+  bus: RealtimeBus,
+  agencyId: string,
+  skipped: SkippedTicket[]
+): void {
   if (skipped.length === 0) return;
   const reasons: Record<string, number> = {};
   for (const s of skipped) reasons[s.reason] = (reasons[s.reason] ?? 0) + 1;
-  bus.emit("alert:manager", {
+  bus.emit("alert:manager", agencyId, {
     type: "KIOSK_SYSTEM_ERROR",
     payload: { skippedCount: skipped.length, reasons },
   });

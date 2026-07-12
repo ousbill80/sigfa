@@ -5,7 +5,10 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "src/*": ["./src/*"]
+      "src/*": ["./src/*"],
+      "@sigfa/contracts/events/realtime.js": [
+        "../../packages/contracts/dist/events/realtime.d.ts"
+      ]
     }
   },
   "include": ["src/**/*"]

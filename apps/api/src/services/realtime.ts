@@ -1,14 +1,21 @@
 /**
  * realtime — bus d'événements typé et validé par Zod (injectable).
  *
- * LA LOI (API-003) : les événements `ticket:created`, `ticket:called`,
- * `ticket:closed` et `queue:updated` sont émis en <500 ms. Le payload de
- * `queue:updated` ne porte QUE `{ length, estimate }` (jamais de liste de
- * tickets). Chaque émission est validée par un schéma Zod : un payload non
- * conforme lève une `SigfaError` interne, jamais un événement corrompu.
+ * RT-001a : les payloads émis vers le bus sont désormais conformes AU CONTRAT
+ * (`packages/contracts/events/realtime.ts`, chaque `*.payloadSchema`). Les
+ * `EVENT_SCHEMAS` ci-dessous TRANSCRIVENT ces schémas contractuels (le contrat
+ * reste LA LOI ; une suite de PARITÉ importe le contrat et prouve l'équivalence
+ * champ à champ, par événement — cf. `contract-parity.test.ts`).
  *
- * Le bus est INJECTABLE : en production on branche un adaptateur Socket.io ;
- * en test on injecte un bus de capture (`createCaptureBus`).
+ * Signature du bus : `emit(event, agencyId, payload)`. L'`agencyId` en 2e
+ * position est la room cible (`agency:{agencyId}`) ; le payload est la forme
+ * CONTRAT de l'événement.
+ *
+ * Le bus est INJECTABLE :
+ *  - production : `createSocketBus(io)` (diffusion Socket.io après validation) ;
+ *  - production sans socket (`REALTIME_MODE=off`) : `createNoopBus` (valide, ne
+ *    transporte pas) ;
+ *  - test : `createCaptureBus` (capture `(event, agencyId, payload)` validés).
  *
  * @module
  */
@@ -16,51 +23,75 @@
 import { z } from "zod";
 import { SigfaError } from "src/lib/errors.js";
 
-/** Schéma du payload `ticket:created`. */
-export const ticketCreatedSchema = z.object({
-  ticketId: z.string().uuid(),
-  queueId: z.string().uuid(),
+// ─── Fragments réutilisés (transcription du contrat CONTRACT-002) ────────────
+
+/** Statuts de ticket (contrat `ticketStatusSchema`). */
+const ticketStatusSchema = z.enum([
+  "WAITING",
+  "CALLED",
+  "SERVING",
+  "DONE",
+  "NO_SHOW",
+  "ABANDONED",
+  "TRANSFERRED",
+]);
+
+/** Canaux d'émission (contrat `ticketChannelSchema`). */
+const ticketChannelSchema = z.enum(["KIOSK", "QR", "MOBILE", "WHATSAPP"]);
+
+/** Statut de guichet (contrat `counterStatusEnumSchema`). */
+const counterStatusEnumSchema = z.enum(["OPEN", "PAUSED", "CLOSED"]);
+
+/** Résumé de ticket embarqué (contrat `ticketSummarySchema`). */
+const ticketSummarySchema = z.object({
+  id: z.string().uuid(),
+  number: z.string().min(1),
+  status: ticketStatusSchema,
+  serviceId: z.string().uuid(),
   agencyId: z.string().uuid(),
-  displayNumber: z.string(),
-  status: z.literal("WAITING"),
+  channel: ticketChannelSchema,
+  createdAt: z.string().datetime(),
 });
 
-/** Schéma du payload `ticket:called`. */
+/** Résumé de guichet embarqué (contrat `counterSummarySchema`). */
+const counterSummarySchema = z.object({
+  id: z.string().uuid(),
+  label: z.string().min(1),
+});
+
+// ─── Schémas de payload — forme CONTRAT par événement ────────────────────────
+
+/** Schéma du payload `ticket:created` (contrat `ticketCreatedEvent`). */
+export const ticketCreatedSchema = z.object({
+  ticket: ticketSummarySchema,
+  position: z.number().int().min(0),
+  estimate: z.number().int().min(0),
+});
+
+/** Schéma du payload `ticket:called` (contrat `ticketCalledEvent`). */
 export const ticketCalledSchema = z.object({
-  ticketId: z.string().uuid(),
-  queueId: z.string().uuid(),
-  counterId: z.string().uuid(),
-  displayNumber: z.string(),
-  status: z.literal("CALLED"),
+  ticket: ticketSummarySchema,
+  counter: counterSummarySchema,
 });
 
-/** Schéma du payload `ticket:closed`. */
+/** Schéma du payload `ticket:closed` (contrat `ticketClosedEvent`). */
 export const ticketClosedSchema = z.object({
   ticketId: z.string().uuid(),
+  waitTime: z.number().int().min(0),
+  serviceTime: z.number().int().min(0),
+});
+
+/** Schéma du payload `queue:updated` (contrat `queueUpdatedEvent`). */
+export const queueUpdatedSchema = z.object({
   queueId: z.string().uuid(),
-  counterId: z.string().uuid(),
-  status: z.literal("DONE"),
-  waitTime: z.number().int().nonnegative(),
-  serviceTime: z.number().int().nonnegative(),
+  length: z.number().int().min(0),
+  estimate: z.number().int().min(0),
 });
 
 /**
- * Schéma du payload `queue:updated` — STRICT : uniquement `length` + `estimate`.
- * `.strict()` rejette toute clé supplémentaire (ex: une liste de tickets).
- */
-export const queueUpdatedSchema = z
-  .object({
-    queueId: z.string().uuid(),
-    length: z.number().int().nonnegative(),
-    estimate: z.number().int().nonnegative(),
-  })
-  .strict();
-
-/**
- * Types d'alertes manager — LA LOI `alertManagerEvent.payloadSchema`
- * (packages/contracts/events/realtime.ts). Énuméré fermé : aucune fuite hors
- * contrat. QUEUE_CRITICAL (API-004), KIOSK_SYSTEM_ERROR (API-005),
- * AGENT_INACTIVE / AGENT_DISCONNECTED_WITH_TICKET / SLA_BREACH (API-007).
+ * Types d'alertes manager — contrat `alertManagerTypeSchema`. Énuméré fermé :
+ * QUEUE_CRITICAL (API-004), KIOSK_SYSTEM_ERROR (API-005), AGENT_INACTIVE /
+ * AGENT_DISCONNECTED_WITH_TICKET / SLA_BREACH (API-007).
  */
 export const alertManagerTypeSchema = z.enum([
   "AGENT_INACTIVE",
@@ -70,36 +101,28 @@ export const alertManagerTypeSchema = z.enum([
   "KIOSK_SYSTEM_ERROR",
 ]);
 
-/**
- * Schéma UNIQUE du payload `alert:manager` — forme contractuelle `{ type, payload }`.
- * API-007 : l'union héritée (`alertManagerOverflowSchema`) est SUPPRIMÉE ; toutes
- * les alertes (dont QUEUE_CRITICAL migrée) transitent désormais par cette forme.
- */
+/** Schéma du payload `alert:manager` (contrat `alertManagerEvent`). */
 export const alertManagerSchema = z.object({
   type: alertManagerTypeSchema,
   payload: z.record(z.string(), z.unknown()),
 });
 
-/** Schéma du payload `counter:status` (LA LOI CONTRACT-002 `counterStatusEvent`). */
+/** Schéma du payload `counter:status` (contrat `counterStatusEvent`). */
 export const counterStatusSchema = z.object({
   counterId: z.string().uuid(),
-  status: z.enum(["OPEN", "PAUSED", "CLOSED"]),
+  status: counterStatusEnumSchema,
   agentId: z.string().uuid().optional(),
 });
 
-/**
- * Schéma du payload `kiosk:printer-error` (LA LOI CONTRACT-003
- * `kioskPrinterErrorEvent`). Émis UNE fois par épisode d'erreur d'impression
- * (API-011) : `since` est l'horodatage ISO 8601 du début de l'épisode.
- */
+/** Schéma du payload `kiosk:printer-error` (contrat `kioskPrinterErrorEvent`). */
 export const kioskPrinterErrorSchema = z.object({
   kioskId: z.string().uuid(),
   agencyId: z.string().uuid(),
   since: z.string().datetime(),
 });
 
-/** Association nom d'événement → schéma Zod du payload. */
-const EVENT_SCHEMAS = {
+/** Association nom d'événement → schéma Zod du payload (forme CONTRAT). */
+export const EVENT_SCHEMAS = {
   "ticket:created": ticketCreatedSchema,
   "ticket:called": ticketCalledSchema,
   "ticket:closed": ticketClosedSchema,
@@ -109,7 +132,7 @@ const EVENT_SCHEMAS = {
   "kiosk:printer-error": kioskPrinterErrorSchema,
 } as const;
 
-/** Noms d'événements supportés. */
+/** Noms d'événements supportés (les 7 événements serveur→client). */
 export type EventName = keyof typeof EVENT_SCHEMAS;
 
 /** Type du payload pour un événement donné. */
@@ -118,16 +141,18 @@ export type EventPayload<E extends EventName> = z.infer<(typeof EVENT_SCHEMAS)[E
 /** Contrat d'un bus temps réel injectable. */
 export interface RealtimeBus {
   /**
-   * Émet un événement typé après validation Zod du payload.
-   * @param event   - Nom de l'événement
-   * @param payload - Payload conforme au schéma de l'événement
+   * Émet un événement typé après validation Zod du payload (forme contrat).
+   * @param event    - Nom de l'événement
+   * @param agencyId - Agence cible (room `agency:{agencyId}`)
+   * @param payload  - Payload conforme au schéma CONTRAT de l'événement
    */
-  emit<E extends EventName>(event: E, payload: EventPayload<E>): void;
+  emit<E extends EventName>(event: E, agencyId: string, payload: EventPayload<E>): void;
 }
 
 /** Événement capturé (pour les tests). */
 export interface CapturedEvent {
   event: EventName;
+  agencyId: string;
   payload: unknown;
   at: number;
 }
@@ -141,7 +166,7 @@ export interface CaptureBus extends RealtimeBus {
 }
 
 /**
- * Valide un payload contre le schéma de son événement.
+ * Valide un payload contre le schéma (forme contrat) de son événement.
  * @param event   - Nom de l'événement
  * @param payload - Payload à valider
  * @throws {SigfaError} 500 REALTIME_INVALID_PAYLOAD si non conforme
@@ -160,16 +185,17 @@ export function validateEvent<E extends EventName>(event: E, payload: EventPaylo
 }
 
 /**
- * Crée un bus de capture pour les tests : chaque `emit` valide puis mémorise.
+ * Crée un bus de capture pour les tests : chaque `emit` valide puis mémorise
+ * `(event, agencyId, payload)`.
  * @returns Bus de capture avec la liste `events`
  */
 export function createCaptureBus(): CaptureBus {
   const events: CapturedEvent[] = [];
   return {
     events,
-    emit<E extends EventName>(event: E, payload: EventPayload<E>): void {
+    emit<E extends EventName>(event: E, agencyId: string, payload: EventPayload<E>): void {
       validateEvent(event, payload);
-      events.push({ event, payload, at: Date.now() });
+      events.push({ event, agencyId, payload, at: Date.now() });
     },
     ofType<E extends EventName>(event: E): CapturedEvent[] {
       return events.filter((e) => e.event === event);
@@ -179,12 +205,12 @@ export function createCaptureBus(): CaptureBus {
 
 /**
  * Crée un bus « no-op » validant (émissions silencieuses en production sans
- * adaptateur socket branché). Valide toujours le payload.
+ * adaptateur socket branché — `REALTIME_MODE=off`). Valide toujours le payload.
  * @returns Bus qui valide sans transporter
  */
 export function createNoopBus(): RealtimeBus {
   return {
-    emit<E extends EventName>(event: E, payload: EventPayload<E>): void {
+    emit<E extends EventName>(event: E, _agencyId: string, payload: EventPayload<E>): void {
       validateEvent(event, payload);
     },
   };

@@ -206,7 +206,7 @@ function maybeEmitPrinterError(bus: RealtimeBus, row: HeartbeatRow): void {
   const wasHealthy = !PRINTER_ERROR_STATUSES.has(row.previous_status);
   const isError = PRINTER_ERROR_STATUSES.has(row.printer_status);
   if (wasHealthy && isError) {
-    bus.emit("kiosk:printer-error", {
+    bus.emit("kiosk:printer-error", row.agency_id, {
       kioskId: row.id,
       agencyId: row.agency_id,
       since: new Date().toISOString(),
