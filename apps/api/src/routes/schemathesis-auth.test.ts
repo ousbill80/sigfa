@@ -92,8 +92,8 @@ async function runMigrations(client: pg.Client): Promise<void> {
       deleted_at TIMESTAMPTZ,
       CONSTRAINT users_super_admin_bank_id_check CHECK (
         (role = 'SUPER_ADMIN') = (bank_id IS NULL)
-      )
-    );
+      ), is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
+);
   `);
   await client.query(`
     CREATE TABLE IF NOT EXISTS agency_users (

@@ -253,6 +253,7 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "POST",   path: "/kiosks/{kioskId}/heartbeat",         requiredRole: "AUTHENTICATED", tenantScope: "agency" },
   { method: "GET",    path: "/agencies/{id}/qr",                   requiredRole: "AGENT",         tenantScope: "agency" },
   { method: "GET",    path: "/public/agencies/{agencyId}/operations", requiredRole: "NONE",       tenantScope: "public" },
+  { method: "GET",    path: "/public/agencies/{agencyId}/relationship-managers", requiredRole: "NONE", tenantScope: "public" },
   { method: "POST",   path: "/public/tickets",                     requiredRole: "NONE",          tenantScope: "public" },
   { method: "GET",    path: "/public/tickets/{trackingId}",        requiredRole: "NONE",          tenantScope: "public" },
   { method: "POST",   path: "/public/tickets/{trackingId}/feedback", requiredRole: "NONE",        tenantScope: "public" },

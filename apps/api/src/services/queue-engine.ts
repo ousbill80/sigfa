@@ -13,7 +13,7 @@
  * @module
  */
 
-import type { Tx, TicketSelector } from "src/services/queue-strategy.js";
+import type { Tx, TicketSelector, SelectedTicket } from "src/services/queue-strategy.js";
 
 /** Ordre de priorité : plus bas index = plus haute priorité. */
 export const PRIORITY_ORDER: Record<string, number> = {
@@ -144,6 +144,86 @@ export const selectNextPriority: TicketSelector = async (
     issuedAt: row.issued_at,
   };
 };
+
+/**
+ * Résout l'agent affecté au guichet (ou `null` si aucun / guichet inconnu).
+ *
+ * @param counterId - Guichet appelant
+ * @param tx        - Transaction courante
+ * @returns UUID de l'agent, ou `null`
+ */
+async function getCounterAgentId(counterId: string, tx: Tx): Promise<string | null> {
+  const res = await tx.query(`SELECT agent_id FROM counters WHERE id = $1`, [counterId]);
+  const row = res.rows[0] as { agent_id: string | null } | undefined;
+  return row?.agent_id ?? null;
+}
+
+/**
+ * Sélectionne le prochain WAITING de la file PERSONNELLE d'un conseiller
+ * (`target_manager_id = managerId`, même file), ordre priorité porteur puis FIFO.
+ *
+ * `FOR UPDATE SKIP LOCKED` : verrou identique à la file de service. Aucun filtrage
+ * langue (la file conseiller est mono-agent — le client a choisi ce conseiller).
+ *
+ * @param queueId   - File du guichet
+ * @param managerId - Conseiller (agent du guichet)
+ * @param tx        - Transaction courante
+ * @returns Ticket perso sélectionné, ou `null` si file perso vide
+ */
+async function selectNextPersonal(
+  queueId: string,
+  managerId: string,
+  tx: Tx
+): Promise<SelectedTicket | null> {
+  const res = await tx.query(
+    `SELECT t.id, t.queue_id, t.service_id, t.status, t.priority, t.issued_at
+       FROM tickets t
+      WHERE t.queue_id = $1
+        AND t.status = 'WAITING'
+        AND t.target_manager_id = $2
+      ORDER BY ${PRIORITY_CASE_T} ASC, t.issued_at ASC
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED`,
+    [queueId, managerId]
+  );
+  const row = res.rows[0] as
+    | { id: string; queue_id: string; service_id: string; status: string; priority: string; issued_at: Date }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    queueId: row.queue_id,
+    serviceId: row.service_id,
+    status: row.status,
+    priority: row.priority,
+    issuedAt: row.issued_at,
+  };
+}
+
+/**
+ * Stratégie conseiller (MODEL-API-B, D6) — file personnelle PRIORITÉ ABSOLUE.
+ *
+ * Fabrique un `TicketSelector` injectable : QUAND un agent conseiller fait
+ * `call-next`, il sert D'ABORD sa file personnelle (tickets `target_manager_id =
+ * lui`, ordre priorité porteur puis FIFO) ; SEULEMENT si elle est vide → délègue
+ * au `fallback` (file de service — comportement existant `selectNextPriority`).
+ *
+ * Un guichet sans agent, ou dont l'agent n'a aucun ticket personnel en attente,
+ * se comporte EXACTEMENT comme la file de service (aucune régression).
+ *
+ * @param fallback - Sélecteur de la file de service (défaut branché par l'appelant)
+ * @returns Un `TicketSelector` priorisant la file conseiller
+ */
+export function selectNextForManager(fallback: TicketSelector): TicketSelector {
+  return async (queueId, counterId, tx) => {
+    const agentId = await getCounterAgentId(counterId, tx);
+    if (agentId) {
+      const personal = await selectNextPersonal(queueId, agentId, tx);
+      if (personal) return personal;
+    }
+    return fallback(queueId, counterId, tx);
+  };
+}
 
 /**
  * Calcule la position réelle d'un ticket dans l'ordre de sélection prioritaire.

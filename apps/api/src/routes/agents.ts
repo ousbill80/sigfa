@@ -93,6 +93,10 @@ const updateProfileSchema = z
     agencyIds: z.array(z.string().uuid()).optional(),
     workSchedule: workScheduleSchema.optional(),
     phoneMasked: safeText().optional(),
+    /** Marquage conseiller (MODEL-API-B/D5) — RBAC AGENCY_DIRECTOR (route). */
+    isRelationshipManager: z.boolean().optional(),
+    displayName: safeText().max(255).nullish(),
+    photoUrl: z.string().url().max(2048).nullish(),
   })
   .strict();
 
@@ -221,7 +225,8 @@ async function loadAgentProfile(
 ): Promise<Record<string, unknown>> {
   const res = await db.query(
     `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.bank_id,
-            u.languages, u.work_schedule, u.created_at
+            u.languages, u.work_schedule, u.is_relationship_manager, u.display_name,
+            u.photo_url, u.created_at
        FROM users u
       WHERE u.id = $1 AND u.bank_id = $2`,
     [agentId, tenant.bankId]
@@ -236,6 +241,9 @@ async function loadAgentProfile(
         bank_id: string;
         languages: string[];
         work_schedule: unknown;
+        is_relationship_manager: boolean;
+        display_name: string | null;
+        photo_url: string | null;
         created_at: Date;
       }
     | undefined;
@@ -257,6 +265,9 @@ async function loadAgentProfile(
     languages: row.languages.length > 0 ? row.languages : ["FR"],
     serviceIds: services,
     agencyIds: agencies,
+    isRelationshipManager: row.is_relationship_manager,
+    ...(row.display_name !== null ? { displayName: row.display_name } : {}),
+    ...(row.photo_url !== null ? { photoUrl: row.photo_url } : {}),
     ...(row.work_schedule ? { workSchedule: row.work_schedule } : {}),
     createdAt: row.created_at.toISOString(),
   };
@@ -302,8 +313,16 @@ function registerPatchProfile(router: Hono<AgentEnv>): void {
         entityId: agentId,
         ip: extractIp(c),
         diff: buildDiff(
-          { languages: before["languages"], serviceIds: before["serviceIds"], agencyIds: before["agencyIds"], workSchedule: before["workSchedule"] },
-          { languages: after["languages"], serviceIds: after["serviceIds"], agencyIds: after["agencyIds"], workSchedule: after["workSchedule"] }
+          {
+            languages: before["languages"], serviceIds: before["serviceIds"], agencyIds: before["agencyIds"],
+            workSchedule: before["workSchedule"], isRelationshipManager: before["isRelationshipManager"],
+            displayName: before["displayName"], photoUrl: before["photoUrl"],
+          },
+          {
+            languages: after["languages"], serviceIds: after["serviceIds"], agencyIds: after["agencyIds"],
+            workSchedule: after["workSchedule"], isRelationshipManager: after["isRelationshipManager"],
+            displayName: after["displayName"], photoUrl: after["photoUrl"],
+          }
         ),
       });
       return c.json(after, 200);
@@ -332,6 +351,30 @@ async function applyProfileUpdate(
               updated_at = NOW()
         WHERE id=$1 AND bank_id=$2`,
       [agentId, bankId, input.languages ?? null, input.workSchedule ? JSON.stringify(input.workSchedule) : null]
+    );
+  }
+  // MODEL-API-B/D5 : marquage conseiller (chaque champ appliqué s'il est FOURNI).
+  if (
+    input.isRelationshipManager !== undefined ||
+    input.displayName !== undefined ||
+    input.photoUrl !== undefined
+  ) {
+    await db.query(
+      `UPDATE users
+          SET is_relationship_manager = CASE WHEN $3::boolean IS NULL THEN is_relationship_manager ELSE $3 END,
+              display_name = CASE WHEN $4::boolean THEN $5 ELSE display_name END,
+              photo_url    = CASE WHEN $6::boolean THEN $7 ELSE photo_url END,
+              updated_at = NOW()
+        WHERE id=$1 AND bank_id=$2`,
+      [
+        agentId,
+        bankId,
+        input.isRelationshipManager ?? null,
+        input.displayName !== undefined,
+        input.displayName ?? null,
+        input.photoUrl !== undefined,
+        input.photoUrl ?? null,
+      ]
     );
   }
   if (input.serviceIds !== undefined) {

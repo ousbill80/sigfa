@@ -36,6 +36,7 @@ import {
 } from "src/services/queue-strategy.js";
 import {
   selectNextPriority,
+  selectNextForManager,
   computePositionPriority,
   shouldAlertOverflow,
   findOverflowQueues,
@@ -72,6 +73,8 @@ const createSchema = z.object({
   serviceId: z.string().uuid(),
   /** Opération optionnelle (MODEL-API-A/D1) : si fournie → service_id dérivé. */
   operationId: z.string().uuid().optional(),
+  /** Conseiller ciblé optionnel (MODEL-API-B/D6) : file personnelle du conseiller. */
+  targetManagerId: z.string().uuid().optional(),
   channel: z.enum(["KIOSK", "QR", "MOBILE", "WHATSAPP"]),
   phoneNumber: z.string().regex(/^\+[1-9]\d{6,14}$/).optional(),
   priority: z.enum(["STANDARD", "PRIORITY", "VIP", "PMR", "SENIOR"]).optional(),
@@ -116,10 +119,13 @@ function errorResponse(c: TicketCtx, err: unknown): Response {
  * Crée le routeur des tickets. Le bus temps réel est injectable (tests) ;
  * défaut : bus no-op validant.
  *
- * @param selector - Stratégie de sélection (défaut `selectNextPriority` — API-004)
+ * @param selector - Stratégie de sélection. Défaut : `selectNextForManager`
+ *   (MODEL-API-B/D6 — file conseiller priorité absolue, fallback `selectNextPriority`).
  * @returns Routeur Hono monté sous /api/v1
  */
-export function createTicketRouter(selector: TicketSelector = selectNextPriority): Hono<TicketEnv> {
+export function createTicketRouter(
+  selector: TicketSelector = selectNextForManager(selectNextPriority)
+): Hono<TicketEnv> {
   const router = new Hono<TicketEnv>();
   registerCreate(router);
   registerGet(router);
@@ -249,6 +255,12 @@ export interface IssueTicketInput {
    * est DÉRIVÉ de l'opération ; incohérence avec `serviceId` → 422 mismatch.
    */
   operationId?: string | undefined;
+  /**
+   * Conseiller ciblé optionnel (MODEL-API-B/D6). Si fourni, validé comme conseiller
+   * actif de l'agence → pose `target_manager_id` (file personnelle) ; sinon 404
+   * `RELATIONSHIP_MANAGER_NOT_FOUND` (opaque en public).
+   */
+  targetManagerId?: string | undefined;
   channel: "KIOSK" | "QR" | "MOBILE" | "WHATSAPP";
   phoneNumber?: string | undefined;
   priority?: "STANDARD" | "PRIORITY" | "VIP" | "PMR" | "SENIOR" | undefined;
@@ -304,6 +316,8 @@ export async function issueTicketFor(
     // MODEL-API-A/D1 : si operationId fourni, dérive le service_id de l'opération
     // (scope agence), pose operation_id ; mismatch avec serviceId → 422.
     const resolved = await resolveOperation(db, at, input);
+    // MODEL-API-B/D6 : si targetManagerId fourni, valider conseiller actif de l'agence.
+    const targetManagerId = await resolveTargetManager(db, at, input.targetManagerId);
     const ctx = await resolveServiceQueue(db, at, resolved.serviceId);
     const number = await allocateNumber(db, ctx.queueId);
     const displayNumber = `${ctx.code}-${String(number).padStart(3, "0")}`;
@@ -315,6 +329,7 @@ export async function issueTicketFor(
       input,
       serviceId: resolved.serviceId,
       operationId: resolved.operationId,
+      targetManagerId,
       number,
       displayNumber,
       trackingId,
@@ -342,6 +357,7 @@ export async function issueTicketFor(
       priority: input.priority ?? "STANDARD",
       serviceId: resolved.serviceId,
       ...(resolved.operationId ? { operationId: resolved.operationId } : {}),
+      ...(targetManagerId ? { targetManagerId } : {}),
       agencyId: ctx.agencyId,
       channel: input.channel,
       position,
@@ -387,6 +403,42 @@ async function resolveOperation(
     );
   }
   return { serviceId: row.service_id, operationId: row.id };
+}
+
+/**
+ * Résout le conseiller ciblé (MODEL-API-B/D6). SI `targetManagerId` fourni : valide
+ * un conseiller ACTIF de l'agence (`is_relationship_manager AND is_active AND
+ * deleted_at IS NULL`, affecté à l'agence via `agency_users`, dans la banque si
+ * `at.bankId` fourni). Inconnu / non-conseiller / hors agence → 404
+ * `RELATIONSHIP_MANAGER_NOT_FOUND`. SI absent → `null` (pas de ciblage).
+ *
+ * @returns L'uuid du conseiller validé, ou `null` si non fourni
+ */
+async function resolveTargetManager(
+  db: Client,
+  at: IssueTenant,
+  targetManagerId: string | undefined
+): Promise<string | null> {
+  if (!targetManagerId) return null;
+  const res = await db.query(
+    `SELECT u.id
+       FROM users u
+       JOIN agency_users au ON au.user_id = u.id AND au.agency_id = $2
+      WHERE u.id = $1
+        AND u.is_relationship_manager = true
+        AND u.is_active = true
+        AND u.deleted_at IS NULL
+        AND ($3::uuid IS NULL OR u.bank_id = $3)`,
+    [targetManagerId, at.agencyId, at.bankId]
+  );
+  if (res.rows.length === 0) {
+    throw new SigfaError(
+      "RELATIONSHIP_MANAGER_NOT_FOUND",
+      "Conseiller introuvable pour cet identifiant.",
+      404
+    );
+  }
+  return targetManagerId;
 }
 
 /** Chiffre + hache le téléphone fourni (ou renvoie des nulls). */
@@ -467,6 +519,7 @@ async function insertTicket(
     input: IssueTicketInput;
     serviceId: string;
     operationId: string | null;
+    targetManagerId: string | null;
     number: number;
     displayNumber: string;
     trackingId: string;
@@ -475,10 +528,10 @@ async function insertTicket(
 ): Promise<{ id: string; issued_at: Date }> {
   const res = await db.query(
     `INSERT INTO tickets
-       (bank_id, agency_id, queue_id, service_id, operation_id, number, display_number,
+       (bank_id, agency_id, queue_id, service_id, operation_id, target_manager_id, number, display_number,
         tracking_id, channel, status, priority, phone_encrypted, phone_hash, sms_consent,
         required_language)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'WAITING',$10,$11,$12,$13,$14)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'WAITING',$11,$12,$13,$14,$15)
      RETURNING id, issued_at`,
     [
       args.bankId,
@@ -486,6 +539,7 @@ async function insertTicket(
       args.ctx.queueId,
       args.serviceId,
       args.operationId,
+      args.targetManagerId,
       args.number,
       args.displayNumber,
       args.trackingId,

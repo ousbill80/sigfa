@@ -118,7 +118,8 @@ async function runMigrations(client: pg.Client): Promise<void> {
       closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER,
       issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (queue_id, number, issued_day));`);
+      UNIQUE (queue_id, number, issued_day), target_manager_id UUID
+);`);
   // Table borne minimale (assertKioskSessionActive au handshake WS borne).
   await client.query(`
     CREATE TABLE IF NOT EXISTS kiosks (

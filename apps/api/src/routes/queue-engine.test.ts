@@ -111,7 +111,8 @@ async function runMigrations(client: pg.Client): Promise<void> {
       bank_id UUID REFERENCES banks(id),
       email TEXT NOT NULL UNIQUE,
       languages TEXT[] NOT NULL DEFAULT '{}',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
+);
   `);
   await client.query(`
     CREATE TABLE IF NOT EXISTS counter_services (
@@ -134,7 +135,8 @@ async function runMigrations(client: pg.Client): Promise<void> {
       closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER,
       issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (queue_id, number, issued_day));
+      UNIQUE (queue_id, number, issued_day), target_manager_id UUID
+);
   `);
   await client.query(`
     CREATE TABLE IF NOT EXISTS ticket_transfers (

@@ -144,8 +144,8 @@ async function setupSchema(client: pg.Client): Promise<void> {
       is_active BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      deleted_at TIMESTAMPTZ
-    );
+      deleted_at TIMESTAMPTZ, is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
+);
   `);
 
   await client.query(`

@@ -342,7 +342,8 @@ async function applyRtSchema(db: pg.Client): Promise<void> {
       closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER,
       issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (queue_id, number, issued_day));`);
+      UNIQUE (queue_id, number, issued_day), target_manager_id UUID
+);`);
   await db.query(`
     CREATE TABLE IF NOT EXISTS kiosks (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),

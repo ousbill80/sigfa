@@ -61,6 +61,7 @@ const syncItemSchema = z
     localUuid: z.string().uuid(),
     serviceId: z.string().uuid(),
     operationId: z.string().uuid().optional(),
+    targetManagerId: z.string().uuid().optional(),
     channel: z.enum(["KIOSK", "QR", "MOBILE", "WHATSAPP"]),
     createdOfflineAt: z.string().datetime(),
     priority: z.enum(["STANDARD", "PRIORITY", "VIP", "PMR", "SENIOR"]).optional(),
@@ -198,10 +199,13 @@ async function syncOne(db: Client, tenant: TenantContext, it: SyncItem): Promise
   // MODEL-API-A/D1 (offline-sync D8) : operationId optionnel/item → service_id dérivé.
   const resolved = await resolveOperation(db, tenant, it);
   if (resolved.kind === "skip") return skip(it.localUuid, resolved.reason);
+  // MODEL-API-B/D6 : conseiller ciblé optionnel → skip RELATIONSHIP_MANAGER_NOT_FOUND si invalide.
+  const manager = await resolveTargetManager(db, tenant, it.targetManagerId);
+  if (manager.kind === "skip") return skip(it.localUuid, manager.reason);
   const queue = await resolveQueue(db, tenant, resolved.serviceId);
   if (!queue) return skip(it.localUuid, "SERVICE_NOT_FOUND");
   try {
-    return await insertSynced(db, tenant, it, queue, resolved.serviceId, resolved.operationId);
+    return await insertSynced(db, tenant, it, queue, resolved.serviceId, resolved.operationId, manager.targetManagerId);
   } catch (err) {
     logger.error({ localUuid: it.localUuid, err }, "sync:ticket-failed");
     return skip(it.localUuid, "SYNC_ERROR");
@@ -235,6 +239,39 @@ async function resolveOperation(
   if (!row) return { kind: "skip", reason: "OPERATION_NOT_FOUND" };
   if (it.serviceId !== row.service_id) return { kind: "skip", reason: "SERVICE_OPERATION_MISMATCH" };
   return { kind: "ok", serviceId: row.service_id, operationId: row.id };
+}
+
+/**
+ * Résout le conseiller ciblé d'un item sync (MODEL-API-B/D6). `targetManagerId`
+ * absent → pas de ciblage. Fourni : valide un conseiller ACTIF de l'agence du
+ * scope (`is_relationship_manager AND is_active AND deleted_at IS NULL`, affecté
+ * à l'agence) ; inconnu/non-conseiller/hors agence → skip
+ * `RELATIONSHIP_MANAGER_NOT_FOUND` (l'item fautif est ignoré, le reste passe).
+ */
+async function resolveTargetManager(
+  db: Client,
+  tenant: TenantContext,
+  targetManagerId: string | undefined
+): Promise<
+  | { kind: "ok"; targetManagerId: string | null }
+  | { kind: "skip"; reason: string }
+> {
+  if (!targetManagerId) return { kind: "ok", targetManagerId: null };
+  const agencyId = tenant.agencyIds[0];
+  if (!agencyId) return { kind: "skip", reason: "RELATIONSHIP_MANAGER_NOT_FOUND" };
+  const res = await db.query(
+    `SELECT u.id
+       FROM users u
+       JOIN agency_users au ON au.user_id = u.id AND au.agency_id = $2
+      WHERE u.id = $1
+        AND u.is_relationship_manager = true
+        AND u.is_active = true
+        AND u.deleted_at IS NULL
+        AND u.bank_id = $3`,
+    [targetManagerId, agencyId, tenant.bankId]
+  );
+  if (res.rows.length === 0) return { kind: "skip", reason: "RELATIONSHIP_MANAGER_NOT_FOUND" };
+  return { kind: "ok", targetManagerId };
 }
 
 /** Construit un résultat skipped. */
@@ -275,13 +312,14 @@ async function insertSynced(
   it: SyncItem,
   queue: { queueId: string; agencyId: string; code: string },
   serviceId: string,
-  operationId: string | null
+  operationId: string | null,
+  targetManagerId: string | null
 ): Promise<Outcome> {
   await db.query("BEGIN");
   try {
     const number = await allocateNumber(db, queue.queueId);
     const displayNumber = `${queue.code}-${String(number).padStart(3, "0")}`;
-    const inserted = await insertRow(db, tenant, it, queue, number, displayNumber, serviceId, operationId);
+    const inserted = await insertRow(db, tenant, it, queue, number, displayNumber, serviceId, operationId, targetManagerId);
     if (!inserted) {
       await db.query("ROLLBACK");
       return skip(it.localUuid, "ALREADY_SYNCED");
@@ -329,13 +367,14 @@ async function insertRow(
   number: number,
   displayNumber: string,
   serviceId: string,
-  operationId: string | null
+  operationId: string | null,
+  targetManagerId: string | null
 ): Promise<{ id: string } | undefined> {
   const res = await db.query(
     `INSERT INTO tickets
-       (bank_id, agency_id, queue_id, service_id, operation_id, number, display_number,
+       (bank_id, agency_id, queue_id, service_id, operation_id, target_manager_id, number, display_number,
         tracking_id, local_uuid, channel, status, priority)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'WAITING',$11)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'WAITING',$12)
      ON CONFLICT (local_uuid) DO NOTHING
      RETURNING id`,
     [
@@ -344,6 +383,7 @@ async function insertRow(
       queue.queueId,
       serviceId,
       operationId,
+      targetManagerId,
       number,
       displayNumber,
       nanoid(21),

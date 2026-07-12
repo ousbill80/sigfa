@@ -58,6 +58,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
     channel: z.literal("KIOSK"),
     serviceId: z.string().uuid(),
     operationId: z.string().uuid().optional(),
+    targetManagerId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164.nullish(),
@@ -67,6 +68,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
     channel: z.literal("QR"),
     serviceId: z.string().uuid(),
     operationId: z.string().uuid().optional(),
+    targetManagerId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164.nullish(),
@@ -76,6 +78,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
     channel: z.literal("MOBILE"),
     serviceId: z.string().uuid(),
     operationId: z.string().uuid().optional(),
+    targetManagerId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164,
@@ -85,6 +88,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
     channel: z.literal("WHATSAPP"),
     serviceId: z.string().uuid(),
     operationId: z.string().uuid().optional(),
+    targetManagerId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164,
@@ -127,9 +131,60 @@ export function createPublicTicketRouter(): Hono<PublicEnv> {
   const router = new Hono<PublicEnv>();
   registerCreate(router);
   registerPublicOperations(router);
+  registerPublicRelationshipManagers(router);
   registerTrack(router);
   registerFeedback(router);
   return router;
+}
+
+/**
+ * GET /public/agencies/:agencyId/relationship-managers (role NONE) — liste
+ * publique NOMINATIVE des conseillers (MODEL-API-B/D5).
+ *
+ * Retourne UNIQUEMENT `{ id, displayName, photoUrl? }` des users conseillers
+ * ACTIFS de l'agence (`is_relationship_manager AND is_active AND deleted_at IS
+ * NULL`). **ZÉRO PII** : jamais email/rôle/téléphone/phone_hash — liste blanche
+ * stricte de colonnes (la requête ne SELECTionne que id/display_name/photo_url).
+ * `agencyId` malformé → 400 VALIDATION_ERROR. Scope agence (aucune fuite tenant :
+ * filtre `au.agency_id`). Un conseiller sans `display_name` est exclu (nominatif).
+ */
+function registerPublicRelationshipManagers(router: Hono<PublicEnv>): void {
+  router.get("/public/agencies/:agencyId/relationship-managers", async (c) => {
+    const agencyId = c.req.param("agencyId");
+    if (!PUBLIC_UUID_RE.test(agencyId)) {
+      return c.json(buildError("VALIDATION_ERROR", "agencyId requis (UUID)."), 400);
+    }
+    const db = c.get("db");
+    const res = await db.query(
+      `SELECT u.id, u.display_name, u.photo_url
+         FROM users u
+         JOIN agency_users au ON au.user_id = u.id AND au.agency_id = $1
+        WHERE u.is_relationship_manager = true
+          AND u.is_active = true
+          AND u.deleted_at IS NULL
+          AND u.display_name IS NOT NULL
+        ORDER BY u.display_name ASC, u.id ASC`,
+      [agencyId]
+    );
+    const data = (res.rows as PublicRelationshipManagerRow[]).map(publicRelationshipManagerDto);
+    return c.json({ data }, 200);
+  });
+}
+
+/** Ligne brute d'un conseiller public (liste blanche stricte — zéro PII). */
+interface PublicRelationshipManagerRow {
+  id: string;
+  display_name: string;
+  photo_url: string | null;
+}
+
+/** Projette le DTO public d'un conseiller (LA LOI `PublicRelationshipManager`). */
+function publicRelationshipManagerDto(row: PublicRelationshipManagerRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    ...(row.photo_url !== null ? { photoUrl: row.photo_url } : {}),
+  };
 }
 
 /** Regex UUID canonique pour valider `agencyId`/`serviceId`. */
@@ -243,6 +298,7 @@ async function issuePublicTicket(c: PublicCtx, input: PublicCreateInput): Promis
   const issueInput: IssueTicketInput = {
     serviceId: input.serviceId,
     operationId: input.operationId,
+    targetManagerId: input.targetManagerId,
     channel: input.channel,
     priority: input.priority,
     phoneNumber: input.phoneNumber ?? undefined,
@@ -276,6 +332,7 @@ function publicCreatedDto(r: Record<string, unknown>): Record<string, unknown> {
     estimatedWaitMinutes: r["estimatedWaitMinutes"],
     serviceId: r["serviceId"],
     ...(r["operationId"] ? { operationId: r["operationId"] } : {}),
+    ...(r["targetManagerId"] ? { targetManagerId: r["targetManagerId"] } : {}),
     agencyId: r["agencyId"],
     createdAt: r["createdAt"],
   };
