@@ -132,7 +132,20 @@ export type TranslationKey =
   | "admin.operations.inactive"
   | "admin.operations.edit"
   | "admin.operations.deactivate"
-  | "admin.operations.manage";
+  | "admin.operations.manage"
+  | "admin.conseiller.title"
+  | "admin.conseiller.intro"
+  | "admin.conseiller.agent_id"
+  | "admin.conseiller.load"
+  | "admin.conseiller.toggle"
+  | "admin.conseiller.display_name"
+  | "admin.conseiller.display_name_hint"
+  | "admin.conseiller.photo_url"
+  | "admin.conseiller.photo_url_hint"
+  | "admin.conseiller.kiosk_notice"
+  | "admin.conseiller.saved"
+  | "admin.conseiller.marked"
+  | "admin.conseiller.unmarked";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -259,6 +272,22 @@ export const FR: TranslationDict = {
   "admin.operations.edit": "Modifier",
   "admin.operations.deactivate": "Désactiver",
   "admin.operations.manage": "Gérer les opérations",
+  "admin.conseiller.title": "Marquer un conseiller",
+  "admin.conseiller.intro":
+    "Marquez un agent comme conseiller clientèle. Son nom public et sa photo apparaîtront sur la borne.",
+  "admin.conseiller.agent_id": "Identifiant de l'agent",
+  "admin.conseiller.load": "Charger le profil",
+  "admin.conseiller.toggle": "Agent conseiller clientèle",
+  "admin.conseiller.display_name": "Nom public (affiché en borne)",
+  "admin.conseiller.display_name_hint":
+    "Requis pour un conseiller. Ce nom apparaît sur la borne (ex. « Kofi A. »).",
+  "admin.conseiller.photo_url": "Photo (URL, optionnel)",
+  "admin.conseiller.photo_url_hint": "Optionnel — apparaît sur la borne à côté du nom.",
+  "admin.conseiller.kiosk_notice":
+    "Le nom public et la photo apparaissent sur la borne, dans la liste des conseillers.",
+  "admin.conseiller.saved": "Profil conseiller enregistré.",
+  "admin.conseiller.marked": "Conseiller",
+  "admin.conseiller.unmarked": "Non conseiller",
 };
 
 /** English translations */
@@ -383,6 +412,22 @@ export const EN: TranslationDict = {
   "admin.operations.edit": "Edit",
   "admin.operations.deactivate": "Deactivate",
   "admin.operations.manage": "Manage operations",
+  "admin.conseiller.title": "Mark a relationship manager",
+  "admin.conseiller.intro":
+    "Mark an agent as a relationship manager. Their public name and photo will appear on the kiosk.",
+  "admin.conseiller.agent_id": "Agent identifier",
+  "admin.conseiller.load": "Load profile",
+  "admin.conseiller.toggle": "Relationship manager",
+  "admin.conseiller.display_name": "Public name (shown on kiosk)",
+  "admin.conseiller.display_name_hint":
+    "Required for a relationship manager. Shown on the kiosk (e.g. “Kofi A.”).",
+  "admin.conseiller.photo_url": "Photo (URL, optional)",
+  "admin.conseiller.photo_url_hint": "Optional — shown on the kiosk next to the name.",
+  "admin.conseiller.kiosk_notice":
+    "The public name and photo appear on the kiosk, in the relationship managers list.",
+  "admin.conseiller.saved": "Relationship manager profile saved.",
+  "admin.conseiller.marked": "Relationship manager",
+  "admin.conseiller.unmarked": "Not a manager",
 };
 
 /** All locales map */

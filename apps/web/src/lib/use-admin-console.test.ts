@@ -317,3 +317,109 @@ describe("useAdminConsole — opérations (MODEL-WEB-A, routes canoniques)", () 
     expect(del.ok).toBe(false);
   });
 });
+
+describe("useAdminConsole — conseiller (MODEL-WEB-B, routes canoniques)", () => {
+  const AGENT_ID = "55555555-5555-4555-a555-555555555555";
+
+  it("MODEL-WEB-B: getAgent — GET /agents/{id} renvoie le profil conseiller", async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get(`${BASE}/agents/:id`, ({ request }) => {
+        seen.push(new URL(request.url).pathname);
+        return HttpResponse.json({
+          id: AGENT_ID,
+          firstName: "Kofi",
+          lastName: "Asante",
+          role: "AGENT",
+          bankId: BANK_ID,
+          agencyId: AGENCY_ID,
+          status: "AVAILABLE",
+          languages: ["FR"],
+          serviceIds: [],
+          agencyIds: [AGENCY_ID],
+          isRelationshipManager: true,
+          displayName: "Kofi A.",
+          photoUrl: "https://cdn/x.png",
+          createdAt: "2025-06-01T00:00:00Z",
+        });
+      }),
+    );
+    const { result } = makeConsole();
+    let out!: { ok: boolean; agent?: { id: string; isRelationshipManager: boolean; displayName?: string } };
+    await act(async () => {
+      out = await result.current.getAgent(AGENT_ID);
+    });
+    expect(seen).toContain(`/agents/${AGENT_ID}`);
+    expect(out.ok).toBe(true);
+    expect(out.agent).toEqual(expect.objectContaining({ id: AGENT_ID, isRelationshipManager: true, displayName: "Kofi A." }));
+  });
+
+  it("MODEL-WEB-B: getAgent — profil sans flag → isRelationshipManager défaut false", async () => {
+    server.use(
+      http.get(`${BASE}/agents/:id`, () =>
+        HttpResponse.json({ id: AGENT_ID, firstName: "Ama", lastName: "K", role: "AGENT", bankId: BANK_ID, agencyId: AGENCY_ID, status: "AVAILABLE", languages: ["FR"], serviceIds: [], agencyIds: [AGENCY_ID], createdAt: "2025-06-01T00:00:00Z" }),
+      ),
+    );
+    const { result } = makeConsole();
+    let out!: { ok: boolean; agent?: { isRelationshipManager: boolean } };
+    await act(async () => {
+      out = await result.current.getAgent(AGENT_ID);
+    });
+    expect(out.agent?.isRelationshipManager).toBe(false);
+  });
+
+  it("MODEL-WEB-B: getAgent — 404 → message humain, pas d'agent", async () => {
+    server.use(http.get(`${BASE}/agents/:id`, () => HttpResponse.json({ error: { code: "NOT_FOUND" } }, { status: 404 })));
+    const { result } = makeConsole();
+    let out!: { ok: boolean; agent?: unknown; message?: string };
+    await act(async () => {
+      out = await result.current.getAgent("unknown");
+    });
+    expect(out.ok).toBe(false);
+    expect(out.agent).toBeUndefined();
+    expect(out.message).toBeTruthy();
+  });
+
+  it("MODEL-WEB-B: markConseiller — PATCH /agents/{id} avec isRelationshipManager/displayName/photoUrl", async () => {
+    const seen: { path: string; body: unknown }[] = [];
+    server.use(
+      http.patch(`${BASE}/agents/:id`, async ({ request }) => {
+        seen.push({ path: new URL(request.url).pathname, body: await request.json() });
+        return HttpResponse.json({ id: AGENT_ID, firstName: "Kofi", lastName: "Asante", role: "AGENT", bankId: BANK_ID, agencyId: AGENCY_ID, status: "AVAILABLE", languages: ["FR"], serviceIds: [], agencyIds: [AGENCY_ID], isRelationshipManager: true, displayName: "Kofi A.", createdAt: "2025-06-01T00:00:00Z" });
+      }),
+    );
+    const { result } = makeConsole();
+    let res!: { ok: boolean };
+    await act(async () => {
+      res = await result.current.markConseiller(AGENT_ID, { isRelationshipManager: true, displayName: "Kofi A.", photoUrl: "https://cdn/x.png" });
+    });
+    expect(res.ok).toBe(true);
+    expect(seen).toContainEqual({
+      path: `/agents/${AGENT_ID}`,
+      body: { isRelationshipManager: true, displayName: "Kofi A.", photoUrl: "https://cdn/x.png" },
+    });
+  });
+
+  it("MODEL-WEB-B: markConseiller — offline bloque la mutation", async () => {
+    const { result } = makeConsole();
+    act(() => result.current.setConnection("offline"));
+    let res!: { ok: boolean; message?: string };
+    await act(async () => {
+      res = await result.current.markConseiller(AGENT_ID, { isRelationshipManager: false });
+    });
+    expect(res.ok).toBe(false);
+    expect(res.message).toBe("Connexion requise pour configurer");
+  });
+
+  it("MODEL-WEB-B: markConseiller — erreur serveur (500) → message humain sans code brut", async () => {
+    server.use(http.patch(`${BASE}/agents/:id`, () => HttpResponse.json({ error: { code: "X" } }, { status: 500 })));
+    const { result } = makeConsole();
+    let res!: { ok: boolean; message?: string };
+    await act(async () => {
+      res = await result.current.markConseiller(AGENT_ID, { isRelationshipManager: true, displayName: "Kofi A." });
+    });
+    expect(res.ok).toBe(false);
+    expect(res.message).toBeTruthy();
+    expect(res.message).not.toContain("X");
+  });
+});

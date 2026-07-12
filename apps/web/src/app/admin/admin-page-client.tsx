@@ -18,6 +18,7 @@ import { AgenciesSection } from "@/components/admin/agencies-section";
 import { ServicesSection } from "@/components/admin/services-section";
 import { SmsTemplateEditor } from "@/components/admin/sms-template-editor";
 import { AgentsImport } from "@/components/admin/agents-import-panel";
+import { AgentConseillerSection } from "@/components/admin/agent-conseiller-section";
 import { OnboardingWizard } from "@/components/admin/onboarding-wizard";
 import { ThresholdsForm } from "@/components/admin/thresholds-form";
 import { CounterForm } from "@/components/admin/counter-form";
@@ -119,14 +120,20 @@ export function AdminPageClient({ apiBase, bankId, agencyId, role }: AdminPageCl
         return <SmsTemplateEditor eventType="TICKET_CONFIRMATION" initialContent="" onSave={(tpl) => void adminConsole.saveSmsTemplates([tpl])} />;
       case "agents":
         return (
-          <AgentsImport
-            summary={importSummary}
-            onImport={(file) => {
-              void adminConsole.importAgents(file).then((r) => {
-                if (r.ok && r.summary) setImportSummary(r.summary);
-              });
-            }}
-          />
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+            <AgentsImport
+              summary={importSummary}
+              onImport={(file) => {
+                void adminConsole.importAgents(file).then((r) => {
+                  if (r.ok && r.summary) setImportSummary(r.summary);
+                });
+              }}
+            />
+            <AgentConseillerSection
+              onLoadAgent={(id) => adminConsole.getAgent(id)}
+              onSave={(id, body) => adminConsole.markConseiller(id, body)}
+            />
+          </div>
         );
       case "onboarding":
         return (

@@ -87,6 +87,30 @@ export interface ServiceRow {
   order: number;
 }
 
+/**
+ * An agent profile row (subset) as exposed by the console for conseiller marking
+ * (MODEL-WEB-B). Only the fields the conseiller form needs are surfaced; no PII
+ * beyond what the AgentProfile contract already returns to AGENCY_DIRECTOR+.
+ */
+export interface AgentProfileRow {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  isRelationshipManager: boolean;
+  displayName?: string;
+  photoUrl?: string | null;
+}
+
+/**
+ * Partial update payload for the conseiller fields of an agent (MODEL-WEB-B).
+ * Maps 1:1 onto the additive fields of `UpdateAgentProfileRequest` (D5).
+ */
+export interface UpdateConseillerBody {
+  isRelationshipManager: boolean;
+  displayName?: string;
+  photoUrl?: string | null;
+}
+
 /** Partial update payload for an operation. */
 export interface UpdateOperationBody {
   code?: string;
@@ -138,6 +162,10 @@ export interface UseAdminConsoleResult {
   createCounter: (body: { label: string; serviceIds?: string[] }) => Promise<MutationResult>;
   /** Import agents CSV (POST /agents/import, multipart). */
   importAgents: (file: File) => Promise<{ ok: boolean; summary?: ImportSummary; message?: string }>;
+  /** Load an agent profile (GET /agents/{id}) for conseiller marking (MODEL-WEB-B). */
+  getAgent: (id: string) => Promise<{ ok: boolean; agent?: AgentProfileRow; message?: string }>;
+  /** Mark/unmark an agent as conseiller (PATCH /agents/{id}) (MODEL-WEB-B, D5). */
+  markConseiller: (id: string, body: UpdateConseillerBody) => Promise<MutationResult>;
   /** Update bank SMS templates (PATCH /banks/{id}/sms-templates). */
   saveSmsTemplates: (templates: { type: SmsEventType; content: string }[]) => Promise<MutationResult>;
   /** Update bank thresholds (PATCH /banks/{id}/thresholds). */
@@ -313,6 +341,48 @@ export function useAdminConsole(options: UseAdminConsoleOptions): UseAdminConsol
     [agents, connection],
   );
 
+  const getAgent = useCallback<UseAdminConsoleResult["getAgent"]>(
+    async (id) => {
+      const { data, error, response } = await agents.GET("/agents/{id}", {
+        params: { path: { id } },
+      });
+      if (error || !data) return { ok: false, message: humanError(error, response) };
+      const a = data as {
+        id: string;
+        firstName?: string;
+        lastName?: string;
+        isRelationshipManager?: boolean;
+        displayName?: string;
+        photoUrl?: string | null;
+      };
+      return {
+        ok: true,
+        agent: {
+          id: a.id,
+          firstName: a.firstName,
+          lastName: a.lastName,
+          isRelationshipManager: a.isRelationshipManager ?? false,
+          displayName: a.displayName,
+          photoUrl: a.photoUrl,
+        },
+      };
+    },
+    [agents],
+  );
+
+  const markConseiller = useCallback<UseAdminConsoleResult["markConseiller"]>(
+    async (id, body) => {
+      const blocked = offlineGuard();
+      if (blocked) return blocked;
+      const { error, response } = await agents.PATCH("/agents/{id}", {
+        params: { path: { id } },
+        body,
+      });
+      return error ? { ok: false, message: humanError(error, response) } : { ok: true };
+    },
+    [agents, offlineGuard],
+  );
+
   const saveSmsTemplates = useCallback<UseAdminConsoleResult["saveSmsTemplates"]>(
     async (templates) => {
       const blocked = offlineGuard();
@@ -383,6 +453,8 @@ export function useAdminConsole(options: UseAdminConsoleOptions): UseAdminConsol
       deleteOperation,
       createCounter,
       importAgents,
+      getAgent,
+      markConseiller,
       saveSmsTemplates,
       saveThresholds,
       saveThemeColors,
@@ -404,6 +476,8 @@ export function useAdminConsole(options: UseAdminConsoleOptions): UseAdminConsol
       deleteOperation,
       createCounter,
       importAgents,
+      getAgent,
+      markConseiller,
       saveSmsTemplates,
       saveThresholds,
       saveThemeColors,

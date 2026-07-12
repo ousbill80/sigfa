@@ -42,6 +42,17 @@ export interface OperationDraft {
   iconKey?: string;
 }
 
+/**
+ * Draft shape for the conseiller (relationship manager) marking form (MODEL-WEB-B).
+ * When `isRelationshipManager` is true, `displayName` (public name shown on the
+ * kiosk) becomes REQUIRED. `photoUrl` is always optional (a valid http(s) URL).
+ */
+export interface ConseillerDraft {
+  isRelationshipManager: boolean;
+  displayName: string;
+  photoUrl: string;
+}
+
 /** Draft shape for the bank thresholds form. */
 export interface ThresholdsDraft {
   queueCriticalThreshold: number;
@@ -121,6 +132,30 @@ export function validateThresholds(draft: ThresholdsDraft): FieldErrors {
   }
   if (!isIntInRange(draft.noShowTimeoutMinutes, 1, 30)) {
     errors.noShowTimeoutMinutes = "Le délai no-show doit être un entier entre 1 et 30 minutes.";
+  }
+  return errors;
+}
+
+/** A photo URL must be an absolute http(s) URL (contract `format: uri`). */
+const PHOTO_URL_RE = /^https?:\/\/\S+$/i;
+
+/**
+ * Validates the conseiller (relationship manager) marking draft (MODEL-WEB-B, D5).
+ * `displayName` is REQUIRED as soon as `isRelationshipManager` is true — the
+ * public name + photo are what appear on the kiosk relationship-managers list.
+ * When the agent is NOT a conseiller, both fields are free (nothing to validate).
+ * `photoUrl` stays optional but, when filled, must be a valid http(s) URL.
+ * @param draft - The conseiller form values.
+ * @returns Inline field errors ({} when valid).
+ */
+export function validateConseiller(draft: ConseillerDraft): FieldErrors {
+  const errors: FieldErrors = {};
+  if (draft.isRelationshipManager && draft.displayName.trim().length === 0) {
+    errors.displayName =
+      "Le nom public est obligatoire pour un conseiller (il apparaît sur la borne).";
+  }
+  if (draft.photoUrl.trim().length > 0 && !PHOTO_URL_RE.test(draft.photoUrl.trim())) {
+    errors.photoUrl = "La photo doit être une URL valide (http ou https).";
   }
   return errors;
 }
