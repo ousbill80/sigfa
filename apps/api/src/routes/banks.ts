@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
+import { safeText } from "src/lib/safe-text.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
   paramUuid,
@@ -41,7 +42,7 @@ interface BankEnv {
 /** Corps de POST /banks (LA LOI CreateBankRequest, additionalProperties: false). */
 const createBankSchema = z
   .object({
-    name: z.string().min(1),
+    name: safeText().min(1),
     slug: z.string().regex(/^[a-z0-9-]+$/),
     contactEmail: z.string().email().optional(),
   })
@@ -50,7 +51,7 @@ const createBankSchema = z
 /** Corps de PATCH /banks/:id (LA LOI UpdateBankRequest). */
 const updateBankSchema = z
   .object({
-    name: z.string().min(1).optional(),
+    name: safeText().min(1).optional(),
     active: z.boolean().optional(),
   })
   .strict();

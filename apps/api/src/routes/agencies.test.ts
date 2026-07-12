@@ -143,4 +143,29 @@ describe("API-008: agences CRUD + soft-delete + RBAC + audit", () => {
     const res = await req("PATCH", `/agencies/${bankA.agencyId}`, dirToken, { nope: 1 });
     expect(res.status).toBe(422);
   });
+
+  it("API-008: POST agence avec octet NUL dans name → 422 (jamais 500 PG 22021)", async () => {
+    const res = await req("POST", "/agencies", adminToken, { name: "Agence\x00Cocody" });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("UNPROCESSABLE_ENTITY");
+  });
+
+  it("API-008: POST agence avec octet NUL dans address → 422 (pas 500)", async () => {
+    const res = await req("POST", "/agencies", adminToken, {
+      name: "Agence Plateau",
+      address: "Rue\x00des Banques",
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("API-008: non-régression — name accentué (FR) accepté (201, non filtré)", async () => {
+    const res = await req("POST", "/agencies", adminToken, {
+      name: "Agence Générale Abidjan",
+      address: "Boulevard de la Paix, Cocody",
+    });
+    expect(res.status).toBe(201);
+    const ag = (await res.json()) as { name: string };
+    expect(ag.name).toBe("Agence Générale Abidjan");
+  });
 });

@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
+import { safeText } from "src/lib/safe-text.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
   paramUuid,
@@ -53,7 +54,7 @@ const NOTIFICATION_TYPES = [
 const smsTemplateSchema = z
   .object({
     type: z.enum(NOTIFICATION_TYPES),
-    content: z.string().min(1).max(160),
+    content: safeText().min(1).max(160),
   })
   .strict();
 

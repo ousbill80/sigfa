@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
+import { safeText } from "src/lib/safe-text.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
   paramUuid,
@@ -46,7 +47,7 @@ type ServiceCtx = Context<ServiceEnv>;
 /** Corps de POST /services (LA LOI CreateServiceRequest). */
 const createServiceSchema = z
   .object({
-    name: z.string().min(1),
+    name: safeText().min(1),
     code: z.string().regex(/^[A-Z]{2,4}$/).optional(),
     slaMinutes: z.number().int().min(1).default(10),
     order: z.number().int().min(1).optional(),
@@ -56,7 +57,7 @@ const createServiceSchema = z
 /** Corps de PATCH /services/:id (LA LOI UpdateServiceRequest). */
 const updateServiceSchema = z
   .object({
-    name: z.string().min(1).optional(),
+    name: safeText().min(1).optional(),
     slaMinutes: z.number().int().min(1).optional(),
     active: z.boolean().optional(),
     order: z.number().int().min(1).optional(),

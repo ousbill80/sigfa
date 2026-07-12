@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
+import { safeText } from "src/lib/safe-text.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
   paramUuid,
@@ -46,7 +47,7 @@ type CounterCtx = Context<CounterEnv>;
 /** Corps de POST /counters (LA LOI CreateCounterRequest). */
 const createCounterSchema = z
   .object({
-    label: z.string().min(1),
+    label: safeText().min(1),
     serviceIds: z.array(z.string().uuid()).optional(),
   })
   .strict();

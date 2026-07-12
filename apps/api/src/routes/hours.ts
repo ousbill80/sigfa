@@ -19,6 +19,7 @@ import { z } from "zod";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
+import { safeText } from "src/lib/safe-text.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
   paramUuid,
@@ -64,7 +65,7 @@ const weeklyScheduleSchema = z
 const exceptionalClosureSchema = z
   .object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    reason: z.string().max(200),
+    reason: safeText().max(200),
   })
   .strict();
 

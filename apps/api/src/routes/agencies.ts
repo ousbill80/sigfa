@@ -18,6 +18,7 @@ import { z } from "zod";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
+import { safeText } from "src/lib/safe-text.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
   paramUuid,
@@ -47,20 +48,20 @@ const OPEN_TICKET_STATUSES = ["WAITING", "CALLED", "SERVING"] as const;
 /** Corps de POST /agencies (LA LOI CreateAgencyRequest). */
 const createAgencySchema = z
   .object({
-    name: z.string().min(1),
-    address: z.string().optional(),
-    phone: z.string().optional(),
-    timezone: z.string().optional(),
+    name: safeText().min(1),
+    address: safeText().optional(),
+    phone: safeText().optional(),
+    timezone: safeText().optional(),
   })
   .strict();
 
 /** Corps de PATCH /agencies/:id (LA LOI UpdateAgencyRequest). */
 const updateAgencySchema = z
   .object({
-    name: z.string().min(1).optional(),
+    name: safeText().min(1).optional(),
     active: z.boolean().optional(),
-    address: z.string().optional(),
-    phone: z.string().optional(),
+    address: safeText().optional(),
+    phone: safeText().optional(),
   })
   .strict();
 

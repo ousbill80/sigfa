@@ -90,6 +90,18 @@ describe("API-008: services CRUD + RBAC + audit", () => {
     expect(res.status).toBe(422);
   });
 
+  it("API-008: POST service avec octet NUL dans name → 422 (jamais 500 PG 22021)", async () => {
+    const res = await req("POST", `/services?agencyId=${bankA.agencyId}`, dirToken, { name: "Cré\x00dits", code: "NL" });
+    expect(res.status).toBe(422);
+  });
+
+  it("API-008: non-régression — name accentué accepté (201, non filtré)", async () => {
+    const res = await req("POST", `/services?agencyId=${bankA.agencyId}`, dirToken, { name: "Service Épargne", code: "EP" });
+    expect(res.status).toBe(201);
+    const svc = (await res.json()) as { name: string };
+    expect(svc.name).toBe("Service Épargne");
+  });
+
   it("API-008: RBAC — DIRECTOR de l'agence A ciblant l'agence B (?agencyId=B) → 403", async () => {
     const bankB = await seedBankAgency(h.db, "svc-bank-b");
     const res = await req("GET", `/services?agencyId=${bankB.agencyId}`, dirToken);

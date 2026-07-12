@@ -29,6 +29,7 @@ import {
 import { computeAgentStats, type StatsPeriod } from "src/services/agent-stats.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
 import { parseStrict } from "src/lib/admin-helpers.js";
+import { safeText } from "src/lib/safe-text.js";
 
 /** Variables de contexte Hono du routeur agents (bus injecté par app.ts). */
 interface AgentEnv {
@@ -59,7 +60,7 @@ type AgentCtx = Context<AgentEnv>;
 /** Corps de POST /agents/:id/status (LA LOI UpdateAgentStatusRequest). */
 const statusSchema = z.object({
   status: z.enum(["AVAILABLE", "SERVING", "PAUSED", "ABSENT", "OFFLINE"]),
-  reason: z.string().max(255).nullish(),
+  reason: safeText().max(255).nullish(),
 });
 
 /** Query de GET /agents/:id/stats. */
@@ -91,7 +92,7 @@ const updateProfileSchema = z
     serviceIds: z.array(z.string().uuid()).optional(),
     agencyIds: z.array(z.string().uuid()).optional(),
     workSchedule: workScheduleSchema.optional(),
-    phoneMasked: z.string().optional(),
+    phoneMasked: safeText().optional(),
   })
   .strict();
 
