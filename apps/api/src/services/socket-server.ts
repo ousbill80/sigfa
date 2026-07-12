@@ -22,7 +22,12 @@ import { jwtVerify } from "jose";
 import { z } from "zod";
 import { joinAgencyEvent, TV_DISPLAY_ROLE } from "@sigfa/contracts/events/realtime.js";
 import { logger } from "src/lib/logger.js";
-import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import {
+  createNoopBus,
+  displayRoom,
+  staffRoom,
+  type RealtimeBus,
+} from "src/services/realtime.js";
 import { getAlertingConfig } from "src/config/alerting.js";
 import {
   markDisconnect,
@@ -237,6 +242,7 @@ function handleJoinAgency(socket: Socket, payload: unknown): void {
   const { agencyId } = parsed.data;
   const agencyIds = socket.data["agencyIds"] as string[] | undefined ?? [];
   const role = socket.data["role"] as string | undefined ?? "";
+  const isDisplay = socket.data["isDisplay"] === true;
 
   // DISPLAY est confiné à sa PROPRE agence : `SUPER_ADMIN` ne s'applique jamais
   // à lui (son role est DISPLAY), donc la garde d'inclusion suffit à le borner.
@@ -246,10 +252,18 @@ function handleJoinAgency(socket: Socket, payload: unknown): void {
     return;
   }
 
-  const room = `agency:${agencyId}`;
+  // Room d'affichage PUBLIC : rejointe par TOUTES les sockets de l'agence (staff
+  // ET écran mural DISPLAY). Reçoit uniquement les signaux d'affichage (allowlist).
+  const room = displayRoom(agencyId);
   void socket.join(room);
+
+  // Room STAFF (F-SEC-TV-01) : seules les sockets NON-DISPLAY (authentifiées staff)
+  // la rejoignent, EN PLUS de la room publique. DISPLAY ne la rejoint JAMAIS → il
+  // ne peut recevoir aucun signal de supervision (alert:manager/counter:status/…).
+  if (!isDisplay) void socket.join(staffRoom(agencyId));
+
   socket.emit("join:ok", `Rejoint ${room}`);
-  logger.info({ socketId: socket.id, room, role }, "socket:join:ok");
+  logger.info({ socketId: socket.id, room, role, isDisplay }, "socket:join:ok");
 }
 
 /**
