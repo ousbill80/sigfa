@@ -65,6 +65,47 @@ describe("AdZone — rendu", () => {
     render(<AdZone slides={slides} />);
     expect(screen.getByTestId("tv-adslide-image")).toHaveAttribute("src", "/media/promo.jpg");
   });
+
+  it("AdZone: titre long — taille BORNÉE en clamp() (pas le hero fixe 180px), ne déborde pas", () => {
+    // « Ouvrez un compte en 10 minutes » = le titre le plus long du deck.
+    render(<AdZone slides={[DEFAULT_AD_SLIDES[0]!]} />);
+    const title = screen.getByTestId("tv-adslide-title");
+    const style = title.getAttribute("style") ?? "";
+    // Taille responsive bornée, pas la constante d'affichage géante du ticket TV.
+    expect(style).toContain("clamp(");
+    expect(style).not.toContain("var(--display-tv-hero)");
+    // Interlignage serré + équilibrage des lignes pour tenir sur ≤ quelques lignes.
+    expect(style).toContain("line-height: 1.05");
+    expect(style).toContain("text-wrap: balance");
+  });
+
+  it("AdZone: grille header / contenu centré / footer — zones distinctes (anti-chevauchement)", () => {
+    render(<AdZone tenantName="Banque du Commerce" clock="14:37:22" />);
+    // Le contenu (titre/sous-titre) vit dans sa propre rangée centrée, séparée
+    // des overlays haut (header) et bas (footer) → aucun chevauchement possible.
+    const content = screen.getByTestId("tv-adzone-content");
+    expect(content).toBeInTheDocument();
+    expect(within(content).getByTestId("tv-adslide-title")).toBeInTheDocument();
+    const root = screen.getByTestId("tv-adzone");
+    expect(root.getAttribute("style")).toContain("grid-template-rows");
+    // Header et footer restent présents et distincts du contenu.
+    expect(within(content).queryByTestId("tv-adzone-overlay")).toBeNull();
+    expect(within(content).queryByTestId("tv-adzone-footer")).toBeNull();
+  });
+
+  it("AdZone: rotation — le titre centré suit le slide actif", () => {
+    render(<AdZone />);
+    const title = screen.getByTestId("tv-adslide-title");
+    // Un seul titre rendu (celui du slide actif), pas un par slide.
+    expect(screen.getAllByTestId("tv-adslide-title")).toHaveLength(1);
+    expect(title.getAttribute("data-slide-id")).toBe(DEFAULT_AD_SLIDES[0]!.id);
+  });
+
+  it("AdZone: deck vide — pas de titre, pas de crash", () => {
+    render(<AdZone slides={[]} />);
+    expect(screen.queryByTestId("tv-adslide-title")).toBeNull();
+    expect(screen.getByTestId("tv-adzone-content")).toBeInTheDocument();
+  });
 });
 
 describe("AdZone — rotation du carrousel (fake-timers)", () => {

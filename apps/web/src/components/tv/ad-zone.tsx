@@ -37,12 +37,22 @@ const rootStyle: CSSProperties = {
   flex: 1,
   minHeight: "100vh",
   overflow: "hidden",
-  display: "flex",
-  flexDirection: "column",
+  /* Grille « billboard » : header (haut) / contenu centré / footer (bas).
+     Les trois rangées sont DISTINCTES → jamais de chevauchement, même titre long. */
+  display: "grid",
+  gridTemplateRows: "var(--tv-header-height) 1fr auto",
   backgroundColor: "var(--night-2, var(--surface-screen))",
   color: "var(--ink-inverse)",
   fontFamily: "var(--font-text)",
 };
+
+/**
+ * Titre du slide : taille BORNÉE (clamp) au lieu du hero fixe 180px, pour que
+ * même un titre long (« Ouvrez un compte en 10 minutes ») tienne en 16:9 sans
+ * déborder sur les overlays. Interlignage serré + équilibrage des lignes.
+ */
+const AD_TITLE_FONT_SIZE = "clamp(2.75rem, 6.2vw, 6rem)" as const;
+const AD_SUBTITLE_FONT_SIZE = "clamp(1.375rem, 2.4vw, 2.4375rem)" as const;
 
 /**
  * Full-screen resting AdZone carousel.
@@ -61,24 +71,24 @@ export function AdZone({
 
   return (
     <div data-testid="tv-adzone" data-active={active ? "on" : "off"} style={rootStyle}>
-      {/* Slides empilées ; opacité pilotée pour un fondu croisé doux */}
-      <div data-testid="tv-adzone-stage" style={{ position: "absolute", inset: 0 }}>
+      {/* Fonds plein-cadre empilés (dégradés/médias) ; opacité pilotée pour le
+          fondu croisé. Ils vivent DERRIÈRE la grille (couche z séparée) et ne
+          portent PLUS le texte → le contenu textuel reste borné à la rangée
+          centrale, sans jamais chevaucher header/footer. */}
+      <div
+        data-testid="tv-adzone-stage"
+        aria-hidden="true"
+        style={{ position: "absolute", inset: 0, zIndex: 0 }}
+      >
         {slides.map((slide, i) => (
           <div
             key={slide.id}
             data-testid="tv-adslide"
             data-slide-id={slide.id}
             data-visible={i === index ? "on" : "off"}
-            aria-hidden={i === index ? undefined : true}
             style={{
               position: "absolute",
               inset: 0,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              justifyContent: "center",
-              gap: "var(--space-6)",
-              padding: "var(--space-24)",
               background: slide.bg,
               opacity: i === index ? 1 : 0,
               transition: reducedMotion ? "none" : `opacity ${AD_FADE_MS}ms var(--ease)`,
@@ -93,34 +103,6 @@ export function AdZone({
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
               />
             )}
-            <div
-              data-testid="tv-adslide-title"
-              style={{
-                position: "relative",
-                fontSize: "var(--display-tv-hero)",
-                fontFamily: "var(--font-display)",
-                fontWeight: 600,
-                lineHeight: "var(--leading-tight)",
-                letterSpacing: "var(--tracking-tight)",
-                color: slide.accent ?? "var(--gold)",
-                maxWidth: "16ch",
-              }}
-            >
-              {t(slide.titleKey, locale)}
-            </div>
-            {slide.subtitleKey !== undefined && (
-              <div
-                data-testid="tv-adslide-subtitle"
-                style={{
-                  position: "relative",
-                  fontSize: "var(--text-4xl)",
-                  color: "var(--ink-inverse)",
-                  maxWidth: "28ch",
-                }}
-              >
-                {t(slide.subtitleKey, locale)}
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -130,6 +112,7 @@ export function AdZone({
         data-testid="tv-adzone-overlay"
         style={{
           position: "relative",
+          zIndex: 1,
           height: "var(--tv-header-height)",
           display: "flex",
           alignItems: "center",
@@ -137,7 +120,6 @@ export function AdZone({
           padding: "0 var(--space-12)",
           color: "var(--ink-inverse-soft)",
           fontSize: "var(--text-lg)",
-          flexShrink: 0,
         }}
       >
         <span style={{ fontWeight: 600, color: "var(--brand)" }}>{tenantName}</span>
@@ -150,11 +132,79 @@ export function AdZone({
         </span>
       </header>
 
+      {/* Rangée centrale : le contenu du slide actif, CENTRÉ verticalement dans
+          l'espace SÛR entre header et footer. Padding généreux → marges autour
+          du titre. Le titre est borné (clamp) donc un titre long reste dans la
+          zone sans jamais toucher les overlays. */}
+      <div
+        data-testid="tv-adzone-content"
+        style={{
+          position: "relative",
+          zIndex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          justifyContent: "center",
+          gap: "var(--space-6)",
+          padding: "var(--space-8) var(--space-24)",
+          overflow: "hidden",
+        }}
+      >
+        {current !== undefined && (
+          <>
+            {/* Eyebrow discret — repère « billboard » premium, sans image ni
+                texte réseau (pur token). Marque l'espace publicitaire. */}
+            <span
+              data-testid="tv-adslide-eyebrow"
+              aria-hidden="true"
+              style={{
+                width: "var(--space-16)",
+                height: "var(--space-1)",
+                borderRadius: "var(--r-full)",
+                background: current.accent ?? "var(--gold)",
+                opacity: 0.9,
+              }}
+            />
+            <div
+              data-testid="tv-adslide-title"
+              data-slide-id={current.id}
+              style={{
+                fontSize: AD_TITLE_FONT_SIZE,
+                fontFamily: "var(--font-display)",
+                fontWeight: 600,
+                lineHeight: 1.05,
+                letterSpacing: "var(--tracking-tight)",
+                color: current.accent ?? "var(--gold)",
+                maxWidth: "18ch",
+                textWrap: "balance",
+              }}
+            >
+              {t(current.titleKey, locale)}
+            </div>
+            {current.subtitleKey !== undefined && (
+              <div
+                data-testid="tv-adslide-subtitle"
+                style={{
+                  fontSize: AD_SUBTITLE_FONT_SIZE,
+                  lineHeight: "var(--leading-tight)",
+                  color: "var(--ink-inverse)",
+                  maxWidth: "34ch",
+                  textWrap: "balance",
+                }}
+              >
+                {t(current.subtitleKey, locale)}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <footer
         data-testid="tv-adzone-footer"
         style={{
           position: "relative",
-          marginTop: "auto",
+          zIndex: 1,
           display: "flex",
           alignItems: "center",
           gap: "var(--space-4)",
