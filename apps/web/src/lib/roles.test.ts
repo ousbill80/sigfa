@@ -31,6 +31,22 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("MANAGER", "/admin")).toBe(false);
     });
 
+    it("WEB-004: RBAC AGENT → /dashboard/network retourne 403", () => {
+      expect(canAccess("AGENT", "/dashboard/network")).toBe(false);
+    });
+
+    it("WEB-004: RBAC BANK_ADMIN — /dashboard/network autorisé (périmètre JWT)", () => {
+      expect(canAccess("BANK_ADMIN", "/dashboard/network")).toBe(true);
+    });
+
+    it("WEB-004: RBAC AGENCY_DIRECTOR — /dashboard/network autorisé", () => {
+      expect(canAccess("AGENCY_DIRECTOR", "/dashboard/network")).toBe(true);
+    });
+
+    it("WEB-004: RBAC MANAGER — /dashboard/network retourne 403 (non direction réseau)", () => {
+      expect(canAccess("MANAGER", "/dashboard/network")).toBe(false);
+    });
+
     it("SUPER_ADMIN has access to all routes", () => {
       expect(canAccess("SUPER_ADMIN", "/admin")).toBe(true);
       expect(canAccess("SUPER_ADMIN", "/dashboard/manager")).toBe(true);

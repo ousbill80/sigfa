@@ -56,7 +56,20 @@ export type TranslationKey =
   | "manager.acknowledge"
   | "manager.open"
   | "manager.paused"
-  | "manager.vs_j7";
+  | "manager.vs_j7"
+  | "network.title"
+  | "network.ranking"
+  | "network.map"
+  | "network.alerts"
+  | "network.overview"
+  | "network.offline"
+  | "network.empty"
+  | "network.empty_cta"
+  | "network.error"
+  | "network.page"
+  | "network.prev"
+  | "network.next"
+  | "network.agency_offline";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -107,6 +120,19 @@ export const FR: TranslationDict = {
   "manager.open": "Ouvrir",
   "manager.paused": "Suspendre",
   "manager.vs_j7": "vs J-7",
+  "network.title": "DIRECTION RÉSEAU",
+  "network.ranking": "CLASSEMENT AGENCES",
+  "network.map": "CARTE DU RÉSEAU",
+  "network.alerts": "ALERTES RÉSEAU",
+  "network.overview": "SYNTHÈSE RÉSEAU",
+  "network.offline": "Mode hors ligne — classement figé, resynchronisation à la reconnexion",
+  "network.empty": "Aucune agence configurée pour votre banque",
+  "network.empty_cta": "Créer la première agence",
+  "network.error": "Impossible de charger le tableau de bord réseau. Veuillez réessayer.",
+  "network.page": "Page",
+  "network.prev": "Précédent",
+  "network.next": "Suivant",
+  "network.agency_offline": "Hors ligne",
 };
 
 /** English translations */
@@ -155,6 +181,19 @@ export const EN: TranslationDict = {
   "manager.open": "Open",
   "manager.paused": "Pause",
   "manager.vs_j7": "vs D-7",
+  "network.title": "NETWORK DIRECTION",
+  "network.ranking": "AGENCY RANKING",
+  "network.map": "NETWORK MAP",
+  "network.alerts": "NETWORK ALERTS",
+  "network.overview": "NETWORK OVERVIEW",
+  "network.offline": "Offline mode — ranking frozen, resync on reconnection",
+  "network.empty": "No agency configured for your bank",
+  "network.empty_cta": "Create the first agency",
+  "network.error": "Unable to load the network dashboard. Please try again.",
+  "network.page": "Page",
+  "network.prev": "Previous",
+  "network.next": "Next",
+  "network.agency_offline": "Offline",
 };
 
 /** Dioula translations (Mandé language, Burkina Faso / Côte d'Ivoire) */
@@ -203,6 +242,19 @@ export const DIOULA: TranslationDict = {
   "manager.open": "A da wuli",
   "manager.paused": "A jɔ",
   "manager.vs_j7": "ka ɲɛsin J-7 ma",
+  "network.title": "RÉSƆ ƝƐMƆGƆYA",
+  "network.ranking": "AGENCE ƝƐSINALI",
+  "network.map": "RÉSƆ KARTI",
+  "network.alerts": "RÉSƆ LASƆMINIW",
+  "network.overview": "RÉSƆ KUNAFONI",
+  "network.offline": "Internet tɛ — ƝƐSINALI jɔlen, a bɛ segin i mako",
+  "network.empty": "Agence si ma sigi i ka banki la fɔlɔ",
+  "network.empty_cta": "Agence fɔlɔ da",
+  "network.error": "Réso tableau tɛ se ka yɛlɛ. I ka segin.",
+  "network.page": "Ɲɛ",
+  "network.prev": "Kɔfɛ",
+  "network.next": "Ɲɛfɛ",
+  "network.agency_offline": "Hors ligne",
 };
 
 /** Baoulé translations (Akan language, Côte d'Ivoire) */
@@ -251,6 +303,19 @@ export const BAOULE: TranslationDict = {
   "manager.open": "Tike",
   "manager.paused": "Jran",
   "manager.vs_j7": "nin J-7",
+  "network.title": "RÉSO SIESIE'N",
+  "network.ranking": "AGENCE'N BE NGUAN'N",
+  "network.map": "RÉSO KARTI'N",
+  "network.alerts": "RÉSO AFƆTUƐ'N MUN",
+  "network.overview": "RÉSO NDƐ'N",
+  "network.offline": "Internet nianman — nguan'n jran, sɛ kɔ kɛ be sa'n",
+  "network.empty": "Agence fi nunman ɔ banki'n su ekun",
+  "network.empty_cta": "Yi agence klikli'n",
+  "network.error": "Réso tableau'n kwlá nianman. Sɛ i ekun.",
+  "network.page": "Bue'n",
+  "network.prev": "Sin",
+  "network.next": "Ɲrun",
+  "network.agency_offline": "Hors ligne",
 };
 
 /** All locales map */

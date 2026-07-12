@@ -21,6 +21,9 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   "/admin": ["SUPER_ADMIN", "BANK_ADMIN"],
   // AUDITOR reaches the manager dashboard in read-only mode (WEB-003).
   "/dashboard/manager": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AUDITOR"],
+  // Network direction dashboard (WEB-004): BANK_ADMIN / AGENCY_DIRECTOR JWT scope only.
+  // AGENT is excluded (→ 403). Must precede "/dashboard" so the prefix match wins.
+  "/dashboard/network": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR"],
   "/dashboard/agent": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AGENT"],
   "/agent": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AGENT"],
   "/audit": ["SUPER_ADMIN", "BANK_ADMIN", "AUDITOR"],
