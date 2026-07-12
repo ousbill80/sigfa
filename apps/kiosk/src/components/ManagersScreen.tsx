@@ -70,6 +70,68 @@ export function computeInitials(displayName: string): string {
   return letters.toUpperCase();
 }
 
+/** Repli initiales (cercle --brand-soft) — partagé photo absente ET onError. */
+function InitialsBadge({ displayName }: { displayName: string }) {
+  const initials = computeInitials(displayName);
+  return (
+    <span
+      data-testid="manager-avatar-initials"
+      aria-hidden="true"
+      style={{
+        flexShrink: 0,
+        width: "72px",
+        height: "72px",
+        borderRadius: "var(--r-full)",
+        backgroundColor: "var(--brand-soft)",
+        color: "var(--brand-strong)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "28px",
+        fontWeight: 700,
+      }}
+    >
+      {initials !== "" ? initials : <PersonIcon size={40} />}
+    </span>
+  );
+}
+
+/**
+ * Avatar conseiller : photo (`<img>`) si `photoUrl` fournie, sinon INITIALES.
+ * ROBUSTESSE : si l'image échoue à charger (404, chemin invalide, réseau), on
+ * bascule sur le repli initiales via `onError` — jamais d'image cassée en PROD.
+ */
+function ManagerAvatar({
+  displayName,
+  photoUrl,
+  altText,
+}: {
+  displayName: string;
+  photoUrl?: string | null;
+  altText: string;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  if (!photoUrl || imgFailed) {
+    return <InitialsBadge displayName={displayName} />;
+  }
+  return (
+    <img
+      data-testid="manager-avatar-photo"
+      src={photoUrl}
+      alt={altText}
+      onError={() => setImgFailed(true)}
+      style={{
+        flexShrink: 0,
+        width: "72px",
+        height: "72px",
+        borderRadius: "var(--r-full)",
+        objectFit: "cover",
+        backgroundColor: "var(--brand-soft)",
+      }}
+    />
+  );
+}
+
 export function ManagersScreen({ agencyId }: ManagersScreenProps) {
   const t = useTranslations("managersModelB");
   const router = useRouter();
@@ -87,13 +149,16 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
   }, timeoutMs);
 
   /**
-   * Navigue vers la confirmation en portant `targetManagerId` + `agencyId`.
-   * Le ticket rejoindra la file personnelle du conseiller (MODEL-API-B/D6).
+   * Navigue vers la confirmation en portant `targetManagerId` + `agencyId` +
+   * `managerName`. Le ticket rejoindra la file personnelle du conseiller
+   * (MODEL-API-B/D6) ; `managerName` (donnée publique, non-PII) est transporté
+   * jusqu'à la confirmation ET au Moment Ticket pour rappeler QUI le client
+   * va voir (réassurance).
    */
   const goToConfirmation = useCallback(
-    (managerId: string) => {
+    (managerId: string, displayName: string) => {
       router.push(
-        `/${currentLocale}/confirmation?targetManagerId=${managerId}&agencyId=${agencyId}`
+        `/${currentLocale}/confirmation?targetManagerId=${managerId}&agencyId=${agencyId}&managerName=${encodeURIComponent(displayName)}`
       );
     },
     [router, currentLocale, agencyId]
@@ -319,12 +384,11 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
           }}
         >
           {managers.map((manager) => {
-            const initials = computeInitials(manager.displayName);
             return (
               <button
                 key={manager.id}
                 data-testid="manager-card"
-                onClick={() => goToConfirmation(manager.id)}
+                onClick={() => goToConfirmation(manager.id, manager.displayName)}
                 style={{
                   minHeight: "96px",
                   backgroundColor: "var(--surface-1)",
@@ -339,42 +403,11 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
                   textAlign: "left",
                 }}
               >
-                {/* Avatar : photo si fournie, sinon initiales dans --brand-soft. */}
-                {manager.photoUrl ? (
-                  <img
-                    data-testid="manager-avatar-photo"
-                    src={manager.photoUrl}
-                    alt={t("avatarAlt", { name: manager.displayName })}
-                    style={{
-                      flexShrink: 0,
-                      width: "72px",
-                      height: "72px",
-                      borderRadius: "var(--r-full)",
-                      objectFit: "cover",
-                      backgroundColor: "var(--brand-soft)",
-                    }}
-                  />
-                ) : (
-                  <span
-                    data-testid="manager-avatar-initials"
-                    aria-hidden="true"
-                    style={{
-                      flexShrink: 0,
-                      width: "72px",
-                      height: "72px",
-                      borderRadius: "var(--r-full)",
-                      backgroundColor: "var(--brand-soft)",
-                      color: "var(--brand-strong)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "28px",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {initials !== "" ? initials : <PersonIcon size={40} />}
-                  </span>
-                )}
+                <ManagerAvatar
+                  displayName={manager.displayName}
+                  photoUrl={manager.photoUrl}
+                  altText={t("avatarAlt", { name: manager.displayName })}
+                />
                 <div
                   style={{
                     display: "flex",

@@ -71,6 +71,7 @@ const frMessages = {
     offlineBanner: "Mode hors connexion — ticket temporaire",
     offlineInfo: "Ticket local — synchronisation dès reconnexion",
     printerError: "Imprimante indisponible — un agent vous remettra votre ticket",
+    managerReminder: "Vous verrez : {name}",
   },
   voice008: { playLabel: "Écouter" },
   degraded007: {
@@ -89,6 +90,7 @@ const enMessages = {
     offlineBanner: "Offline mode — temporary ticket",
     offlineInfo: "Local ticket — sync on reconnection",
     printerError: "Printer unavailable — a staff member will give you your ticket",
+    managerReminder: "You'll see: {name}",
   },
   voice008: { playLabel: "Écouter" },
   degraded007: {
@@ -294,6 +296,26 @@ describe("KIOSK-005: TicketScreen", () => {
     // No inline animation styles
     const animatedEls = container.querySelectorAll("[style*='animation']");
     expect(animatedEls.length).toBe(0);
+  });
+
+  it("MODEL-KIOSK-B: chemin conseiller → rappel « Vous verrez : {name} » sur le Moment Ticket", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} managerName="Awa Diallo" />
+      </NextIntlClientProvider>
+    );
+    const reminder = screen.getByTestId("ticket-manager-reminder");
+    expect(reminder).toBeInTheDocument();
+    expect(reminder.textContent).toContain("Awa Diallo");
+  });
+
+  it("MODEL-KIOSK-B: chemin opération (sans conseiller) → AUCUN rappel sur le Moment Ticket", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.queryByTestId("ticket-manager-reminder")).not.toBeInTheDocument();
   });
 
   // KIOSK-005: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)

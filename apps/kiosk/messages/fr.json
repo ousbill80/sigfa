@@ -83,7 +83,8 @@
     "skipButton": "Passer (sans numéro de téléphone)",
     "errorPhone": "Il manque votre numéro — ou touchez Passer",
     "loadingMessage": "Émission de votre ticket...",
-    "offlineBanner": "Mode hors connexion — ticket local généré"
+    "offlineBanner": "Mode hors connexion — ticket local généré",
+    "managerReminder": "Vous verrez : {name}"
   },
   "ticket005": {
     "position": "Position dans la file : {position}e",
@@ -94,7 +95,8 @@
     "voiceAnnounce": "Votre numéro est {displayNumber}. Vous êtes en position {position}. Attente estimée : {minutes} minutes.",
     "offlineBanner": "Mode hors connexion — ticket temporaire",
     "offlineInfo": "Ticket local — synchronisation dès reconnexion",
-    "printerError": "Imprimante indisponible — un agent vous remettra votre ticket"
+    "printerError": "Imprimante indisponible — un agent vous remettra votre ticket",
+    "managerReminder": "Vous verrez : {name}"
   },
   "voice008": {
     "playLabel": "Écouter"

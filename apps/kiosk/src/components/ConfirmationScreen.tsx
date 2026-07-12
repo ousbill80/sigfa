@@ -34,6 +34,13 @@ interface ConfirmationScreenProps {
    * conseiller (MODEL-API-B/D6). `serviceId` reste requis par le contrat.
    */
   targetManagerId?: string;
+  /**
+   * MODEL-KIOSK-B (finition) : nom d'affichage du conseiller ciblé (donnée
+   * publique, non-PII). Sert UNIQUEMENT à rappeler à l'usager QUI il va voir
+   * (réassurance). Présent sur le chemin conseiller, absent sur le chemin
+   * opération (qui reste inchangé).
+   */
+  managerName?: string;
   agencyId: string;
   /**
    * KIOSK-007 : sink d'événement simulé (F4) pour `alert:manager
@@ -60,6 +67,7 @@ export function ConfirmationScreen({
   serviceId,
   operationId,
   targetManagerId,
+  managerName,
   agencyId,
   systemErrorSink = noopDegradedSink,
 }: ConfirmationScreenProps) {
@@ -136,6 +144,11 @@ export function ConfirmationScreen({
       position: String(data.position),
       estimatedWaitMinutes: String(data.estimatedWaitMinutes),
     });
+    // MODEL-KIOSK-B (finition) : nom conseiller (public, non-PII) porté jusqu'au
+    // Moment Ticket pour rappeler QUI le client va voir. Chemin conseiller seul.
+    if (targetManagerId && managerName) {
+      params.set("managerName", managerName);
+    }
     return `/${currentLocale}/ticket?${params.toString()}`;
   };
 
@@ -312,6 +325,23 @@ export function ConfirmationScreen({
       >
         {t("title")}
       </h1>
+
+      {/* MODEL-KIOSK-B (finition) — Rappel discret du conseiller choisi
+          (réassurance). Chemin conseiller UNIQUEMENT (targetManagerId + nom) ;
+          le chemin opération reste inchangé. Tokens uniquement, zéro emoji. */}
+      {targetManagerId && managerName && (
+        <p
+          data-testid="manager-reminder"
+          style={{
+            fontSize: "20px",
+            color: "var(--ink-muted-inv)",
+            textAlign: "center",
+            margin: 0,
+          }}
+        >
+          {t("managerReminder", { name: managerName })}
+        </p>
+      )}
 
       {/* Phone display */}
       <div

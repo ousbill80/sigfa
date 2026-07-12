@@ -33,6 +33,12 @@ interface TicketScreenProps {
   printerStatus?: PrinterStatus;
   phoneNumber?: string;
   smsConsent?: boolean;
+  /**
+   * MODEL-KIOSK-B (finition) : nom du conseiller ciblé (public, non-PII). Rappel
+   * discret « Vous verrez : {name} » sur le Moment Ticket — réassurance. Présent
+   * sur le chemin conseiller uniquement ; le chemin opération reste inchangé.
+   */
+  managerName?: string;
   isAccessibilityMode?: boolean;
   /**
    * KIOSK-007 : vrai si le réseau a été coupé APRÈS le 201 mais AVANT
@@ -66,6 +72,7 @@ export function TicketScreen({
   printerStatus,
   phoneNumber,
   smsConsent,
+  managerName,
   isAccessibilityMode = false,
   networkLostBeforePrinterConfirm = false,
 }: TicketScreenProps) {
@@ -154,6 +161,23 @@ export function TicketScreen({
       >
         {t("position", { position })}
       </p>
+
+      {/* MODEL-KIOSK-B (finition) — Rappel discret du conseiller choisi sur le
+          Moment Ticket (réassurance). Chemin conseiller UNIQUEMENT ; le chemin
+          opération reste inchangé. Sobre, tokens uniquement, zéro emoji. */}
+      {managerName && (
+        <p
+          data-testid="ticket-manager-reminder"
+          style={{
+            fontSize: "20px",
+            color: "var(--ink-muted-inv)",
+            textAlign: "center",
+            margin: 0,
+          }}
+        >
+          {t("managerReminder", { name: managerName })}
+        </p>
+      )}
 
       {/* Estimated wait — texte de base identique */}
       <p

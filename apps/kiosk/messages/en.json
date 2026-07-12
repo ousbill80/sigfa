@@ -83,7 +83,8 @@
     "skipButton": "Skip (without phone number)",
     "errorPhone": "Phone number missing — or tap Skip",
     "loadingMessage": "Issuing your ticket...",
-    "offlineBanner": "Offline mode — local ticket generated"
+    "offlineBanner": "Offline mode — local ticket generated",
+    "managerReminder": "You'll see: {name}"
   },
   "ticket005": {
     "position": "Position in queue: {position}",
@@ -94,7 +95,8 @@
     "voiceAnnounce": "Your number is {displayNumber}. You are in position {position}. Estimated wait: {minutes} minutes.",
     "offlineBanner": "Offline mode — temporary ticket",
     "offlineInfo": "Local ticket — sync on reconnection",
-    "printerError": "Printer unavailable — a staff member will give you your ticket"
+    "printerError": "Printer unavailable — a staff member will give you your ticket",
+    "managerReminder": "You'll see: {name}"
   },
   "voice008": {
     "playLabel": "Listen"

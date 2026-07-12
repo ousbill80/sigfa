@@ -40,6 +40,7 @@ const frMessages = {
     errorPhone: "Il manque votre numéro — ou touchez Passer",
     loadingMessage: "Émission de votre ticket...",
     offlineBanner: "Mode hors connexion — ticket local généré",
+    managerReminder: "Vous verrez : {name}",
   },
   degraded007: {
     systemError: "Un problème est survenu. Adressez-vous à l'accueil, on s'occupe de vous.",
@@ -57,6 +58,7 @@ const enMessages = {
     errorPhone: "Phone number missing — or tap Skip",
     loadingMessage: "Issuing your ticket...",
     offlineBanner: "Offline mode — local ticket generated",
+    managerReminder: "You'll see: {name}",
   },
   degraded007: {
     systemError: "Something went wrong. Please see reception, we will take care of you.",
@@ -286,6 +288,31 @@ describe("KIOSK-004: ConfirmationScreen", () => {
     });
     // serviceId reste requis par le contrat (file conseiller = filtre logique).
     expect(capturedBody.serviceId).toBe("svc-conseiller");
+  });
+
+  it("MODEL-KIOSK-B: chemin conseiller → rappel « Vous verrez : {name} » (réassurance)", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <ConfirmationScreen
+          serviceId="svc-conseiller"
+          targetManagerId="rm-1"
+          managerName="Awa Diallo"
+          agencyId="agt-001"
+        />
+      </NextIntlClientProvider>
+    );
+    const reminder = screen.getByTestId("manager-reminder");
+    expect(reminder).toBeInTheDocument();
+    expect(reminder.textContent).toContain("Awa Diallo");
+  });
+
+  it("MODEL-KIOSK-B: chemin opération (sans conseiller) → AUCUN rappel conseiller", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <ConfirmationScreen serviceId="svc-1" agencyId="agt-001" />
+      </NextIntlClientProvider>
+    );
+    expect(screen.queryByTestId("manager-reminder")).not.toBeInTheDocument();
   });
 
   it("MODEL-KIOSK-B: sans targetManagerId → body ne contient PAS targetManagerId", async () => {

@@ -166,7 +166,29 @@ describe("MODEL-KIOSK-B: ManagersScreen", () => {
     expect(badge.querySelector("img")).toBeNull();
   });
 
-  it("MODEL-KIOSK-B: clic sur un conseiller → confirmation avec targetManagerId + agencyId", async () => {
+  it("MODEL-KIOSK-B: photoUrl qui échoue (onError) → repli initiales, jamais d'image cassée", async () => {
+    mockManagers(3);
+    const { container } = renderScreen();
+    await waitFor(() => {
+      expect(container.querySelectorAll("[data-testid='manager-card']").length).toBe(3);
+    });
+    // rm-1 (Kofi A.) a une photoUrl → <img> rendue au départ.
+    const imgs = container.querySelectorAll("[data-testid='manager-avatar-photo']");
+    expect(imgs.length).toBe(2);
+    // Simule un échec de chargement (404/réseau) sur la photo de rm-1.
+    fireEvent.error(imgs[0]);
+    await waitFor(() => {
+      // La <img> de rm-1 disparaît, remplacée par les initiales « KA ».
+      expect(container.querySelectorAll("[data-testid='manager-avatar-photo']").length).toBe(1);
+    });
+    const initials = container.querySelectorAll("[data-testid='manager-avatar-initials']");
+    // Awa Diallo (déjà sans photo) + Kofi A. (repli) → 2 badges initiales.
+    expect(initials.length).toBe(2);
+    const texts = Array.from(initials).map((el) => (el as HTMLElement).textContent);
+    expect(texts).toContain("KA");
+  });
+
+  it("MODEL-KIOSK-B: clic sur un conseiller → confirmation avec targetManagerId + displayName + agencyId", async () => {
     mockManagers(3);
     renderScreen();
     await waitFor(() => {
@@ -174,7 +196,7 @@ describe("MODEL-KIOSK-B: ManagersScreen", () => {
     });
     screen.getAllByTestId("manager-card")[0].click();
     expect(mockPush).toHaveBeenCalledWith(
-      `/fr/confirmation?targetManagerId=rm-1&agencyId=${AGENCY_ID}`
+      `/fr/confirmation?targetManagerId=rm-1&agencyId=${AGENCY_ID}&managerName=${encodeURIComponent("Kofi A.")}`
     );
   });
 

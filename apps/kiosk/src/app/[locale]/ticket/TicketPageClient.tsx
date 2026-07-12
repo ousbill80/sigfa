@@ -47,6 +47,8 @@ export function TicketPageClient() {
       : undefined;
   const networkLostBeforePrinterConfirm =
     searchParams.get("networkLostBeforePrinterConfirm") === "true";
+  // MODEL-KIOSK-B (finition) : nom conseiller (public, non-PII) pour le rappel.
+  const managerName = searchParams.get("managerName") ?? undefined;
 
   // S6 : aucune donnée de ticket (visite directe/historique) → retour accueil.
   const hasTicket = displayNumber !== null;
@@ -67,6 +69,7 @@ export function TicketPageClient() {
       estimatedWaitMinutes={estimatedWaitMinutes}
       phoneNumber={pii?.phoneNumber}
       smsConsent={pii?.smsConsent ?? false}
+      managerName={managerName}
       printerStatus={printerStatus}
       networkLostBeforePrinterConfirm={networkLostBeforePrinterConfirm}
     />
