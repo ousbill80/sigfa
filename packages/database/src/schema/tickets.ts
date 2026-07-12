@@ -18,7 +18,7 @@ import { services } from "./services.js";
 import { queues } from "./queues.js";
 import { counters } from "./counters.js";
 import { users } from "./users.js";
-import { ticketStatusEnum, ticketPriorityEnum, ticketChannelEnum } from "./enums.js";
+import { ticketStatusEnum, ticketPriorityEnum, ticketChannelEnum, agentLanguageEnum } from "./enums.js";
 
 /**
  * `tickets` — ticket de file (LA LOI `Ticket`).
@@ -101,6 +101,12 @@ export const tickets = pgTable(
     feedbackScore: integer("feedback_score"),
     /** Commentaire de satisfaction (≤500). */
     feedbackComment: text("feedback_comment"),
+    /**
+     * Langue préférée du porteur du ticket pour le routage par l'API-004.
+     * Nullable — la préférence est optionnelle ; NULL = aucune contrainte de langue.
+     * Valeurs : `FR` | `DIOULA` | `BAOULE` | `EN` (LA LOI `AgentLanguage`).
+     */
+    requiredLanguage: agentLanguageEnum("required_language"),
     /** Horodatage du feedback. */
     feedbackAt: timestamp("feedback_at", { withTimezone: true }),
     /**
