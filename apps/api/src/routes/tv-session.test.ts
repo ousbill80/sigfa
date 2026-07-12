@@ -144,4 +144,28 @@ describe("CONTRACT-013: session TV publique — agencyId → JWT DISPLAY lecture
     // DISPLAY n'autorise AUCUNE route HTTP, même en lecture (confiné au socket).
     expect(res.status).toBe(403);
   });
+
+  // ── Trou #4 : rate-limit 20/min/IP → 429 avec details.retryAfterSeconds ──
+  it("CONTRACT-013: > 20 POST /tv/session par fenêtre → 429 TOO_MANY_REQUESTS + details.retryAfterSeconds", async () => {
+    // Fenêtre Redis propre pour cette dimension IP (clé `route:tv-session:ip:*`).
+    const keys = await h.redis.keys("ratelimit:route:tv-session:*");
+    if (keys.length > 0) await h.redis.del(...keys);
+
+    const bankC = await seedBankAgency(h.db, "tv-bank-ratelimit");
+    // 20 appels autorisés (limite), le 21e dépasse la fenêtre glissante.
+    let last: Response | undefined;
+    for (let i = 0; i < 21; i++) {
+      last = await openTvSession(bankC.agencyId);
+    }
+    expect(last?.status).toBe(429);
+    const body = (await last!.json()) as {
+      error: { code: string; details?: { retryAfterSeconds?: number } };
+    };
+    expect(body.error.code).toBe("TOO_MANY_REQUESTS");
+    // La LOI : le corps porte `details.retryAfterSeconds` (backoff client testé côté web).
+    expect(typeof body.error.details?.retryAfterSeconds).toBe("number");
+    expect(body.error.details?.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+    // En-tête Retry-After également présent.
+    expect(last?.headers.get("Retry-After")).toBeTruthy();
+  });
 });
