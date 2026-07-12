@@ -1,7 +1,7 @@
 // __tests__/mob-001-navigation.test.tsx
 // MOB-001: Expo Router v3 — navigation entre 3 routes typées sans crash (Jest + RNTL)
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, waitFor } from '@testing-library/react-native';
 
 // Test de rendu des 3 layouts principaux sans crash
 import RootLayout from '../app/_layout';
@@ -12,8 +12,13 @@ import HomeScreen from '../app/(app)/index';
 import Step1Screen from '../app/(app)/new-ticket/step-1';
 
 describe('MOB-001: Expo Router v3 — navigation entre 3 routes typées sans crash', () => {
-  test('RootLayout se rend sans crash', () => {
-    expect(() => render(<RootLayout />)).not.toThrow();
+  test('RootLayout se rend sans crash', async () => {
+    // S8 : le root layout gate le rendu derrière initSecureStorage() (async) —
+    // on attend la résolution du gate pour un rendu stable (pas d'update hors act).
+    const { queryByTestId } = render(<RootLayout />);
+    await waitFor(() => {
+      expect(queryByTestId('secure-storage-gate')).toBeNull();
+    });
   });
 
   test('AuthLayout se rend sans crash', () => {

@@ -1,17 +1,48 @@
-// offline-queue.ts — MOB-002
-// File d'attente offline basée sur MMKV
-import { MMKV } from 'react-native-mmkv';
+// offline-queue.ts — MOB-002 (+ S7/S8 Boucle 2 F4)
+// File d'attente offline basée sur MMKV — store CHIFFRÉ au repos (S8) :
+// l'instance MMKV est fournie par secure-storage.ts (encryptionKey issue du
+// trousseau système). Tout accès avant initSecureStorage() échoue fermé.
+//
+// S7 : les champs sont alignés sur le contrat public.yaml (PublicTicketMobile)
+// — `phoneNumber` (ex-`phone`) et `smsConsent` (ex-`uemoaConsent`).
+// Les entrées héritées (stade dev) sont MIGRÉES à la lecture, pas purgées.
+import { getOfflineQueueStorage } from '@/services/secure-storage';
 
-const storage = new MMKV({ id: 'sigfa-offline-queue' });
 const PENDING_KEY = 'pending_tickets';
 
 export interface PendingTicket {
   idempotencyKey: string;
   agencyId: string;
   serviceId: string;
-  phone: string;
-  uemoaConsent: boolean;
+  /** Numéro E.164 — nommage du contrat public.yaml (ex-`phone`). */
+  phoneNumber: string;
+  /** Opt-in SMS UEMOA — nommage du contrat public.yaml (ex-`uemoaConsent`). */
+  smsConsent: boolean;
   enqueuedAt: string;
+  /** Statut local connu (les clôturés sont purgés par flush() sans réseau). */
+  status?: string;
+}
+
+/** Forme brute stockée — tolère les champs hérités d'avant S7. */
+type StoredPendingTicket = Partial<PendingTicket> & {
+  phone?: string;
+  uemoaConsent?: boolean;
+};
+
+/** Migration à la lecture : entrées héritées → champs du contrat public.yaml. */
+function normalizeEntry(entry: StoredPendingTicket): PendingTicket {
+  const normalized: PendingTicket = {
+    idempotencyKey: entry.idempotencyKey ?? '',
+    agencyId: entry.agencyId ?? '',
+    serviceId: entry.serviceId ?? '',
+    phoneNumber: entry.phoneNumber ?? entry.phone ?? '',
+    smsConsent: entry.smsConsent ?? entry.uemoaConsent ?? false,
+    enqueuedAt: entry.enqueuedAt ?? '',
+  };
+  if (entry.status !== undefined) {
+    normalized.status = entry.status;
+  }
+  return normalized;
 }
 
 /**
@@ -21,21 +52,29 @@ export interface PendingTicket {
 export function enqueue(ticket: PendingTicket): PendingTicket[] {
   const existing = getPendingTickets();
   const updated = [...existing, ticket];
-  storage.set(PENDING_KEY, JSON.stringify(updated));
+  getOfflineQueueStorage().set(PENDING_KEY, JSON.stringify(updated));
   return updated;
 }
 
 /**
- * Récupère tous les tickets en attente.
+ * Récupère tous les tickets en attente (entrées héritées migrées à la volée).
  */
 export function getPendingTickets(): PendingTicket[] {
-  const raw = storage.getString(PENDING_KEY);
+  const raw = getOfflineQueueStorage().getString(PENDING_KEY);
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as PendingTicket[];
+    const parsed = JSON.parse(raw) as StoredPendingTicket[];
+    return parsed.map(normalizeEntry);
   } catch {
     return [];
   }
+}
+
+/**
+ * Remplace le contenu de la file (utilisé par flush() pour les rejeux).
+ */
+export function setPendingTickets(tickets: PendingTicket[]): void {
+  getOfflineQueueStorage().set(PENDING_KEY, JSON.stringify(tickets));
 }
 
 /**
@@ -44,7 +83,7 @@ export function getPendingTickets(): PendingTicket[] {
 export function dequeue(idempotencyKey: string): PendingTicket[] {
   const existing = getPendingTickets();
   const updated = existing.filter(t => t.idempotencyKey !== idempotencyKey);
-  storage.set(PENDING_KEY, JSON.stringify(updated));
+  getOfflineQueueStorage().set(PENDING_KEY, JSON.stringify(updated));
   return updated;
 }
 
@@ -52,5 +91,5 @@ export function dequeue(idempotencyKey: string): PendingTicket[] {
  * Vide complètement la file.
  */
 export function clearQueue(): void {
-  storage.delete(PENDING_KEY);
+  getOfflineQueueStorage().delete(PENDING_KEY);
 }

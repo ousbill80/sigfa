@@ -1,8 +1,10 @@
 // __tests__/mob-002-offline-enqueue.test.tsx
 // MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV
+// (S8 : le store est chiffré derrière le gate initSecureStorage())
 import { enqueue, getPendingTickets, clearQueue, dequeue, type PendingTicket } from '../src/services/offline-queue';
+import { initSecureStorage, resetSecureStorageForTests } from '../src/services/secure-storage';
 
-// Mock MMKV storage
+// Mock MMKV storage (recrypt requis par le gate S8)
 const mockStorage: Record<string, string> = {};
 jest.mock('react-native-mmkv', () => ({
   MMKV: jest.fn().mockImplementation(() => ({
@@ -10,13 +12,16 @@ jest.mock('react-native-mmkv', () => ({
     getString: jest.fn((key: string) => mockStorage[key]),
     delete: jest.fn((key: string) => { delete mockStorage[key]; }),
     contains: jest.fn((key: string) => key in mockStorage),
+    recrypt: jest.fn(),
   })),
 }));
 
 describe('MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV', () => {
-  beforeEach(() => {
-    // Clear mock storage before each test
+  beforeEach(async () => {
+    // Clear mock storage before each test + passage du gate S8
     Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    resetSecureStorageForTests();
+    await initSecureStorage();
   });
 
   test('enqueue() ajoute un ticket dans MMKV', () => {
@@ -24,8 +29,8 @@ describe('MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV', ()
       idempotencyKey: 'test-key-001',
       agencyId: 'agency-1',
       serviceId: 'service-1',
-      phone: '+2250102030405',
-      uemoaConsent: true,
+      phoneNumber: '+2250102030405',
+      smsConsent: true,
       enqueuedAt: new Date().toISOString(),
     };
 
@@ -39,8 +44,8 @@ describe('MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV', ()
       idempotencyKey: 'test-key-002',
       agencyId: 'agency-1',
       serviceId: 'service-1',
-      phone: '+2250102030405',
-      uemoaConsent: true,
+      phoneNumber: '+2250102030405',
+      smsConsent: true,
       enqueuedAt: new Date().toISOString(),
     };
 
@@ -56,8 +61,8 @@ describe('MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV', ()
         idempotencyKey: `key-${i}`,
         agencyId: 'agency-1',
         serviceId: 'service-1',
-        phone: '+2250102030405',
-        uemoaConsent: true,
+        phoneNumber: '+2250102030405',
+        smsConsent: true,
         enqueuedAt: new Date().toISOString(),
       });
     }
@@ -69,8 +74,8 @@ describe('MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV', ()
       idempotencyKey: 'key-clear',
       agencyId: 'agency-1',
       serviceId: 'service-1',
-      phone: '+2250102030405',
-      uemoaConsent: true,
+      phoneNumber: '+2250102030405',
+      smsConsent: true,
       enqueuedAt: new Date().toISOString(),
     });
     clearQueue();
@@ -78,8 +83,8 @@ describe('MOB-002: offline — enqueue() écrit dans pending_tickets[] MMKV', ()
   });
 
   test('dequeue() supprime un ticket par idempotencyKey', () => {
-    enqueue({ idempotencyKey: 'key-a', agencyId: 'a1', serviceId: 's1', phone: '+225', uemoaConsent: true, enqueuedAt: new Date().toISOString() });
-    enqueue({ idempotencyKey: 'key-b', agencyId: 'a1', serviceId: 's1', phone: '+225', uemoaConsent: true, enqueuedAt: new Date().toISOString() });
+    enqueue({ idempotencyKey: 'key-a', agencyId: 'a1', serviceId: 's1', phoneNumber: '+225', smsConsent: true, enqueuedAt: new Date().toISOString() });
+    enqueue({ idempotencyKey: 'key-b', agencyId: 'a1', serviceId: 's1', phoneNumber: '+225', smsConsent: true, enqueuedAt: new Date().toISOString() });
     const remaining = dequeue('key-a');
     expect(remaining).toHaveLength(1);
     expect(remaining[0]?.idempotencyKey).toBe('key-b');

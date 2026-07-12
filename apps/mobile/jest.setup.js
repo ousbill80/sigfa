@@ -15,14 +15,39 @@ jest.mock('@react-native-community/netinfo', () => ({
   useNetInfo: jest.fn(() => ({ isConnected: true, isInternetReachable: true })),
 }));
 
-// Mock react-native-mmkv
+// Mock react-native-mmkv (recrypt requis par le gate S8 — secure-storage.ts)
 jest.mock('react-native-mmkv', () => ({
   MMKV: jest.fn().mockImplementation(() => ({
     set: jest.fn(),
     getString: jest.fn(() => undefined),
     delete: jest.fn(),
     contains: jest.fn(() => false),
+    recrypt: jest.fn(),
   })),
+}));
+
+// Mock expo-secure-store (S8) — trousseau en mémoire
+jest.mock('expo-secure-store', () => {
+  const secureStore = {};
+  return {
+    getItemAsync: jest.fn((key) => Promise.resolve(secureStore[key] ?? null)),
+    setItemAsync: jest.fn((key, value) => {
+      secureStore[key] = value;
+      return Promise.resolve();
+    }),
+    deleteItemAsync: jest.fn((key) => {
+      delete secureStore[key];
+      return Promise.resolve();
+    }),
+    AFTER_FIRST_UNLOCK: 'AFTER_FIRST_UNLOCK',
+  };
+});
+
+// Mock expo-crypto (S8) — aléa déterministe pour les tests
+jest.mock('expo-crypto', () => ({
+  getRandomBytesAsync: jest.fn((count) =>
+    Promise.resolve(Uint8Array.from({ length: count }, (_, i) => (i * 31 + 7) % 256))
+  ),
 }));
 
 // Mock expo-router — Stack must be a valid React component (not a plain object)
