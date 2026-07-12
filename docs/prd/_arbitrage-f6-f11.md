@@ -42,7 +42,7 @@ Implémentation **max autonome, TOUT en mock derrière interface** (adaptateurs 
 
 - **D11 — Mock ≠ clos pour SEC-004 (charge) et NET-003 (observabilité)** : artefacts (scénario k6, config PgBouncer, dashboards as-code, règles d'alerte) livrables maintenant, mais **validation des seuils GATED infra réelle** (env de charge dédié nightly ; métriques réelles). Ne pas les compter « 100 % clos » sur mock.
 
-## Décisions PO nécessaires (défauts retenus ci-dessus — confirme ou corrige)
+## Décisions PO — ✅ CONFIRMÉES par le PO le 2026-07-12 (verrouillées, ce ne sont plus des défauts)
 1. **Formules KPI REP-001** (D2) : rattachement jour = émission ; SLA = attente ; TRANSFERRED origine/destination ; occupation par-agent. → impact direct sur ce que voient directeurs/COMEX.
 2. **Périmètre rapport journalier 18 h** : `00:00→18:00` Abidjan (retenu) vs 24 h glissantes.
 3. **IA (gated pilote)** : cible MAE, horizon J..J+7, seuil volume publication score, hébergement modèle intra-infra SIGFA (aucun tiers).
