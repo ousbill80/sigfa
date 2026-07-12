@@ -9,13 +9,14 @@
  *
  * @module lib/tv-session.test
  */
-import { describe, it, expect } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { server } from "../test/msw-server";
 import {
   parseRetryAfterSeconds,
   TV_SESSION_PATH,
+  TV_SESSION_REMINT_MARGIN_MS,
   useTvSession,
 } from "./tv-session";
 
@@ -142,5 +143,110 @@ describe("useTvSession", () => {
     await waitFor(() => expect(result.current.status).toBe("ready"), { timeout: 3000 });
     expect(attempts).toBeGreaterThanOrEqual(2);
     expect(result.current.accessToken).toBe("eyJhbGciOiJIUzI1NiJ9.display.sig");
+  });
+});
+
+/**
+ * Trou de couverture #5 (panel durcissement TV) : le corps du `setTimeout` de
+ * re-mint (`tv-session.ts:186-187`) n'était exercé par aucun test. Le token
+ * DISPLAY n'est PAS renouvelable (aucun endpoint refresh) : à l'approche de
+ * l'expiration (TTL − marge), le hook RE-MINT via le flux normal `POST
+ * /tv/session`. On l'exerce avec des fake timers en avançant le temps jusqu'au
+ * déclenchement programmé.
+ */
+describe("useTvSession — re-mint programmé avant expiration (fake timers)", () => {
+  // Nettoyage systématique pour ne pas polluer les autres tests du fichier.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("RT-003: avance jusqu'à TTL − marge → 2e POST /tv/session, nouveau token (aucun refresh)", async () => {
+    vi.useFakeTimers();
+    const TTL_SECONDS = 43200;
+    const tokens = ["token.A.display.sig", "token.B.display.sig"];
+    const bodies: unknown[] = [];
+    const authHeaders: boolean[] = [];
+    let call = 0;
+    server.use(
+      http.post(`${API}${TV_SESSION_PATH}`, async ({ request }) => {
+        bodies.push(await request.json());
+        authHeaders.push(request.headers.has("authorization"));
+        const accessToken = tokens[Math.min(call, tokens.length - 1)];
+        call += 1;
+        return HttpResponse.json(
+          { accessToken, expiresIn: TTL_SECONDS, agencyId: AGENCY_ID, role: "DISPLAY" },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useTvSession({ agencyId: AGENCY_ID, mode: "real", apiBase: API }),
+    );
+
+    // Mint initial (token A). advanceTimersByTimeAsync(0) purge les microtâches
+    // MSW/React sans faire avancer l'horloge du re-mint.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.status).toBe("ready");
+    expect(result.current.accessToken).toBe(tokens[0]);
+    expect(call).toBe(1);
+
+    // Avance jusqu'au déclenchement du re-mint programmé (TTL − marge).
+    const remintDelayMs = TTL_SECONDS * 1000 - TV_SESSION_REMINT_MARGIN_MS;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(remintDelayMs);
+    });
+
+    // Un SECOND mint a eu lieu et un NOUVEAU token (B ≠ A) est exposé.
+    expect(call).toBe(2);
+    expect(result.current.status).toBe("ready");
+    expect(result.current.accessToken).toBe(tokens[1]);
+    expect(tokens[1]).not.toBe(tokens[0]);
+
+    // Le re-mint réutilise le flux normal : même route publique (aucun Bearer),
+    // même corps contractualisé { agencyId }. Aucun endpoint refresh appelé.
+    expect(bodies).toEqual([{ agencyId: AGENCY_ID }, { agencyId: AGENCY_ID }]);
+    expect(authHeaders).toEqual([false, false]);
+  });
+
+  it("RT-003: re-mint qui échoue → repli offline (status error, aucun token, pas de crash)", async () => {
+    vi.useFakeTimers();
+    const TTL_SECONDS = 43200;
+    let call = 0;
+    server.use(
+      http.post(`${API}${TV_SESSION_PATH}`, () => {
+        call += 1;
+        // 1er mint OK ; le re-mint échoue (réseau) → repli offline.
+        if (call === 1) {
+          return HttpResponse.json(
+            { accessToken: "token.A.display.sig", expiresIn: TTL_SECONDS, agencyId: AGENCY_ID, role: "DISPLAY" },
+            { status: 201 },
+          );
+        }
+        return HttpResponse.error();
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useTvSession({ agencyId: AGENCY_ID, mode: "real", apiBase: API }),
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.status).toBe("ready");
+    expect(result.current.accessToken).toBe("token.A.display.sig");
+
+    const remintDelayMs = TTL_SECONDS * 1000 - TV_SESSION_REMINT_MARGIN_MS;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(remintDelayMs);
+    });
+
+    // Re-mint tenté puis échec durable → repli offline propre.
+    expect(call).toBe(2);
+    expect(result.current.status).toBe("error");
+    expect(result.current.accessToken).toBeUndefined();
   });
 });
