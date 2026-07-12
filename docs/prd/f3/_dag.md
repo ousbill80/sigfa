@@ -41,7 +41,7 @@ F2 DONE ──► API-001 (auth) ──► API-002 (middleware tenant+withPlatfo
 | API-004 | Moteur de file : priorités 5 niveaux, routage compétence+langue, débordement, pause de file | 003 | DONE |
 | API-005 | Sync offline : batch ≤100, idempotence local_uuid, résolution numéros | 003 | DONE |
 | API-006 | Socket.io serveur conforme contrat + lock d'appel (2 agents → 1 gagnant) | 003 | DONE |
-| API-007 | Agents : statuts+history, chrono, alertes (inactif, SLA, déconnexion→WAITING PRIORITY) + **convergence `alert:manager` sur `{type,payload}` de LA LOI (dette API-004/005, supprimer l'union locale)** | 004, 006 | TODO |
+| API-007 | Agents : statuts+history, chrono, alertes (inactif, SLA, déconnexion→WAITING PRIORITY) + convergence `alert:manager` sur `{type,payload}` de LA LOI (dette API-004/005 **RÉSORBÉE**, union supprimée) | 004, 006 | DONE |
 | API-008 | CRUD admin : banks/agencies/services/counters/queues/hours+fériés, RBAC 6 rôles, audit branché | 002 | TODO |
 | API-009 | Templates & onboarding : clone-from, kiosk-access+session borne, import CSV agents, theming+purge-phone | 008 | TODO |
 | API-010 | Feedback public par trackingId : fenêtres 422/409, agrégation NPS, anti-spam | 003 | TODO |
