@@ -31,6 +31,7 @@ import { createSmsTemplateRouter } from "src/routes/sms-templates.js";
 import { createThemeRouter } from "src/routes/theme.js";
 import { createOnboardingRouter } from "src/routes/onboarding.js";
 import { createKioskSessionRouter } from "src/routes/kiosk-session.js";
+import { createTvSessionRouter } from "src/routes/tv-session.js";
 import { createAgentImportRouter } from "src/routes/agents-import.js";
 import { createDataPrivacyRouter } from "src/routes/data-privacy.js";
 import { createPublicTicketRouter } from "src/routes/public-tickets.js";
@@ -165,6 +166,9 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   app.route("/api/v1", onboardingRouter);
   const kioskSessionRouter = createKioskSessionRouter();
   app.route("/api/v1", kioskSessionRouter);
+  // Session d'affichage TV publique (CONTRACT-013) : token DISPLAY lecture seule.
+  const tvSessionRouter = createTvSessionRouter();
+  app.route("/api/v1", tvSessionRouter);
   const agentImportRouter = createAgentImportRouter();
   app.route("/api/v1", agentImportRouter);
   const dataPrivacyRouter = createDataPrivacyRouter();

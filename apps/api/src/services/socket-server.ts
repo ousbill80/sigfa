@@ -20,6 +20,7 @@ import type { Client } from "pg";
 import type http from "http";
 import { jwtVerify } from "jose";
 import { z } from "zod";
+import { joinAgencyEvent, TV_DISPLAY_ROLE } from "@sigfa/contracts/events/realtime.js";
 import { logger } from "src/lib/logger.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
 import { getAlertingConfig } from "src/config/alerting.js";
@@ -65,8 +66,12 @@ export interface SocketServerOptions {
 /** Schéma du payload sync:request. */
 const syncRequestSchema = z.object({ agencyId: z.string().uuid() });
 
-/** Schéma du payload join:agency. */
-const joinAgencySchema = z.object({ agencyId: z.string().uuid() });
+/**
+ * Schéma du payload join:agency — forme UNIQUE contractualisée (CONTRACT-013).
+ * Réutilise `joinAgencyEvent.payloadSchema` du contrat (`{ agencyId }`) : LA LOI,
+ * remplace tout `join:agency` ad hoc côté serveur.
+ */
+const joinAgencySchema = joinAgencyEvent.payloadSchema;
 
 /**
  * Attache un serveur Socket.io 4 à un serveur HTTP existant (Hono).
@@ -120,10 +125,17 @@ export function createSocketServer(
         await assertKioskSessionActive(db, jwtPayload.kioskId, jwtPayload.sessionId);
       }
 
+      // Un JWT DISPLAY (token d'affichage TV public, CONTRACT-013) est ACCEPTÉ pour
+      // l'authentification socket au même titre qu'un JWT agent/kiosk. Son
+      // confinement (join UNIQUEMENT à `agency:{agencyId}` de son claim, aucune
+      // mutation) est assuré par `handleJoinAgency`/`handleSyncRequest` via
+      // `agencyIds` = `[agencyId]`. Aucune émission portée vers une room ne contient
+      // de PII (ticket:called/queue:updated/sync:state = ids/numéros/libellés).
       socket.data["userId"] = jwtPayload.sub ?? null;
       socket.data["bankId"] = jwtPayload.bankId ?? null;
       socket.data["agencyIds"] = jwtPayload.agencyIds ?? [];
       socket.data["role"] = jwtPayload.role ?? "UNKNOWN";
+      socket.data["isDisplay"] = jwtPayload.role === TV_DISPLAY_ROLE;
       next();
     } catch {
       logger.warn({ socketId: socket.id }, "socket:handshake:invalid-token");
@@ -133,10 +145,12 @@ export function createSocketServer(
 
   io.on("connection", (socket) => {
     const userId = socket.data["userId"] as string | null;
+    const isDisplay = socket.data["isDisplay"] === true;
     logger.info({ socketId: socket.id, userId }, "socket:connected");
 
-    // Anti-flap : une reconnexion dans la fenêtre annule la déconnexion en attente.
-    if (userId) void cancelDisconnect(redis, userId);
+    // Anti-flap agent : une reconnexion annule la déconnexion en attente. Un socket
+    // DISPLAY n'est PAS un agent (sub = `tv:{agencyId}`) — aucun cycle de présence.
+    if (userId && !isDisplay) void cancelDisconnect(redis, userId);
 
     socket.on("join:agency", (payload: unknown) => {
       handleJoinAgency(socket, payload);
@@ -148,7 +162,9 @@ export function createSocketServer(
 
     socket.on("disconnect", () => {
       logger.info({ socketId: socket.id }, "socket:disconnected");
-      void scheduleDisconnect(socket, { db, redis, bus, bankIdOf });
+      // La déconnexion d'un écran TV (DISPLAY) ne déclenche AUCUN traitement de
+      // présence agent (pas de marque Redis, pas d'alerte). Réservé aux agents.
+      if (!isDisplay) void scheduleDisconnect(socket, { db, redis, bus, bankIdOf });
     });
   });
 
@@ -196,8 +212,16 @@ async function scheduleDisconnect(
 }
 
 /**
- * Gère la demande de join de room agency:{agencyId}.
- * Vérifie que l'agencyId est dans le scope JWT du socket.
+ * Gère la demande de join de room agency:{agencyId} — forme UNIQUE contractualisée
+ * (CONTRACT-013, `joinAgencyEvent.payloadSchema`).
+ *
+ * Autorisation :
+ *   - agent/kiosk (JWT scope agency) : `agencyId ∈ agencyIds` du JWT ;
+ *   - DISPLAY (token d'affichage TV public) : `agencyId === agencyId de son claim`
+ *     (son `agencyIds` = `[agencyId]`) — il ne peut JAMAIS rejoindre une AUTRE
+ *     room que la sienne (LEÇON SEC-F3-01, confinement lecture seule) ;
+ *   - SUPER_ADMIN : toute agence.
+ * Sinon → `error:forbidden` + log (jamais de join hors scope).
  *
  * @param socket   - Socket du client
  * @param payload  - Payload { agencyId } reçu
@@ -214,16 +238,18 @@ function handleJoinAgency(socket: Socket, payload: unknown): void {
   const agencyIds = socket.data["agencyIds"] as string[] | undefined ?? [];
   const role = socket.data["role"] as string | undefined ?? "";
 
+  // DISPLAY est confiné à sa PROPRE agence : `SUPER_ADMIN` ne s'applique jamais
+  // à lui (son role est DISPLAY), donc la garde d'inclusion suffit à le borner.
   if (role !== "SUPER_ADMIN" && !agencyIds.includes(agencyId)) {
     socket.emit("error:forbidden", `agencyId ${agencyId} hors scope JWT`);
-    logger.warn({ socketId: socket.id, agencyId, agencyIds }, "socket:join:out-of-scope");
+    logger.warn({ socketId: socket.id, agencyId, agencyIds, role }, "socket:join:out-of-scope");
     return;
   }
 
   const room = `agency:${agencyId}`;
   void socket.join(room);
   socket.emit("join:ok", `Rejoint ${room}`);
-  logger.info({ socketId: socket.id, room }, "socket:join:ok");
+  logger.info({ socketId: socket.id, room, role }, "socket:join:ok");
 }
 
 /**

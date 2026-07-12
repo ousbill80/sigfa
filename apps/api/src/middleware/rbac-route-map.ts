@@ -27,6 +27,7 @@ export type RequiredRole =
   | "MANAGER"
   | "AGENT"
   | "AUDITOR"
+  | "DISPLAY"
   | "MISSING";
 
 /** Scope de tenant pour une route */
@@ -48,6 +49,12 @@ export interface RouteRbacEntry {
  * seule), il ne dérive JAMAIS un accès de la hiérarchie numérique (cf.
  * `hasRequiredRole`). Le placer ici (ex. AUDITOR > AGENT) rouvrirait l'escalade
  * de privilèges vers les routes mutantes AGENT (Boucle 3 F3 — BLOCKER).
+ *
+ * ⚠️ DISPLAY (token d'affichage TV public) est lui aussi ABSENT et ORTHOGONAL —
+ * LEÇON SEC-F3-01. C'est un rôle d'AFFICHAGE SOCKET pur : il n'autorise AUCUNE
+ * route HTTP (ni lecture ni mutation), seulement la réception des flux socket de
+ * SA room. Le placer dans la hiérarchie (ou l'autoriser sur une lecture HTTP)
+ * rouvrirait une escalade — il ne DOIT jamais satisfaire un `requiredRole` HTTP.
  */
 export const ROLE_HIERARCHY: Record<string, number> = {
   SUPER_ADMIN: 100,
@@ -84,7 +91,17 @@ export function hasRequiredRole(
   requiredRole: RequiredRole,
   method = "GET"
 ): boolean {
+  // Route publique : aucun rôle requis (le middleware ne l'atteint même pas).
   if (requiredRole === "NONE") return true;
+
+  // DISPLAY (token d'affichage TV public) : rôle ORTHOGONAL d'AFFICHAGE SOCKET —
+  // LEÇON SEC-F3-01. Sa SEULE surface est la réception socket de sa propre room.
+  // Il ne satisfait AUCUNE route HTTP à rôle requis — ni mutation, ni lecture, ni
+  // même une route `AUTHENTICATED` (sinon /auth/me, heartbeat, devices lui seraient
+  // ouverts). Refus systématique AVANT toute autre règle (403). Un DISPLAY n'a
+  // aucune raison d'appeler une route HTTP protégée.
+  if (userRole === "DISPLAY") return false;
+
   if (requiredRole === "AUTHENTICATED") return userRole !== "NONE";
 
   // Le SUPER_ADMIN passe toujours (toutes méthodes, tous scopes).
@@ -230,6 +247,7 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "GET",  path: "/ai/feedback-insights",              requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
 
   // ── PUBLIC (public.yaml) ──────────────────────────────────────────────────
+  { method: "POST",   path: "/tv/session",                         requiredRole: "NONE",          tenantScope: "agency" },
   { method: "POST",   path: "/kiosk/session",                      requiredRole: "NONE",          tenantScope: "agency" },
   { method: "DELETE", path: "/kiosk/session/{kioskId}",            requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "POST",   path: "/kiosks/{kioskId}/heartbeat",         requiredRole: "AUTHENTICATED", tenantScope: "agency" },
