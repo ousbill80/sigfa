@@ -12,6 +12,7 @@ import { createSigfaClient } from "@sigfa/contracts";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useOfflineTicket } from "@/hooks/useOfflineTicket";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { storeTicketMomentPii, purgeTicketMomentPii } from "@/lib/ticket-moment-store";
 import {
   signalKioskSystemError,
   noopDegradedSink,
@@ -90,22 +91,36 @@ export function ConfirmationScreen({
     }
   };
 
-  const buildTicketUrl = (data: {
-    trackingId: string;
-    displayNumber: string;
-    position: number;
-    estimatedWaitMinutes: number;
-  }) => {
+  /**
+   * S6 : l'URL /ticket ne transporte plus AUCUNE PII (borne PARTAGÉE, UEMOA).
+   * Le téléphone + le consentement transitent par le store mémoire
+   * (`ticket-moment-store`, purge après affichage/timeout) ; l'URL ne porte
+   * que les données publiques du Moment Ticket.
+   */
+  const buildTicketUrl = (
+    data: {
+      trackingId: string;
+      displayNumber: string;
+      position: number;
+      estimatedWaitMinutes: number;
+    },
+    pii: { phoneNumber?: string; smsConsent?: boolean }
+  ) => {
+    if (pii.phoneNumber) {
+      storeTicketMomentPii({
+        phoneNumber: pii.phoneNumber,
+        smsConsent: pii.smsConsent ?? false,
+      });
+    } else {
+      // Aucun téléphone transmis (skip) : aucune PII résiduelle en mémoire.
+      purgeTicketMomentPii();
+    }
     const params = new URLSearchParams({
       trackingId: data.trackingId,
       displayNumber: data.displayNumber,
       position: String(data.position),
       estimatedWaitMinutes: String(data.estimatedWaitMinutes),
     });
-    if (phoneDigits.length > 0) {
-      params.set("phoneNumber", phoneDigits);
-      params.set("smsConsent", String(smsConsent));
-    }
     return `/${currentLocale}/ticket?${params.toString()}`;
   };
 
@@ -153,12 +168,15 @@ export function ConfirmationScreen({
         lastStatus = response.status;
 
         if (response.status === 201 && data) {
-          router.push(buildTicketUrl({
-            trackingId: data.trackingId,
-            displayNumber: data.displayNumber ?? data.number,
-            position: data.position,
-            estimatedWaitMinutes: data.estimatedWaitMinutes,
-          }));
+          router.push(buildTicketUrl(
+            {
+              trackingId: data.trackingId,
+              displayNumber: data.displayNumber ?? data.number,
+              position: data.position,
+              estimatedWaitMinutes: data.estimatedWaitMinutes,
+            },
+            { phoneNumber: finalPhone, smsConsent: finalConsent }
+          ));
           return;
         }
 
@@ -183,23 +201,29 @@ export function ConfirmationScreen({
       // Autres non-201 (4xx…) : repli offline pour ne pas bloquer l'usager.
       setIsOffline(true);
       const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
-      router.push(buildTicketUrl({
-        trackingId: offlineTicket.trackingId,
-        displayNumber: offlineTicket.displayNumber,
-        position: offlineTicket.position,
-        estimatedWaitMinutes: offlineTicket.estimatedWaitMinutes,
-      }));
+      router.push(buildTicketUrl(
+        {
+          trackingId: offlineTicket.trackingId,
+          displayNumber: offlineTicket.displayNumber,
+          position: offlineTicket.position,
+          estimatedWaitMinutes: offlineTicket.estimatedWaitMinutes,
+        },
+        { phoneNumber: finalPhone, smsConsent: finalConsent }
+      ));
       return;
     } catch {
       // Network error: use offline fallback
       setIsOffline(true);
       const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
-      router.push(buildTicketUrl({
-        trackingId: offlineTicket.trackingId,
-        displayNumber: offlineTicket.displayNumber,
-        position: offlineTicket.position,
-        estimatedWaitMinutes: offlineTicket.estimatedWaitMinutes,
-      }));
+      router.push(buildTicketUrl(
+        {
+          trackingId: offlineTicket.trackingId,
+          displayNumber: offlineTicket.displayNumber,
+          position: offlineTicket.position,
+          estimatedWaitMinutes: offlineTicket.estimatedWaitMinutes,
+        },
+        { phoneNumber: finalPhone, smsConsent: finalConsent }
+      ));
       return;
     } finally {
       setIsLoading(false);
