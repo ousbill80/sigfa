@@ -35,7 +35,7 @@
     "waitEstimate": "~{minutes} min",
     "seeMore": "See more services",
     "closedService": "Closed — {schedule}",
-    "accessibilityButton": "♿ Priority access",
+    "accessibilityButton": "Priority access",
     "emptyTitle": "No services available",
     "emptyMessage": "Please go to reception — a staff member will assist you.",
     "offlineBanner": "Offline mode"

@@ -120,10 +120,20 @@ describe("KIOSK-003: ServicesScreen", () => {
         expect(cardEl.style.minHeight, `Card minHeight for ${locale}`).toBe("96px");
       });
 
+      // v2 : plus d'emoji. Chaque carte porte une icône SVG cohérente
+      // (cercle --brand-soft) au lieu du glyphe emoji.
       const icons = container.querySelectorAll("[data-testid='service-icon']");
+      expect(icons.length, `Icon count for ${locale}`).toBe(4);
       icons.forEach((icon) => {
         const iconEl = icon as HTMLElement;
-        expect(iconEl.style.fontSize, `Icon fontSize for ${locale}`).toBe("40px");
+        expect(iconEl.style.backgroundColor, `Icon circle bg for ${locale}`).toBe(
+          "var(--brand-soft)"
+        );
+        expect(
+          iconEl.querySelector("svg"),
+          `SVG icon present for ${locale}`
+        ).toBeInTheDocument();
+        expect(iconEl.textContent, `No emoji glyph for ${locale}`).toBe("");
       });
 
       const labels = container.querySelectorAll("[data-testid='service-label']");

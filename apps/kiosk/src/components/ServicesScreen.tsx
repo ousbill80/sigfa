@@ -1,8 +1,12 @@
 /**
  * KIOSK-003 — ServicesScreen.tsx
  * Écran de sélection de service — refonte v2 « Sérénité Premium ».
- * Grille de cartes chaudes sur --night, cibles ≥ 96px, max 4 + « Voir plus ».
- * Tokens @sigfa/ui uniquement, aucune valeur hex en dur.
+ *
+ * Disposition : grille de tuiles 2 colonnes (1 colonne si peu d'espace),
+ * largeur de contenu max contenue et centrée. Icônes SVG cohérentes
+ * (`ServiceIcon`) posées dans un cercle `--brand-soft` — fin des emoji.
+ * Temps d'attente en pill discret, chevron d'action. Tokens @sigfa/ui
+ * uniquement, aucune valeur hex en dur.
  */
 "use client";
 
@@ -13,11 +17,16 @@ import { EmptyState } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { DEFAULT_LONG_QUEUE_THRESHOLD_MIN } from "@/hooks/useDegradedState";
+import { ServiceIcon } from "@/components/icons/ServiceIcon";
+import { AccessibilityIcon, ChevronIcon, PhoneIcon } from "@/components/icons/UiIcons";
 
 export interface ServiceItem {
   id: string;
   name: string;
-  icon: string;
+  /** Code optionnel — sert au mapping d'icône par mot-clé (sinon `name`). */
+  code?: string;
+  /** @deprecated emoji retiré en v2 ; conservé pour compat de données. */
+  icon?: string;
   estimatedMinutes: number;
   isOpen: boolean;
   schedule?: string;
@@ -83,7 +92,7 @@ export function ServicesScreen({
         }}
       >
         <EmptyState
-          icon={<span style={{ fontSize: "40px", lineHeight: 1 }}>🗂️</span>}
+          icon={<ServiceIcon name="generic" size={48} style={{ color: "var(--ink-inverse)" }} />}
           title={t("emptyTitle")}
           description={t("emptyMessage")}
           style={{ color: "var(--ink-inverse)" }}
@@ -154,145 +163,194 @@ export function ServicesScreen({
         {t("title")}
       </h1>
 
-      {/* KIOSK-007 — Bannière file longue : message d'affluence + champ
-          téléphone mis en avant (SMS non optionnel visuellement ici). */}
-      {isLongQueue && (
-        <section
-          data-testid="long-queue-banner"
-          aria-live="polite"
-          style={{
-            backgroundColor: "var(--surface-1)",
-            borderRadius: "var(--r-lg)",
-            boxShadow: "var(--shadow-2)",
-            padding: "var(--space-4) var(--space-6)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-3)",
-          }}
-        >
-          <span style={{ fontSize: "28px", fontWeight: 600, color: "var(--ink-strong)" }}>
-            {tDeg("longQueueTitle", { estimate: longestOpenWait })}
-          </span>
-          <span style={{ fontSize: "24px", color: "var(--ink-soft)" }}>
-            {tDeg("longQueueMessage")}
-          </span>
-          {/* Champ téléphone mis en avant — CTA menant à la saisie du numéro. */}
-          <button
-            data-testid="long-queue-phone-cta"
-            onClick={() =>
-              router.push(`/${currentLocale}/confirmation?agencyId=${agencyId}`)
-            }
-            style={{
-              minHeight: "72px",
-              fontSize: "28px",
-              fontWeight: 600,
-              color: "var(--brand-contrast)",
-              backgroundColor: "var(--brand)",
-              boxShadow: "var(--shadow-brand)",
-              border: "none",
-              borderRadius: "var(--r-md)",
-              cursor: "pointer",
-            }}
-          >
-            📱 {tDeg("phoneFieldLabel")}
-          </button>
-        </section>
-      )}
-
-      {/* Service cards */}
+      {/* Zone de contenu centrée — largeur max contenue (pas d'étirement). */}
       <div
         style={{
+          width: "100%",
+          maxWidth: "960px",
+          margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          gap: "var(--space-4)",
+          gap: "var(--space-6)",
           flex: 1,
         }}
       >
-        {visibleServices.map((service) => (
-          <button
-            key={service.id}
-            data-testid="service-card"
-            onClick={() => handleServiceSelect(service)}
-            aria-disabled={!service.isOpen ? "true" : undefined}
+        {/* KIOSK-007 — Bannière file longue : message d'affluence + champ
+            téléphone mis en avant (SMS non optionnel visuellement ici). */}
+        {isLongQueue && (
+          <section
+            data-testid="long-queue-banner"
+            aria-live="polite"
             style={{
-              minHeight: "96px",
               backgroundColor: "var(--surface-1)",
               borderRadius: "var(--r-lg)",
-              border: "1px solid var(--hairline)",
-              boxShadow: service.isOpen ? "var(--shadow-2)" : "var(--shadow-1)",
-              cursor: service.isOpen ? "pointer" : "not-allowed",
-              display: "flex",
-              alignItems: "center",
+              boxShadow: "var(--shadow-2)",
               padding: "var(--space-4) var(--space-6)",
-              gap: "var(--space-6)",
-              opacity: service.isOpen ? 1 : 0.4,
-              textAlign: "left",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-3)",
             }}
           >
-            <span
-              data-testid="service-icon"
-              style={{ fontSize: "40px", lineHeight: 1 }}
-            >
-              {service.icon}
+            <span style={{ fontSize: "28px", fontWeight: 600, color: "var(--ink-strong)" }}>
+              {tDeg("longQueueTitle", { estimate: longestOpenWait })}
             </span>
-            <div
+            <span style={{ fontSize: "24px", color: "var(--ink-soft)" }}>
+              {tDeg("longQueueMessage")}
+            </span>
+            {/* Champ téléphone mis en avant — CTA menant à la saisie du numéro. */}
+            <button
+              data-testid="long-queue-phone-cta"
+              onClick={() =>
+                router.push(`/${currentLocale}/confirmation?agencyId=${agencyId}`)
+              }
               style={{
+                minHeight: "72px",
+                fontSize: "28px",
+                fontWeight: 600,
+                color: "var(--brand-contrast)",
+                backgroundColor: "var(--brand)",
+                boxShadow: "var(--shadow-brand)",
+                border: "none",
+                borderRadius: "var(--r-md)",
+                cursor: "pointer",
                 display: "flex",
-                flexDirection: "column",
-                gap: "var(--space-1)",
-                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "var(--space-3)",
               }}
             >
-              <span
-                data-testid="service-label"
-                style={{
-                  fontSize: "28px",
-                  fontWeight: 600,
-                  color: "var(--action-label)",
-                }}
-              >
-                {service.name}
-              </span>
-              {service.isOpen ? (
-                <span
-                  data-testid="service-estimate"
-                  style={{ fontSize: "20px", color: "var(--ink-soft)" }}
-                >
-                  {t("waitEstimate", { minutes: service.estimatedMinutes })}
-                </span>
-              ) : (
-                <span
-                  data-testid="service-schedule"
-                  style={{ fontSize: "20px", color: "var(--ink-soft)" }}
-                >
-                  {t("closedService", { schedule: service.schedule ?? "" })}
-                </span>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
+              <PhoneIcon size={28} />
+              {tDeg("phoneFieldLabel")}
+            </button>
+          </section>
+        )}
 
-      {/* See more button */}
-      {hasMore && !showAll && (
-        <button
-          data-testid="see-more-btn"
-          onClick={() => setShowAll(true)}
+        {/* Service cards — grille 2 colonnes (1 si peu d'espace). */}
+        <div
           style={{
-            fontSize: "24px",
-            color: "var(--ink-inverse)",
-            background: "none",
-            border: "2px solid var(--ink-inverse)",
-            borderRadius: "var(--r-md)",
-            cursor: "pointer",
-            padding: "var(--space-4)",
-            minHeight: "72px",
-            textAlign: "center",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+            gap: "var(--space-6)",
           }}
         >
-          {t("seeMore")}
-        </button>
-      )}
+          {visibleServices.map((service) => (
+            <button
+              key={service.id}
+              data-testid="service-card"
+              onClick={() => handleServiceSelect(service)}
+              aria-disabled={!service.isOpen ? "true" : undefined}
+              style={{
+                minHeight: "96px",
+                backgroundColor: "var(--surface-1)",
+                borderRadius: "var(--r-lg)",
+                border: "1px solid var(--hairline)",
+                boxShadow: service.isOpen ? "var(--shadow-2)" : "var(--shadow-1)",
+                cursor: service.isOpen ? "pointer" : "not-allowed",
+                display: "flex",
+                alignItems: "center",
+                padding: "var(--space-4) var(--space-6)",
+                gap: "var(--space-6)",
+                opacity: service.isOpen ? 1 : 0.4,
+                textAlign: "left",
+              }}
+            >
+              {/* Cercle icône --brand-soft, icône SVG en --brand. */}
+              <span
+                data-testid="service-icon"
+                style={{
+                  flexShrink: 0,
+                  width: "72px",
+                  height: "72px",
+                  borderRadius: "var(--r-full)",
+                  backgroundColor: "var(--brand-soft)",
+                  color: "var(--brand)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ServiceIcon keyword={service.code ?? service.name} size={40} />
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: "var(--space-2)",
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  data-testid="service-label"
+                  style={{
+                    fontSize: "28px",
+                    fontWeight: 600,
+                    color: "var(--action-label)",
+                  }}
+                >
+                  {service.name}
+                </span>
+                {service.isOpen ? (
+                  <span
+                    data-testid="service-estimate"
+                    style={{
+                      fontSize: "20px",
+                      fontWeight: 600,
+                      color: "var(--brand-strong)",
+                      backgroundColor: "var(--brand-soft)",
+                      borderRadius: "var(--r-full)",
+                      padding: "var(--space-1) var(--space-3)",
+                    }}
+                  >
+                    {t("waitEstimate", { minutes: service.estimatedMinutes })}
+                  </span>
+                ) : (
+                  <span
+                    data-testid="service-schedule"
+                    style={{
+                      fontSize: "20px",
+                      color: "var(--ink-soft)",
+                      backgroundColor: "var(--surface-2)",
+                      borderRadius: "var(--r-full)",
+                      padding: "var(--space-1) var(--space-3)",
+                    }}
+                  >
+                    {t("closedService", { schedule: service.schedule ?? "" })}
+                  </span>
+                )}
+              </div>
+              {service.isOpen && (
+                <ChevronIcon
+                  size={28}
+                  style={{ flexShrink: 0, color: "var(--ink-soft)" }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* See more button */}
+        {hasMore && !showAll && (
+          <button
+            data-testid="see-more-btn"
+            onClick={() => setShowAll(true)}
+            style={{
+              fontSize: "24px",
+              color: "var(--ink-inverse)",
+              background: "none",
+              border: "2px solid var(--ink-inverse)",
+              borderRadius: "var(--r-md)",
+              cursor: "pointer",
+              padding: "var(--space-4)",
+              minHeight: "72px",
+              textAlign: "center",
+            }}
+          >
+            {t("seeMore")}
+          </button>
+        )}
+      </div>
 
       {/* Accessibility button */}
       <button
@@ -307,8 +365,12 @@ export function ServicesScreen({
           padding: "var(--space-2)",
           minHeight: "72px",
           alignSelf: "center",
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-3)",
         }}
       >
+        <AccessibilityIcon size={isAccessibilityMode ? 32 : 28} />
         {t("accessibilityButton")}
       </button>
     </main>

@@ -27,41 +27,88 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
     Which service do you need?
   </h1>
   <div
-    style="display: flex; flex-direction: column; gap: var(--space-4); flex: 1 1 0%;"
+    style="width: 100%; max-width: 960px; margin: 0px auto; display: flex; flex-direction: column; gap: var(--space-6); flex: 1 1 0%;"
   >
-    <button
-      aria-disabled="true"
-      data-testid="service-card"
-      style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
+    <div
+      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--space-6);"
     >
-      <span
-        data-testid="service-icon"
-        style="font-size: 40px; line-height: 1;"
-      >
-        💸
-      </span>
-      <div
-        style="display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 0%;"
+      <button
+        aria-disabled="true"
+        data-testid="service-card"
+        style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
       >
         <span
-          data-testid="service-label"
-          style="font-size: 28px; font-weight: 600; color: var(--action-label);"
+          data-testid="service-icon"
+          style="flex-shrink: 0; width: 72px; height: 72px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
         >
-          Virement international
+          <svg
+            aria-hidden="true"
+            data-icon="transfer"
+            fill="none"
+            focusable="false"
+            height="40"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="40"
+          >
+            <path
+              d="M4 9h13l-3-3"
+            />
+            <path
+              d="M20 15H7l3 3"
+            />
+          </svg>
         </span>
-        <span
-          data-testid="service-schedule"
-          style="font-size: 20px; color: var(--ink-soft);"
+        <div
+          style="display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); flex: 1 1 0%; min-width: 0;"
         >
-          Closed — lundi 08h00
-        </span>
-      </div>
-    </button>
+          <span
+            data-testid="service-label"
+            style="font-size: 28px; font-weight: 600; color: var(--action-label);"
+          >
+            Virement international
+          </span>
+          <span
+            data-testid="service-schedule"
+            style="font-size: 20px; color: var(--ink-soft); background-color: var(--surface-2); border-radius: var(--r-full); padding: var(--space-1) var(--space-3);"
+          >
+            Closed — lundi 08h00
+          </span>
+        </div>
+      </button>
+    </div>
   </div>
   <button
     data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center;"
+    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center; display: flex; align-items: center; gap: var(--space-3);"
   >
+    <svg
+      aria-hidden="true"
+      fill="none"
+      focusable="false"
+      height="28"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="28"
+    >
+      <circle
+        cx="12"
+        cy="4.5"
+        r="1.8"
+      />
+      <path
+        d="M12 7v5h4l2 5"
+      />
+      <path
+        d="M12 12H8l-1 3a4 4 0 1 0 5 4"
+      />
+    </svg>
     ♿ Priority access
   </button>
 </main>
@@ -94,41 +141,88 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
     Quel service souhaitez-vous ?
   </h1>
   <div
-    style="display: flex; flex-direction: column; gap: var(--space-4); flex: 1 1 0%;"
+    style="width: 100%; max-width: 960px; margin: 0px auto; display: flex; flex-direction: column; gap: var(--space-6); flex: 1 1 0%;"
   >
-    <button
-      aria-disabled="true"
-      data-testid="service-card"
-      style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
+    <div
+      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--space-6);"
     >
-      <span
-        data-testid="service-icon"
-        style="font-size: 40px; line-height: 1;"
-      >
-        💸
-      </span>
-      <div
-        style="display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 0%;"
+      <button
+        aria-disabled="true"
+        data-testid="service-card"
+        style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
       >
         <span
-          data-testid="service-label"
-          style="font-size: 28px; font-weight: 600; color: var(--action-label);"
+          data-testid="service-icon"
+          style="flex-shrink: 0; width: 72px; height: 72px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
         >
-          Virement international
+          <svg
+            aria-hidden="true"
+            data-icon="transfer"
+            fill="none"
+            focusable="false"
+            height="40"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="40"
+          >
+            <path
+              d="M4 9h13l-3-3"
+            />
+            <path
+              d="M20 15H7l3 3"
+            />
+          </svg>
         </span>
-        <span
-          data-testid="service-schedule"
-          style="font-size: 20px; color: var(--ink-soft);"
+        <div
+          style="display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); flex: 1 1 0%; min-width: 0;"
         >
-          Fermé — lundi 08h00
-        </span>
-      </div>
-    </button>
+          <span
+            data-testid="service-label"
+            style="font-size: 28px; font-weight: 600; color: var(--action-label);"
+          >
+            Virement international
+          </span>
+          <span
+            data-testid="service-schedule"
+            style="font-size: 20px; color: var(--ink-soft); background-color: var(--surface-2); border-radius: var(--r-full); padding: var(--space-1) var(--space-3);"
+          >
+            Fermé — lundi 08h00
+          </span>
+        </div>
+      </button>
+    </div>
   </div>
   <button
     data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center;"
+    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center; display: flex; align-items: center; gap: var(--space-3);"
   >
+    <svg
+      aria-hidden="true"
+      fill="none"
+      focusable="false"
+      height="28"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="28"
+    >
+      <circle
+        cx="12"
+        cy="4.5"
+        r="1.8"
+      />
+      <path
+        d="M12 7v5h4l2 5"
+      />
+      <path
+        d="M12 12H8l-1 3a4 4 0 1 0 5 4"
+      />
+    </svg>
     ♿ Accès prioritaire
   </button>
 </main>

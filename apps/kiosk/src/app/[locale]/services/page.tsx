@@ -8,10 +8,10 @@ import type { ServiceItem } from "@/components/ServicesScreen";
 // Default placeholder services for the static export
 // In production these would be fetched from the API
 const DEFAULT_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", icon: "💰", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", icon: "💵", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", icon: "🔄", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", icon: "📋", estimatedMinutes: 15, isOpen: true },
+  { id: "svc-1", name: "Dépôt", code: "deposit", estimatedMinutes: 5, isOpen: true },
+  { id: "svc-2", name: "Retrait", code: "withdrawal", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-3", name: "Virement", code: "transfer", estimatedMinutes: 12, isOpen: true },
+  { id: "svc-4", name: "Réclamation", code: "complaint", estimatedMinutes: 15, isOpen: true },
 ];
 
 export default function ServicesPage() {

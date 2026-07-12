@@ -35,7 +35,7 @@
     "waitEstimate": "~{minutes} min",
     "seeMore": "Voir plus de services",
     "closedService": "Fermé — {schedule}",
-    "accessibilityButton": "♿ Accès prioritaire",
+    "accessibilityButton": "Accès prioritaire",
     "emptyTitle": "Aucun service disponible",
     "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
     "offlineBanner": "Mode hors connexion"
