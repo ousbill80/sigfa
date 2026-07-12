@@ -138,6 +138,13 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "POST",  path: "/services",     requiredRole: "AGENCY_DIRECTOR",  tenantScope: "agency" },
   { method: "PATCH", path: "/services/{id}", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
 
+  // ── OPERATIONS (core.yaml — MODEL-CONTRACT-A) ─────────────────────────────
+  { method: "GET",    path: "/services/{serviceId}/operations", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+  { method: "POST",   path: "/services/{serviceId}/operations", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+  { method: "GET",    path: "/operations/{id}",                 requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+  { method: "PATCH",  path: "/operations/{id}",                 requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+  { method: "DELETE", path: "/operations/{id}",                 requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+
   // ── COUNTERS (core.yaml) ──────────────────────────────────────────────────
   { method: "GET",   path: "/counters",                       requiredRole: "MANAGER",         tenantScope: "agency" },
   { method: "POST",  path: "/counters",                       requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
@@ -227,6 +234,7 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "DELETE", path: "/kiosk/session/{kioskId}",            requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "POST",   path: "/kiosks/{kioskId}/heartbeat",         requiredRole: "AUTHENTICATED", tenantScope: "agency" },
   { method: "GET",    path: "/agencies/{id}/qr",                   requiredRole: "AGENT",         tenantScope: "agency" },
+  { method: "GET",    path: "/public/agencies/{agencyId}/operations", requiredRole: "NONE",       tenantScope: "public" },
   { method: "POST",   path: "/public/tickets",                     requiredRole: "NONE",          tenantScope: "public" },
   { method: "GET",    path: "/public/tickets/{trackingId}",        requiredRole: "NONE",          tenantScope: "public" },
   { method: "POST",   path: "/public/tickets/{trackingId}/feedback", requiredRole: "NONE",        tenantScope: "public" },

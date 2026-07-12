@@ -79,6 +79,15 @@ async function runMigrations(client: pg.Client): Promise<void> {
       sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
   await client.query(`
+    CREATE TABLE IF NOT EXISTS operations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
+      agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id),
+      code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER,
+      display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(service_id, code));
+  `);
+  await client.query(`
     CREATE TABLE IF NOT EXISTS queues (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
       agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id),
@@ -114,7 +123,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
     CREATE TABLE IF NOT EXISTS tickets (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
       agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id),
-      service_id UUID NOT NULL REFERENCES services(id), counter_id UUID, agent_id UUID,
+      service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID,
       number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE,
       channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
       priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT,
@@ -557,5 +566,93 @@ describe("API-003: cycle de vie du ticket", () => {
     const evt = bus.ofType("queue:updated").at(-1);
     expect(evt).toBeDefined();
     expect(Object.keys(evt?.payload as object).sort()).toEqual(["estimate", "length", "queueId"]);
+  });
+});
+
+/** Crée une opération sous un service et retourne son id. */
+async function seedOperation(serviceId: string, code: string, slaMinutes: number | null): Promise<string> {
+  const res = await db.query(
+    `INSERT INTO operations (bank_id, agency_id, service_id, code, name, sla_minutes, display_order)
+     VALUES ($1,$2,$3,$4,'Op',$5,0) RETURNING id`,
+    [ids.bankId, ids.agencyId, serviceId, code, slaMinutes]
+  );
+  return (res.rows[0] as { id: string }).id;
+}
+
+describe("MODEL-API-A: résolution operation→service (POST /tickets)", () => {
+  it("MODEL-API-A: operationId fourni → service_id dérivé + operation_id posé", async () => {
+    const opId = await seedOperation(ids.serviceId, "DEP", 8);
+    const r = await post(
+      "/tickets",
+      { serviceId: ids.serviceId, operationId: opId, channel: "KIOSK" },
+      { "X-Idempotency-Key": nano() }
+    );
+    expect(r.status).toBe(201);
+    const body = r.data as { serviceId: string; operationId: string; id: string };
+    expect(body.serviceId).toBe(ids.serviceId);
+    expect(body.operationId).toBe(opId);
+    const row = await db.query(`SELECT service_id, operation_id FROM tickets WHERE id=$1`, [body.id]);
+    const t = row.rows[0] as { service_id: string; operation_id: string };
+    expect(t.service_id).toBe(ids.serviceId);
+    expect(t.operation_id).toBe(opId);
+  });
+
+  it("MODEL-API-A: mismatch serviceId/operationId → 422 SERVICE_OPERATION_MISMATCH", async () => {
+    const opId = await seedOperation(ids.serviceId, "MIS", null);
+    const r = await post(
+      "/tickets",
+      { serviceId: ids.service2Id, operationId: opId, channel: "KIOSK" },
+      { "X-Idempotency-Key": nano() }
+    );
+    expect(r.status).toBe(422);
+    expect((r.data as { error: { code: string } }).error.code).toBe("SERVICE_OPERATION_MISMATCH");
+  });
+
+  it("MODEL-API-A: operationId inconnu → 404 OPERATION_NOT_FOUND", async () => {
+    const r = await post(
+      "/tickets",
+      { serviceId: ids.serviceId, operationId: "00000000-0000-4000-a000-000000000000", channel: "KIOSK" },
+      { "X-Idempotency-Key": nano() }
+    );
+    expect(r.status).toBe(404);
+    expect((r.data as { error: { code: string } }).error.code).toBe("OPERATION_NOT_FOUND");
+  });
+
+  it("MODEL-API-A: operationId absent → serviceId tel quel (F2/F3 inchangé)", async () => {
+    const r = await post(
+      "/tickets",
+      { serviceId: ids.serviceId, channel: "KIOSK" },
+      { "X-Idempotency-Key": nano() }
+    );
+    expect(r.status).toBe(201);
+    const body = r.data as { serviceId: string; operationId?: string };
+    expect(body.serviceId).toBe(ids.serviceId);
+    expect(body.operationId).toBeUndefined();
+  });
+
+  it("MODEL-API-A: opération inactive → 404 OPERATION_NOT_FOUND", async () => {
+    const opId = await seedOperation(ids.serviceId, "INA", 5);
+    await db.query(`UPDATE operations SET is_active=false WHERE id=$1`, [opId]);
+    const r = await post(
+      "/tickets",
+      { serviceId: ids.serviceId, operationId: opId, channel: "KIOSK" },
+      { "X-Idempotency-Key": nano() }
+    );
+    expect(r.status).toBe(404);
+  });
+
+  it("MODEL-API-A: SLA résolu (opération sinon service) utilisé dans l'estimation TMT", async () => {
+    // Opération avec SLA 42 (>15 défaut, >service 10) sur un service sans historique
+    // (<5 obs DONE) → fallback = SLA opération résolu = 42 min × position 1.
+    const opId = await seedOperation(ids.service2Id, "SLA", 42);
+    const r = await post(
+      "/tickets",
+      { serviceId: ids.service2Id, operationId: opId, channel: "QR" },
+      { "X-Idempotency-Key": nano() }
+    );
+    expect(r.status).toBe(201);
+    const body = r.data as { position: number; estimatedWaitMinutes: number };
+    expect(body.position).toBe(1);
+    expect(body.estimatedWaitMinutes).toBe(42);
   });
 });

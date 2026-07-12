@@ -23,6 +23,7 @@ import { createAgentRouter } from "src/routes/agents.js";
 import { createBankRouter } from "src/routes/banks.js";
 import { createAgencyRouter } from "src/routes/agencies.js";
 import { createServiceRouter } from "src/routes/services.js";
+import { createOperationRouter } from "src/routes/operations.js";
 import { createCounterRouter } from "src/routes/counters.js";
 import { createHoursRouter } from "src/routes/hours.js";
 import { createThresholdsRouter } from "src/routes/thresholds.js";
@@ -141,6 +142,9 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // Routes CRUD admin (API-008) — services & guichets (scope agence).
   const serviceRouter = createServiceRouter();
   app.route("/api/v1", serviceRouter);
+  // Routes CRUD opérations (MODEL-API-A) — enfants d'un service, scope agence.
+  const operationRouter = createOperationRouter();
+  app.route("/api/v1", operationRouter);
   const counterRouter = createCounterRouter();
   app.route("/api/v1", counterRouter);
 

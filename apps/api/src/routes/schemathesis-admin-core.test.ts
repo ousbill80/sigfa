@@ -68,6 +68,12 @@ beforeAll(async () => {
     `INSERT INTO counters (bank_id, agency_id, number, label) VALUES ($1,$2,1,'G1')`,
     [fx.bankId, fx.agencyId]
   );
+  // Seed une opération pour exercer GET/PATCH/DELETE /operations/{id} (MODEL-API-A).
+  await h.db.query(
+    `INSERT INTO operations (bank_id, agency_id, service_id, code, name, sla_minutes, display_order)
+     VALUES ($1,$2,$3,'DEP','Dépôt',NULL,0)`,
+    [fx.bankId, fx.agencyId, serviceId]
+  );
   token = await forgeToken(
     h.jwtSecretBytes,
     "BANK_ADMIN",
@@ -138,6 +144,20 @@ describe("API-008: CRUD complet conforme LA LOI — Schemathesis PASS core+admin
       ["/tickets", "/auth"]
     );
     console.log("[Schemathesis core] Output:", output.slice(0, 2500));
+    expect(exitCode).toBe(0);
+  }, 300_000);
+
+  it("MODEL-API-A: Schemathesis PASS core.yaml operations (CRUD /services/{id}/operations + /operations/{id})", async () => {
+    if (!(await dockerAvailable())) {
+      console.warn("[Schemathesis operations] Docker indisponible — SKIP gracieux");
+      return;
+    }
+    const { exitCode, output } = await runSchemathesis(
+      "core.yaml",
+      "^/(services/[^/]+/operations|operations)",
+      ["/tickets", "/auth"]
+    );
+    console.log("[Schemathesis operations] Output:", output.slice(0, 2500));
     expect(exitCode).toBe(0);
   }, 300_000);
 

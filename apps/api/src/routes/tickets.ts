@@ -70,6 +70,8 @@ interface TicketEnv {
 /** Schéma d'émission d'un ticket (agencyId dérivé du JWT). */
 const createSchema = z.object({
   serviceId: z.string().uuid(),
+  /** Opération optionnelle (MODEL-API-A/D1) : si fournie → service_id dérivé. */
+  operationId: z.string().uuid().optional(),
   channel: z.enum(["KIOSK", "QR", "MOBILE", "WHATSAPP"]),
   phoneNumber: z.string().regex(/^\+[1-9]\d{6,14}$/).optional(),
   priority: z.enum(["STANDARD", "PRIORITY", "VIP", "PMR", "SENIOR"]).optional(),
@@ -173,6 +175,7 @@ interface TicketRow {
   agency_id: string;
   queue_id: string;
   service_id: string;
+  operation_id: string | null;
   counter_id: string | null;
   number: number;
   display_number: string | null;
@@ -241,6 +244,11 @@ type CreateInput = z.infer<typeof createSchema>;
  */
 export interface IssueTicketInput {
   serviceId: string;
+  /**
+   * Opération optionnelle (MODEL-API-A/D1). Si fournie, le `service_id` du ticket
+   * est DÉRIVÉ de l'opération ; incohérence avec `serviceId` → 422 mismatch.
+   */
+  operationId?: string | undefined;
   channel: "KIOSK" | "QR" | "MOBILE" | "WHATSAPP";
   phoneNumber?: string | undefined;
   priority?: "STANDARD" | "PRIORITY" | "VIP" | "PMR" | "SENIOR" | undefined;
@@ -293,7 +301,10 @@ export async function issueTicketFor(
 ): Promise<Record<string, unknown>> {
   await db.query("BEGIN");
   try {
-    const ctx = await resolveServiceQueue(db, at, input.serviceId);
+    // MODEL-API-A/D1 : si operationId fourni, dérive le service_id de l'opération
+    // (scope agence), pose operation_id ; mismatch avec serviceId → 422.
+    const resolved = await resolveOperation(db, at, input);
+    const ctx = await resolveServiceQueue(db, at, resolved.serviceId);
     const number = await allocateNumber(db, ctx.queueId);
     const displayNumber = `${ctx.code}-${String(number).padStart(3, "0")}`;
     const trackingId = nanoid(21);
@@ -302,6 +313,8 @@ export async function issueTicketFor(
       bankId: ctx.bankId,
       ctx,
       input,
+      serviceId: resolved.serviceId,
+      operationId: resolved.operationId,
       number,
       displayNumber,
       trackingId,
@@ -309,12 +322,14 @@ export async function issueTicketFor(
     });
     // API-004 : position utilise l'ordre prioritaire (VIP>PMR>SENIOR>PRIORITY>STANDARD)
     const position = await computePositionPriority(inserted.id, db);
-    const estimate = await estimateWaitMinutes(position, input.serviceId, db);
+    // D4 : SLA résolu (opération sinon service) en fallback TMT de l'estimation.
+    const estimate = await estimateWaitMinutes(position, resolved.serviceId, db, resolved.operationId);
     await db.query("COMMIT");
     await emitCreated(bus, redis, db, {
       inserted,
       ctx,
       input,
+      serviceId: resolved.serviceId,
       number,
       position,
       estimate,
@@ -325,7 +340,8 @@ export async function issueTicketFor(
       displayNumber,
       status: "WAITING",
       priority: input.priority ?? "STANDARD",
-      serviceId: input.serviceId,
+      serviceId: resolved.serviceId,
+      ...(resolved.operationId ? { operationId: resolved.operationId } : {}),
       agencyId: ctx.agencyId,
       channel: input.channel,
       position,
@@ -337,6 +353,40 @@ export async function issueTicketFor(
     await db.query("ROLLBACK");
     throw err;
   }
+}
+
+/**
+ * Résout l'opération (MODEL-API-A/D1). SI `operationId` fourni : charge l'opération
+ * active, dans le scope agence (et banque si `at.bankId` fourni), dérive le
+ * `service_id` de l'opération. SI `serviceId` aussi fourni et incohérent → 422
+ * `SERVICE_OPERATION_MISMATCH`. Opération inconnue/inactive/hors agence → 404
+ * `OPERATION_NOT_FOUND`. SI `operationId` absent → `serviceId` tel quel (F2/F3).
+ *
+ * @returns Le `serviceId` effectif + l'`operationId` (ou null si non fourni)
+ */
+async function resolveOperation(
+  db: Client,
+  at: IssueTenant,
+  input: IssueTicketInput
+): Promise<{ serviceId: string; operationId: string | null }> {
+  if (!input.operationId) return { serviceId: input.serviceId, operationId: null };
+  const res = await db.query(
+    `SELECT id, service_id FROM operations
+      WHERE id = $1 AND agency_id = $2 AND is_active = true
+        AND ($3::uuid IS NULL OR bank_id = $3)`,
+    [input.operationId, at.agencyId, at.bankId]
+  );
+  const row = res.rows[0] as { id: string; service_id: string } | undefined;
+  if (!row) throw new SigfaError("OPERATION_NOT_FOUND", "Opération introuvable pour cet identifiant.", 404);
+  if (input.serviceId !== row.service_id) {
+    throw new SigfaError(
+      "SERVICE_OPERATION_MISMATCH",
+      "Le serviceId fourni est incohérent avec le service de l'opération.",
+      422,
+      { serviceId: input.serviceId, operationServiceId: row.service_id }
+    );
+  }
+  return { serviceId: row.service_id, operationId: row.id };
 }
 
 /** Chiffre + hache le téléphone fourni (ou renvoie des nulls). */
@@ -415,6 +465,8 @@ async function insertTicket(
     bankId: string;
     ctx: { queueId: string; agencyId: string };
     input: IssueTicketInput;
+    serviceId: string;
+    operationId: string | null;
     number: number;
     displayNumber: string;
     trackingId: string;
@@ -423,16 +475,17 @@ async function insertTicket(
 ): Promise<{ id: string; issued_at: Date }> {
   const res = await db.query(
     `INSERT INTO tickets
-       (bank_id, agency_id, queue_id, service_id, number, display_number,
+       (bank_id, agency_id, queue_id, service_id, operation_id, number, display_number,
         tracking_id, channel, status, priority, phone_encrypted, phone_hash, sms_consent,
         required_language)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'WAITING',$9,$10,$11,$12,$13)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'WAITING',$10,$11,$12,$13,$14)
      RETURNING id, issued_at`,
     [
       args.bankId,
       args.ctx.agencyId,
       args.ctx.queueId,
-      args.input.serviceId,
+      args.serviceId,
+      args.operationId,
       args.number,
       args.displayNumber,
       args.trackingId,
@@ -456,6 +509,7 @@ async function emitCreated(
     inserted: { id: string; issued_at: Date };
     ctx: { queueId: string; agencyId: string };
     input: IssueTicketInput;
+    serviceId: string;
     number: number;
     position: number;
     estimate: number;
@@ -469,7 +523,7 @@ async function emitCreated(
       id: args.inserted.id,
       number: `A${String(args.number).padStart(3, "0")}`,
       status: "WAITING",
-      serviceId: args.input.serviceId,
+      serviceId: args.serviceId,
       agencyId,
       channel: args.input.channel,
       createdAt: args.inserted.issued_at.toISOString(),
@@ -507,7 +561,8 @@ function registerGet(router: Hono<TicketEnv>): void {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       // API-004 : position reflète l'ordre VIP>PMR>SENIOR>PRIORITY>STANDARD
       const position = await computePositionPriority(row.id, db);
-      const estimate = await estimateWaitMinutes(position, row.service_id, db);
+      // D4 : SLA résolu (opération sinon service) en fallback TMT.
+      const estimate = await estimateWaitMinutes(position, row.service_id, db, row.operation_id);
       return c.json(ticketView(row, position, estimate), 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -524,6 +579,7 @@ function ticketView(row: TicketRow, position: number, estimate: number): Record<
     status: row.status,
     priority: row.priority,
     serviceId: row.service_id,
+    ...(row.operation_id ? { operationId: row.operation_id } : {}),
     agencyId: row.agency_id,
     channel: row.channel,
     position,

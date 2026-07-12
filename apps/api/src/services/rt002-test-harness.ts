@@ -309,6 +309,14 @@ async function applyRtSchema(db: pg.Client): Promise<void> {
       agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL,
       sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await db.query(`
+    CREATE TABLE IF NOT EXISTS operations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
+      agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id),
+      code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER,
+      display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(service_id, code));`);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS queues (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
       agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id),
@@ -325,7 +333,7 @@ async function applyRtSchema(db: pg.Client): Promise<void> {
     CREATE TABLE IF NOT EXISTS tickets (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
       agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id),
-      service_id UUID NOT NULL REFERENCES services(id), counter_id UUID, agent_id UUID,
+      service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID,
       number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE,
       channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
       priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT,

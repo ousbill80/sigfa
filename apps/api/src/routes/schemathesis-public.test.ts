@@ -59,8 +59,9 @@ async function runMigrations(client: pg.Client): Promise<void> {
   await client.query(`CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE TABLE IF NOT EXISTS agencies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE TABLE IF NOT EXISTS services (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+  await client.query(`CREATE TABLE IF NOT EXISTS operations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER, display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(service_id, code));`);
   await client.query(`CREATE TABLE IF NOT EXISTS queues (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), current_ticket_number INTEGER NOT NULL DEFAULT 0, status queue_status NOT NULL DEFAULT 'OPEN', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL DEFAULT 'KIOSK', status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), closed_at TIMESTAMPTZ, feedback_score INTEGER, feedback_comment TEXT, feedback_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL DEFAULT 'KIOSK', status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), closed_at TIMESTAMPTZ, feedback_score INTEGER, feedback_comment TEXT, feedback_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE TABLE IF NOT EXISTS daily_agency_stats (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID REFERENCES services(id), day DATE NOT NULL, tickets_issued INTEGER NOT NULL DEFAULT 0, tickets_served INTEGER NOT NULL DEFAULT 0, tickets_abandoned INTEGER NOT NULL DEFAULT 0, tickets_no_show INTEGER NOT NULL DEFAULT 0, total_wait_seconds INTEGER NOT NULL DEFAULT 0, total_service_seconds INTEGER NOT NULL DEFAULT 0, sla_met_count INTEGER NOT NULL DEFAULT 0, sla_total_count INTEGER NOT NULL DEFAULT 0, feedback_count INTEGER NOT NULL DEFAULT 0, feedback_sum INTEGER NOT NULL DEFAULT 0, nps_promoters INTEGER NOT NULL DEFAULT 0, nps_passives INTEGER NOT NULL DEFAULT 0, nps_detractors INTEGER NOT NULL DEFAULT 0, agent_active_seconds INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS das_no_service_uniq ON daily_agency_stats (bank_id, agency_id, day) WHERE service_id IS NULL;`);
   await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS das_with_service_uniq ON daily_agency_stats (bank_id, agency_id, service_id, day) WHERE service_id IS NOT NULL;`);
@@ -73,6 +74,12 @@ async function runMigrations(client: pg.Client): Promise<void> {
   const serviceId = (svc.rows[0] as { id: string }).id;
   const q = await client.query(`INSERT INTO queues (bank_id, agency_id, service_id) VALUES ($1,$2,$3) RETURNING id`, [bankId, agencyId, serviceId]);
   const queueId = (q.rows[0] as { id: string }).id;
+  // Opération active pour la liste publique borne (MODEL-API-A).
+  await client.query(
+    `INSERT INTO operations (bank_id, agency_id, service_id, code, name, sla_minutes, display_order)
+     VALUES ($1,$2,$3,'DEP','Dépôt',NULL,0)`,
+    [bankId, agencyId, serviceId]
+  );
   // Un ticket DONE clôturé à l'instant (fenêtre ouverte) + un WAITING pour le suivi.
   await client.query(
     `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, display_number, tracking_id, channel, status, closed_at)
@@ -151,6 +158,46 @@ describe("API-010: Schemathesis module public", () => {
       exitCode = e.code ?? 1;
     }
     console.log("[Schemathesis public] Output:", output.slice(0, 3000));
+    expect(exitCode).toBe(0);
+  }, 180_000);
+
+  it("MODEL-API-A: Schemathesis PASS liste publique operations (/public/agencies/{id}/operations)", async () => {
+    const contractPath = join(import.meta.dirname, "../../../../packages/contracts/generated/bundled/public.yaml");
+    let dockerAvailable = false;
+    try {
+      await execAsync("docker --version");
+      dockerAvailable = true;
+    } catch {
+      console.warn("[Schemathesis public operations] Docker non disponible — SKIP gracieux");
+    }
+    if (!dockerAvailable) {
+      expect(dockerAvailable).toBe(false);
+      return;
+    }
+
+    let output = "";
+    let exitCode = 0;
+    try {
+      const result = await execAsync(
+        `docker run --rm \
+          -v "${contractPath}:/contract.yaml" \
+          --add-host=host.docker.internal:host-gateway \
+          schemathesis/schemathesis:stable \
+          run /contract.yaml \
+          --url "http://host.docker.internal:${apiPort}/api/v1" \
+          --include-path-regex "^/public/agencies/[^/]+/operations" \
+          --max-examples 20 \
+          --request-timeout 10000 \
+          --checks not_a_server_error`,
+        { timeout: 150_000 }
+      );
+      output = result.stdout + result.stderr;
+    } catch (err: unknown) {
+      const e = err as { stdout?: string; stderr?: string; code?: number };
+      output = (e.stdout ?? "") + (e.stderr ?? "");
+      exitCode = e.code ?? 1;
+    }
+    console.log("[Schemathesis public operations] Output:", output.slice(0, 3000));
     expect(exitCode).toBe(0);
   }, 180_000);
 });

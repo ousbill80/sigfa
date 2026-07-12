@@ -39,7 +39,11 @@ function cacheKey(queueId: string): string {
  * @param tx        - Transaction / connexion courante
  * @returns TMT en minutes (arrondi supérieur, ≥1)
  */
-export async function computeTmtMinutes(serviceId: string, tx: Tx): Promise<number> {
+export async function computeTmtMinutes(
+  serviceId: string,
+  tx: Tx,
+  operationId?: string | null
+): Promise<number> {
   const res = await tx.query(
     `SELECT COUNT(*)::int AS n, COALESCE(AVG(service_time_seconds), 0) AS avg_s
        FROM tickets
@@ -53,15 +57,29 @@ export async function computeTmtMinutes(serviceId: string, tx: Tx): Promise<numb
   if (row.n >= TMT_MIN_OBSERVATIONS) {
     return Math.max(1, Math.ceil(Number(row.avg_s) / 60));
   }
-  return fallbackTmtMinutes(serviceId, tx);
+  return fallbackTmtMinutes(serviceId, tx, operationId);
 }
 
 /**
- * TMT de repli : `sla_minutes` du service, sinon défaut global 15 min.
- * @param serviceId - Service ciblé
- * @param tx        - Transaction / connexion courante
+ * TMT de repli : **SLA résolu** (D4 — `operation.sla_minutes ?? service.sla_minutes`),
+ * sinon défaut global 15 min. Quand `operationId` est fourni, le SLA propre de
+ * l'opération prime ; s'il est NULL (héritage) ou l'opération absente, on retombe
+ * sur le SLA du service.
+ *
+ * @param serviceId   - Service ciblé
+ * @param tx          - Transaction / connexion courante
+ * @param operationId - Opération optionnelle du ticket (SLA prioritaire)
  */
-async function fallbackTmtMinutes(serviceId: string, tx: Tx): Promise<number> {
+async function fallbackTmtMinutes(
+  serviceId: string,
+  tx: Tx,
+  operationId?: string | null
+): Promise<number> {
+  if (operationId) {
+    const opRes = await tx.query(`SELECT sla_minutes FROM operations WHERE id = $1`, [operationId]);
+    const opRow = opRes.rows[0] as { sla_minutes: number | null } | undefined;
+    if (opRow?.sla_minutes != null) return opRow.sla_minutes;
+  }
   const res = await tx.query(`SELECT sla_minutes FROM services WHERE id = $1`, [serviceId]);
   const row = res.rows[0] as { sla_minutes: number } | undefined;
   return row?.sla_minutes ?? TMT_GLOBAL_FALLBACK_MINUTES;
@@ -69,17 +87,19 @@ async function fallbackTmtMinutes(serviceId: string, tx: Tx): Promise<number> {
 
 /**
  * Estime le temps d'attente (minutes) = position × TMT.
- * @param position  - Position PULL du ticket
- * @param serviceId - Service du ticket
- * @param tx        - Transaction / connexion courante
+ * @param position    - Position PULL du ticket
+ * @param serviceId   - Service du ticket
+ * @param tx          - Transaction / connexion courante
+ * @param operationId - Opération optionnelle (SLA résolu prioritaire — D4)
  */
 export async function estimateWaitMinutes(
   position: number,
   serviceId: string,
-  tx: Tx
+  tx: Tx,
+  operationId?: string | null
 ): Promise<number> {
   if (position <= 0) return 0;
-  const tmt = await computeTmtMinutes(serviceId, tx);
+  const tmt = await computeTmtMinutes(serviceId, tx, operationId);
   return position * tmt;
 }
 

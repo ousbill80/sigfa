@@ -57,6 +57,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
   z.object({
     channel: z.literal("KIOSK"),
     serviceId: z.string().uuid(),
+    operationId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164.nullish(),
@@ -65,6 +66,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
   z.object({
     channel: z.literal("QR"),
     serviceId: z.string().uuid(),
+    operationId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164.nullish(),
@@ -73,6 +75,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
   z.object({
     channel: z.literal("MOBILE"),
     serviceId: z.string().uuid(),
+    operationId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164,
@@ -81,6 +84,7 @@ const publicCreateSchema = z.discriminatedUnion("channel", [
   z.object({
     channel: z.literal("WHATSAPP"),
     serviceId: z.string().uuid(),
+    operationId: z.string().uuid().optional(),
     agencyId: z.string().uuid(),
     priority: priorityEnum.optional(),
     phoneNumber: phoneE164,
@@ -102,6 +106,7 @@ interface TicketRow {
   id: string;
   agency_id: string;
   service_id: string;
+  operation_id: string | null;
   number: number;
   display_number: string | null;
   tracking_id: string;
@@ -121,9 +126,63 @@ interface TicketRow {
 export function createPublicTicketRouter(): Hono<PublicEnv> {
   const router = new Hono<PublicEnv>();
   registerCreate(router);
+  registerPublicOperations(router);
   registerTrack(router);
   registerFeedback(router);
   return router;
+}
+
+/** Regex UUID canonique pour valider `agencyId`/`serviceId`. */
+const PUBLIC_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * GET /public/agencies/:agencyId/operations?serviceId= (role NONE) — affichage borne.
+ *
+ * Retourne les opérations ACTIVES d'un service, avec `slaMinutes` **RÉSOLU**
+ * (`operation.sla_minutes ?? service.sla_minutes` — D4) pour l'estimation d'attente.
+ * Aucune donnée sensible : id/code/name/slaMinutes(résolu)/iconKey uniquement.
+ * `agencyId`/`serviceId` malformés → 400 VALIDATION_ERROR.
+ */
+function registerPublicOperations(router: Hono<PublicEnv>): void {
+  router.get("/public/agencies/:agencyId/operations", async (c) => {
+    const agencyId = c.req.param("agencyId");
+    const serviceId = c.req.query("serviceId");
+    if (!PUBLIC_UUID_RE.test(agencyId) || !serviceId || !PUBLIC_UUID_RE.test(serviceId)) {
+      return c.json(buildError("VALIDATION_ERROR", "agencyId/serviceId requis (UUID)."), 400);
+    }
+    const db = c.get("db");
+    const res = await db.query(
+      `SELECT o.id, o.code, o.name,
+              COALESCE(o.sla_minutes, s.sla_minutes) AS sla_minutes, o.icon_key
+         FROM operations o JOIN services s ON s.id = o.service_id
+        WHERE o.agency_id = $1 AND o.service_id = $2 AND o.is_active = true
+        ORDER BY o.display_order ASC, o.created_at ASC`,
+      [agencyId, serviceId]
+    );
+    const data = (res.rows as PublicOperationRow[]).map(publicOperationDto);
+    return c.json({ data }, 200);
+  });
+}
+
+/** Ligne brute d'opération publique (SLA déjà résolu par la requête). */
+interface PublicOperationRow {
+  id: string;
+  code: string;
+  name: string;
+  sla_minutes: number | null;
+  icon_key: string | null;
+}
+
+/** Projette le DTO public d'une opération (LA LOI `PublicOperation`). */
+function publicOperationDto(row: PublicOperationRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    slaMinutes: row.sla_minutes,
+    ...(row.icon_key !== null ? { iconKey: row.icon_key } : {}),
+  };
 }
 
 /** Résout le bus depuis le contexte, ou fournit un no-op validant. */
@@ -183,6 +242,7 @@ function registerCreate(router: Hono<PublicEnv>): void {
 async function issuePublicTicket(c: PublicCtx, input: PublicCreateInput): Promise<Record<string, unknown>> {
   const issueInput: IssueTicketInput = {
     serviceId: input.serviceId,
+    operationId: input.operationId,
     channel: input.channel,
     priority: input.priority,
     phoneNumber: input.phoneNumber ?? undefined,
@@ -215,6 +275,7 @@ function publicCreatedDto(r: Record<string, unknown>): Record<string, unknown> {
     position: r["position"],
     estimatedWaitMinutes: r["estimatedWaitMinutes"],
     serviceId: r["serviceId"],
+    ...(r["operationId"] ? { operationId: r["operationId"] } : {}),
     agencyId: r["agencyId"],
     createdAt: r["createdAt"],
   };
@@ -258,7 +319,7 @@ function errorResponse(c: PublicCtx, err: unknown): Response {
 async function loadByTracking(db: Client, trackingId: string): Promise<TicketRow | null> {
   if (!TRACKING_RE.test(trackingId)) return null;
   const res = await db.query(
-    `SELECT id, agency_id, service_id, number, display_number, tracking_id,
+    `SELECT id, agency_id, service_id, operation_id, number, display_number, tracking_id,
             channel, status, priority, closed_at, feedback_score, issued_at
        FROM tickets WHERE tracking_id = $1`,
     [trackingId]
@@ -304,6 +365,7 @@ function publicStatusDto(row: TicketRow): Record<string, unknown> {
     estimatedWaitMinutes: 0,
     agencyId: row.agency_id,
     serviceId: row.service_id,
+    ...(row.operation_id ? { operationId: row.operation_id } : {}),
     createdAt: row.issued_at.toISOString(),
   };
 }

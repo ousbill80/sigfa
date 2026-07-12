@@ -60,6 +60,7 @@ const syncItemSchema = z
   .object({
     localUuid: z.string().uuid(),
     serviceId: z.string().uuid(),
+    operationId: z.string().uuid().optional(),
     channel: z.enum(["KIOSK", "QR", "MOBILE", "WHATSAPP"]),
     createdOfflineAt: z.string().datetime(),
     priority: z.enum(["STANDARD", "PRIORITY", "VIP", "PMR", "SENIOR"]).optional(),
@@ -194,14 +195,46 @@ type Outcome =
  */
 async function syncOne(db: Client, tenant: TenantContext, it: SyncItem): Promise<Outcome> {
   if (isClockSkewed(it.createdOfflineAt)) return skip(it.localUuid, "CLOCK_SKEW");
-  const queue = await resolveQueue(db, tenant, it.serviceId);
+  // MODEL-API-A/D1 (offline-sync D8) : operationId optionnel/item → service_id dérivé.
+  const resolved = await resolveOperation(db, tenant, it);
+  if (resolved.kind === "skip") return skip(it.localUuid, resolved.reason);
+  const queue = await resolveQueue(db, tenant, resolved.serviceId);
   if (!queue) return skip(it.localUuid, "SERVICE_NOT_FOUND");
   try {
-    return await insertSynced(db, tenant, it, queue);
+    return await insertSynced(db, tenant, it, queue, resolved.serviceId, resolved.operationId);
   } catch (err) {
     logger.error({ localUuid: it.localUuid, err }, "sync:ticket-failed");
     return skip(it.localUuid, "SYNC_ERROR");
   }
+}
+
+/**
+ * Résout l'opération d'un item sync (MODEL-API-A/D1). `operationId` absent →
+ * `serviceId` tel quel. `operationId` fourni : opération active dans le scope
+ * agence, `service_id` dérivé ; opération inconnue/inactive/hors agence →
+ * skip `OPERATION_NOT_FOUND` ; incohérence avec `serviceId` → skip
+ * `SERVICE_OPERATION_MISMATCH` (un item fautif est ignoré, le reste passe).
+ */
+async function resolveOperation(
+  db: Client,
+  tenant: TenantContext,
+  it: SyncItem
+): Promise<
+  | { kind: "ok"; serviceId: string; operationId: string | null }
+  | { kind: "skip"; reason: string }
+> {
+  if (!it.operationId) return { kind: "ok", serviceId: it.serviceId, operationId: null };
+  const agencyId = tenant.agencyIds[0];
+  if (!agencyId) return { kind: "skip", reason: "OPERATION_NOT_FOUND" };
+  const res = await db.query(
+    `SELECT id, service_id FROM operations
+      WHERE id = $1 AND agency_id = $2 AND bank_id = $3 AND is_active = true`,
+    [it.operationId, agencyId, tenant.bankId]
+  );
+  const row = res.rows[0] as { id: string; service_id: string } | undefined;
+  if (!row) return { kind: "skip", reason: "OPERATION_NOT_FOUND" };
+  if (it.serviceId !== row.service_id) return { kind: "skip", reason: "SERVICE_OPERATION_MISMATCH" };
+  return { kind: "ok", serviceId: row.service_id, operationId: row.id };
 }
 
 /** Construit un résultat skipped. */
@@ -240,13 +273,15 @@ async function insertSynced(
   db: Client,
   tenant: TenantContext,
   it: SyncItem,
-  queue: { queueId: string; agencyId: string; code: string }
+  queue: { queueId: string; agencyId: string; code: string },
+  serviceId: string,
+  operationId: string | null
 ): Promise<Outcome> {
   await db.query("BEGIN");
   try {
     const number = await allocateNumber(db, queue.queueId);
     const displayNumber = `${queue.code}-${String(number).padStart(3, "0")}`;
-    const inserted = await insertRow(db, tenant, it, queue, number, displayNumber);
+    const inserted = await insertRow(db, tenant, it, queue, number, displayNumber, serviceId, operationId);
     if (!inserted) {
       await db.query("ROLLBACK");
       return skip(it.localUuid, "ALREADY_SYNCED");
@@ -292,20 +327,23 @@ async function insertRow(
   it: SyncItem,
   queue: { queueId: string; agencyId: string },
   number: number,
-  displayNumber: string
+  displayNumber: string,
+  serviceId: string,
+  operationId: string | null
 ): Promise<{ id: string } | undefined> {
   const res = await db.query(
     `INSERT INTO tickets
-       (bank_id, agency_id, queue_id, service_id, number, display_number,
+       (bank_id, agency_id, queue_id, service_id, operation_id, number, display_number,
         tracking_id, local_uuid, channel, status, priority)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'WAITING',$10)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'WAITING',$11)
      ON CONFLICT (local_uuid) DO NOTHING
      RETURNING id`,
     [
       tenant.bankId,
       queue.agencyId,
       queue.queueId,
-      it.serviceId,
+      serviceId,
+      operationId,
       number,
       displayNumber,
       nanoid(21),

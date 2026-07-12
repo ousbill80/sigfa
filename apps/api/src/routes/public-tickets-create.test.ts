@@ -67,8 +67,9 @@ async function runMigrations(client: pg.Client): Promise<void> {
   await client.query(`CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE TABLE IF NOT EXISTS agencies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE TABLE IF NOT EXISTS services (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+  await client.query(`CREATE TABLE IF NOT EXISTS operations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER, display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(service_id, code));`);
   await client.query(`CREATE TABLE IF NOT EXISTS queues (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), current_ticket_number INTEGER NOT NULL DEFAULT 0, status queue_status NOT NULL DEFAULT 'OPEN', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL DEFAULT 'KIOSK', status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, required_language VARCHAR(10), issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ, closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER, feedback_score INTEGER, feedback_comment TEXT, feedback_at TIMESTAMPTZ, issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL DEFAULT 'KIOSK', status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, required_language VARCHAR(10), issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ, closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER, feedback_score INTEGER, feedback_comment TEXT, feedback_at TIMESTAMPTZ, issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
 }
 
 /** POST /public/tickets avec IP simulée + clé d'idempotence optionnelle. */
@@ -233,5 +234,55 @@ describe("PUBLIC-TICKETS: tenant-isolation", () => {
     // serviceId de la banque A + agencyId de la banque B → aucune file appariée.
     const res = await postTicket({ channel: "KIOSK", serviceId, agencyId: otherAgencyId });
     expect(res.status).toBe(404);
+  });
+});
+
+/** Crée une opération active sous un service (tenant A). */
+async function seedOperation(code: string, slaMinutes: number | null): Promise<string> {
+  return (await db.query(
+    `INSERT INTO operations (bank_id, agency_id, service_id, code, name, sla_minutes, display_order)
+     VALUES ($1,$2,$3,$4,'Op',$5,0) RETURNING id`,
+    [bankId, agencyId, serviceId, code, slaMinutes]
+  )).rows[0].id as string;
+}
+
+describe("MODEL-API-A: création publique par opération + liste publique operations", () => {
+  it("MODEL-API-A: POST /public/tickets avec operationId → ticket dans le bon service + operation_id posé", async () => {
+    const opId = await seedOperation("DEP", 8);
+    const res = await postTicket({ channel: "KIOSK", serviceId, operationId: opId, agencyId });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { trackingId: string; serviceId: string; operationId: string };
+    expect(body.serviceId).toBe(serviceId);
+    expect(body.operationId).toBe(opId);
+    const row = (await db.query(`SELECT operation_id FROM tickets WHERE tracking_id=$1`, [body.trackingId])).rows[0] as { operation_id: string };
+    expect(row.operation_id).toBe(opId);
+  });
+
+  it("MODEL-API-A: POST /public/tickets operationId inconnu → 404 (opaque)", async () => {
+    const res = await postTicket({ channel: "KIOSK", serviceId, operationId: randomUUID(), agencyId });
+    expect(res.status).toBe(404);
+  });
+
+  it("MODEL-API-A: POST /public/tickets mismatch serviceId/operationId → 422 SERVICE_OPERATION_MISMATCH", async () => {
+    const opId = await seedOperation("MIS", null);
+    const res = await postTicket({ channel: "KIOSK", serviceId: pausedServiceId, operationId: opId, agencyId });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("SERVICE_OPERATION_MISMATCH");
+  });
+
+  it("MODEL-API-A: GET /public/agencies/:agencyId/operations?serviceId= → actives + slaMinutes RÉSOLU", async () => {
+    await seedOperation("R1", 20); // SLA propre → 20
+    await seedOperation("R2", null); // hérite du service (10)
+    const inactive = await seedOperation("R3", 5);
+    await db.query(`UPDATE operations SET is_active=false WHERE id=$1`, [inactive]);
+    const res = await app.request(`/api/v1/public/agencies/${agencyId}/operations?serviceId=${serviceId}`, {
+      headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ code: string; slaMinutes: number }> };
+    const byCode = new Map(body.data.map((o) => [o.code, o.slaMinutes]));
+    expect(byCode.get("R1")).toBe(20);
+    expect(byCode.get("R2")).toBe(10); // SLA résolu = service.sla_minutes
+    expect(byCode.has("R3")).toBe(false); // inactive exclue
   });
 });
