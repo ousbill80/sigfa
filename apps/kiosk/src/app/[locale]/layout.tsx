@@ -10,6 +10,7 @@
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
+import { KioskSessionProvider } from "@/components/KioskSessionProvider";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -30,7 +31,9 @@ export default async function LocaleLayout(props: {
     <html lang={locale}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
+          {/* S5 : session borne câblée au démarrage (KIOSK-001), re-créée à
+              expiration, dégradée non bloquante en échec. */}
+          <KioskSessionProvider>{children}</KioskSessionProvider>
         </NextIntlClientProvider>
       </body>
     </html>
