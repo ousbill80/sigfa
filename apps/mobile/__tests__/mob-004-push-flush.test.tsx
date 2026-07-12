@@ -245,38 +245,56 @@ describe('MOB-004: MMKV read offline — position affichée depuis MMKV quand Ne
   });
 });
 
+// Réponse 201 conforme PublicTicketCreatedResponse (contrat public.yaml — S7)
+function flushCreated201(trackingId: string): Response {
+  return new Response(
+    JSON.stringify({
+      trackingId,
+      number: 'A044',
+      displayNumber: 'OA-044',
+      status: 'WAITING',
+      channel: 'MOBILE',
+      position: 7,
+      estimatedWaitMinutes: 14,
+      serviceId: '77777777-7777-4777-a777-777777777777',
+      agencyId: '33333333-3333-4333-a333-333333333333',
+      createdAt: '2026-07-12T09:02:00Z',
+    }),
+    { status: 201, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
 describe('MOB-004: flush() FIFO — pending_tickets[] consommés dans l\'ordre, dédupliqués, clôturés purgés', () => {
   test('MOB-004: flush() FIFO — tickets consommés dans l\'ordre d\'insertion', async () => {
     const tickets = [
-      { idempotencyKey: 'key-1', agencyId: 'ag1', serviceId: 'srv1', phone: '+225', uemoaConsent: true, enqueuedAt: '2026-01-01T00:00:00Z' },
-      { idempotencyKey: 'key-2', agencyId: 'ag1', serviceId: 'srv2', phone: '+225', uemoaConsent: true, enqueuedAt: '2026-01-01T00:00:01Z' },
+      { idempotencyKey: 'key-1', agencyId: 'ag1', serviceId: 'srv1', phoneNumber: '+225', smsConsent: true, enqueuedAt: '2026-01-01T00:00:00Z' },
+      { idempotencyKey: 'key-2', agencyId: 'ag1', serviceId: 'srv2', phoneNumber: '+225', smsConsent: true, enqueuedAt: '2026-01-01T00:00:01Z' },
     ];
     mockStorage['pending_tickets'] = JSON.stringify(tickets);
 
     const order: string[] = [];
-    const fetchMock = jest.fn().mockImplementation((url: string, opts: RequestInit) => {
-      const body = JSON.parse(opts.body as string) as { idempotencyKey: string };
-      order.push(body.idempotencyKey ?? (opts.headers as Record<string, string>)?.['X-Idempotency-Key'] ?? url);
-      return Promise.resolve({ ok: true, status: 201, json: async () => ({ trackingId: 'srv-id' }) });
+    const fetchMock = jest.fn().mockImplementation((req: Request) => {
+      order.push(req.headers.get('x-idempotency-key') ?? '');
+      return Promise.resolve(flushCreated201('Mn4pQrStUvWxYzAb5cDeF'));
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await flush({ apiBaseUrl: 'http://localhost:4000' });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(order).toEqual(['key-1', 'key-2']);
   });
 
   test('MOB-004: flush() dédup — même idempotencyKey envoyée une seule fois', async () => {
     const tickets = [
-      { idempotencyKey: 'dup-key', agencyId: 'ag1', serviceId: 'srv1', phone: '+225', uemoaConsent: true, enqueuedAt: '2026-01-01T00:00:00Z' },
-      { idempotencyKey: 'dup-key', agencyId: 'ag1', serviceId: 'srv1', phone: '+225', uemoaConsent: true, enqueuedAt: '2026-01-01T00:00:00Z' },
+      { idempotencyKey: 'dup-key', agencyId: 'ag1', serviceId: 'srv1', phoneNumber: '+225', smsConsent: true, enqueuedAt: '2026-01-01T00:00:00Z' },
+      { idempotencyKey: 'dup-key', agencyId: 'ag1', serviceId: 'srv1', phoneNumber: '+225', smsConsent: true, enqueuedAt: '2026-01-01T00:00:00Z' },
     ];
     mockStorage['pending_tickets'] = JSON.stringify(tickets);
 
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true, status: 201,
-      json: async () => ({ trackingId: 'srv-dup' }),
-    });
+    const fetchMock = jest.fn().mockImplementation(() =>
+      Promise.resolve(flushCreated201('Xp3nBmKqLrTs7vWzYj9cD'))
+    );
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await flush({ apiBaseUrl: 'http://localhost:4000' });
@@ -286,14 +304,15 @@ describe('MOB-004: flush() FIFO — pending_tickets[] consommés dans l\'ordre, 
 
   test('MOB-004: flush() purge — tickets clôturés (status served/cancelled) purgés sans appel réseau', async () => {
     const tickets = [
-      { idempotencyKey: 'closed-1', agencyId: 'ag1', serviceId: 's1', phone: '+225', uemoaConsent: true, enqueuedAt: '2026-01-01T00:00:00Z', status: 'served' },
-      { idempotencyKey: 'open-1', agencyId: 'ag1', serviceId: 's2', phone: '+225', uemoaConsent: true, enqueuedAt: '2026-01-01T00:00:01Z' },
+      { idempotencyKey: 'closed-1', agencyId: 'ag1', serviceId: 's1', phoneNumber: '+225', smsConsent: true, enqueuedAt: '2026-01-01T00:00:00Z', status: 'served' },
+      { idempotencyKey: 'open-1', agencyId: 'ag1', serviceId: 's2', phoneNumber: '+225', smsConsent: true, enqueuedAt: '2026-01-01T00:00:01Z' },
     ];
     mockStorage['pending_tickets'] = JSON.stringify(tickets);
 
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true, status: 201,
-      json: async () => ({ trackingId: 'srv-ok' }),
+    const fetchMock = jest.fn().mockImplementation((req: Request) => {
+      // Seul le ticket ouvert doit partir sur le réseau
+      expect(req.headers.get('x-idempotency-key')).toBe('open-1');
+      return Promise.resolve(flushCreated201('Gh6iJkLmNoPqRsTu7vWxY'));
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -306,7 +325,10 @@ describe('MOB-004: flush() FIFO — pending_tickets[] consommés dans l\'ordre, 
   test('MOB-004: flush() file vide — ne crash pas', async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
-    await expect(flush({ apiBaseUrl: 'http://localhost:4000' })).resolves.toBeUndefined();
+    await expect(flush({ apiBaseUrl: 'http://localhost:4000' })).resolves.toEqual({
+      submitted: [],
+      remainingCount: 0,
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -1,12 +1,19 @@
-// ticket-mmkv.ts — MOB-004 (+ S8 Boucle 2 F4)
+// ticket-mmkv.ts — MOB-004 (+ S7/S8 Boucle 2 F4)
 // Persistance MMKV: trackingId, position, estimatedWaitMinutes, lastSyncAt
 // TTL = durée de vie du ticket (clôture = purge MMKV)
 // S8 : les stores MMKV sont CHIFFRÉS au repos et fournis par secure-storage.ts
 // (encryptionKey issue du trousseau système) — plus aucune instance locale.
+// S7 : flush() crée les tickets via POST /public/tickets (contrat public.yaml,
+// channel MOBILE) à travers le client typé @sigfa/contracts — jamais /tickets.
+import { createSigfaClient } from '@sigfa/contracts';
+
+import { getTicketStateStorage } from '@/services/secure-storage';
 import {
-  getOfflineQueueStorage,
-  getTicketStateStorage,
-} from '@/services/secure-storage';
+  getPendingTickets,
+  setPendingTickets,
+  clearQueue,
+  type PendingTicket,
+} from '@/services/offline-queue';
 
 const TICKET_STATE_KEY = 'ticket_state';
 
@@ -48,51 +55,50 @@ export function purgeTicketState(): void {
 }
 
 // ============================================================
-// flush() FIFO — MOB-004
+// flush() FIFO — MOB-004 (+ S7 Boucle 2 F4)
 // Consomme la file pending_tickets[] depuis offline-queue.ts
 // en FIFO, avec déduplication par X-Idempotency-Key,
 // et purge des tickets clôturés (status served/cancelled).
+// Soumission via le client typé @sigfa/contracts sur la route
+// publique du contrat : POST /public/tickets (channel MOBILE).
 // ============================================================
-
-interface PendingTicketWithStatus {
-  idempotencyKey: string;
-  agencyId: string;
-  serviceId: string;
-  phone: string;
-  uemoaConsent: boolean;
-  enqueuedAt: string;
-  status?: string;
-}
-
-const PENDING_KEY = 'pending_tickets';
-
-function getPendingTickets(): PendingTicketWithStatus[] {
-  const raw = getOfflineQueueStorage().getString(PENDING_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as PendingTicketWithStatus[];
-  } catch {
-    return [];
-  }
-}
-
-function setPendingTickets(tickets: PendingTicketWithStatus[]): void {
-  getOfflineQueueStorage().set(PENDING_KEY, JSON.stringify(tickets));
-}
 
 export interface FlushOptions {
   apiBaseUrl: string;
 }
 
+export interface FlushSubmission {
+  idempotencyKey: string;
+  /** trackingId nanoid(21) retourné par le serveur (PublicTicketCreatedResponse). */
+  trackingId: string;
+}
+
+export interface FlushResult {
+  /** Tickets créés côté serveur, dans l'ordre FIFO de soumission. */
+  submitted: FlushSubmission[];
+  /** Tickets restés en file (erreur réseau/serveur) — rejoués au prochain flush. */
+  remainingCount: number;
+}
+
 /**
- * flush() — consomme la file FIFO pending_tickets[] de MOB-002:
- * 1. Déduplique par idempotencyKey (ne soumet qu'une fois chaque key)
+ * flush() — consomme la file FIFO pending_tickets[] de MOB-002 :
+ * 1. Déduplique par idempotencyKey (ne soumet qu'une fois chaque clé)
  * 2. Purge les tickets clôturés (status served/cancelled) sans appel réseau
- * 3. Soumet les tickets en ordre FIFO via POST /tickets
+ * 3. Soumet en ordre FIFO via POST /public/tickets (client typé, channel MOBILE,
+ *    X-Idempotency-Key en HEADER uniquement — jamais dans le body)
+ * 4. Persiste le trackingId serveur (writeTicketState) pour le suivi MOB-003/004
+ *
+ * 409 IDEMPOTENCY_CONFLICT : retiré de la file — le rejeu de la même clé avec
+ * le même payload aurait renvoyé 201 (idempotence 24 h) ; un 409 signifie un
+ * payload divergent qui ne réussira jamais.
  */
-export async function flush({ apiBaseUrl }: FlushOptions): Promise<void> {
+export async function flush({ apiBaseUrl }: FlushOptions): Promise<FlushResult> {
   const tickets = getPendingTickets();
-  if (!tickets.length) return;
+  if (!tickets.length) {
+    return { submitted: [], remainingCount: 0 };
+  }
+
+  const client = createSigfaClient('public', apiBaseUrl);
 
   // Déduplique par idempotencyKey (conserve la première occurrence = FIFO)
   const seen = new Set<string>();
@@ -108,30 +114,43 @@ export async function flush({ apiBaseUrl }: FlushOptions): Promise<void> {
   );
 
   // Soumet dans l'ordre FIFO
-  const remaining: PendingTicketWithStatus[] = [];
+  const submitted: FlushSubmission[] = [];
+  const remaining: PendingTicket[] = [];
   for (const ticket of toSubmit) {
     try {
-      const res = await fetch(`${apiBaseUrl}/tickets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Idempotency-Key': ticket.idempotencyKey,
+      const { data, response } = await client.POST('/public/tickets', {
+        params: {
+          header: { 'X-Idempotency-Key': ticket.idempotencyKey },
         },
-        body: JSON.stringify({
-          agencyId: ticket.agencyId,
+        body: {
+          channel: 'MOBILE',
           serviceId: ticket.serviceId,
-          phone: ticket.phone,
-          uemoaConsent: ticket.uemoaConsent,
-          idempotencyKey: ticket.idempotencyKey,
-        }),
+          agencyId: ticket.agencyId,
+          phoneNumber: ticket.phoneNumber,
+          smsConsent: ticket.smsConsent,
+        },
       });
 
-      if (!res.ok && res.status !== 409) {
-        // 409 = déjà traité (idempotent) → considéré comme succès
-        // Autre erreur → remettre dans la file pour le prochain flush
+      if (data) {
+        submitted.push({
+          idempotencyKey: ticket.idempotencyKey,
+          trackingId: data.trackingId,
+        });
+        // Le trackingId public (nanoid 21) fait foi pour le suivi :
+        // useTicketPolling / useOfflineTicketState lisent cet état.
+        writeTicketState({
+          trackingId: data.trackingId,
+          position: data.position,
+          estimatedWaitMinutes: data.estimatedWaitMinutes,
+          lastSyncAt: new Date().toISOString(),
+          status: 'waiting',
+          displayNumber: data.displayNumber ?? data.number,
+        });
+      } else if (response.status !== 409) {
+        // Erreur serveur (≠ conflit d'idempotence) → rejouer au prochain flush
         remaining.push(ticket);
       }
-      // Succès (2xx ou 409) → retiré de la file
+      // 409 IDEMPOTENCY_CONFLICT → retiré de la file (voir docstring)
     } catch {
       // Erreur réseau → remettre dans la file
       remaining.push(ticket);
@@ -142,6 +161,8 @@ export async function flush({ apiBaseUrl }: FlushOptions): Promise<void> {
   if (remaining.length > 0) {
     setPendingTickets(remaining);
   } else {
-    getOfflineQueueStorage().delete(PENDING_KEY);
+    clearQueue();
   }
+
+  return { submitted, remainingCount: remaining.length };
 }

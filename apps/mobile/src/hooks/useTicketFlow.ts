@@ -76,12 +76,14 @@ export function useTicketFlow(): UseTicketFlowReturn {
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
+    // S7 : la file offline porte les champs du contrat public.yaml
+    // (phoneNumber/smsConsent) — l'état du hook garde les noms UI historiques.
     const pending: PendingTicket = {
       idempotencyKey: state.idempotencyKey,
       agencyId: state.agencyId,
       serviceId: state.serviceId,
-      phone: state.phone,
-      uemoaConsent: state.uemoaConsent,
+      phoneNumber: state.phone,
+      smsConsent: state.uemoaConsent,
       enqueuedAt: new Date().toISOString(),
     };
 

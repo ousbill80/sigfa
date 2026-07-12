@@ -42,7 +42,10 @@ module.exports = {
     'react-native/Libraries/BatchedBridge/NativeModules': '<rootDir>/__mocks__/NativeModules.js',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@sigfa/schemas$': '<rootDir>/../../packages/schemas/src/index.ts',
-    '^@sigfa/contracts$': '<rootDir>/../../packages/contracts/src/index.ts',
+    // @sigfa/contracts : createSigfaClient vit dans client.ts. On mappe la
+    // SOURCE (pas dist/, ESM "type: module" que jest CJS refuse ; pas index.ts,
+    // qui porte import.meta). Même logique que l'alias vitest du kiosk.
+    '^@sigfa/contracts$': '<rootDir>/../../packages/contracts/src/client.ts',
   },
   transformIgnorePatterns: [
     // pnpm-compatible: two-pattern approach

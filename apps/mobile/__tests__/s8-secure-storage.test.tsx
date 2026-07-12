@@ -144,8 +144,8 @@ describe('S8: la file offline MOB-002 fonctionne inchangée derrière le store c
       idempotencyKey: 'k-s8-001',
       agencyId: 'agency-1',
       serviceId: 'service-1',
-      phone: '+2250102030405',
-      uemoaConsent: true,
+      phoneNumber: '+2250102030405',
+      smsConsent: true,
       enqueuedAt: new Date().toISOString(),
     });
 
