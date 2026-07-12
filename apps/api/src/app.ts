@@ -17,6 +17,7 @@ import { buildError } from "src/lib/errors.js";
 import { logger } from "src/lib/logger.js";
 import { createAuthRouter } from "src/routes/auth.js";
 import { createTicketRouter } from "src/routes/tickets.js";
+import { createTicketSyncRouter } from "src/routes/tickets-sync.js";
 import { createQueueRouter } from "src/routes/queues.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
@@ -91,6 +92,12 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // Routes tickets (API-003/004) sous /api/v1 (chemins /tickets, /counters/…)
   const ticketRouter = createTicketRouter();
   app.route("/api/v1", ticketRouter);
+
+  // Route de synchronisation offline (API-005) : POST /tickets/sync.
+  // Montée AVANT le routeur tickets générique ? Non : Hono route par chemin exact,
+  // et /tickets/sync n'entre pas en collision avec /tickets/:id (POST simple).
+  const ticketSyncRouter = createTicketSyncRouter();
+  app.route("/api/v1", ticketSyncRouter);
 
   // Routes files d'attente (API-004) sous /api/v1 (PATCH /queues/:id)
   const queueRouter = createQueueRouter();

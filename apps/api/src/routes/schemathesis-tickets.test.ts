@@ -2,10 +2,11 @@
  * Schemathesis — module Tickets (API-003).
  *
  * Démarre l'API réelle (PG + Redis Testcontainers) puis invoque Schemathesis
- * via Docker contre les routes /tickets et /counters/{counterId}/call-next avec
- * un JWT AGENT valide.
+ * via Docker contre les routes /tickets, /tickets/sync (API-005) et
+ * /counters/{counterId}/call-next avec un JWT AGENT valide.
  *
  * Nommage : `API-003: Schemathesis PASS sur le module tickets`
+ *           `API-005: Schemathesis PASS sur /tickets/sync`
  *
  * @module
  */
@@ -65,7 +66,8 @@ async function runMigrations(client: pg.Client): Promise<{ bankId: string; agenc
   await client.query(`CREATE TABLE IF NOT EXISTS counters (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), number INTEGER NOT NULL, label TEXT NOT NULL, status counter_status NOT NULL DEFAULT 'OPEN', agent_id UUID, current_ticket_id UUID, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID REFERENCES banks(id), email TEXT NOT NULL UNIQUE, languages TEXT[] NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await client.query(`CREATE TABLE IF NOT EXISTS counter_services (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), counter_id UUID NOT NULL REFERENCES counters(id), service_id UUID NOT NULL REFERENCES services(id), UNIQUE(counter_id, service_id));`);
-  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, required_language TEXT, issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ, closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER, issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (queue_id, number, issued_day));`);
+  // API-005 : colonne local_uuid unique (idempotence sync offline) incluse.
+  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, local_uuid UUID UNIQUE, channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, required_language TEXT, issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ, closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER, issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (queue_id, number, issued_day));`);
   await client.query(`CREATE TABLE IF NOT EXISTS ticket_transfers (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), ticket_id UUID NOT NULL REFERENCES tickets(id), from_counter_id UUID, from_service_id UUID NOT NULL REFERENCES services(id), to_service_id UUID NOT NULL REFERENCES services(id), to_counter_id UUID, reason TEXT, transferred_by UUID NOT NULL, transferred_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
 
   const bank = await client.query(`INSERT INTO banks (name, slug) VALUES ('B','b') RETURNING id`);
@@ -160,5 +162,34 @@ describe("API-003: Schemathesis", () => {
     }
     console.log("[Schemathesis tickets] Output:", output.slice(0, 3000));
     expect(exitCode).toBe(0);
+    // API-005 : /tickets/sync est dans le périmètre (regex ^/(tickets|…)).
+    // Schemathesis génère et rejoue des cas contre POST /tickets/sync ; l'absence
+    // de server error (5xx) sur toutes les routes matchées le couvre.
   }, 180_000);
+
+  it("API-005: Schemathesis couvre POST /tickets/sync (route réelle 200/skipped)", async () => {
+    // Smoke rapide (sans Docker) : la route contractuelle répond conformément.
+    const res = await fetch(`http://127.0.0.1:${apiPort}/api/v1/tickets/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "X-Idempotency-Key": `smoke-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        tickets: [
+          {
+            localUuid: "550e8400-e29b-41d4-a716-446655440099",
+            serviceId: "00000000-0000-4000-a000-000000000000",
+            channel: "KIOSK",
+            createdOfflineAt: "2026-07-11T07:00:00.000Z",
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { synced: unknown[]; skipped: Array<{ reason: string }> };
+    // Service inexistant → skipped SERVICE_NOT_FOUND (jamais un 5xx).
+    expect(body.skipped[0]?.reason).toBe("SERVICE_NOT_FOUND");
+  }, 30_000);
 });

@@ -57,16 +57,41 @@ export const queueUpdatedSchema = z
   .strict();
 
 /**
- * Schéma du payload `alert:manager` — API-004 (QUEUE_CRITICAL + débordement).
+ * Schéma du payload `alert:manager` — variante API-004 (QUEUE_CRITICAL + débordement).
  * `overflowQueueIds` liste les files de services compatibles pour absorber.
  */
-export const alertManagerSchema = z.object({
+export const alertManagerOverflowSchema = z.object({
   event: z.literal("QUEUE_CRITICAL"),
   queueId: z.string().uuid(),
   serviceId: z.string().uuid(),
   length: z.number().int().nonnegative(),
   overflowQueueIds: z.array(z.string().uuid()),
 });
+
+/**
+ * Schéma du payload `alert:manager` — variante CONTRACT-012 (`{ type, payload }`).
+ * Aligné sur `alertManagerEvent.payloadSchema` du contrat : `type` énuméré +
+ * `payload` contextuel libre. Utilisé par API-005 pour `KIOSK_SYSTEM_ERROR`.
+ */
+export const alertManagerTypedSchema = z.object({
+  type: z.enum([
+    "AGENT_INACTIVE",
+    "AGENT_DISCONNECTED_WITH_TICKET",
+    "SLA_BREACH",
+    "QUEUE_CRITICAL",
+    "KIOSK_SYSTEM_ERROR",
+  ]),
+  payload: z.record(z.string(), z.unknown()),
+});
+
+/**
+ * Schéma du payload `alert:manager` — union des deux variantes acceptées :
+ * la forme héritée API-004 et la forme contractuelle `{ type, payload }`.
+ */
+export const alertManagerSchema = z.union([
+  alertManagerOverflowSchema,
+  alertManagerTypedSchema,
+]);
 
 /** Association nom d'événement → schéma Zod du payload. */
 const EVENT_SCHEMAS = {

@@ -1,0 +1,347 @@
+/**
+ * Route de synchronisation offline — API-005.
+ *
+ * POST /tickets/sync — batch borné (≤100) idempotent de tickets créés hors-ligne.
+ *
+ * LA LOI (core.yaml, `POST /tickets/sync`) :
+ *   - Requête `TicketSyncRequest` = `{ tickets: TicketSyncItem[] }` (1..100).
+ *   - `TicketSyncItem` (additionalProperties:false) = `{ localUuid, serviceId,
+ *     channel, createdOfflineAt, priority? }`.
+ *   - Réponse 200 = `{ synced: {localUuid, serverId, number}[],
+ *     skipped: {localUuid, reason}[] }`.
+ *   - `X-Idempotency-Key` obligatoire (400 / 409) ; batch >100 → 422 BATCH_TOO_LARGE.
+ *
+ * Idempotence unitaire par `localUuid` (contrainte DB unique + ON CONFLICT).
+ * Transaction PAR TICKET : un échec isolé → skipped, le reste passe.
+ * Un `queue:updated` par file affectée ; un `alert:manager` KIOSK_SYSTEM_ERROR
+ * par batch dès qu'au moins une ligne est skipped.
+ *
+ * @module
+ */
+
+import { Hono, type Context } from "hono";
+import { z } from "zod";
+import type { Redis } from "ioredis";
+import type { Client } from "pg";
+import { nanoid } from "nanoid";
+import { SigfaError, buildError } from "src/lib/errors.js";
+import { logger } from "src/lib/logger.js";
+import type { TenantContext } from "src/middleware/tenant.js";
+import {
+  requireIdempotencyKey,
+  findReplay,
+  storeReplay,
+} from "src/services/idempotency.js";
+import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import { queueLength } from "src/services/queue-strategy.js";
+import { estimateWaitMinutes, invalidateEstimate } from "src/services/queue-estimation.js";
+
+/** Nombre maximum de tickets par batch de synchronisation (LA LOI). */
+const MAX_BATCH = 100;
+/** Dérive d'horloge tolérée avant de marquer CLOCK_SKEW (millisecondes). */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+/** Variables de contexte Hono injectées par app.ts. */
+interface SyncEnv {
+  Variables: {
+    db: Client;
+    redis: Redis;
+    jwtSecret: Uint8Array;
+    tenant: TenantContext;
+    bus: RealtimeBus;
+  };
+}
+
+/** Contexte Hono typé pour ce routeur. */
+type SyncCtx = Context<SyncEnv>;
+
+/** Schéma d'un item de sync — STRICT (additionalProperties:false du contrat). */
+const syncItemSchema = z
+  .object({
+    localUuid: z.string().uuid(),
+    serviceId: z.string().uuid(),
+    channel: z.enum(["KIOSK", "QR", "MOBILE", "WHATSAPP"]),
+    createdOfflineAt: z.string().datetime(),
+    priority: z.enum(["STANDARD", "PRIORITY", "VIP", "PMR", "SENIOR"]).optional(),
+  })
+  .strict();
+
+/** Schéma de la requête de sync (minItems 1 — la borne 100 est vérifiée à part). */
+const syncRequestSchema = z.object({
+  tickets: z.array(syncItemSchema).min(1),
+});
+
+/** Item validé de sync. */
+type SyncItem = z.infer<typeof syncItemSchema>;
+/** Ligne synchronisée (LA LOI : localUuid, serverId, number). */
+interface SyncedTicket { localUuid: string; serverId: string; number: string; }
+/** Ligne ignorée (LA LOI : localUuid, reason). */
+interface SkippedTicket { localUuid: string; reason: string; }
+
+/** Parse le corps JSON, `null` si malformé. */
+async function parseJson(c: SyncCtx): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Résout le bus depuis le contexte, ou fournit un no-op validant. */
+function getBus(c: SyncCtx): RealtimeBus {
+  return (c.get("bus") as RealtimeBus | undefined) ?? createNoopBus();
+}
+
+/** Émet une réponse d'erreur SigfaError au format LA LOI. */
+function errorResponse(c: SyncCtx, err: unknown): Response {
+  if (err instanceof SigfaError) {
+    return c.json(
+      buildError(err.code, err.message, err.details),
+      err.httpStatus as 400 | 401 | 403 | 404 | 409 | 422
+    );
+  }
+  throw err;
+}
+
+/**
+ * Crée le routeur de synchronisation offline (monté sous /api/v1).
+ * @returns Routeur Hono exposant POST /tickets/sync
+ */
+export function createTicketSyncRouter(): Hono<SyncEnv> {
+  const router = new Hono<SyncEnv>();
+  router.post("/tickets/sync", handleSync);
+  return router;
+}
+
+/** Handler principal de POST /tickets/sync. */
+async function handleSync(c: SyncCtx): Promise<Response> {
+  const tenant = c.get("tenant");
+  const db = c.get("db");
+  const redis = c.get("redis");
+  try {
+    const key = requireIdempotencyKey(c.req.header("X-Idempotency-Key"));
+    const body = await parseJson(c);
+    assertBatchSize(body);
+    const parsed = syncRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json(buildError("VALIDATION_ERROR", "Corps invalide.", { issues: parsed.error.issues }), 400);
+    }
+    const scope = `tickets-sync:${tenant.bankId ?? "_"}`;
+    const replay = await findReplay(redis, scope, key, parsed.data);
+    if (replay) return c.newResponse(replay.body, replay.status as 200, { "Content-Type": "application/json" });
+    const result = await processBatch(db, redis, tenant, parsed.data.tickets, getBus(c));
+    const bodyStr = JSON.stringify(result);
+    await storeReplay(redis, scope, key, parsed.data, 200, bodyStr);
+    return c.newResponse(bodyStr, 200, { "Content-Type": "application/json" });
+  } catch (err) {
+    return errorResponse(c, err);
+  }
+}
+
+/**
+ * Vérifie la borne 100 AVANT la validation Zod → 422 BATCH_TOO_LARGE.
+ * @throws {SigfaError} 422 BATCH_TOO_LARGE si le batch dépasse la limite
+ */
+function assertBatchSize(body: unknown): void {
+  const tickets = (body as { tickets?: unknown })?.tickets;
+  if (Array.isArray(tickets) && tickets.length > MAX_BATCH) {
+    throw new SigfaError("BATCH_TOO_LARGE", "Le batch dépasse la limite de 100 tickets par synchronisation.", 422, {
+      maxItems: MAX_BATCH,
+      receivedItems: tickets.length,
+    });
+  }
+}
+
+/**
+ * Traite le batch ticket-par-ticket dans l'ordre `createdOfflineAt` croissant,
+ * puis émet les événements agrégés (queue:updated par file, alerte par batch).
+ */
+async function processBatch(
+  db: Client,
+  redis: Redis,
+  tenant: TenantContext,
+  tickets: SyncItem[],
+  bus: RealtimeBus
+): Promise<{ synced: SyncedTicket[]; skipped: SkippedTicket[] }> {
+  const ordered = [...tickets].sort((a, b) => a.createdOfflineAt.localeCompare(b.createdOfflineAt));
+  const synced: SyncedTicket[] = [];
+  const skipped: SkippedTicket[] = [];
+  const affectedQueues = new Set<string>();
+  for (const it of ordered) {
+    const outcome = await syncOne(db, tenant, it);
+    if (outcome.kind === "synced") {
+      synced.push(outcome.ticket);
+      affectedQueues.add(outcome.queueId);
+    } else {
+      skipped.push(outcome.ticket);
+    }
+  }
+  await emitAffectedQueues(bus, redis, db, affectedQueues);
+  emitSkipAlert(bus, skipped);
+  return { synced, skipped };
+}
+
+/** Résultat du traitement d'un item : synchronisé (avec sa file) ou ignoré. */
+type Outcome =
+  | { kind: "synced"; ticket: SyncedTicket; queueId: string }
+  | { kind: "skipped"; ticket: SkippedTicket };
+
+/**
+ * Traite un item : filtres (CLOCK_SKEW, SERVICE_NOT_FOUND, ALREADY_SYNCED)
+ * puis insertion transactionnelle idempotente. Échec isolé → skipped, journalisé.
+ */
+async function syncOne(db: Client, tenant: TenantContext, it: SyncItem): Promise<Outcome> {
+  if (isClockSkewed(it.createdOfflineAt)) return skip(it.localUuid, "CLOCK_SKEW");
+  const queue = await resolveQueue(db, tenant, it.serviceId);
+  if (!queue) return skip(it.localUuid, "SERVICE_NOT_FOUND");
+  try {
+    return await insertSynced(db, tenant, it, queue);
+  } catch (err) {
+    logger.error({ localUuid: it.localUuid, err }, "sync:ticket-failed");
+    return skip(it.localUuid, "SYNC_ERROR");
+  }
+}
+
+/** Construit un résultat skipped. */
+function skip(localUuid: string, reason: string): Outcome {
+  return { kind: "skipped", ticket: { localUuid, reason } };
+}
+
+/** Vrai si `createdOfflineAt` est dans le futur au-delà de la tolérance de dérive. */
+function isClockSkewed(createdOfflineAt: string): boolean {
+  return new Date(createdOfflineAt).getTime() - Date.now() > CLOCK_SKEW_MS;
+}
+
+/** File + code service pour l'agence du JWT (ou `null` si hors scope/inexistant). */
+async function resolveQueue(
+  db: Client,
+  tenant: TenantContext,
+  serviceId: string
+): Promise<{ queueId: string; agencyId: string; code: string } | null> {
+  const agencyId = tenant.agencyIds[0];
+  if (!agencyId) return null;
+  const res = await db.query(
+    `SELECT q.id AS queue_id, q.agency_id, s.code
+       FROM queues q JOIN services s ON s.id = q.service_id
+      WHERE q.service_id = $1 AND q.agency_id = $2 AND q.bank_id = $3`,
+    [serviceId, agencyId, tenant.bankId]
+  );
+  const row = res.rows[0] as { queue_id: string; agency_id: string; code: string } | undefined;
+  return row ? { queueId: row.queue_id, agencyId: row.agency_id, code: row.code } : null;
+}
+
+/**
+ * Insère un ticket synchronisé en transaction avec idempotence unitaire
+ * (`ON CONFLICT (local_uuid) DO NOTHING`). Conflit → ALREADY_SYNCED.
+ */
+async function insertSynced(
+  db: Client,
+  tenant: TenantContext,
+  it: SyncItem,
+  queue: { queueId: string; agencyId: string; code: string }
+): Promise<Outcome> {
+  await db.query("BEGIN");
+  try {
+    const number = await allocateNumber(db, queue.queueId);
+    const displayNumber = `${queue.code}-${String(number).padStart(3, "0")}`;
+    const inserted = await insertRow(db, tenant, it, queue, number, displayNumber);
+    if (!inserted) {
+      await db.query("ROLLBACK");
+      return skip(it.localUuid, "ALREADY_SYNCED");
+    }
+    await db.query("COMMIT");
+    return {
+      kind: "synced",
+      queueId: queue.queueId,
+      ticket: { localUuid: it.localUuid, serverId: inserted.id, number: `A${String(number).padStart(3, "0")}` },
+    };
+  } catch (err) {
+    await db.query("ROLLBACK");
+    throw err;
+  }
+}
+
+/**
+ * Alloue le prochain numéro par lock-then-increment avec reset quotidien Abidjan
+ * (identique à l'émission API-003).
+ */
+async function allocateNumber(db: Client, queueId: string): Promise<number> {
+  const res = await db.query(
+    `UPDATE queues q
+        SET current_ticket_number = CASE
+              WHEN EXISTS (
+                SELECT 1 FROM tickets t
+                 WHERE t.queue_id = q.id
+                   AND t.issued_day = (NOW() AT TIME ZONE 'Africa/Abidjan')::date
+              ) THEN q.current_ticket_number + 1
+              ELSE 1
+            END
+      WHERE q.id = $1
+      RETURNING current_ticket_number`,
+    [queueId]
+  );
+  return (res.rows[0] as { current_ticket_number: number }).current_ticket_number;
+}
+
+/** Insère la ligne ticket (ON CONFLICT local_uuid → `undefined` = déjà syncé). */
+async function insertRow(
+  db: Client,
+  tenant: TenantContext,
+  it: SyncItem,
+  queue: { queueId: string; agencyId: string },
+  number: number,
+  displayNumber: string
+): Promise<{ id: string } | undefined> {
+  const res = await db.query(
+    `INSERT INTO tickets
+       (bank_id, agency_id, queue_id, service_id, number, display_number,
+        tracking_id, local_uuid, channel, status, priority)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'WAITING',$10)
+     ON CONFLICT (local_uuid) DO NOTHING
+     RETURNING id`,
+    [
+      tenant.bankId,
+      queue.agencyId,
+      queue.queueId,
+      it.serviceId,
+      number,
+      displayNumber,
+      nanoid(21),
+      it.localUuid,
+      it.channel,
+      it.priority ?? "STANDARD",
+    ]
+  );
+  return res.rows[0] as { id: string } | undefined;
+}
+
+/** Émet un `queue:updated` par file affectée (recalcul longueur + estimation). */
+async function emitAffectedQueues(
+  bus: RealtimeBus,
+  redis: Redis,
+  db: Client,
+  queueIds: Set<string>
+): Promise<void> {
+  for (const queueId of queueIds) {
+    await invalidateEstimate(redis, queueId);
+    const length = await queueLength(queueId, db);
+    const svc = await db.query(`SELECT service_id FROM queues WHERE id = $1`, [queueId]);
+    const serviceId = (svc.rows[0] as { service_id: string } | undefined)?.service_id;
+    const estimate = serviceId ? await estimateWaitMinutes(length, serviceId, db) : 0;
+    bus.emit("queue:updated", { queueId, length, estimate });
+  }
+}
+
+/**
+ * Émet UNE alerte `alert:manager` KIOSK_SYSTEM_ERROR par batch dès qu'au moins
+ * une ligne est skipped. Payload = compte + raisons agrégées.
+ */
+function emitSkipAlert(bus: RealtimeBus, skipped: SkippedTicket[]): void {
+  if (skipped.length === 0) return;
+  const reasons: Record<string, number> = {};
+  for (const s of skipped) reasons[s.reason] = (reasons[s.reason] ?? 0) + 1;
+  bus.emit("alert:manager", {
+    type: "KIOSK_SYSTEM_ERROR",
+    payload: { skippedCount: skipped.length, reasons },
+  });
+}
