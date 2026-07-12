@@ -585,7 +585,17 @@ function registerCall(router: Hono<TicketEnv>): void {
   });
 }
 
-/** Appel ciblé d'un ticket précis avec verrou Redis SET NX. */
+/**
+ * Appel ciblé d'un ticket précis avec verrou Redis durci (API-006).
+ *
+ * Protocole :
+ * 1. Charger le ticket (404 si introuvable)
+ * 2. Vérifier la transition légale via nextStatus (ILLEGAL_TRANSITION si illégale)
+ * 3. Acquérir le verrou Redis SET NX PX 5000
+ *    - Si échec : 409 TICKET_ALREADY_CLAIMED (autre agent)
+ * 4. Re-vérification transactionnelle : FOR UPDATE → si déjà CALLED → 409
+ * 5. UPDATE + COMMIT + émettre les événements
+ */
 async function callTargeted(
   db: Client,
   redis: Redis,
@@ -594,24 +604,62 @@ async function callTargeted(
   counterId: string,
   bus: RealtimeBus
 ): Promise<Record<string, unknown>> {
+  // Étape 1 : charger le ticket pour la vérification de transition
   const row = await loadTicket(db, tenant, id);
-  const locked = await redis.set(`ticket-lock:${id}`, counterId, "EX", 30, "NX");
-  if (locked === null) {
-    const owner = await redis.get(`ticket-lock:${id}`);
-    if (owner && owner !== counterId) {
-      throw new SigfaError("TICKET_ALREADY_CLAIMED", `Ce ticket a déjà été pris.`, 409, {
-        claimedByCounterId: owner,
-      });
-    }
-  }
+
+  // Étape 2 : vérifier la transition (lève ILLEGAL_TRANSITION si status non légal)
   nextStatus(row.status, "call");
+
+  // Étape 3 : verrou Redis durci SET NX PX 5000
+  const lockKey = `ticket-lock:${id}`;
+  const locked = await redis.set(lockKey, counterId, "PX", 5000, "NX");
+  if (locked === null) {
+    // Un autre agent tient le verrou → TICKET_ALREADY_CLAIMED
+    const owner = await redis.get(lockKey);
+    throw new SigfaError("TICKET_ALREADY_CLAIMED", "Ce ticket a déjà été pris.", 409, {
+      claimedByCounterId: owner ?? "unknown",
+    });
+  }
+
+  // Étape 4 : re-vérification transactionnelle (FOR UPDATE)
+  await db.query("BEGIN");
+  const checkRes = await db.query(
+    `SELECT id, status, queue_id, service_id, counter_id, called_at
+       FROM tickets WHERE id = $1 AND bank_id = $2 FOR UPDATE`,
+    [id, tenant.bankId]
+  );
+  const freshRow = checkRes.rows[0] as {
+    id: string; status: string; queue_id: string; service_id: string;
+    counter_id: string | null; called_at: Date | null;
+  } | undefined;
+
+  if (!freshRow) {
+    await db.query("ROLLBACK");
+    await redis.del(lockKey);
+    throw new SigfaError("NOT_FOUND", "Ticket introuvable.", 404);
+  }
+
+  // Re-vérification : si entre-temps le ticket a été pris → 409 TICKET_ALREADY_CLAIMED
+  if (freshRow.status !== "WAITING") {
+    await db.query("ROLLBACK");
+    await redis.del(lockKey);
+    throw new SigfaError("TICKET_ALREADY_CLAIMED", "Ce ticket a déjà été pris.", 409, {
+      currentStatus: freshRow.status,
+    });
+  }
+
+  // Étape 5 : UPDATE + COMMIT
   const now = new Date();
   await db.query(
     `UPDATE tickets SET status = 'CALLED', counter_id = $1, called_at = COALESCE(called_at, $2), updated_at = NOW() WHERE id = $3`,
     [counterId, now, id]
   );
-  await afterCall(bus, redis, db, { ticketId: id, queueId: row.queue_id, counterId });
-  return callView(id, row.service_id, counterId, row.called_at ?? now);
+  await db.query("COMMIT");
+
+  // Post-commit: libérer le verrou et émettre les événements
+  await redis.del(lockKey);
+  await afterCall(bus, redis, db, { ticketId: id, queueId: freshRow.queue_id, counterId });
+  return callView(id, freshRow.service_id, counterId, freshRow.called_at ?? now);
 }
 
 // ── POST /tickets/:id/serve ──────────────────────────────────────────────────

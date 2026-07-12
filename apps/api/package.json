@@ -17,7 +17,6 @@
     "@sigfa/database": "workspace:*",
     "@sigfa/schemas": "workspace:*",
     "@sigfa/testing": "workspace:*",
-    "testcontainers": "^10.28.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^26.1.1",
     "@types/pg": "^8.20.0",
@@ -27,12 +26,14 @@
     "eslint-plugin-import": "^2.29.0",
     "pg": "^8.22.0",
     "supertest": "^7.2.2",
+    "testcontainers": "^10.28.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^3.0.0"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.8",
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.80.2",
     "hono": "^4.12.29",
@@ -40,6 +41,8 @@
     "jose": "^6.2.3",
     "nanoid": "^5.1.16",
     "pino": "^10.3.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "zod": "^4.4.3"
   }
 }
