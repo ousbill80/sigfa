@@ -22,10 +22,18 @@ import { SigfaError, buildError } from "src/lib/errors.js";
 import { checkRateLimit, clientIp } from "src/lib/rate-limit.js";
 import { sanitizeComment, CommentTooLongError, CommentControlCharError } from "src/lib/comment-sanitize.js";
 import { incrementDailyNps } from "src/services/feedback-nps.js";
+import {
+  requireIdempotencyKey,
+  acquireIdempotency,
+  storeReplay,
+  releaseIdempotencyLock,
+} from "src/services/idempotency.js";
+import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import { issueTicketFor, type IssueTicketInput } from "src/routes/tickets.js";
 
 /** Variables de contexte Hono (injectées par app.ts). */
 interface PublicEnv {
-  Variables: { db: Client; redis: Redis };
+  Variables: { db: Client; redis: Redis; bus: RealtimeBus };
 }
 
 /** Contexte Hono typé pour ce routeur. */
@@ -33,6 +41,55 @@ type PublicCtx = Context<PublicEnv>;
 
 /** Pattern nanoid(21) — LA LOI `^[A-Za-z0-9_-]{21}$`. */
 const TRACKING_RE = /^[A-Za-z0-9_-]{21}$/;
+
+/** Format E.164 LA LOI des sous-schémas canal (`^\+[1-9]\d{7,14}$`). */
+const phoneE164 = z.string().regex(/^\+[1-9]\d{7,14}$/);
+/** Priorité contractuelle (TicketPriority). */
+const priorityEnum = z.enum(["STANDARD", "PRIORITY", "VIP", "PMR", "SENIOR"]);
+
+/**
+ * Corps `POST /public/tickets` — oneOf discriminé par `channel` (LA LOI).
+ * - KIOSK/QR : téléphone FACULTATIF (mais `smsConsent` requis si téléphone).
+ * - MOBILE/WHATSAPP : téléphone + `smsConsent` OBLIGATOIRES.
+ * `agencyId`/`serviceId` proviennent du CORPS (création publique sans JWT).
+ */
+const publicCreateSchema = z.discriminatedUnion("channel", [
+  z.object({
+    channel: z.literal("KIOSK"),
+    serviceId: z.string().uuid(),
+    agencyId: z.string().uuid(),
+    priority: priorityEnum.optional(),
+    phoneNumber: phoneE164.nullish(),
+    smsConsent: z.boolean().optional(),
+  }),
+  z.object({
+    channel: z.literal("QR"),
+    serviceId: z.string().uuid(),
+    agencyId: z.string().uuid(),
+    priority: priorityEnum.optional(),
+    phoneNumber: phoneE164.nullish(),
+    smsConsent: z.boolean().optional(),
+  }),
+  z.object({
+    channel: z.literal("MOBILE"),
+    serviceId: z.string().uuid(),
+    agencyId: z.string().uuid(),
+    priority: priorityEnum.optional(),
+    phoneNumber: phoneE164,
+    smsConsent: z.boolean(),
+  }),
+  z.object({
+    channel: z.literal("WHATSAPP"),
+    serviceId: z.string().uuid(),
+    agencyId: z.string().uuid(),
+    priority: priorityEnum.optional(),
+    phoneNumber: phoneE164,
+    smsConsent: z.boolean(),
+  }),
+]);
+
+/** Données validées d'émission publique. */
+type PublicCreateInput = z.infer<typeof publicCreateSchema>;
 
 /** Schéma du corps de feedback (LA LOI `FeedbackRequest`) — note 1–5 entière. */
 const feedbackSchema = z.object({
@@ -63,9 +120,118 @@ interface TicketRow {
  */
 export function createPublicTicketRouter(): Hono<PublicEnv> {
   const router = new Hono<PublicEnv>();
+  registerCreate(router);
   registerTrack(router);
   registerFeedback(router);
   return router;
+}
+
+/** Résout le bus depuis le contexte, ou fournit un no-op validant. */
+function getBus(c: PublicCtx): RealtimeBus {
+  return (c.get("bus") as RealtimeBus | undefined) ?? createNoopBus();
+}
+
+// ── POST /public/tickets ─────────────────────────────────────────────────────
+
+/**
+ * Enregistre l'émission de ticket PUBLIQUE (borne/QR/mobile/WhatsApp), SANS JWT.
+ *
+ * Mutation critique → `X-Idempotency-Key` OBLIGATOIRE (verrou SET NX atomique).
+ * L'agence/le service viennent du CORPS (validés existants/actifs) ; le `bank_id`
+ * du ticket est DÉRIVÉ de la file résolue — jamais accepté du client (anti-fuite).
+ * Le rate-limit IP (60/min) est déjà appliqué en amont par `mountGlobalRateLimits`
+ * (config/rate-limits.ts, source IP via `TRUST_PROXY`).
+ */
+function registerCreate(router: Hono<PublicEnv>): void {
+  router.post("/public/tickets", async (c) => {
+    const redis = c.get("redis");
+    try {
+      const key = requireIdempotencyKey(c.req.header("X-Idempotency-Key"));
+      const parsed = publicCreateSchema.safeParse(await parseJson(c));
+      if (!parsed.success) {
+        return c.json(buildError("VALIDATION_ERROR", "Corps invalide.", { issues: parsed.error.issues }), 400);
+      }
+      // Scope idempotence indépendant du tenant (création publique multi-banque).
+      const scope = "public-tickets";
+      const outcome = await acquireIdempotency(redis, scope, key, parsed.data);
+      if (outcome.kind === "replay") return replayResponse(c, outcome.result);
+      let bodyStr: string;
+      try {
+        const dto = await issuePublicTicket(c, parsed.data);
+        bodyStr = JSON.stringify(dto);
+      } catch (processErr) {
+        // Échec du traitement : libérer le verrou pour permettre un nouvel essai.
+        await releaseIdempotencyLock(redis, scope, key);
+        throw processErr;
+      }
+      await storeReplay(redis, scope, key, parsed.data, 201, bodyStr);
+      return replayResponse(c, { status: 201, body: bodyStr });
+    } catch (err) {
+      return errorResponse(c, err);
+    }
+  });
+}
+
+/**
+ * Émet le ticket via le cœur RÉUTILISABLE `issueTicketFor` (tickets.ts) puis
+ * projette la réponse PUBLIQUE (LA LOI `PublicTicketCreatedResponse`) — SANS
+ * exposer l'uuid interne. Le `bankId` est dérivé côté file (null en entrée).
+ *
+ * @param c     - Contexte Hono
+ * @param input - Corps validé (discriminé par canal)
+ */
+async function issuePublicTicket(c: PublicCtx, input: PublicCreateInput): Promise<Record<string, unknown>> {
+  const issueInput: IssueTicketInput = {
+    serviceId: input.serviceId,
+    channel: input.channel,
+    priority: input.priority,
+    phoneNumber: input.phoneNumber ?? undefined,
+    smsConsent: input.smsConsent,
+  };
+  const result = await issueTicketFor(
+    c.get("db"),
+    c.get("redis"),
+    { bankId: null, agencyId: input.agencyId },
+    issueInput,
+    getBus(c)
+  );
+  return publicCreatedDto(result);
+}
+
+/**
+ * Projette le DTO public de création — liste blanche stricte des champs LA LOI.
+ * L'uuid interne (`id`) présent dans le résultat d'émission est ÉCARTÉ.
+ *
+ * @param r - Résultat brut de `issueTicketFor`
+ */
+function publicCreatedDto(r: Record<string, unknown>): Record<string, unknown> {
+  return {
+    trackingId: r["trackingId"],
+    number: r["number"],
+    displayNumber: r["displayNumber"],
+    status: r["status"],
+    priority: r["priority"],
+    channel: r["channel"],
+    position: r["position"],
+    estimatedWaitMinutes: r["estimatedWaitMinutes"],
+    serviceId: r["serviceId"],
+    agencyId: r["agencyId"],
+    createdAt: r["createdAt"],
+  };
+}
+
+/** Rejoue une réponse enregistrée byte-identique (JSON). */
+function replayResponse(c: PublicCtx, replay: { status: number; body: string }): Response {
+  return c.newResponse(replay.body, replay.status as 201, { "Content-Type": "application/json" });
+}
+
+/** Parse le corps JSON, `null` si malformé. */
+async function parseJson(c: PublicCtx): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    return null;
+  }
 }
 
 /** Émet le 404 OPAQUE unique (identique pour inconnu ET malformé). */
@@ -76,7 +242,7 @@ function opaqueNotFound(c: PublicCtx): Response {
 /** Émet une SigfaError au format LA LOI (sinon relance). */
 function errorResponse(c: PublicCtx, err: unknown): Response {
   if (err instanceof SigfaError) {
-    return c.json(buildError(err.code, err.message, err.details), err.httpStatus as 404 | 409 | 422);
+    return c.json(buildError(err.code, err.message, err.details), err.httpStatus as 400 | 403 | 404 | 409 | 422);
   }
   throw err;
 }

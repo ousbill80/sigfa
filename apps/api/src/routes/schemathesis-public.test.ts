@@ -138,7 +138,7 @@ describe("API-010: Schemathesis module public", () => {
           schemathesis/schemathesis:stable \
           run /contract.yaml \
           --url "http://host.docker.internal:${apiPort}/api/v1" \
-          --include-path-regex "^/public/tickets/[^/]+" \
+          --include-path-regex "^/public/tickets" \
           --max-examples 20 \
           --request-timeout 10000 \
           --checks not_a_server_error`,

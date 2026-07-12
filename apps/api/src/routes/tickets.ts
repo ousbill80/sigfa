@@ -235,6 +235,26 @@ function replayResponse(c: TicketCtx, replay: { status: number; body: string }):
 type CreateInput = z.infer<typeof createSchema>;
 
 /**
+ * Entrée d'émission générique (JWT ou borne publique). `bankId`/`agencyId` sont
+ * fournis explicitement : le chemin agent les dérive du JWT, le chemin public du
+ * corps de la requête (agence/service validés existants et cohérents).
+ */
+export interface IssueTicketInput {
+  serviceId: string;
+  channel: "KIOSK" | "QR" | "MOBILE" | "WHATSAPP";
+  phoneNumber?: string | undefined;
+  priority?: "STANDARD" | "PRIORITY" | "VIP" | "PMR" | "SENIOR" | undefined;
+  smsConsent?: boolean | undefined;
+  requiredLanguage?: string | undefined;
+}
+
+/** Contexte tenant résolu (bank + agence) pour l'émission. */
+export interface IssueTenant {
+  bankId: string | null;
+  agencyId: string;
+}
+
+/**
  * Émet un ticket : résout la file, alloue le numéro (lock-then-increment),
  * compose displayNumber, persiste, calcule position/estimation, émet events.
  */
@@ -245,15 +265,41 @@ async function issueTicket(
   input: CreateInput,
   bus: RealtimeBus
 ): Promise<Record<string, unknown>> {
+  const agencyId = tenant.agencyIds[0];
+  if (!agencyId) throw new SigfaError("FORBIDDEN", "Aucune agence dans le scope du JWT.", 403);
+  return issueTicketFor(db, redis, { bankId: tenant.bankId, agencyId }, input, bus);
+}
+
+/**
+ * Cœur d'émission RÉUTILISABLE (agent JWT ou borne publique) : résout la file
+ * pour `(bankId, agencyId, serviceId)`, alloue le numéro, persiste, calcule
+ * position/estimation, émet `ticket:created`/`queue:updated`.
+ *
+ * Le `bankId` d'émission est TOUJOURS celui dérivé de la file résolue (jamais
+ * un champ client), garantissant l'absence de fuite inter-tenant.
+ *
+ * @param db     - Connexion PG
+ * @param redis  - Client Redis
+ * @param at     - Tenant résolu (bank + agence) — source du scope
+ * @param input  - Données validées d'émission
+ * @param bus    - Bus temps réel
+ */
+export async function issueTicketFor(
+  db: Client,
+  redis: Redis,
+  at: IssueTenant,
+  input: IssueTicketInput,
+  bus: RealtimeBus
+): Promise<Record<string, unknown>> {
   await db.query("BEGIN");
   try {
-    const ctx = await resolveServiceQueue(db, tenant, input.serviceId);
+    const ctx = await resolveServiceQueue(db, at, input.serviceId);
     const number = await allocateNumber(db, ctx.queueId);
     const displayNumber = `${ctx.code}-${String(number).padStart(3, "0")}`;
     const trackingId = nanoid(21);
     const phone = buildPhone(input);
     const inserted = await insertTicket(db, {
-      tenant,
+      bankId: ctx.bankId,
       ctx,
       input,
       number,
@@ -294,7 +340,7 @@ async function issueTicket(
 }
 
 /** Chiffre + hache le téléphone fourni (ou renvoie des nulls). */
-function buildPhone(input: CreateInput): { encrypted: string | null; hash: string | null; consent: boolean } {
+function buildPhone(input: IssueTicketInput): { encrypted: string | null; hash: string | null; consent: boolean } {
   if (!input.phoneNumber) return { encrypted: null, hash: null, consent: false };
   return {
     encrypted: encryptPhone(input.phoneNumber),
@@ -304,21 +350,26 @@ function buildPhone(input: CreateInput): { encrypted: string | null; hash: strin
 }
 
 /**
- * Résout la file (queue) + code service pour l'agence du JWT.
+ * Résout la file (queue) + code service pour l'agence fournie (JWT ou borne).
  * Vérifie que la file est ouverte (API-004 : 422 QUEUE_PAUSED si PAUSED/CLOSED).
+ *
+ * Quand `at.bankId` est fourni (chemin agent), il borne la requête ; sinon
+ * (chemin public) le bankId est DÉRIVÉ de la file résolue via l'agence — jamais
+ * accepté depuis le client. L'appariement `agency_id = $2` garantit qu'un service
+ * d'une autre agence/banque ne peut être ciblé (isolation tenant).
  */
 async function resolveServiceQueue(
   db: Client,
-  tenant: TenantContext,
+  at: IssueTenant,
   serviceId: string
 ): Promise<{ queueId: string; agencyId: string; code: string; bankId: string }> {
-  const agencyId = tenant.agencyIds[0];
-  if (!agencyId) throw new SigfaError("FORBIDDEN", "Aucune agence dans le scope du JWT.", 403);
+  const agencyId = at.agencyId;
   const res = await db.query(
     `SELECT q.id AS queue_id, q.agency_id, q.bank_id, q.status, s.code
        FROM queues q JOIN services s ON s.id = q.service_id
-      WHERE q.service_id = $1 AND q.agency_id = $2 AND q.bank_id = $3`,
-    [serviceId, agencyId, tenant.bankId]
+      WHERE q.service_id = $1 AND q.agency_id = $2
+        AND ($3::uuid IS NULL OR q.bank_id = $3)`,
+    [serviceId, agencyId, at.bankId]
   );
   const row = res.rows[0] as
     | { queue_id: string; agency_id: string; bank_id: string; status: string; code: string }
@@ -361,9 +412,9 @@ async function allocateNumber(db: Client, queueId: string): Promise<number> {
 async function insertTicket(
   db: Client,
   args: {
-    tenant: TenantContext;
+    bankId: string;
     ctx: { queueId: string; agencyId: string };
-    input: CreateInput;
+    input: IssueTicketInput;
     number: number;
     displayNumber: string;
     trackingId: string;
@@ -378,7 +429,7 @@ async function insertTicket(
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'WAITING',$9,$10,$11,$12,$13)
      RETURNING id, issued_at`,
     [
-      args.tenant.bankId,
+      args.bankId,
       args.ctx.agencyId,
       args.ctx.queueId,
       args.input.serviceId,
@@ -404,7 +455,7 @@ async function emitCreated(
   args: {
     inserted: { id: string; issued_at: Date };
     ctx: { queueId: string; agencyId: string };
-    input: CreateInput;
+    input: IssueTicketInput;
     number: number;
     position: number;
     estimate: number;
@@ -945,7 +996,9 @@ async function reinsertTarget(
   row: TicketRow,
   targetServiceId: string
 ): Promise<{ ticketId: string; queueId: string }> {
-  const ctx = await resolveServiceQueue(db, tenant, targetServiceId);
+  const agencyId = tenant.agencyIds[0];
+  if (!agencyId) throw new SigfaError("FORBIDDEN", "Aucune agence dans le scope du JWT.", 403);
+  const ctx = await resolveServiceQueue(db, { bankId: tenant.bankId, agencyId }, targetServiceId);
   const number = await allocateNumber(db, ctx.queueId);
   const displayNumber = `${ctx.code}-${String(number).padStart(3, "0")}`;
   const res = await db.query(
