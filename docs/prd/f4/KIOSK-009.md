@@ -1,6 +1,6 @@
 ## KIOSK-009 : Feedback post-service sur borne — note 1-5, commentaire vocal optionnel
 
-**Module** : F4 — Kiosque · **Agent** : agent-kiosk · **Dépend de** : KIOSK-005 · **Statut** : TODO
+**Module** : F4 — Kiosque · **Agent** : agent-kiosk · **Dépend de** : KIOSK-005 · **Statut** : DONE (2026-07-12)
 
 **Révision** : v2 — arbitrage 19
 
