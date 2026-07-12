@@ -532,7 +532,11 @@ describe("KIOSK-004: ConfirmationScreen additional branches", () => {
       expect(offlineBanner).toBeInTheDocument();
     });
 
-    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("/fr/ticket"));
+    // KIOSK-006 : l'émission offline est désormais asynchrone (écriture Dexie),
+    // la navigation intervient après la persistance locale du ticket.
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("/fr/ticket"));
+    });
   });
 
   it("KIOSK-004: backspace key on empty phone does nothing", () => {

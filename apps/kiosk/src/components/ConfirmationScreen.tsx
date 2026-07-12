@@ -5,12 +5,13 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useOfflineTicket } from "@/hooks/useOfflineTicket";
+import { OfflineBanner } from "@/components/OfflineBanner";
 
 interface ConfirmationScreenProps {
   serviceId: string;
@@ -32,7 +33,7 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
   const router = useRouter();
   const params = useParams();
   const currentLocale = (params?.locale as string) ?? "fr";
-  const { createOfflineTicket } = useOfflineTicket();
+  const { createOfflineTicket, syncPendingTickets } = useOfflineTicket();
 
   const [phoneDigits, setPhoneDigits] = useState("");
   const [smsConsent, setSmsConsent] = useState(false);
@@ -43,6 +44,18 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
   useInactivityTimeout(() => {
     router.push(`/${currentLocale}`);
   }, 30000);
+
+  // KIOSK-006 : au retour réseau, déclenche automatiquement la synchronisation
+  // des tickets offline en attente (POST /tickets/sync via @sigfa/contracts).
+  // Le bandeau offline disparaît alors en fondu (250 ms) via <OfflineBanner>.
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      void syncPendingTickets();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [syncPendingTickets]);
 
   const handleKey = (key: string) => {
     if (key === "⌫") {
@@ -125,7 +138,7 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
       // Non-201 response: use offline fallback to avoid blocking user
       if (response.status !== 201) {
         setIsOffline(true);
-        const offlineTicket = await createOfflineTicket();
+        const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
         router.push(buildTicketUrl({
           trackingId: offlineTicket.trackingId,
           displayNumber: offlineTicket.displayNumber,
@@ -137,7 +150,7 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
     } catch {
       // Network error: use offline fallback
       setIsOffline(true);
-      const offlineTicket = await createOfflineTicket();
+      const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
       router.push(buildTicketUrl({
         trackingId: offlineTicket.trackingId,
         displayNumber: offlineTicket.displayNumber,
@@ -164,22 +177,8 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
         gap: "1.5rem",
       }}
     >
-      {/* Offline banner */}
-      {isOffline && (
-        <div
-          data-testid="offline-banner"
-          style={{
-            backgroundColor: "var(--info)",
-            color: "var(--ink-inverse)",
-            padding: "0.75rem 1rem",
-            borderRadius: "0.5rem",
-            fontSize: "20px",
-            textAlign: "center",
-          }}
-        >
-          {t("offlineBanner")}
-        </div>
-      )}
+      {/* KIOSK-006 : bandeau offline discret (--info, non bloquant), fondu 250 ms au retour réseau */}
+      <OfflineBanner isOffline={isOffline} />
 
       {/* Title */}
       <h1
