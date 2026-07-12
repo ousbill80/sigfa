@@ -28,4 +28,12 @@ describe("API-011: rate-limits globaux (config)", () => {
     expect(paths).toContain("/public/tickets");
     expect(paths).toContain("/webhooks");
   });
+
+  it("MODEL-API-B: /public/agencies borné 60/min (anti-énumération D5)", () => {
+    const agencies = GLOBAL_RATE_LIMITS.find((r) => r.path === "/public/agencies");
+    expect(agencies).toBeDefined();
+    expect(agencies?.name).toBe("public-agencies");
+    expect(agencies?.limit).toBe(60);
+    expect(agencies?.windowSeconds).toBe(60);
+  });
 });

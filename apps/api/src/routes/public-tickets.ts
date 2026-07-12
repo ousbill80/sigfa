@@ -147,6 +147,9 @@ export function createPublicTicketRouter(): Hono<PublicEnv> {
  * stricte de colonnes (la requête ne SELECTionne que id/display_name/photo_url).
  * `agencyId` malformé → 400 VALIDATION_ERROR. Scope agence (aucune fuite tenant :
  * filtre `au.agency_id`). Un conseiller sans `display_name` est exclu (nominatif).
+ * Rate-limit IP anti-énumération (60/min) appliqué en amont par
+ * `mountGlobalRateLimits` sur le préfixe `/public/agencies` (config/rate-limits.ts,
+ * source IP via `TRUST_PROXY`) : au-delà → 429 TOO_MANY_REQUESTS.
  */
 function registerPublicRelationshipManagers(router: Hono<PublicEnv>): void {
   router.get("/public/agencies/:agencyId/relationship-managers", async (c) => {
@@ -198,6 +201,9 @@ const PUBLIC_UUID_RE =
  * (`operation.sla_minutes ?? service.sla_minutes` — D4) pour l'estimation d'attente.
  * Aucune donnée sensible : id/code/name/slaMinutes(résolu)/iconKey uniquement.
  * `agencyId`/`serviceId` malformés → 400 VALIDATION_ERROR.
+ * Rate-limit IP anti-énumération (60/min) appliqué en amont par
+ * `mountGlobalRateLimits` sur le préfixe `/public/agencies` (config/rate-limits.ts,
+ * source IP via `TRUST_PROXY`) : au-delà → 429 TOO_MANY_REQUESTS.
  */
 function registerPublicOperations(router: Hono<PublicEnv>): void {
   router.get("/public/agencies/:agencyId/operations", async (c) => {
@@ -253,8 +259,9 @@ function getBus(c: PublicCtx): RealtimeBus {
  * Mutation critique → `X-Idempotency-Key` OBLIGATOIRE (verrou SET NX atomique).
  * L'agence/le service viennent du CORPS (validés existants/actifs) ; le `bank_id`
  * du ticket est DÉRIVÉ de la file résolue — jamais accepté du client (anti-fuite).
- * Le rate-limit IP (60/min) est déjà appliqué en amont par `mountGlobalRateLimits`
- * (config/rate-limits.ts, source IP via `TRUST_PROXY`).
+ * Le rate-limit IP (60/min) du préfixe `/public/tickets` est déjà appliqué en amont
+ * par `mountGlobalRateLimits` (config/rate-limits.ts, source IP via `TRUST_PROXY`).
+ * Fenêtre indépendante de celle de `/public/agencies` (dimension `public-tickets`).
  */
 function registerCreate(router: Hono<PublicEnv>): void {
   router.post("/public/tickets", async (c) => {
