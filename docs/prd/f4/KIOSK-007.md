@@ -1,6 +1,6 @@
 ## KIOSK-007 : États dégradés — imprimante HS, file longue (SMS), service fermé, erreur système
 
-**Module** : F4 — Kiosque · **Agent** : agent-kiosk · **Dépend de** : KIOSK-005, CONTRACT-012 · **Statut** : TODO
+**Module** : F4 — Kiosque · **Agent** : agent-kiosk · **Dépend de** : KIOSK-005, CONTRACT-012 · **Statut** : DONE (2026-07-12)
 
 **Révision** : v2 — arbitrage 19
 
