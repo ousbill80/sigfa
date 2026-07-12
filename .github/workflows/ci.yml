@@ -125,7 +125,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: pnpm test
+        # --concurrency=1 : sérialise les packages turbo. Sur un runner 2 cœurs, faire
+        # tourner en parallèle plusieurs suites Testcontainers (api, database) + jest
+        # (mobile) + vitest sature CPU/Docker et provoque des échecs INTERMITTENTS
+        # (chaque package est vert isolément). Classe « CI 2 cœurs ≠ local » — cf.
+        # .claude/lessons/etat-local-residuel-masque-la-ci.md. Fiabilité > vitesse ici.
+        run: pnpm test -- --concurrency=1
 
       - name: Build tools/ci
         run: pnpm --filter @sigfa/ci run build
