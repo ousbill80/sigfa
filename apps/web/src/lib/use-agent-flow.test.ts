@@ -46,6 +46,39 @@ describe("useAgentFlow — call-next", () => {
     expect(result.current.ticket?.id).toBe(TICKET_ID);
   });
 
+  it("RT-003: call-next sans `number` → numéro lu via GET /tickets/{id}", async () => {
+    server.use(
+      http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
+        // Réponse réelle callView : id présent, PAS de `number`.
+        HttpResponse.json({ id: TICKET_ID, status: "CALLED", counterId: COUNTER_ID }),
+      ),
+      http.get(`${BASE}/tickets/${TICKET_ID}`, () =>
+        HttpResponse.json({ id: TICKET_ID, number: "A007", status: "CALLED" }),
+      ),
+    );
+    const { result } = makeFlow();
+    await act(async () => {
+      await result.current.callNext();
+    });
+    expect(result.current.status).toBe("serving");
+    expect(result.current.ticket?.number).toBe("A007");
+  });
+
+  it("RT-003: call-next sans `number` et GET en échec → numéro vide, pas de crash", async () => {
+    server.use(
+      http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
+        HttpResponse.json({ id: TICKET_ID, status: "CALLED", counterId: COUNTER_ID }),
+      ),
+      http.get(`${BASE}/tickets/${TICKET_ID}`, () => HttpResponse.error()),
+    );
+    const { result } = makeFlow();
+    await act(async () => {
+      await result.current.callNext();
+    });
+    expect(result.current.status).toBe("serving");
+    expect(result.current.ticket?.number).toBe("");
+  });
+
   it("WEB-002: appelle bien /call-next (jamais /call) — route canonique", async () => {
     let calledPath = "";
     server.use(
@@ -100,13 +133,16 @@ describe("useAgentFlow — TERMINER", () => {
       http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
         HttpResponse.json({ id: TICKET_ID, number: "A042", status: "CALLED", counterId: COUNTER_ID }),
       ),
+      http.post(`${BASE}/tickets/${TICKET_ID}/serve`, () =>
+        HttpResponse.json({ id: TICKET_ID, status: "SERVING", counterId: COUNTER_ID }),
+      ),
       http.post(`${BASE}/tickets/${TICKET_ID}/close`, () =>
         HttpResponse.json({ id: TICKET_ID, number: "A042", status: "DONE", counterId: COUNTER_ID, waitTime: 600, serviceTime: 300, closedAt: "2026-07-11T09:36:00Z" }),
       ),
     );
   });
 
-  it("WEB-002: TERMINER → POST /tickets/{id}/close → zone ticket réinitialisée", async () => {
+  it("WEB-002: TERMINER → serve puis POST /tickets/{id}/close → zone ticket réinitialisée", async () => {
     const { result } = makeFlow();
     await act(async () => {
       await result.current.callNext();
@@ -148,6 +184,9 @@ describe("useAgentFlow — robustesse réseau", () => {
       http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
         HttpResponse.json({ id: TICKET_ID, number: "A042", status: "CALLED", counterId: COUNTER_ID }),
       ),
+      http.post(`${BASE}/tickets/${TICKET_ID}/serve`, () =>
+        HttpResponse.json({ id: TICKET_ID, status: "SERVING", counterId: COUNTER_ID }),
+      ),
       http.post(`${BASE}/tickets/${TICKET_ID}/close`, () =>
         HttpResponse.json({ error: { code: "ILLEGAL_TRANSITION" } }, { status: 409 }),
       ),
@@ -167,6 +206,9 @@ describe("useAgentFlow — robustesse réseau", () => {
     server.use(
       http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
         HttpResponse.json({ id: TICKET_ID, number: "A042", status: "CALLED", counterId: COUNTER_ID }),
+      ),
+      http.post(`${BASE}/tickets/${TICKET_ID}/serve`, () =>
+        HttpResponse.json({ id: TICKET_ID, status: "SERVING", counterId: COUNTER_ID }),
       ),
       http.post(`${BASE}/tickets/${TICKET_ID}/close`, () => HttpResponse.error()),
     );

@@ -155,7 +155,8 @@ export function SocketProvider(props: SocketProviderProps): ReactElement {
     function requestSync(): void {
       // D4 : resync = convergence d'état (snapshot), pas de rejeu.
       if (agencyId) {
-        socket.emit("join:agency", agencyId);
+        // Le serveur valide `{ agencyId }` (joinAgencySchema/syncRequestSchema).
+        socket.emit("join:agency", { agencyId });
         socket.emit("sync:request", { agencyId });
       }
     }

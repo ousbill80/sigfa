@@ -12,11 +12,22 @@ import { AgentConsole, type TransferOption } from "@/components/agent/agent-cons
 import { useAgentFlow } from "@/lib/use-agent-flow";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 
-/** Prism mock base URL (RT-001 keeps the real socket inactive). */
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4010";
+/** Mode temps réel (dérivé de l'env). */
+const REALTIME = process.env.NEXT_PUBLIC_REALTIME_MODE === "real";
+
+/**
+ * Base API du client agent.
+ * - mode `real` : proxy same-origin `/api/rt` — injecte le Bearer httpOnly côté
+ *   serveur et relaie vers `/api/v1` (RT-003 ; token jamais exposé au JS client).
+ * - mode `off`  : mock Prism canonique (RT-001, socket inactif).
+ */
+const API_BASE = REALTIME
+  ? "/api/rt"
+  : process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4010";
 
 /** Counter operated by the signed-in agent (would come from the JWT claim). */
-const COUNTER_ID = "cccccccc-cccc-4ccc-accc-cccccccccccc";
+const COUNTER_ID =
+  process.env.NEXT_PUBLIC_AGENT_COUNTER_ID ?? "cccccccc-cccc-4ccc-accc-cccccccccccc";
 
 /** Inline transfer destinations (would come from the agency services). */
 const TRANSFER_OPTIONS: TransferOption[] = [

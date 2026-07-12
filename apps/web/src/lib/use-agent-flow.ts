@@ -3,7 +3,9 @@
  *
  * Drives the agent console against the typed client generated from core.yaml:
  * - APPELER LE SUIVANT → POST /counters/{counterId}/call-next (route canonique).
- * - TERMINER → PATCH /tickets/{id}/close (réinitialise la zone ticket).
+ * - TERMINER → POST /tickets/{id}/serve puis POST /tickets/{id}/close : l'agent
+ *   SERT (CALLED→SERVING) puis CLÔTURE (SERVING→DONE), conformément au cycle de
+ *   vie API-003 (le close exige l'état SERVING). Réinitialise la zone ticket.
  * - TRANSFÉRER → sélecteur inline (aucune modale).
  *
  * Realtime is simulated (RT-001) : the called ticket comes from the HTTP
@@ -60,6 +62,22 @@ export interface UseAgentFlowResult {
 }
 
 /**
+ * Lit le numéro d'appel d'un ticket via GET /tickets/{id} (route de contrat).
+ * Renvoie une chaîne vide en cas d'échec (affichage dégradé, jamais un crash).
+ * @param client - Client core typé.
+ * @param id - UUID du ticket.
+ * @returns Le numéro (ex. "A001") ou "".
+ */
+async function fetchTicketNumber(client: CoreClient, id: string): Promise<string> {
+  try {
+    const { data } = await client.GET("/tickets/{id}", { params: { path: { id } } });
+    return (data as { number?: string } | undefined)?.number ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Agent counter workflow hook.
  * @param options - {@link UseAgentFlowOptions}.
  * @returns {@link UseAgentFlowResult}.
@@ -91,11 +109,12 @@ export function useAgentFlow(options: UseAgentFlowOptions): UseAgentFlowResult {
         return;
       }
       const called = data as { id?: string; number?: string };
-      setTicket({
-        id: called.id ?? "",
-        number: called.number ?? "",
-        startedAt: Date.now(),
-      });
+      const id = called.id ?? "";
+      // La route call-next renvoie l'id mais PAS le numéro d'appel (callView).
+      // Le numéro affichable (ex. "A001") est lu via GET /tickets/{id} — route
+      // de contrat renvoyant `number`. Fallback conservé si déjà présent.
+      const number = called.number ?? (id ? await fetchTicketNumber(client, id) : "");
+      setTicket({ id, number, startedAt: Date.now() });
       setStatus("serving");
     } catch {
       setStatus("error");
@@ -108,6 +127,12 @@ export function useAgentFlow(options: UseAgentFlowOptions): UseAgentFlowResult {
     setStatus("loading");
     setMessage(null);
     try {
+      // Cycle API-003 : SERVIR (CALLED→SERVING) avant de CLÔTURER (SERVING→DONE).
+      // Le serve est idempotent côté serveur (served_at = COALESCE) : rejouable
+      // sans effet de bord. Un ticket déjà SERVING renvoie une transition légale.
+      await client.POST("/tickets/{id}/serve", {
+        params: { path: { id: ticket.id } },
+      });
       const { error } = await client.POST("/tickets/{id}/close", {
         params: {
           path: { id: ticket.id },

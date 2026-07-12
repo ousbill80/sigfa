@@ -135,9 +135,9 @@ describe("SocketProvider", () => {
     servers.push(srv);
     let joined: string | null = null;
     srv.io.on("connection", (socket: ServerSocket) => {
-      socket.on("join:agency", (agencyId: string) => {
-        joined = agencyId;
-        void socket.join(`agency:${agencyId}`);
+      socket.on("join:agency", (payload: { agencyId: string }) => {
+        joined = payload.agencyId;
+        void socket.join(`agency:${payload.agencyId}`);
         socket.emit("ticket:called", contractTicketCalled("A047", "Guichet 3"));
       });
     });
@@ -187,8 +187,8 @@ describe("SocketProvider", () => {
     servers.push(srv);
     let syncRequests = 0;
     srv.io.on("connection", (socket: ServerSocket) => {
-      socket.on("join:agency", (agencyId: string) => {
-        void socket.join(`agency:${agencyId}`);
+      socket.on("join:agency", (payload: { agencyId: string }) => {
+        void socket.join(`agency:${payload.agencyId}`);
       });
       socket.on("sync:request", () => {
         syncRequests += 1;

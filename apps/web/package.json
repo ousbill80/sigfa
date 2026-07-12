@@ -9,7 +9,9 @@
     "lint": "next lint --dir src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test --config=playwright.config.ts",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@sigfa/contracts": "workspace:*",
@@ -23,7 +25,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.61.1",
     "@sigfa/config": "workspace:*",
+    "ioredis": "^5.4.1",
+    "pg": "^8.13.0",
+    "@types/pg": "^8.11.0",
+    "testcontainers": "^10.28.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",

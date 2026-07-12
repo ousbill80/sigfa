@@ -334,6 +334,9 @@ importers:
       '@eslint/js':
         specifier: ^9.0.0
         version: 9.39.5
+      '@playwright/test':
+        specifier: ^1.61.1
+        version: 1.61.1
       '@sigfa/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -352,6 +355,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.20.0
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.17
@@ -373,12 +379,18 @@ importers:
       eslint-config-next:
         specifier: 15.3.3
         version: 15.3.3(eslint-plugin-import-x@4.17.1(@typescript-eslint/utils@8.63.0(eslint@9.39.5(jiti@1.21.7))(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint@9.39.5(jiti@1.21.7)))(eslint@9.39.5(jiti@1.21.7))(typescript@5.9.3)
+      ioredis:
+        specifier: ^5.4.1
+        version: 5.11.1
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0
       msw:
         specifier: ^2.7.0
         version: 2.15.0(@types/node@22.20.1)(typescript@5.9.3)
+      pg:
+        specifier: ^8.13.0
+        version: 8.22.0
       postcss:
         specifier: ^8.4.49
         version: 8.5.16
@@ -388,6 +400,9 @@ importers:
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.19(yaml@2.9.0)
+      testcontainers:
+        specifier: ^10.28.0
+        version: 10.28.0
       typescript:
         specifier: ^5.0.0
         version: 5.9.3

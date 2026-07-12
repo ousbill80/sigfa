@@ -8,6 +8,11 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
+    // Les tests unitaires/composants vivent dans src/. L'E2E Playwright (RT-003)
+    // vit dans e2e/ et tourne via `test:e2e` (backend réel orchestré) — jamais
+    // collecté par vitest.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    exclude: ["node_modules", "dist", ".next", "e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "json-summary"],
