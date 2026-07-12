@@ -71,6 +71,15 @@ export const tickets = pgTable(
     /** Agent en charge (FK RESTRICT, optionnel). */
     /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
     agentId: uuid("agent_id").references(() => users.id, { onDelete: "restrict" }),
+    /**
+     * Conseiller ciblé par le ticket (MODEL-DB-B, D6).
+     * NULLABLE (FK users RESTRICT) — quand fourni, le ticket rejoint la file
+     * PERSONNELLE de ce conseiller (routage mono-agent, logique en API-B).
+     * Additif : ne touche pas `service_id`/`operation_id`/`queue_id`.
+     * Pas de nouvelle table file — la file conseiller = filtre `target_manager_id`.
+     */
+    /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
+    targetManagerId: uuid("target_manager_id").references(() => users.id, { onDelete: "restrict" }),
     /** Numéro séquentiel brut dans la file. */
     number: integer("number").notNull(),
     /** Numéro d'affichage `{code}-{NNN}` (composé par l'API). */
@@ -133,6 +142,8 @@ export const tickets = pgTable(
     index("tickets_bank_id_agency_id_idx").on(table.bankId, table.agencyId),
     index("tickets_bank_id_phone_hash_idx").on(table.bankId, table.phoneHash),
     index("tickets_operation_id_idx").on(table.operationId),
+    /** Index file conseiller (MODEL-DB-B, D6) — filtre `target_manager_id`. */
+    index("tickets_target_manager_id_idx").on(table.targetManagerId),
     unique("tickets_queue_id_number_issued_day_key").on(
       table.queueId,
       table.number,

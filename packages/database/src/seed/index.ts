@@ -396,7 +396,25 @@ async function seedDemoCountersAndKiosk(query: QueryFn): Promise<void> {
 }
 
 /**
+ * Conseillers de démo (MODEL-DB-B, D5) : ≥2 agents seed marqués `is_relationship_manager`.
+ * Clé = rôle démo persistable, valeur = attributs publics (display_name + photo_url).
+ * Démontre la liste publique nominative (zéro PII : ni email, ni rôle exposés).
+ */
+const DEMO_RELATIONSHIP_MANAGERS: Record<string, { displayName: string; photoUrl: string }> = {
+  AGENT: {
+    displayName: "Awa Koné",
+    photoUrl: "https://cdn.sigfa-demo.ci/managers/awa-kone.jpg",
+  },
+  MANAGER: {
+    displayName: "Kouadio N'Guessan",
+    photoUrl: "https://cdn.sigfa-demo.ci/managers/kouadio-nguessan.jpg",
+  },
+};
+
+/**
  * Insère un utilisateur de démo pour un rôle donné.
+ * MODEL-DB-B : marque les rôles de `DEMO_RELATIONSHIP_MANAGERS` comme conseillers
+ * (`is_relationship_manager=true` + `display_name` + `photo_url`).
  *
  * @param query    - Connexion migrateur (BYPASSRLS)
  * @param role     - Rôle SIGFA à créer
@@ -412,11 +430,17 @@ async function seedDemoUser(
   const hash = await hashDemoPassword(password);
   const userId = generateDemoUserId(role);
   const email = demoEmail(role);
+  const manager = DEMO_RELATIONSHIP_MANAGERS[role];
+  const isRm = manager !== undefined;
+  const displayName = manager ? `'${manager.displayName.replace(/'/g, "''")}'` : "NULL";
+  const photoUrl = manager ? `'${manager.photoUrl.replace(/'/g, "''")}'` : "NULL";
   await query(`
-    INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
+    INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role,
+                       is_relationship_manager, display_name, photo_url)
     VALUES (
       '${userId}', '${DEMO_BANK_ID}', '${email}',
-      '${hash}', 'Demo', '${role}', '${role}'
+      '${hash}', 'Demo', '${role}', '${role}',
+      ${isRm}, ${displayName}, ${photoUrl}
     )
     ON CONFLICT (email) DO NOTHING
   `);

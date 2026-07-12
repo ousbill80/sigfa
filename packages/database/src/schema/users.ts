@@ -66,6 +66,24 @@ export const users = pgTable(
     phoneHash: text("phone_hash"),
     /** Compte actif. */
     isActive: boolean("is_active").notNull().default(true),
+    /**
+     * Conseiller « relationship manager » (MODEL-DB-B, D5).
+     * Additif NOT NULL default false — un conseiller apparaît dans la liste
+     * publique nominative `GET /public/agencies/{id}/relationship-managers`
+     * (filtre `is_relationship_manager AND is_active AND deleted_at IS NULL`).
+     * AUCUN lien client↔conseiller attitré (respecte le hors-scope CRM, CLAUDE.md §5).
+     */
+    isRelationshipManager: boolean("is_relationship_manager").notNull().default(false),
+    /**
+     * Nom d'affichage public du conseiller (liste publique — zéro PII).
+     * NULLABLE : renseigné pour les conseillers ; NULL sinon.
+     */
+    displayName: text("display_name"),
+    /**
+     * URL de la photo publique du conseiller (optionnelle).
+     * NULLABLE : la photo est facultative dans la liste publique.
+     */
+    photoUrl: text("photo_url"),
     /** Horodatage de création. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Horodatage de dernière mise à jour. */
