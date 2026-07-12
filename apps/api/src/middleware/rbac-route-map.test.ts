@@ -61,4 +61,26 @@ describe("SEC-F3: RBAC AUDITOR orthogonal (lecture seule)", () => {
     expect(hasRequiredRole("AGENT", "AUTHENTICATED", "POST")).toBe(true);
     expect(hasRequiredRole("NONE", "AUTHENTICATED", "GET")).toBe(false);
   });
+
+  // ── CONTRACT-013 : DISPLAY orthogonal socket-only, REFUSÉ sur tout HTTP ──
+  it("SEC-CONTRACT-013: DISPLAY REFUSÉ sur toute route HTTP protégée (mutation ET lecture)", () => {
+    // Mutations : jamais.
+    for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
+      expect(hasRequiredRole("DISPLAY", "AGENT", method)).toBe(false);
+    }
+    // Lectures : jamais non plus (rôle d'affichage socket pur, aucune surface HTTP).
+    expect(hasRequiredRole("DISPLAY", "AGENT", "GET")).toBe(false);
+    expect(hasRequiredRole("DISPLAY", "MANAGER", "GET")).toBe(false);
+    expect(hasRequiredRole("DISPLAY", "AUDITOR", "GET")).toBe(false);
+  });
+
+  it("SEC-CONTRACT-013: DISPLAY autorisé sur route publique NONE mais REFUSÉ sur AUTHENTICATED", () => {
+    // Une route publique (`requiredRole:NONE`) n'exige aucun rôle — DISPLAY passe
+    // au même titre que n'importe qui (ex. re-mint de son propre token TV).
+    expect(hasRequiredRole("DISPLAY", "NONE", "POST")).toBe(true);
+    // Mais une route AUTHENTICATED (/auth/me, heartbeat, devices) lui est REFUSÉE :
+    // le refus DISPLAY intervient AVANT la garde AUTHENTICATED (défense en profondeur).
+    expect(hasRequiredRole("DISPLAY", "AUTHENTICATED", "GET")).toBe(false);
+    expect(hasRequiredRole("DISPLAY", "AUTHENTICATED", "POST")).toBe(false);
+  });
 });
