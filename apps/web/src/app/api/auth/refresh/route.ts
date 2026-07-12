@@ -1,8 +1,15 @@
 /**
  * Token refresh API route — silent token refresh using refresh_token cookie.
+ *
+ * S4 (Boucle 2 F4) : aligné sur LA LOI (`core.yaml` RefreshRequest
+ * `{refreshToken}` / AuthTokens camelCase) via le client typé
+ * @sigfa/contracts. L'ancien body `{refresh_token}` faisait échouer la
+ * rotation contre l'API réelle à chaque appel.
  * @module app/api/auth/refresh/route
  */
 import { NextRequest, NextResponse } from "next/server";
+import { createSigfaClient } from "@sigfa/contracts";
+import { setAuthCookies } from "@/lib/auth-cookies";
 
 const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4010";
 
@@ -15,13 +22,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const upstream = await fetch(`${API_URL}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+    // Client typé @sigfa/contracts — POST /auth/refresh (RefreshRequest → AuthTokens).
+    const client = createSigfaClient("core", API_URL);
+    const { data, error } = await client.POST("/auth/refresh", {
+      body: { refreshToken },
     });
 
-    if (!upstream.ok) {
+    if (error || !data) {
       // Refresh failed — clear cookies and signal re-login
       const response = NextResponse.json({ error: "Refresh failed" }, { status: 401 });
       response.cookies.delete("access_token");
@@ -29,31 +36,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return response;
     }
 
-    const data = (await upstream.json()) as {
-      access_token: string;
-      refresh_token: string;
-      expires_in: number;
-    };
-
-    const response = NextResponse.json({ ok: true });
-
-    response.cookies.set("access_token", data.access_token, {
-      httpOnly: true,
-      secure: process.env["NODE_ENV"] === "production",
-      sameSite: "lax",
-      maxAge: data.expires_in,
-      path: "/",
-    });
-
-    response.cookies.set("refresh_token", data.refresh_token, {
-      httpOnly: true,
-      secure: process.env["NODE_ENV"] === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
-      path: "/",
-    });
-
-    return response;
+    return setAuthCookies(NextResponse.json({ ok: true }), data);
   } catch {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
