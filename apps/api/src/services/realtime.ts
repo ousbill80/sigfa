@@ -87,6 +87,17 @@ export const counterStatusSchema = z.object({
   agentId: z.string().uuid().optional(),
 });
 
+/**
+ * Schéma du payload `kiosk:printer-error` (LA LOI CONTRACT-003
+ * `kioskPrinterErrorEvent`). Émis UNE fois par épisode d'erreur d'impression
+ * (API-011) : `since` est l'horodatage ISO 8601 du début de l'épisode.
+ */
+export const kioskPrinterErrorSchema = z.object({
+  kioskId: z.string().uuid(),
+  agencyId: z.string().uuid(),
+  since: z.string().datetime(),
+});
+
 /** Association nom d'événement → schéma Zod du payload. */
 const EVENT_SCHEMAS = {
   "ticket:created": ticketCreatedSchema,
@@ -95,6 +106,7 @@ const EVENT_SCHEMAS = {
   "queue:updated": queueUpdatedSchema,
   "counter:status": counterStatusSchema,
   "alert:manager": alertManagerSchema,
+  "kiosk:printer-error": kioskPrinterErrorSchema,
 } as const;
 
 /** Noms d'événements supportés. */

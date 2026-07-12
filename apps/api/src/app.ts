@@ -33,6 +33,11 @@ import { createKioskSessionRouter } from "src/routes/kiosk-session.js";
 import { createAgentImportRouter } from "src/routes/agents-import.js";
 import { createDataPrivacyRouter } from "src/routes/data-privacy.js";
 import { createPublicTicketRouter } from "src/routes/public-tickets.js";
+import { createHealthRouter } from "src/routes/health.js";
+import { createAuditLogRouter } from "src/routes/audit-logs.js";
+import { createDeviceRouter } from "src/routes/devices.js";
+import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
+import { mountGlobalRateLimits } from "src/config/rate-limits.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
@@ -84,6 +89,10 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
     c.set("bus", bus);
     await next();
   });
+
+  // Rate-limits GLOBAUX (API-011) — montés AVANT l'auth : bornes IP indépendantes
+  // par route sur /public/*, webhooks et /notifications/devices (429 + Retry-After).
+  mountGlobalRateLimits(app as unknown as Hono<never>);
 
   // Middleware tenant + RBAC (API-002) — vérifie JWT, rôle, et scope tenant
   app.use("/api/v1/*", tenantMiddleware as Parameters<typeof app.use>[1]);
@@ -161,6 +170,16 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // Anti-spam Redis, fenêtre 24 h UTC, NPS incrémental, 404 opaque anti-énumération.
   const publicTicketRouter = createPublicTicketRouter();
   app.route("/api/v1", publicTicketRouter);
+
+  // Routes API-011 (dernière story F3) : santé, supervision bornes, audit, devices.
+  // - /health : public, sans auth/tenant (checks postgres+redis, 503 si down).
+  // - /kiosks/status : supervision MANAGER+ (ONLINE/SILENT dérivé de last_seen).
+  // - /audit-logs : lecture seule stricte (AUDITOR|SUPER_ADMIN).
+  // - /notifications/devices : enregistrement idempotent + DELETE ownership.
+  app.route("/api/v1", createHealthRouter());
+  app.route("/api/v1", createKioskStatusRouter());
+  app.route("/api/v1", createAuditLogRouter());
+  app.route("/api/v1", createDeviceRouter());
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>

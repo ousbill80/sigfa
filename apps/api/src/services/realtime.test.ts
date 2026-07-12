@@ -157,3 +157,22 @@ describe("API-007: alert:manager convergé sur la forme contractuelle unique { t
     ).toThrowError(SigfaError);
   });
 });
+
+describe("API-011: kiosk:printer-error (CONTRACT-003)", () => {
+  it("API-011: kiosk:printer-error valide {kioskId, agencyId, since} et rejette un payload malformé", () => {
+    const bus = createCaptureBus();
+    bus.emit("kiosk:printer-error", {
+      kioskId: "14141414-1414-4141-a141-141414141414",
+      agencyId: AGENCY_ID,
+      since: "2026-07-12T10:00:00.000Z",
+    });
+    expect(bus.ofType("kiosk:printer-error")).toHaveLength(1);
+    expect(() =>
+      validateEvent("kiosk:printer-error", {
+        kioskId: "not-a-uuid",
+        agencyId: AGENCY_ID,
+        since: "2026-07-12T10:00:00.000Z",
+      } as never)
+    ).toThrowError(SigfaError);
+  });
+});

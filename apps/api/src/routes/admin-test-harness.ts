@@ -126,6 +126,8 @@ async function applyAdminSchema(db: pg.Client): Promise<void> {
         CREATE TYPE notification_channel AS ENUM ('SMS','WHATSAPP','PUSH'); END IF;
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='printer_status') THEN
         CREATE TYPE printer_status AS ENUM ('OK','PAPER_LOW','ERROR','OFFLINE'); END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='push_platform') THEN
+        CREATE TYPE push_platform AS ENUM ('IOS','ANDROID','EXPO'); END IF;
     END $$;
   `);
   await db.query(`CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, theme JSONB NOT NULL DEFAULT '{}', queue_critical_threshold INTEGER NOT NULL DEFAULT 50, agent_inactivity_minutes INTEGER NOT NULL DEFAULT 15, no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), deleted_at TIMESTAMPTZ);`);
@@ -145,6 +147,7 @@ async function applyAdminSchema(db: pg.Client): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS notification_templates (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), type notification_type NOT NULL, channel notification_channel NOT NULL, lang TEXT NOT NULL, body TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(bank_id, type, channel, lang));`);
   await db.query(`CREATE TABLE IF NOT EXISTS public_holidays (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), date DATE NOT NULL, name TEXT NOT NULL, description TEXT, is_approximate BOOLEAN NOT NULL DEFAULT false, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(date, name));`);
   await db.query(`CREATE TABLE IF NOT EXISTS audit_log (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), actor_id UUID, actor_role role, actor_email TEXT, action VARCHAR(500) NOT NULL, entity_type TEXT NOT NULL, entity_id UUID, occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), ip INET, diff JSONB);`);
+  await db.query(`CREATE TABLE IF NOT EXISTS notification_devices (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), device_token TEXT NOT NULL UNIQUE, platform push_platform NOT NULL, phone_hash TEXT, last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(), revoked_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
   await db.query(`CREATE TABLE IF NOT EXISTS agent_status_history (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), agent_id UUID NOT NULL REFERENCES users(id), from_status agent_status, to_status agent_status NOT NULL, changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
 }
 
