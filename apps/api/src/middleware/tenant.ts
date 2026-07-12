@@ -17,7 +17,8 @@ import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { verifyAccessToken } from "src/services/auth.service.js";
-import { buildError } from "src/lib/errors.js";
+import { assertKioskSessionActive } from "src/services/kiosk-session.service.js";
+import { SigfaError, buildError } from "src/lib/errors.js";
 import { logger } from "src/lib/logger.js";
 import { findRouteEntry, hasRequiredRole } from "src/middleware/rbac-route-map.js";
 
@@ -194,6 +195,21 @@ export async function tenantMiddleware(
           );
         }
       }
+    }
+  }
+
+  // Session borne : refuser un JWT dont la session a été révoquée (API-009),
+  // MÊME si `exp` est encore valide (révocation côté serveur, non côté token).
+  const kioskId = payload["kioskId"] as string | undefined;
+  const sessionId = payload["sessionId"] as string | undefined;
+  if (kioskId && sessionId) {
+    try {
+      await assertKioskSessionActive(c.get("db"), kioskId, sessionId);
+    } catch (err) {
+      const message =
+        err instanceof SigfaError ? err.message : "Session borne révoquée.";
+      logger.warn({ requestId, kioskId }, "kiosk:session-revoked");
+      return c.json(buildError("KIOSK_SESSION_REVOKED", message), 401);
     }
   }
 

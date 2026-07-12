@@ -27,6 +27,11 @@ import { createCounterRouter } from "src/routes/counters.js";
 import { createHoursRouter } from "src/routes/hours.js";
 import { createThresholdsRouter } from "src/routes/thresholds.js";
 import { createSmsTemplateRouter } from "src/routes/sms-templates.js";
+import { createThemeRouter } from "src/routes/theme.js";
+import { createOnboardingRouter } from "src/routes/onboarding.js";
+import { createKioskSessionRouter } from "src/routes/kiosk-session.js";
+import { createAgentImportRouter } from "src/routes/agents-import.js";
+import { createDataPrivacyRouter } from "src/routes/data-privacy.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
@@ -136,6 +141,20 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   app.route("/api/v1", thresholdsRouter);
   const smsTemplateRouter = createSmsTemplateRouter();
   app.route("/api/v1", smsTemplateRouter);
+
+  // Routes onboarding & plateforme (API-009, admin.yaml + public.yaml + agents.yaml).
+  // Theming (couleurs corrigées ≥4.5:1, presign R2), clonage de config,
+  // session borne (JWT 12 h + révocation), import CSV, droit à l'oubli.
+  const themeRouter = createThemeRouter();
+  app.route("/api/v1", themeRouter);
+  const onboardingRouter = createOnboardingRouter();
+  app.route("/api/v1", onboardingRouter);
+  const kioskSessionRouter = createKioskSessionRouter();
+  app.route("/api/v1", kioskSessionRouter);
+  const agentImportRouter = createAgentImportRouter();
+  app.route("/api/v1", agentImportRouter);
+  const dataPrivacyRouter = createDataPrivacyRouter();
+  app.route("/api/v1", dataPrivacyRouter);
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>
