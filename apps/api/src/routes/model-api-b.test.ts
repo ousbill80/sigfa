@@ -211,6 +211,32 @@ describe("MODEL-API-B: liste publique nominative des conseillers (D5)", () => {
   });
 });
 
+describe("MODEL-API-B: rate-limit anti-énumération /public/agencies/* (D5)", () => {
+  // La borne globale (config/rate-limits.ts) couvre /public/agencies : 60/min/IP.
+  // Au-delà, 429 TOO_MANY_REQUESTS + retryAfterSeconds — surface d'énumération bornée.
+  it("MODEL-API-B: >60 GET .../relationship-managers depuis une IP → 429 + retryAfterSeconds", async () => {
+    let last: { status: number; data: unknown } | undefined;
+    for (let i = 0; i < 61; i++) {
+      last = await req("GET", `/public/agencies/${ids.agencyId}/relationship-managers`);
+    }
+    expect(last?.status).toBe(429);
+    const body = last?.data as { error: { code: string; details?: { retryAfterSeconds?: number } } };
+    expect(body.error.code).toBe("TOO_MANY_REQUESTS");
+    expect(body.error.details?.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it("MODEL-API-B: >60 GET .../operations depuis une IP → 429 + retryAfterSeconds", async () => {
+    let last: { status: number; data: unknown } | undefined;
+    for (let i = 0; i < 61; i++) {
+      last = await req("GET", `/public/agencies/${ids.agencyId}/operations?serviceId=${ids.serviceId}`);
+    }
+    expect(last?.status).toBe(429);
+    const body = last?.data as { error: { code: string; details?: { retryAfterSeconds?: number } } };
+    expect(body.error.code).toBe("TOO_MANY_REQUESTS");
+    expect(body.error.details?.retryAfterSeconds).toBeGreaterThan(0);
+  });
+});
+
 describe("MODEL-API-B: marquage conseiller PATCH /agents/{id} (RBAC + audit)", () => {
   it("MODEL-API-B: AGENCY_DIRECTOR marque un agent conseiller → profil + audit", async () => {
     const dirTok = await token("AGENCY_DIRECTOR", ids.directorId, [ids.agencyId]);

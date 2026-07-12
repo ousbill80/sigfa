@@ -204,4 +204,46 @@ describe("API-010: Schemathesis module public", () => {
     console.log("[Schemathesis public operations] Output:", output.slice(0, 3000));
     expect(exitCode).toBe(0);
   }, 180_000);
+
+  it("MODEL-API-B: Schemathesis PASS liste publique relationship-managers (/public/agencies/{id}/relationship-managers)", async () => {
+    const contractPath = join(import.meta.dirname, "../../../../packages/contracts/generated/bundled/public.yaml");
+    let dockerAvailable = false;
+    try {
+      await execAsync("docker --version");
+      dockerAvailable = true;
+    } catch {
+      console.warn("[Schemathesis public relationship-managers] Docker non disponible — SKIP gracieux");
+    }
+    if (!dockerAvailable) {
+      expect(dockerAvailable).toBe(false);
+      return;
+    }
+
+    // 429 (nouveau rate-limit /public/agencies 60/min/IP) N'EST PAS un 5xx : la
+    // stratégie `not_a_server_error` l'accepte. `--max-examples` aligné sur operations.
+    let output = "";
+    let exitCode = 0;
+    try {
+      const result = await execAsync(
+        `docker run --rm \
+          -v "${contractPath}:/contract.yaml" \
+          --add-host=host.docker.internal:host-gateway \
+          schemathesis/schemathesis:stable \
+          run /contract.yaml \
+          --url "http://host.docker.internal:${apiPort}/api/v1" \
+          --include-path-regex "^/public/agencies/[^/]+/relationship-managers" \
+          --max-examples 20 \
+          --request-timeout 10000 \
+          --checks not_a_server_error`,
+        { timeout: 150_000 }
+      );
+      output = result.stdout + result.stderr;
+    } catch (err: unknown) {
+      const e = err as { stdout?: string; stderr?: string; code?: number };
+      output = (e.stdout ?? "") + (e.stderr ?? "");
+      exitCode = e.code ?? 1;
+    }
+    console.log("[Schemathesis public relationship-managers] Output:", output.slice(0, 3000));
+    expect(exitCode).toBe(0);
+  }, 180_000);
 });

@@ -38,6 +38,11 @@ interface RouteLimit {
 export const GLOBAL_RATE_LIMITS: readonly RouteLimit[] = [
   { path: "/notifications/devices", name: "devices", limit: 10, windowSeconds: 60 },
   { path: "/public/tickets", name: "public-tickets", limit: 60, windowSeconds: 60 },
+  // Listes publiques NOMINATIVES/opérations (MODEL-API-B/D5) : routes sans auth
+  // `/public/agencies/{id}/relationship-managers` ET `/public/agencies/{id}/operations`.
+  // Le montage `/public/agencies/*` couvre les DEUX sous-routes → surface
+  // d'énumération/scraping bornée à 60/min/IP (fenêtre indépendante).
+  { path: "/public/agencies", name: "public-agencies", limit: 60, windowSeconds: 60 },
   { path: "/webhooks", name: "webhooks", limit: 120, windowSeconds: 60 },
   // Session d'affichage TV publique (CONTRACT-013) : route publique sans auth,
   // bornée par IP (fenêtre indépendante). Un écran mural ne crée qu'une session
