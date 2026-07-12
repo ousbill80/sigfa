@@ -42,6 +42,11 @@ describe("WEB-001: middleware auth", () => {
       expect(isPublicRoute("/tv")).toBe(true);
       expect(checkAccess("/tv", null).action).toBe("allow");
     });
+
+    it("allows /design-preview without authentication (static design gallery)", () => {
+      expect(isPublicRoute("/design-preview")).toBe(true);
+      expect(checkAccess("/design-preview", null).action).toBe("allow");
+    });
   });
 
   describe("RBAC enforcement in middleware", () => {

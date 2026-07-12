@@ -9,8 +9,10 @@ import { canAccess, getDefaultDashboard } from "./roles";
 /**
  * Public routes that don't require auth.
  * `/tv` is a public per-agency read-only display (TV-001, RBAC public).
+ * `/design-preview` is the static design-system gallery (@sigfa/ui) — public,
+ * read-only, no tenant data.
  */
-export const PUBLIC_ROUTES = ["/login", "/tv", "/api/auth/login", "/api/auth/refresh", "/_next", "/favicon.ico"];
+export const PUBLIC_ROUTES = ["/login", "/tv", "/design-preview", "/api/auth/login", "/api/auth/refresh", "/_next", "/favicon.ico"];
 
 /**
  * Determines if a pathname is a public route.

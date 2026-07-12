@@ -1,0 +1,593 @@
+/**
+ * SIGFA Design System v2 — component styles.
+ * Consumes ONLY the tokens from tokens.css. No hex literal here.
+ */
+
+/* ============================= Button ============================= */
+.sig-btn {
+  --_pad-y: var(--space-3);
+  --_pad-x: var(--space-6);
+  --_size: var(--text-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: var(--_size);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  padding: var(--_pad-y) var(--_pad-x);
+  border-radius: var(--r-md);
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  transition: background-color var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease),
+    transform var(--dur-1) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.sig-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.sig-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.sig-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+  transform: none;
+}
+
+/* sizes */
+.sig-btn--dense {
+  --_pad-y: var(--space-2);
+  --_pad-x: var(--space-4);
+  --_size: var(--text-sm);
+}
+.sig-btn--md {
+  --_pad-y: var(--space-3);
+  --_pad-x: var(--space-6);
+  --_size: var(--text-md);
+}
+.sig-btn--kiosk {
+  --_pad-y: var(--space-6);
+  --_pad-x: var(--space-12);
+  --_size: var(--text-xl);
+  min-height: 72px;
+  border-radius: var(--r-lg);
+}
+
+/* variants */
+.sig-btn--primary {
+  background: var(--brand);
+  color: var(--brand-contrast);
+  box-shadow: var(--shadow-brand);
+}
+.sig-btn--primary:hover:not(:disabled) {
+  background: var(--brand-strong);
+}
+.sig-btn--secondary {
+  background: var(--surface-1);
+  color: var(--ink);
+  border-color: var(--hairline);
+  box-shadow: var(--shadow-1);
+}
+.sig-btn--secondary:hover:not(:disabled) {
+  border-color: var(--ink-faint);
+  background: var(--surface-2);
+}
+.sig-btn--ghost {
+  background: transparent;
+  color: var(--brand-strong);
+}
+.sig-btn--ghost:hover:not(:disabled) {
+  background: var(--brand-soft);
+}
+.sig-btn--danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.sig-btn--danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+/* ============================= Card ============================= */
+.sig-card {
+  display: block;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-6);
+  transition: box-shadow var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.sig-card--interactive {
+  cursor: pointer;
+}
+.sig-card--interactive:hover {
+  box-shadow: var(--shadow-2);
+  transform: translateY(-2px);
+}
+.sig-card--interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ============================= Field ============================= */
+.sig-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-family: var(--font-text);
+}
+.sig-field__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+.sig-field__req {
+  color: var(--danger);
+  margin-inline-start: 2px;
+}
+.sig-field__input {
+  font-family: inherit;
+  font-size: var(--text-md);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: var(--space-3) var(--space-4);
+  transition: background-color var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.sig-field__input::placeholder {
+  color: var(--ink-faint);
+}
+.sig-field__input:hover:not(:disabled):not([aria-invalid="true"]) {
+  border-color: var(--ink-faint);
+}
+.sig-field__input:focus-visible,
+.sig-field__input:focus {
+  outline: none;
+  background: var(--surface-1);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.sig-field__input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.sig-field__input[aria-invalid="true"] {
+  border-color: var(--danger);
+  background: var(--surface-1);
+}
+.sig-field__input[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+.sig-field--kiosk .sig-field__input {
+  font-size: var(--text-xl);
+  min-height: 72px;
+}
+.sig-field__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+.sig-field__hint {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+/* ============================= Badge / StatusPill ============================= */
+.sig-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+.sig-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  flex: 0 0 auto;
+}
+.sig-badge--success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.sig-badge--success .sig-badge__dot {
+  background: var(--success);
+}
+.sig-badge--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.sig-badge--warning .sig-badge__dot {
+  background: var(--warning);
+}
+.sig-badge--info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.sig-badge--info .sig-badge__dot {
+  background: var(--info);
+}
+.sig-badge--brand {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+.sig-badge--brand .sig-badge__dot {
+  background: var(--brand);
+}
+/* danger = pastille/pictogramme, JAMAIS un fond plein rouge */
+.sig-badge--danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1.5px solid var(--danger);
+}
+.sig-badge--danger .sig-badge__dot {
+  background: var(--danger);
+}
+
+/* ============================= KpiTile ============================= */
+.sig-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-6);
+  min-width: 0;
+}
+.sig-kpi__label {
+  font-family: var(--font-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-soft);
+  letter-spacing: 0.01em;
+}
+.sig-kpi__value {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-numeric);
+}
+.sig-kpi__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.sig-kpi__delta--up {
+  color: var(--success);
+}
+.sig-kpi__delta--down {
+  color: var(--danger);
+}
+.sig-kpi__delta--flat {
+  color: var(--ink-soft);
+}
+
+/* ============================= TicketMoment (hero) ============================= */
+.sig-ticket {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  text-align: center;
+  background: var(--night);
+  color: var(--ink-inverse);
+  border-radius: var(--r-xl);
+  padding: var(--space-16) var(--space-12);
+  overflow: hidden;
+}
+.sig-ticket__halo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.sig-ticket__halo::before {
+  content: "";
+  width: 320px;
+  height: 320px;
+  border-radius: var(--r-full);
+  background: radial-gradient(
+    circle,
+    var(--gold-soft) 0%,
+    rgba(199, 154, 58, 0.18) 40%,
+    transparent 70%
+  );
+  opacity: 0.5;
+  box-shadow: var(--shadow-gold);
+}
+.sig-ticket__eyebrow {
+  position: relative;
+  font-family: var(--font-text);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-inverse-soft);
+}
+.sig-ticket__number {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: var(--display);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-numeric);
+  animation: sig-ticket-in var(--dur-3) var(--ease) both;
+}
+.sig-ticket__message {
+  position: relative;
+  max-width: 34ch;
+  font-family: var(--font-text);
+  font-size: var(--text-xl);
+  line-height: var(--leading-body);
+  color: var(--ink-inverse);
+}
+.sig-ticket__actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+@keyframes sig-ticket-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+  60% {
+    transform: translateY(0) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sig-ticket__number {
+    animation: none;
+  }
+}
+
+/* ============================= OfflineBanner ============================= */
+.sig-offline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--info);
+  background: var(--info-soft);
+  border: 1px solid var(--info);
+  border-radius: var(--r-md);
+  padding: var(--space-3) var(--space-4);
+}
+.sig-offline__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--info);
+  flex: 0 0 auto;
+}
+
+/* ============================= Skeleton ============================= */
+.sig-skeleton {
+  display: block;
+  border-radius: var(--r-md);
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    var(--hairline) 50%,
+    var(--surface-2) 70%
+  );
+  background-size: 200% 100%;
+  animation: sig-shimmer 1.4s var(--ease) infinite;
+}
+@keyframes sig-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sig-skeleton {
+    animation: none;
+  }
+}
+
+/* ============================= EmptyState ============================= */
+.sig-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-16) var(--space-8);
+  font-family: var(--font-text);
+}
+.sig-empty__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-full);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  margin-bottom: var(--space-2);
+}
+.sig-empty__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--ink);
+}
+.sig-empty__desc {
+  max-width: 40ch;
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+}
+.sig-empty__actions {
+  margin-top: var(--space-4);
+}
+
+/* ============================= Dialog ============================= */
+.sig-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: rgba(26, 19, 12, 0.45);
+  animation: sig-fade var(--dur-2) var(--ease) both;
+  z-index: 50;
+}
+.sig-dialog {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface-1);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-3);
+  padding: var(--space-8);
+  font-family: var(--font-text);
+  animation: sig-dialog-in var(--dur-3) var(--ease) both;
+}
+.sig-dialog__title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: var(--tracking-tight);
+}
+.sig-dialog__body {
+  margin-top: var(--space-3);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+}
+.sig-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+}
+@keyframes sig-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sig-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sig-dialog__backdrop,
+  .sig-dialog {
+    animation: none;
+  }
+}
+
+/* ============================= Stepper ============================= */
+.sig-stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-family: var(--font-text);
+}
+.sig-stepper__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sig-stepper__marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  border: 1.5px solid var(--hairline);
+  background: var(--surface-1);
+  color: var(--ink-soft);
+  transition: background-color var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.sig-stepper__label {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  text-align: center;
+}
+.sig-stepper__step--current .sig-stepper__marker {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-contrast);
+  box-shadow: var(--shadow-brand);
+}
+.sig-stepper__step--current .sig-stepper__label {
+  color: var(--ink);
+  font-weight: 600;
+}
+.sig-stepper__step--done .sig-stepper__marker {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--brand-contrast);
+}
+.sig-stepper__connector {
+  flex: 1 1 auto;
+  height: 2px;
+  margin-top: 18px;
+  background: var(--hairline);
+  border-radius: var(--r-full);
+}
+.sig-stepper__connector--done {
+  background: var(--forest);
+}

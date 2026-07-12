@@ -17,6 +17,9 @@ const CONTRACTS_ENTRY = resolve(__dirname, "./src/lib/contracts-entry.ts");
 const nextConfig: NextConfig = {
   // Strict mode for React 19
   reactStrictMode: true,
+  // @sigfa/ui ships TypeScript source (source-exported workspace package);
+  // Next must transpile it (it also carries CSS + self-hosted woff2 fonts).
+  transpilePackages: ["@sigfa/ui"],
   // Experimental features for Next.js 15
   experimental: {
     // Server actions enabled by default in Next.js 15

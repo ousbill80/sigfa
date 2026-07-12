@@ -1,0 +1,113 @@
+/**
+ * SIGFA Design System v2 — « Sérénité Premium ».
+ * SINGLE SOURCE OF HEX VALUES. No colour literal may live outside this file
+ * (its JS mirror is `tokens.ts`). Components reference `var(--token)` only.
+ *
+ * Palette « Or & Forêt » — terracotta / forêt / or on a warm base.
+ */
+
+:root {
+  /* ---- Encre & surfaces (base chaude) ---- */
+  --paper: #fbf8f3; /* fond clair — blanc chaud (papier ivoire) */
+  --surface-1: #ffffff; /* cartes (élévation sur paper) */
+  --surface-2: #f4eee4; /* sections alternées, champs au repos */
+  --ink: #1a130c; /* texte principal — brun-noir chaud */
+  --ink-soft: #6b5d4f; /* texte secondaire — taupe chaud */
+  --ink-faint: #a99c8b; /* placeholder, métadonnées */
+  --hairline: #ece3d6; /* séparateurs 1px */
+
+  /* ---- Sombre (kiosque plein soleil + TV) ---- */
+  --night: #16110b; /* fond kiosque — brun-nuit profond */
+  --night-2: #0e0a06; /* écran TV — contraste max */
+  --ink-inverse: #fbf6ee; /* texte sur sombre — blanc chaud */
+  --ink-inverse-soft: #b8ab98; /* secondaire sur sombre */
+
+  /* ---- Marque SIGFA — « Or & Forêt » ---- */
+  --brand: #c25a16; /* terracotta/ambre brûlé (primaire produit) */
+  --brand-strong: #9c400c; /* pressé / hover */
+  --brand-soft: #f7e7d6; /* fonds de badge, surbrillance douce */
+  --brand-contrast: #ffffff; /* texte sur brand (grand texte ≥ 3:1) */
+
+  --forest: #0f6b4a; /* vert forêt profond — confiance, positif */
+  --forest-soft: #dbefe6;
+  --gold: #c79a3a; /* or patiné — accents premium, jalons */
+  --gold-soft: #f6ecd2;
+
+  /* ---- Sémantiques (fonctionnels harmonisés) ---- */
+  --success: #0f7a4d; /* guichet ouvert, ticket confirmé */
+  --success-soft: #dbefe6;
+  --warning: #c77d0a; /* file chargée, SLA approche (ambre) */
+  --warning-soft: #f9ebd1;
+  --danger: #c0362c; /* SLA dépassé, erreur — pastille, jamais fond */
+  --danger-soft: #f7ded9;
+  --info: #2c6e9b; /* information neutre, offline (bleu ardoise) */
+  --info-soft: #dceaf3;
+
+  /* ---- Typographie ---- */
+  /* Polices swappables : surcharger ces deux tokens suffit à changer la fonte. */
+  --font-display: "Clash Display", "General Sans", ui-sans-serif, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-text: "General Sans", "Inter Tight", ui-sans-serif, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Échelle modulaire (ratio 1.25, base 16) */
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.875rem; /* 14 */
+  --text-md: 1rem; /* 16 */
+  --text-lg: 1.25rem; /* 20 */
+  --text-xl: 1.5625rem; /* 25 */
+  --text-2xl: 1.9375rem; /* 31 */
+  --text-3xl: 2.4375rem; /* 39 */
+  --text-4xl: 3.0625rem; /* 49 */
+  --display: 4.75rem; /* 76 — numéro de ticket kiosque */
+
+  --leading-body: 1.55;
+  --leading-tight: 1.15;
+  --tracking-tight: -0.015em;
+  --tracking-numeric: -0.02em;
+
+  /* ---- Rayons ---- */
+  --r-sm: 8px;
+  --r-md: 12px; /* champs, boutons */
+  --r-lg: 18px; /* cartes */
+  --r-xl: 28px; /* feuilles, moments forts */
+  --r-full: 999px;
+
+  /* ---- Élévation (ombres chaudes, teintées brun) ---- */
+  --shadow-1: 0 1px 2px rgba(26, 19, 12, 0.06), 0 1px 3px rgba(26, 19, 12, 0.05);
+  --shadow-2: 0 4px 12px rgba(26, 19, 12, 0.08), 0 2px 4px rgba(26, 19, 12, 0.05);
+  --shadow-3: 0 12px 32px rgba(26, 19, 12, 0.12), 0 4px 8px rgba(26, 19, 12, 0.06);
+  --shadow-brand: 0 8px 24px rgba(194, 90, 22, 0.28); /* bouton primaire = présence */
+  --shadow-gold: 0 0 48px rgba(199, 154, 58, 0.35); /* halo Moment Ticket */
+
+  /* ---- Espacement (base 4, généreux) ---- */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* ---- Mouvement ---- */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-1: 120ms; /* feedback tactile */
+  --dur-2: 220ms; /* transitions d'état */
+  --dur-3: 360ms; /* entrée d'écran */
+
+  /* Anneau de focus (marque, 3px) */
+  --focus-ring: 0 0 0 3px var(--brand-soft), 0 0 0 5px var(--brand);
+  --focus-ring-inverse: 0 0 0 3px rgba(199, 154, 58, 0.35), 0 0 0 5px var(--gold);
+}
+
+/* Repli mouvement : instantané si l'utilisateur le demande. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0.01ms;
+    --dur-2: 0.01ms;
+    --dur-3: 0.01ms;
+  }
+}
