@@ -2,7 +2,9 @@
   "extends": "@sigfa/config/tsconfig/base",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "types": ["node"]
   },
-  "include": ["src/**/*", "events/**/*", "generated/types/**/*"]
+  "include": ["src/**/*", "events/**/*", "generated/types/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }
