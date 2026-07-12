@@ -91,63 +91,67 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: tokens.colors.surface0,
     padding: tokens.spacing.xl,
   },
 
   // Empty state
   emptyLabel: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkSoft,
     textAlign: 'center',
   },
 
-  // Global badge de rappel
+  // Global badge de rappel (brand-soft, pictogramme doux)
   badge: {
-    margin: tokens.spacing.md,
-    backgroundColor: tokens.colors.info,
-    borderRadius: tokens.radius.badge,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.xs,
+    margin: tokens.spacing.lg,
+    backgroundColor: tokens.colors.brandSoft,
+    borderRadius: tokens.radius.full,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.sm,
     alignSelf: 'flex-start',
   },
   badgeText: {
-    color: tokens.colors.inkInverse,
-    fontSize: tokens.fontSize.caption,
-    fontWeight: 'bold',
+    color: tokens.colors.brandStrong,
+    fontSize: tokens.fontSize.sm,
+    fontWeight: '700',
   },
 
   // Entries
   entryRow: {
     backgroundColor: tokens.colors.surface1,
     padding: tokens.spacing.lg,
-    marginHorizontal: tokens.spacing.md,
-    marginVertical: tokens.spacing.xs,
-    borderRadius: tokens.radius.card,
+    marginHorizontal: tokens.spacing.lg,
+    marginVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    ...tokens.shadow.card,
   },
   entryNumber: {
-    fontSize: tokens.fontSize.body,
-    fontWeight: 'bold',
+    fontSize: tokens.fontSize.lg,
+    fontWeight: '700',
     color: tokens.colors.inkStrong,
+    letterSpacing: -0.3,
   },
   entryDate: {
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.inkSoft,
   },
   entryRating: {
-    fontSize: tokens.fontSize.body,
-    color: tokens.colors.warning,
+    fontSize: tokens.fontSize.md,
+    color: tokens.colors.gold,
   },
   entryBadge: {
-    backgroundColor: tokens.colors.info,
-    borderRadius: tokens.radius.badge,
-    paddingHorizontal: tokens.spacing.sm,
+    backgroundColor: tokens.colors.brandSoft,
+    borderRadius: tokens.radius.full,
+    paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.xs,
   },
   entryBadgeText: {
-    color: tokens.colors.inkInverse,
-    fontSize: tokens.fontSize.caption,
+    color: tokens.colors.brandStrong,
+    fontSize: tokens.fontSize.xs,
+    fontWeight: '700',
   },
 });

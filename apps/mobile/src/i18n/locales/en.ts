@@ -16,6 +16,11 @@ export const en = {
     newTicket: 'New ticket',
     myTicket: 'My ticket',
   },
+  language: {
+    label: 'Language',
+    fr: 'Français',
+    en: 'English',
+  },
   ticket: {
     title: 'Get a ticket',
     step1Title: 'Choose your service',
@@ -48,6 +53,9 @@ export const en = {
     notFound: 'Please go to the reception desk',
     personsBefore: 'person(s) before you',
     updatedEvery30s: 'Updated every 30 seconds',
+    reassure: "Relax, we'll let you know as soon as your turn is near.",
+    yourTurnSubtitle: "Head to the counter — it's your turn.",
+    numberLabel: 'Your number',
   },
   feedback: {
     title: 'Give feedback',

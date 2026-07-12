@@ -20,10 +20,10 @@ describe('MOB-001: tokens appliqués — zéro valeur de couleur/taille/rayon en
     expect(tokens.spacing.xl).toBe(24);
   });
 
-  test('tokens.radius contient les rayons de bordure', () => {
-    expect(tokens.radius.card).toBe(12);
-    expect(tokens.radius.button).toBe(12);
-    expect(tokens.radius.badge).toBe(999);
+  test('tokens.radius contient les rayons de bordure (v2 : cartes = --r-lg 18)', () => {
+    expect(tokens.radius.card).toBe(18); // --r-lg (Design System v2)
+    expect(tokens.radius.button).toBe(12); // --r-md
+    expect(tokens.radius.badge).toBe(999); // --r-full
   });
 
   test('tokens.fontSize contient les tailles de police', () => {

@@ -113,7 +113,7 @@ export function FeedbackScreen({
         placeholder={i18n.t('feedback.commentPlaceholder')}
         multiline
         maxLength={500}
-        placeholderTextColor={tokens.colors.inkSoft}
+        placeholderTextColor={tokens.colors.inkFaint}
       />
 
       {/* Bouton "Donner mon avis" */}
@@ -131,22 +131,23 @@ export function FeedbackScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: tokens.colors.surface1,
+    backgroundColor: tokens.colors.surface0,
     padding: tokens.spacing.xl,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: tokens.colors.surface0,
     padding: tokens.spacing.xl,
   },
 
   // Section labels
   sectionLabel: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkStrong,
-    fontWeight: 'bold',
-    marginBottom: tokens.spacing.sm,
+    fontWeight: '700',
+    marginBottom: tokens.spacing.md,
     marginTop: tokens.spacing.lg,
   },
 
@@ -156,27 +157,28 @@ const styles = StyleSheet.create({
     marginBottom: tokens.spacing.lg,
   },
   starButton: {
-    minHeight: tokens.minTouchTarget,
-    minWidth: tokens.minTouchTarget,
+    minHeight: tokens.minTouchTarget + 8,
+    minWidth: tokens.minTouchTarget + 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   star: {
-    fontSize: 32,
-    color: tokens.colors.inkSoft,
+    fontSize: 40,
+    color: tokens.colors.inkFaint,
   },
   starFilled: {
-    color: tokens.colors.warning,
+    color: tokens.colors.gold,
   },
 
   // Comment
   commentInput: {
+    backgroundColor: tokens.colors.surface2,
     borderWidth: 1,
-    borderColor: tokens.colors.inkSoft,
-    borderRadius: tokens.radius.card,
-    padding: tokens.spacing.md,
-    minHeight: 100,
-    fontSize: tokens.fontSize.body,
+    borderColor: tokens.colors.hairline,
+    borderRadius: tokens.radius.md,
+    padding: tokens.spacing.lg,
+    minHeight: 120,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkStrong,
     textAlignVertical: 'top',
     marginBottom: tokens.spacing.xl,
@@ -188,44 +190,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.xl,
     paddingVertical: tokens.spacing.md,
     borderRadius: tokens.radius.button,
-    minHeight: tokens.minTouchTarget,
+    minHeight: tokens.minTouchTarget + 8,
     justifyContent: 'center',
     alignItems: 'center',
+    ...tokens.shadow.brand,
   },
   submitText: {
-    color: tokens.colors.inkInverse,
-    fontSize: tokens.fontSize.body,
-    fontWeight: 'bold',
+    color: tokens.colors.brandContrast,
+    fontSize: tokens.fontSize.md,
+    fontWeight: '700',
   },
 
   // States
   successLabel: {
-    fontSize: tokens.fontSize.title,
-    fontWeight: 'bold',
-    color: tokens.colors.success,
+    fontSize: tokens.fontSize.xl,
+    fontWeight: '700',
+    color: tokens.colors.forest,
     textAlign: 'center',
   },
   loadingLabel: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkSoft,
     marginTop: tokens.spacing.md,
   },
   emptyLabel: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkSoft,
     textAlign: 'center',
   },
 
   // Error
   errorBanner: {
-    backgroundColor: 'rgba(240, 68, 56, 0.1)',
-    borderRadius: tokens.radius.card,
-    padding: tokens.spacing.md,
+    backgroundColor: tokens.colors.dangerSoft,
+    borderRadius: tokens.radius.md,
+    padding: tokens.spacing.lg,
     marginBottom: tokens.spacing.md,
   },
   errorLabel: {
     color: tokens.colors.danger,
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.md,
     textAlign: 'center',
   },
 });

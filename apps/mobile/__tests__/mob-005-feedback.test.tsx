@@ -32,7 +32,7 @@ beforeEach(() => {
   mockStorage = {};
 });
 
-describe('MOB-005: écran feedback — 5 étoiles + champ commentaire rendus avec tokens SIGFA (RNTL snapshot × 4 langues)', () => {
+describe('MOB-005: écran feedback — 5 étoiles + champ commentaire rendus avec tokens SIGFA (RNTL snapshot × FR/EN)', () => {
   test('MOB-005: FeedbackScreen — rendu avec 5 étoiles et champ commentaire en français', () => {
     i18n.locale = 'fr';
     const { toJSON, getByTestId } = render(
@@ -58,32 +58,6 @@ describe('MOB-005: écran feedback — 5 étoiles + champ commentaire rendus ave
       />
     );
     expect(toJSON()).toMatchSnapshot('FeedbackScreen-en');
-    i18n.locale = 'fr';
-  });
-
-  test('MOB-005: FeedbackScreen — snapshot en dioula', () => {
-    i18n.locale = 'dioula';
-    const { toJSON } = render(
-      <FeedbackScreen
-        trackingId="tid-nanoid-21-chars00"
-        onSubmit={jest.fn()}
-        screenState="nominal"
-      />
-    );
-    expect(toJSON()).toMatchSnapshot('FeedbackScreen-dioula');
-    i18n.locale = 'fr';
-  });
-
-  test('MOB-005: FeedbackScreen — snapshot en baoulé', () => {
-    i18n.locale = 'baoule';
-    const { toJSON } = render(
-      <FeedbackScreen
-        trackingId="tid-nanoid-21-chars00"
-        onSubmit={jest.fn()}
-        screenState="nominal"
-      />
-    );
-    expect(toJSON()).toMatchSnapshot('FeedbackScreen-baoule');
     i18n.locale = 'fr';
   });
 

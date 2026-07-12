@@ -5,7 +5,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   style={
     {
       "alignItems": "center",
-      "backgroundColor": "#12B76A",
+      "backgroundColor": "#0F6B4A",
       "flex": 1,
       "justifyContent": "center",
       "padding": 24,
@@ -16,9 +16,10 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   <Text
     style={
       {
-        "color": "#F5F7FA",
-        "fontSize": 20,
-        "fontWeight": "bold",
+        "color": "#FBF6EE",
+        "fontSize": 25,
+        "fontWeight": "700",
+        "letterSpacing": 0.5,
         "marginBottom": 12,
         "textAlign": "center",
       }
@@ -29,9 +30,10 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   <Text
     style={
       {
-        "color": "#F5F7FA",
-        "fontSize": 32,
-        "fontWeight": "bold",
+        "color": "#FBF6EE",
+        "fontSize": 64,
+        "fontWeight": "700",
+        "letterSpacing": -1,
         "marginTop": 12,
         "textAlign": "center",
       }
@@ -39,6 +41,19 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     testID="live-ticket-display-number"
   >
     A-001
+  </Text>
+  <Text
+    style={
+      {
+        "color": "#FBF6EE",
+        "fontSize": 16,
+        "marginTop": 16,
+        "opacity": 0.92,
+        "textAlign": "center",
+      }
+    }
+  >
+    Présentez-vous au guichet, c'est à vous.
   </Text>
 </View>
 `;
@@ -48,6 +63,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   style={
     {
       "alignItems": "center",
+      "backgroundColor": "#FBF8F3",
       "flex": 1,
       "justifyContent": "center",
       "padding": 24,
@@ -58,8 +74,8 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   <Text
     style={
       {
-        "color": "#475467",
-        "fontSize": 15,
+        "color": "#6B5D4F",
+        "fontSize": 16,
         "textAlign": "center",
       }
     }
@@ -74,6 +90,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   style={
     {
       "alignItems": "center",
+      "backgroundColor": "#FBF8F3",
       "flex": 1,
       "justifyContent": "center",
       "padding": 24,
@@ -84,8 +101,8 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   <Text
     style={
       {
-        "color": "#F04438",
-        "fontSize": 15,
+        "color": "#C0362C",
+        "fontSize": 16,
         "marginBottom": 16,
         "textAlign": "center",
       }
@@ -123,13 +140,21 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     onStartShouldSetResponder={[Function]}
     style={
       {
-        "backgroundColor": "#2E90FA",
+        "backgroundColor": "#C25A16",
         "borderRadius": 12,
+        "elevation": 6,
         "justifyContent": "center",
         "minHeight": 44,
         "opacity": 1,
         "paddingHorizontal": 24,
         "paddingVertical": 12,
+        "shadowColor": "#C25A16",
+        "shadowOffset": {
+          "height": 8,
+          "width": 0,
+        },
+        "shadowOpacity": 0.28,
+        "shadowRadius": 20,
       }
     }
     testID="live-ticket-retry"
@@ -137,8 +162,9 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     <Text
       style={
         {
-          "color": "#F5F7FA",
-          "fontSize": 15,
+          "color": "#FFFFFF",
+          "fontSize": 16,
+          "fontWeight": "700",
         }
       }
     >
@@ -153,9 +179,10 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   style={
     {
       "alignItems": "center",
-      "backgroundColor": "#FFFFFF",
+      "backgroundColor": "#16110B",
       "flex": 1,
-      "padding": 24,
+      "paddingHorizontal": 24,
+      "paddingVertical": 48,
     }
   }
   testID="live-ticket-idle"
@@ -163,69 +190,156 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   <Text
     style={
       {
-        "color": "#2E90FA",
-        "fontSize": 32,
-        "fontWeight": "bold",
-        "marginBottom": 24,
-        "marginTop": 32,
-        "textAlign": "center",
+        "color": "#B8AB98",
+        "fontSize": 14,
+        "letterSpacing": 1.5,
+        "marginBottom": 12,
+        "marginTop": 24,
+        "textTransform": "uppercase",
       }
     }
-    testID="live-ticket-display-number"
   >
-    A-001
-  </Text>
-  <Text
-    style={
-      {
-        "color": "#475467",
-        "fontSize": 15,
-        "marginBottom": 8,
-      }
-    }
-    testID="live-ticket-position"
-  >
-    Position dans la file
-    : 
-    <Text
-      style={
-        {
-          "color": "#101828",
-          "fontWeight": "bold",
-        }
-      }
-    >
-      1
-    </Text>
-  </Text>
-  <Text
-    style={
-      {
-        "color": "#475467",
-        "fontSize": 15,
-        "marginBottom": 24,
-      }
-    }
-    testID="live-ticket-estimate"
-  >
-    Attente estimée
-    : 
-    <Text
-      style={
-        {
-          "color": "#101828",
-          "fontWeight": "bold",
-        }
-      }
-    >
-      5
-       min
-    </Text>
+    Votre numéro
   </Text>
   <View
     style={
       {
-        "marginTop": 16,
+        "borderRadius": 28,
+        "elevation": 10,
+        "paddingHorizontal": 16,
+        "shadowColor": "#C79A3A",
+        "shadowOffset": {
+          "height": 0,
+          "width": 0,
+        },
+        "shadowOpacity": 0.45,
+        "shadowRadius": 40,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#C79A3A",
+          "fontSize": 64,
+          "fontWeight": "700",
+          "letterSpacing": -1,
+          "textAlign": "center",
+        }
+      }
+      testID="live-ticket-display-number"
+    >
+      A-001
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#FBF6EE",
+        "fontSize": 16,
+        "lineHeight": 24,
+        "marginBottom": 32,
+        "marginTop": 24,
+        "paddingHorizontal": 12,
+        "textAlign": "center",
+      }
+    }
+  >
+    Détendez-vous, nous vous prévenons dès que votre tour approche.
+  </Text>
+  <View
+    style={
+      {
+        "alignItems": "center",
+        "backgroundColor": "rgba(199,154,58,0.10)",
+        "borderRadius": 18,
+        "flexDirection": "row",
+        "marginBottom": 32,
+        "paddingHorizontal": 24,
+        "paddingVertical": 16,
+      }
+    }
+  >
+    <View
+      style={
+        {
+          "alignItems": "center",
+          "flex": 1,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#FBF6EE",
+            "fontSize": 25,
+            "fontWeight": "700",
+          }
+        }
+        testID="live-ticket-position"
+      >
+        1
+      </Text>
+      <Text
+        style={
+          {
+            "color": "#B8AB98",
+            "fontSize": 12,
+            "marginTop": 4,
+          }
+        }
+      >
+        Position dans la file
+      </Text>
+    </View>
+    <View
+      style={
+        {
+          "backgroundColor": "rgba(184,171,152,0.35)",
+          "height": 40,
+          "marginHorizontal": 16,
+          "width": 1,
+        }
+      }
+    />
+    <View
+      style={
+        {
+          "alignItems": "center",
+          "flex": 1,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#FBF6EE",
+            "fontSize": 25,
+            "fontWeight": "700",
+          }
+        }
+        testID="live-ticket-estimate"
+      >
+        5
+         min
+      </Text>
+      <Text
+        style={
+          {
+            "color": "#B8AB98",
+            "fontSize": 12,
+            "marginTop": 4,
+          }
+        }
+      >
+        Attente estimée
+      </Text>
+    </View>
+  </View>
+  <View
+    style={
+      {
+        "marginTop": 12,
         "width": "100%",
       }
     }
@@ -234,9 +348,9 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     <View
       style={
         {
-          "backgroundColor": "rgba(46, 144, 250, 0.1)",
+          "backgroundColor": "rgba(184,171,152,0.25)",
           "borderRadius": 999,
-          "height": 8,
+          "height": 10,
           "overflow": "hidden",
         }
       }
@@ -245,7 +359,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
         collapsable={false}
         style={
           {
-            "backgroundColor": "#2E90FA",
+            "backgroundColor": "#C79A3A",
             "borderRadius": 999,
             "height": "100%",
             "width": "90%",
@@ -256,9 +370,10 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     <Text
       style={
         {
-          "color": "#475467",
-          "fontSize": 13,
-          "marginTop": 8,
+          "color": "#FBF6EE",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "marginTop": 12,
           "textAlign": "center",
         }
       }
@@ -266,6 +381,18 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
       1 personne(s) devant vous
     </Text>
   </View>
+  <Text
+    style={
+      {
+        "color": "#B8AB98",
+        "fontSize": 12,
+        "marginTop": 24,
+        "textAlign": "center",
+      }
+    }
+  >
+    Mis à jour toutes les 30 secondes
+  </Text>
 </View>
 `;
 
@@ -274,7 +401,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
   style={
     {
       "alignItems": "center",
-      "backgroundColor": "#FFFFFF",
+      "backgroundColor": "#FBF8F3",
       "flex": 1,
       "padding": 24,
     }
@@ -285,7 +412,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     style={
       [
         {
-          "backgroundColor": "#FAFBFC",
+          "backgroundColor": "#F4EEE4",
           "borderRadius": 12,
           "marginBottom": 12,
         },
@@ -301,7 +428,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     style={
       [
         {
-          "backgroundColor": "#FAFBFC",
+          "backgroundColor": "#F4EEE4",
           "borderRadius": 12,
           "marginBottom": 12,
         },
@@ -316,7 +443,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     style={
       [
         {
-          "backgroundColor": "#FAFBFC",
+          "backgroundColor": "#F4EEE4",
           "borderRadius": 12,
           "marginBottom": 12,
         },
@@ -331,12 +458,12 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     style={
       [
         {
-          "backgroundColor": "#FAFBFC",
+          "backgroundColor": "#F4EEE4",
           "borderRadius": 12,
           "marginBottom": 12,
         },
         {
-          "height": 8,
+          "height": 10,
           "marginTop": 24,
           "width": "80%",
         },
@@ -344,7 +471,7 @@ exports[`MOB-003: carte plein écran — position, barre de progression et estim
     }
   />
   <ActivityIndicator
-    color="#2E90FA"
+    color="#C79A3A"
     size="small"
     style={
       {

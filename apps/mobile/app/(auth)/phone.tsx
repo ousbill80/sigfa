@@ -1,4 +1,5 @@
-// app/(auth)/phone.tsx — Écran saisie téléphone + OTP
+// app/(auth)/phone.tsx — Écran saisie téléphone + OTP · Refonte v2 « Sérénité Premium »
+// Logique, handlers, testIDs, parcours OTP (fixture 123456) INCHANGÉS — seule l'apparence évolue.
 import React, { useState } from 'react';
 import {
   View,
@@ -13,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { tokens } from '@/tokens';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 export default function PhoneScreen(): React.JSX.Element {
   const router = useRouter();
@@ -33,109 +35,155 @@ export default function PhoneScreen(): React.JSX.Element {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.header}>
+        <LanguageSelector />
+      </View>
+
+      <Text style={styles.brandMark}>SIGFA</Text>
       <Text style={styles.title}>{i18n.t('auth.title')}</Text>
+      <Text style={styles.subtitle}>{i18n.t('nav.myTicket')}</Text>
 
-      {step === 'phone' && (
-        <>
-          <Text style={styles.label}>{i18n.t('auth.phoneLabel')}</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder={i18n.t('auth.phonePlaceholder')}
-            keyboardType="phone-pad"
-            testID="phone-input"
-            accessibilityLabel={i18n.t('auth.phoneLabel')}
-          />
-
-          <View style={styles.consentRow} testID="uemoa-consent-row">
-            <Switch
-              value={uemoa}
-              onValueChange={setUemoa}
-              testID="uemoa-switch"
-              accessibilityLabel={i18n.t('auth.uemoa_consent')}
+      <View style={styles.card}>
+        {step === 'phone' && (
+          <>
+            <Text style={styles.label}>{i18n.t('auth.phoneLabel')}</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder={i18n.t('auth.phonePlaceholder')}
+              placeholderTextColor={tokens.colors.inkFaint}
+              keyboardType="phone-pad"
+              testID="phone-input"
+              accessibilityLabel={i18n.t('auth.phoneLabel')}
             />
-            <Text style={styles.consentText}>{i18n.t('auth.uemoa_consent')}</Text>
-          </View>
 
-          {!uemoa && (
-            <Text style={styles.consentRequired} testID="uemoa-required">
-              {i18n.t('auth.uemoa_required')}
-            </Text>
-          )}
+            <View style={styles.consentRow} testID="uemoa-consent-row">
+              <Switch
+                value={uemoa}
+                onValueChange={setUemoa}
+                trackColor={{ true: tokens.colors.brand, false: tokens.colors.hairline }}
+                thumbColor={tokens.colors.surface1}
+                testID="uemoa-switch"
+                accessibilityLabel={i18n.t('auth.uemoa_consent')}
+              />
+              <Text style={styles.consentText}>{i18n.t('auth.uemoa_consent')}</Text>
+            </View>
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
+            {!uemoa && (
+              <Text style={styles.consentRequired} testID="uemoa-required">
+                {i18n.t('auth.uemoa_required')}
+              </Text>
+            )}
 
-          <TouchableOpacity
-            style={[styles.button, !uemoa && styles.buttonDisabled]}
-            onPress={handleSendOtp}
-            disabled={!uemoa || isLoading}
-            testID="send-otp-button"
-            accessibilityLabel={i18n.t('auth.sendOtp')}
-          >
-            <Text style={styles.buttonText}>{i18n.t('auth.sendOtp')}</Text>
-          </TouchableOpacity>
-        </>
-      )}
+            {error && <Text style={styles.errorText}>{error}</Text>}
 
-      {step === 'otp' && (
-        <>
-          <Text style={styles.label}>{i18n.t('auth.otpLabel')}</Text>
-          <TextInput
-            style={styles.input}
-            value={otp}
-            onChangeText={setOtp}
-            placeholder={i18n.t('auth.otpPlaceholder')}
-            keyboardType="numeric"
-            maxLength={6}
-            testID="otp-input"
-            accessibilityLabel={i18n.t('auth.otpLabel')}
-          />
+            <TouchableOpacity
+              style={[styles.button, !uemoa && styles.buttonDisabled]}
+              onPress={handleSendOtp}
+              disabled={!uemoa || isLoading}
+              activeOpacity={0.85}
+              testID="send-otp-button"
+              accessibilityLabel={i18n.t('auth.sendOtp')}
+            >
+              <Text style={styles.buttonText}>{i18n.t('auth.sendOtp')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
+        {step === 'otp' && (
+          <>
+            <Text style={styles.label}>{i18n.t('auth.otpLabel')}</Text>
+            <TextInput
+              style={styles.input}
+              value={otp}
+              onChangeText={setOtp}
+              placeholder={i18n.t('auth.otpPlaceholder')}
+              placeholderTextColor={tokens.colors.inkFaint}
+              keyboardType="numeric"
+              maxLength={6}
+              testID="otp-input"
+              accessibilityLabel={i18n.t('auth.otpLabel')}
+            />
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleVerify}
-            disabled={isLoading}
-            testID="verify-otp-button"
-            accessibilityLabel={i18n.t('auth.verifyOtp')}
-          >
-            <Text style={styles.buttonText}>{i18n.t('auth.verifyOtp')}</Text>
-          </TouchableOpacity>
-        </>
-      )}
+            {error && <Text style={styles.errorText}>{error}</Text>}
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleVerify}
+              disabled={isLoading}
+              activeOpacity={0.85}
+              testID="verify-otp-button"
+              accessibilityLabel={i18n.t('auth.verifyOtp')}
+            >
+              <Text style={styles.buttonText}>{i18n.t('auth.verifyOtp')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: tokens.colors.surface0,
+  },
   container: {
     flexGrow: 1,
     padding: tokens.spacing.xl,
-    backgroundColor: tokens.colors.surface0,
+  },
+  header: {
+    marginTop: tokens.spacing.md,
+    marginBottom: tokens.spacing.xxl,
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: tokens.fontSize.sm,
+    fontWeight: '700',
+    letterSpacing: 3,
+    color: tokens.colors.brand,
+    marginBottom: tokens.spacing.md,
   },
   title: {
-    fontSize: tokens.fontSize.title,
-    fontWeight: 'bold',
+    fontSize: tokens.fontSize['2xl'],
+    fontWeight: '700',
     color: tokens.colors.inkStrong,
-    marginBottom: tokens.spacing.xl,
+    letterSpacing: -0.5,
+    marginBottom: tokens.spacing.xs,
+  },
+  subtitle: {
+    fontSize: tokens.fontSize.md,
+    color: tokens.colors.inkSoft,
+    marginBottom: tokens.spacing.xxl,
+  },
+  card: {
+    backgroundColor: tokens.colors.surface1,
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.xl,
+    ...tokens.shadow.card,
   },
   label: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.inkSoft,
+    fontWeight: '600',
     marginBottom: tokens.spacing.sm,
   },
   input: {
-    height: tokens.minTouchTarget,
+    minHeight: tokens.minTouchTarget + 6,
+    backgroundColor: tokens.colors.surface2,
     borderWidth: 1,
-    borderColor: tokens.colors.inkSoft,
-    borderRadius: tokens.radius.button,
-    paddingHorizontal: tokens.spacing.md,
-    fontSize: tokens.fontSize.body,
+    borderColor: tokens.colors.hairline,
+    borderRadius: tokens.radius.md,
+    paddingHorizontal: tokens.spacing.lg,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkStrong,
-    backgroundColor: tokens.colors.surface1,
     marginBottom: tokens.spacing.lg,
   },
   consentRow: {
@@ -145,35 +193,39 @@ const styles = StyleSheet.create({
   },
   consentText: {
     flex: 1,
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.inkSoft,
-    marginLeft: tokens.spacing.sm,
+    marginLeft: tokens.spacing.md,
+    lineHeight: 20,
   },
   consentRequired: {
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.danger,
     marginBottom: tokens.spacing.md,
   },
   errorText: {
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.danger,
     marginBottom: tokens.spacing.md,
   },
   button: {
     backgroundColor: tokens.colors.brand,
-    height: tokens.minTouchTarget,
+    minHeight: tokens.minTouchTarget + 8,
     borderRadius: tokens.radius.button,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: tokens.spacing.lg,
+    ...tokens.shadow.brand,
   },
   buttonDisabled: {
-    backgroundColor: tokens.colors.inkSoft,
-    opacity: 0.5,
+    backgroundColor: tokens.colors.surface2,
+    opacity: 0.7,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonText: {
-    color: tokens.colors.inkInverse,
-    fontSize: tokens.fontSize.body,
-    fontWeight: 'bold',
+    color: tokens.colors.brandContrast,
+    fontSize: tokens.fontSize.md,
+    fontWeight: '700',
   },
 });

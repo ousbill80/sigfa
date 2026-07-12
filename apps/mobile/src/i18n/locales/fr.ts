@@ -18,6 +18,12 @@ export const fr = {
     newTicket: 'Nouveau ticket',
     myTicket: 'Mon ticket',
   },
+  // Sélecteur de langue (FR/EN)
+  language: {
+    label: 'Langue',
+    fr: 'Français',
+    en: 'English',
+  },
   // Ticket
   ticket: {
     title: 'Prise de ticket',
@@ -54,6 +60,9 @@ export const fr = {
     notFound: "Adressez-vous à l'accueil",
     personsBefore: 'personne(s) devant vous',
     updatedEvery30s: 'Mis à jour toutes les 30 secondes',
+    reassure: 'Détendez-vous, nous vous prévenons dès que votre tour approche.',
+    yourTurnSubtitle: "Présentez-vous au guichet, c'est à vous.",
+    numberLabel: 'Votre numéro',
   },
   // Feedback (MOB-005)
   feedback: {

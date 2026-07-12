@@ -20,14 +20,15 @@ export function OfflineBadge(): React.JSX.Element | null {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: tokens.colors.warning,
+    backgroundColor: tokens.colors.info,
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.xs,
-    borderRadius: tokens.radius.badge,
+    borderRadius: tokens.radius.full,
     alignSelf: 'center',
   },
   text: {
     color: tokens.colors.inkInverse,
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.xs,
+    fontWeight: '700',
   },
 });

@@ -1,12 +1,10 @@
 // __tests__/mob-001-i18n.test.tsx
-// MOB-001: i18n — les 4 langues chargent sans erreur
-import { i18n } from '../src/i18n';
+// MOB-001: i18n — FR/EN chargent sans erreur (refonte v2 : retrait dioula/baoulé)
+import { i18n, supportedLocales, setLocale } from '../src/i18n';
 import { fr } from '../src/i18n/locales/fr';
 import { en } from '../src/i18n/locales/en';
-import { dioula } from '../src/i18n/locales/dioula';
-import { baoule } from '../src/i18n/locales/baoule';
 
-describe('MOB-001: i18n — les 4 langues chargent sans erreur', () => {
+describe('MOB-001: i18n — FR/EN chargent sans erreur', () => {
   test('locale français charge sans erreur', () => {
     i18n.locale = 'fr';
     expect(i18n.t('auth.title')).toBe('Connexion');
@@ -19,18 +17,15 @@ describe('MOB-001: i18n — les 4 langues chargent sans erreur', () => {
     expect(i18n.t('nav.home')).toBe('Home');
   });
 
-  test('locale dioula charge sans erreur', () => {
-    i18n.locale = 'dioula';
-    const title = i18n.t('auth.title');
-    expect(typeof title).toBe('string');
-    expect(title.length).toBeGreaterThan(0);
+  test('seules FR/EN sont supportées (dioula/baoulé retirés)', () => {
+    expect(supportedLocales).toEqual(['fr', 'en']);
   });
 
-  test('locale baoulé charge sans erreur', () => {
-    i18n.locale = 'baoule';
-    const title = i18n.t('auth.title');
-    expect(typeof title).toBe('string');
-    expect(title.length).toBeGreaterThan(0);
+  test('setLocale bascule FR ⇄ EN', () => {
+    expect(setLocale('en')).toBe('en');
+    expect(i18n.t('nav.home')).toBe('Home');
+    expect(setLocale('fr')).toBe('fr');
+    expect(i18n.t('nav.home')).toBe('Accueil');
   });
 
   test('fallback vers FR si langue inconnue', () => {
@@ -41,18 +36,18 @@ describe('MOB-001: i18n — les 4 langues chargent sans erreur', () => {
     expect(title.length).toBeGreaterThan(0);
   });
 
-  test('les 4 locales ont les clés auth.uemoa_consent', () => {
-    expect(fr.auth.uemoa_consent).toBeDefined();
-    expect(en.auth.uemoa_consent).toBeDefined();
-    expect(dioula.auth.uemoa_consent).toBeDefined();
-    expect(baoule.auth.uemoa_consent).toBeDefined();
+  test('setLocale retombe sur FR si langue non supportée', () => {
+    expect(setLocale('dioula')).toBe('fr');
   });
 
-  test('les 4 locales ont les clés offline.badge', () => {
+  test('FR et EN ont les clés auth.uemoa_consent', () => {
+    expect(fr.auth.uemoa_consent).toBeDefined();
+    expect(en.auth.uemoa_consent).toBeDefined();
+  });
+
+  test('FR et EN ont les clés offline.badge', () => {
     expect(fr.offline.badge).toBeDefined();
     expect(en.offline.badge).toBeDefined();
-    expect(dioula.offline.badge).toBeDefined();
-    expect(baoule.offline.badge).toBeDefined();
   });
 
   afterEach(() => {

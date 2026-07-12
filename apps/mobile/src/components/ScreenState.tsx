@@ -73,19 +73,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: tokens.colors.surface0,
     padding: tokens.spacing.xl,
   },
   label: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkSoft,
     textAlign: 'center',
-    marginTop: tokens.spacing.sm,
+    marginTop: tokens.spacing.md,
   },
   error: {
     color: tokens.colors.danger,
   },
   offline: {
-    color: tokens.colors.warning,
+    color: tokens.colors.info,
   },
   retryButton: {
     marginTop: tokens.spacing.lg,
@@ -93,11 +94,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.xl,
     paddingVertical: tokens.spacing.md,
     borderRadius: tokens.radius.button,
-    minHeight: tokens.minTouchTarget,
+    minHeight: tokens.minTouchTarget + 8,
     justifyContent: 'center',
+    ...tokens.shadow.brand,
   },
   retryText: {
-    color: tokens.colors.inkInverse,
-    fontSize: tokens.fontSize.body,
+    color: tokens.colors.brandContrast,
+    fontSize: tokens.fontSize.md,
+    fontWeight: '700',
   },
 });

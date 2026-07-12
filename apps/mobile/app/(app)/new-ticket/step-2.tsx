@@ -27,6 +27,7 @@ export default function Step2Screen(): React.JSX.Element {
         value={phone}
         onChangeText={setPhone}
         placeholder={i18n.t('auth.phonePlaceholder')}
+        placeholderTextColor={tokens.colors.inkFaint}
         keyboardType="phone-pad"
         testID="step2-phone-input"
         accessibilityLabel={i18n.t('auth.phoneLabel')}
@@ -36,6 +37,8 @@ export default function Step2Screen(): React.JSX.Element {
         <Switch
           value={uemoaConsent}
           onValueChange={setUemoaConsent}
+          trackColor={{ true: tokens.colors.brand, false: tokens.colors.hairline }}
+          thumbColor={tokens.colors.surface1}
           testID="step2-uemoa-switch"
           accessibilityLabel={i18n.t('auth.uemoa_consent')}
         />
@@ -70,25 +73,27 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surface0,
   },
   title: {
-    fontSize: tokens.fontSize.title,
-    fontWeight: 'bold',
+    fontSize: tokens.fontSize.xl,
+    fontWeight: '700',
     color: tokens.colors.inkStrong,
+    letterSpacing: -0.4,
     marginBottom: tokens.spacing.xl,
   },
   label: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.inkSoft,
+    fontWeight: '600',
     marginBottom: tokens.spacing.sm,
   },
   input: {
-    height: tokens.minTouchTarget,
+    minHeight: tokens.minTouchTarget + 6,
     borderWidth: 1,
-    borderColor: tokens.colors.inkSoft,
-    borderRadius: tokens.radius.button,
-    paddingHorizontal: tokens.spacing.md,
-    fontSize: tokens.fontSize.body,
+    borderColor: tokens.colors.hairline,
+    borderRadius: tokens.radius.md,
+    paddingHorizontal: tokens.spacing.lg,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkStrong,
-    backgroundColor: tokens.colors.surface1,
+    backgroundColor: tokens.colors.surface2,
     marginBottom: tokens.spacing.lg,
   },
   consentRow: {
@@ -98,35 +103,39 @@ const styles = StyleSheet.create({
   },
   consentText: {
     flex: 1,
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.inkSoft,
-    marginLeft: tokens.spacing.sm,
+    marginLeft: tokens.spacing.md,
+    lineHeight: 20,
   },
   consentRequired: {
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.danger,
     marginBottom: tokens.spacing.md,
   },
   errorText: {
-    fontSize: tokens.fontSize.caption,
+    fontSize: tokens.fontSize.sm,
     color: tokens.colors.danger,
     marginBottom: tokens.spacing.md,
   },
   button: {
     backgroundColor: tokens.colors.brand,
-    height: tokens.minTouchTarget,
+    minHeight: tokens.minTouchTarget + 8,
     borderRadius: tokens.radius.button,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: tokens.spacing.lg,
+    ...tokens.shadow.brand,
   },
   buttonDisabled: {
-    backgroundColor: tokens.colors.inkSoft,
-    opacity: 0.5,
+    backgroundColor: tokens.colors.surface2,
+    opacity: 0.7,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonText: {
-    color: tokens.colors.inkInverse,
-    fontSize: tokens.fontSize.body,
-    fontWeight: 'bold',
+    color: tokens.colors.brandContrast,
+    fontSize: tokens.fontSize.md,
+    fontWeight: '700',
   },
 });

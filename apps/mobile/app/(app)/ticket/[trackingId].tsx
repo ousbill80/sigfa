@@ -51,14 +51,15 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surface0,
   },
   displayNumber: {
-    fontSize: tokens.fontSize.display,
-    fontWeight: 'bold',
+    fontSize: tokens.fontSize['4xl'],
+    fontWeight: '700',
     color: tokens.colors.brand,
     textAlign: 'center',
+    letterSpacing: -1,
     marginBottom: tokens.spacing.xl,
   },
   label: {
-    fontSize: tokens.fontSize.body,
+    fontSize: tokens.fontSize.md,
     color: tokens.colors.inkSoft,
     marginBottom: tokens.spacing.md,
   },

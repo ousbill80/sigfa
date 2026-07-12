@@ -1,16 +1,14 @@
-// i18n/index.ts — Setup i18n-js avec 4 langues SIGFA
+// i18n/index.ts — Setup i18n-js (FR/EN uniquement)
+// Refonte v2 : le mobile ne porte plus que le français et l'anglais
+// (retrait de dioula/baoulé sur directive PO).
 import { I18n } from 'i18n-js';
 import * as ExpoLocalization from 'expo-localization';
 import { fr } from './locales/fr';
 import { en } from './locales/en';
-import { dioula } from './locales/dioula';
-import { baoule } from './locales/baoule';
 
 const i18n = new I18n({
   fr,
   en,
-  dioula,
-  baoule,
 });
 
 // Défaut = FR (langue officielle Côte d'Ivoire)
@@ -21,8 +19,8 @@ i18n.enableFallback = true;
 const locales = ExpoLocalization.getLocales();
 const deviceLocale = locales[0]?.languageCode ?? 'fr';
 
-// Mapper vers les 4 langues supportées
-const supportedLocales = ['fr', 'en', 'dioula', 'baoule'] as const;
+// Langues supportées : FR / EN
+const supportedLocales = ['fr', 'en'] as const;
 type SupportedLocale = typeof supportedLocales[number];
 
 function detectLocale(code: string): SupportedLocale {
@@ -32,7 +30,14 @@ function detectLocale(code: string): SupportedLocale {
   return 'fr';
 }
 
+/** Change la langue active. Retombe sur FR si non supportée. */
+function setLocale(code: string): SupportedLocale {
+  const next = detectLocale(code);
+  i18n.locale = next;
+  return next;
+}
+
 i18n.locale = detectLocale(deviceLocale);
 
-export { i18n };
+export { i18n, supportedLocales, setLocale };
 export type { SupportedLocale };
