@@ -13,6 +13,7 @@
 import { useState, type ReactElement } from "react";
 import {
   Badge,
+  BankThemeProvider,
   Button,
   Card,
   Dialog,
@@ -52,6 +53,12 @@ interface Copy {
   slaBreached: string;
   info: string;
   vip: string;
+  theming: { title: string; desc: string };
+  themeDefault: string;
+  themeCallNext: string;
+  themeVip: string;
+  themeKpi: string;
+  themeKpiDelta: string;
   feedback: { title: string; desc: string };
   offline: string;
   emptyTitle: string;
@@ -105,6 +112,15 @@ const COPY: Record<Lang, Copy> = {
     slaBreached: "SLA dépassé",
     info: "Information",
     vip: "Client prioritaire",
+    theming: {
+      title: "Theming banque — un seul token, zéro effort",
+      desc: "Chaque banque se brande avec SA couleur primaire. Le MÊME bloc de composants (Button/Card/Badge/KpiTile) est rendu sous 3 chartes via BankThemeProvider — la structure ne bouge pas, le contraste (--brand-contrast) reste ≥ 4.5:1 (WCAG AA, recalculé en JS).",
+    },
+    themeDefault: "Terracotta SIGFA (défaut)",
+    themeCallNext: "Appeler le suivant",
+    themeVip: "Client prioritaire",
+    themeKpi: "Tickets servis",
+    themeKpiDelta: "+12 % vs J-7",
     feedback: { title: "États de service", desc: "Hors-ligne doux, vide accueillant, chargement, dialogue." },
     offline: "Mode hors-ligne — reconnexion en cours.",
     emptyTitle: "Aucun ticket en attente",
@@ -156,6 +172,15 @@ const COPY: Record<Lang, Copy> = {
     slaBreached: "SLA breached",
     info: "Information",
     vip: "Priority client",
+    theming: {
+      title: "Bank theming — one token, zero effort",
+      desc: "Each bank brands with ITS primary colour. The SAME component block (Button/Card/Badge/KpiTile) is rendered under 3 charters via BankThemeProvider — structure never changes and the contrast (--brand-contrast) stays ≥ 4.5:1 (WCAG AA, computed in JS).",
+    },
+    themeDefault: "SIGFA terracotta (default)",
+    themeCallNext: "Call next",
+    themeVip: "Priority client",
+    themeKpi: "Tickets served",
+    themeKpiDelta: "+12% vs 7d",
     feedback: { title: "Service states", desc: "Gentle offline, welcoming empty, loading, dialog." },
     offline: "Offline mode — reconnecting.",
     emptyTitle: "No ticket waiting",
@@ -200,6 +225,22 @@ const SWATCHES: ReadonlyArray<{ name: string; token: keyof typeof color }> = [
   { name: "info", token: "--info" },
 ];
 
+/**
+ * Demo bank charters for the « Theming banque » section. `brandColor: null`
+ * is the untouched SIGFA default (no provider override). Each other entry is a
+ * real tenant primary — proving the whole block re-themes from one hex.
+ */
+const DEMO_BANKS: ReadonlyArray<{
+  key: string;
+  name: string;
+  brandColor: string | null;
+}> = [
+  { key: "sigfa", name: "SIGFA", brandColor: null },
+  { key: "blue", name: "Banque Bleue", brandColor: "#1E5AA8" },
+  { key: "green", name: "Banque Verte", brandColor: "#0B7A4B" },
+  { key: "violet", name: "Banque Violette", brandColor: "#6B3FA0" },
+];
+
 const TYPE_SPECIMEN: ReadonlyArray<{ tag: string; size: string }> = [
   { tag: "display 76", size: "var(--display)" },
   { tag: "4xl 49", size: "var(--text-4xl)" },
@@ -219,6 +260,47 @@ function IconInbox(): ReactElement {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/**
+ * The SAME component block, re-themed per bank. Rendered inside a
+ * `BankThemeProvider` so every `var(--brand*)` inside picks up the tenant hex
+ * while the SIGFA structure stays identical.
+ */
+function BankChart({
+  name,
+  brandColor,
+  t,
+}: {
+  name: string;
+  brandColor: string | null;
+  t: Copy;
+}): ReactElement {
+  const label = brandColor == null ? t.themeDefault : name;
+  const body = (
+    <Card>
+      <div className="dp-bankchart__head">
+        <span className="dp-bankchart__name">{label}</span>
+        <Badge tone="brand">{t.themeVip}</Badge>
+      </div>
+      <div className="dp-row" style={{ gap: "var(--space-3)" }}>
+        <Button variant="primary">{t.themeCallNext}</Button>
+        <Button variant="secondary">{t.secondary}</Button>
+      </div>
+      <KpiTile
+        label={t.themeKpi}
+        value="1 284"
+        delta={t.themeKpiDelta}
+        trend="up"
+      />
+    </Card>
+  );
+
+  return brandColor == null ? (
+    body
+  ) : (
+    <BankThemeProvider brandColor={brandColor}>{body}</BankThemeProvider>
   );
 }
 
@@ -393,6 +475,25 @@ export default function DesignPreviewPage(): ReactElement {
               {t.info}
             </Badge>
             <Badge tone="brand">{t.vip}</Badge>
+          </div>
+        </section>
+
+        {/* Bank theming — the same block under 3 bank charters */}
+        <section className="dp-section">
+          <div className="dp-section__head">
+            <span className="dp-section__eyebrow">Multi-tenant</span>
+            <h2 className="dp-section__title">{t.theming.title}</h2>
+            <p className="dp-section__desc">{t.theming.desc}</p>
+          </div>
+          <div className="dp-grid dp-grid--2">
+            {DEMO_BANKS.map((bank) => (
+              <BankChart
+                key={bank.key}
+                name={bank.name}
+                brandColor={bank.brandColor}
+                t={t}
+              />
+            ))}
           </div>
         </section>
 

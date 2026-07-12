@@ -16,6 +16,12 @@ export * from "./tokens";
 // Utilities
 export * from "./lib/contrast";
 
+// Bank theming (multi-tenant branding)
+export { deriveBankTheme, SIGFA_DEFAULT_BRAND } from "./theme/bank-theme";
+export type { BankTheme } from "./theme/bank-theme";
+export { BankThemeProvider, useBankLogo } from "./theme/BankThemeProvider";
+export type { BankThemeProviderProps } from "./theme/BankThemeProvider";
+
 // Components
 export { Button } from "./components/Button";
 export type {

@@ -151,6 +151,21 @@
   color: var(--ink-faint);
 }
 
+/* Bank theming demo */
+.dp-bankchart__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.dp-bankchart__name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--brand-strong);
+}
+
 /* Dark kiosk section */
 .dp-dark {
   background: var(--night);

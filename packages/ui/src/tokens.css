@@ -23,10 +23,15 @@
   --ink-inverse-soft: #b8ab98; /* secondaire sur sombre */
 
   /* ---- Marque SIGFA — « Or & Forêt » ---- */
-  --brand: #c25a16; /* terracotta/ambre brûlé (primaire produit) */
-  --brand-strong: #9c400c; /* pressé / hover */
-  --brand-soft: #f7e7d6; /* fonds de badge, surbrillance douce */
-  --brand-contrast: #ffffff; /* texte sur brand (grand texte ≥ 3:1) */
+  /* SEUL token tenant : une banque surcharge `--tenant-brand` (via
+     BankThemeProvider) et toute l'UI se re-thème. Défaut = terracotta SIGFA.
+     Les dérivés sont recalculés en JS (WCAG-safe) par le provider ; les
+     `color-mix` ci-dessous ne servent que de repli si `--tenant-brand` est
+     posé sans le provider. `--forest`/`--gold`/sémantiques restent FIXES. */
+  --brand: var(--tenant-brand, #c25a16); /* terracotta/ambre brûlé — surchargeable */
+  --brand-strong: color-mix(in srgb, var(--brand) 85%, #000000); /* pressé / hover */
+  --brand-soft: color-mix(in srgb, var(--brand) 12%, #ffffff); /* fonds de badge, surbrillance douce */
+  --brand-contrast: #ffffff; /* texte sur brand — recalculé WCAG par le provider */
 
   --forest: #0f6b4a; /* vert forêt profond — confiance, positif */
   --forest-soft: #dbefe6;
