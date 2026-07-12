@@ -51,7 +51,7 @@ export default function ManagerDashboardPage(): ReactElement {
   }, []);
 
   return (
-    <>
+    <main style={{ minHeight: "100dvh", backgroundColor: "var(--paper)" }}>
       <ManagerDashboard
         state={dash.state}
         load={dash.load}
@@ -62,6 +62,6 @@ export default function ManagerDashboardPage(): ReactElement {
         onAcknowledge={dash.acknowledge}
       />
       <OfflineBanner />
-    </>
+    </main>
   );
 }

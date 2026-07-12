@@ -2,12 +2,14 @@
  * CounterForm — numbered counter (guichet) create with service assignment (WEB-006).
  *
  * Creates a counter (POST /counters) with a label and an optional set of served
- * services. The label is required (inline error otherwise, no modal). Tokens only.
+ * services. The label is required (inline error otherwise, no modal).
+ * v2 « Sérénité Premium » — @sigfa/ui + tokens only.
  * @module components/admin/counter-form
  */
 "use client";
 
 import { useState, type CSSProperties, type FormEvent, type ReactElement } from "react";
+import { Button, Field } from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 
 /** A selectable service option. */
@@ -26,7 +28,31 @@ export interface CounterFormProps {
   locale?: Locale;
 }
 
-const inputStyle: CSSProperties = { minHeight: "40px", padding: "0 0.75rem", border: "1px solid var(--ink-soft)", borderRadius: "0.375rem", backgroundColor: "var(--surface-0)", color: "var(--ink-strong)", fontSize: "1rem" };
+const overlineStyle: CSSProperties = {
+  fontFamily: "var(--font-text)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--ink-faint)",
+  margin: "0 0 var(--space-4)",
+};
+const errorStyle: CSSProperties = { fontSize: "var(--text-sm)", color: "var(--danger)", marginTop: "var(--space-1)" };
+const legendStyle: CSSProperties = {
+  fontFamily: "var(--font-text)",
+  fontSize: "var(--text-sm)",
+  fontWeight: 600,
+  color: "var(--ink-soft)",
+  padding: "0 var(--space-2)",
+};
+const checkboxRow: CSSProperties = {
+  display: "flex",
+  gap: "var(--space-3)",
+  alignItems: "center",
+  color: "var(--ink)",
+  fontSize: "var(--text-md)",
+  padding: "var(--space-2) 0",
+};
 
 /**
  * Counter creation form.
@@ -53,24 +79,48 @@ export function CounterForm({ services, onSubmit, locale = "fr" }: CounterFormPr
   }
 
   return (
-    <form data-testid="counter-form" onSubmit={handleSubmit} noValidate style={{ maxWidth: "24rem" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", marginBottom: "0.75rem" }}>
-        <label htmlFor="counter-label" style={{ fontSize: "var(--caption)", color: "var(--ink-soft)" }}>Guichet (numéro)</label>
-        <input id="counter-label" data-testid="counter-label" style={inputStyle} value={label} onChange={(e) => setLabel(e.target.value)} />
-        {error && <span data-testid="counter-error" style={{ fontSize: "var(--caption)", color: "var(--danger)" }}>{error}</span>}
+    <form data-testid="counter-form" onSubmit={handleSubmit} noValidate style={{ maxWidth: "26rem" }}>
+      <p style={overlineStyle}>{t("admin.section.counters", locale)}</p>
+
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <Field
+          id="counter-label"
+          data-testid="counter-label"
+          label="Guichet (numéro)"
+          aria-required="true"
+          aria-invalid={error ? true : undefined}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+        {error && <p data-testid="counter-error" role="alert" style={errorStyle}>{error}</p>}
       </div>
-      <fieldset style={{ border: "1px solid var(--surface-1)", borderRadius: "0.375rem", padding: "0.5rem", marginBottom: "0.75rem" }}>
-        <legend style={{ fontSize: "var(--caption)", color: "var(--ink-soft)" }}>Services affectés</legend>
+
+      <fieldset
+        style={{
+          border: "1px solid var(--hairline)",
+          borderRadius: "var(--r-md)",
+          padding: "var(--space-3) var(--space-4)",
+          marginBottom: "var(--space-6)",
+        }}
+      >
+        <legend style={legendStyle}>Services affectés</legend>
         {services.map((service) => (
-          <label key={service.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", color: "var(--ink-strong)" }}>
-            <input type="checkbox" data-testid={`counter-service-${service.id}`} checked={serviceIds.includes(service.id)} onChange={() => toggleService(service.id)} />
+          <label key={service.id} style={checkboxRow}>
+            <input
+              type="checkbox"
+              data-testid={`counter-service-${service.id}`}
+              checked={serviceIds.includes(service.id)}
+              onChange={() => toggleService(service.id)}
+              style={{ width: "18px", height: "18px", accentColor: "var(--brand)" }}
+            />
             {service.name}
           </label>
         ))}
       </fieldset>
-      <button type="submit" data-testid="counter-submit" style={{ minHeight: "40px", padding: "0 1rem", border: "none", borderRadius: "0.375rem", backgroundColor: "var(--brand)", color: "var(--brand-contrast)", cursor: "pointer", fontSize: "1rem" }}>
+
+      <Button type="submit" variant="primary" data-testid="counter-submit">
         {t("admin.save", locale)}
-      </button>
+      </Button>
     </form>
   );
 }

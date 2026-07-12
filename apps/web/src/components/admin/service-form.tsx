@@ -4,12 +4,13 @@
  * Validation runs client-side before submit (admin-validation) and renders each
  * error INLINE next to its field — never a modal. A server-side error (e.g. the
  * translated 409 "code déjà existant") is shown as a persistent inline banner
- * and the form values are preserved (error state).
+ * and the form values are preserved (error state). v2 — @sigfa/ui + tokens only.
  * @module components/admin/service-form
  */
 "use client";
 
 import { useState, type CSSProperties, type FormEvent, type ReactElement } from "react";
+import { Button, Field } from "@sigfa/ui";
 import { validateService, isValid, type FieldErrors } from "@/lib/admin-validation";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -23,28 +24,26 @@ export interface ServiceFormProps {
   locale?: Locale;
 }
 
-const fieldStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "0.25rem", marginBottom: "0.75rem" };
-const labelStyle: CSSProperties = { fontSize: "var(--caption)", color: "var(--ink-soft)" };
-const inputStyle: CSSProperties = {
-  minHeight: "40px",
-  padding: "0 0.75rem",
-  border: "1px solid var(--ink-soft)",
-  borderRadius: "0.375rem",
-  backgroundColor: "var(--surface-0)",
-  color: "var(--ink-strong)",
-  fontSize: "1rem",
+const overlineStyle: CSSProperties = {
+  fontFamily: "var(--font-text)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--ink-faint)",
+  margin: "0 0 var(--space-4)",
 };
-const errorStyle: CSSProperties = { fontSize: "var(--caption)", color: "var(--danger)" };
-const submitStyle: CSSProperties = {
-  minHeight: "40px",
-  padding: "0 1rem",
-  border: "none",
-  borderRadius: "0.375rem",
-  backgroundColor: "var(--brand)",
-  color: "var(--brand-contrast)",
-  cursor: "pointer",
-  fontSize: "1rem",
+const errorStyle: CSSProperties = { fontSize: "var(--text-sm)", color: "var(--danger)", marginTop: "var(--space-1)" };
+const serverErrorStyle: CSSProperties = {
+  fontSize: "var(--text-sm)",
+  color: "var(--danger)",
+  backgroundColor: "var(--danger-soft)",
+  border: "1px solid var(--danger)",
+  borderRadius: "var(--r-md)",
+  padding: "var(--space-3) var(--space-4)",
+  marginBottom: "var(--space-4)",
 };
+const rowStyle: CSSProperties = { marginBottom: "var(--space-4)" };
 
 /**
  * Service create/edit form.
@@ -67,33 +66,65 @@ export function ServiceForm({ onSubmit, serverError, locale = "fr" }: ServiceFor
   }
 
   return (
-    <form data-testid="service-form" onSubmit={handleSubmit} noValidate style={{ maxWidth: "24rem" }}>
+    <form data-testid="service-form" onSubmit={handleSubmit} noValidate style={{ maxWidth: "26rem" }}>
+      <p style={overlineStyle}>{t("admin.section.services", locale)}</p>
+
       {serverError && (
-        <div data-testid="service-server-error" role="alert" style={{ ...errorStyle, marginBottom: "0.75rem" }}>
+        <div data-testid="service-server-error" role="alert" style={serverErrorStyle}>
           {serverError}
         </div>
       )}
-      <div style={fieldStyle}>
-        <label htmlFor="service-name" style={labelStyle}>Nom</label>
-        <input id="service-name" data-testid="service-name" style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} />
-        {errors.name && <span data-testid="error-name" style={errorStyle}>{errors.name}</span>}
+      <div style={rowStyle}>
+        <Field
+          id="service-name"
+          data-testid="service-name"
+          label="Nom"
+          aria-required="true"
+          aria-invalid={errors.name ? true : undefined}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        {errors.name && <p data-testid="error-name" role="alert" style={errorStyle}>{errors.name}</p>}
       </div>
-      <div style={fieldStyle}>
-        <label htmlFor="service-code" style={labelStyle}>Code</label>
-        <input id="service-code" data-testid="service-code" style={inputStyle} value={code} onChange={(e) => setCode(e.target.value)} />
-        {errors.code && <span data-testid="error-code" style={errorStyle}>{errors.code}</span>}
+      <div style={rowStyle}>
+        <Field
+          id="service-code"
+          data-testid="service-code"
+          label="Code"
+          aria-required="true"
+          aria-invalid={errors.code ? true : undefined}
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
+        {errors.code && <p data-testid="error-code" role="alert" style={errorStyle}>{errors.code}</p>}
       </div>
-      <div style={fieldStyle}>
-        <label htmlFor="service-sla" style={labelStyle}>SLA (min)</label>
-        <input id="service-sla" data-testid="service-sla" type="number" style={inputStyle} value={slaMinutes} onChange={(e) => setSlaMinutes(Number(e.target.value))} />
-        {errors.slaMinutes && <span data-testid="error-slaMinutes" style={errorStyle}>{errors.slaMinutes}</span>}
+      <div style={rowStyle}>
+        <Field
+          id="service-sla"
+          data-testid="service-sla"
+          label="SLA (min)"
+          type="number"
+          aria-invalid={errors.slaMinutes ? true : undefined}
+          value={slaMinutes}
+          onChange={(e) => setSlaMinutes(Number(e.target.value))}
+        />
+        {errors.slaMinutes && <p data-testid="error-slaMinutes" role="alert" style={errorStyle}>{errors.slaMinutes}</p>}
       </div>
-      <div style={fieldStyle}>
-        <label htmlFor="service-order" style={labelStyle}>Priorité</label>
-        <input id="service-order" data-testid="service-order" type="number" style={inputStyle} value={order} onChange={(e) => setOrder(Number(e.target.value))} />
-        {errors.order && <span data-testid="error-order" style={errorStyle}>{errors.order}</span>}
+      <div style={rowStyle}>
+        <Field
+          id="service-order"
+          data-testid="service-order"
+          label="Priorité"
+          type="number"
+          aria-invalid={errors.order ? true : undefined}
+          value={order}
+          onChange={(e) => setOrder(Number(e.target.value))}
+        />
+        {errors.order && <p data-testid="error-order" role="alert" style={errorStyle}>{errors.order}</p>}
       </div>
-      <button type="submit" data-testid="service-submit" style={submitStyle}>{t("admin.save", locale)}</button>
+      <Button type="submit" variant="primary" data-testid="service-submit">
+        {t("admin.save", locale)}
+      </Button>
     </form>
   );
 }

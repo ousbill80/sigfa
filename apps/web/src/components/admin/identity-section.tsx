@@ -5,12 +5,13 @@
  * contrast against --surface-1. If the ratio is below 4.5:1 an inline warning is
  * shown together with the auto-corrected value (theme.autoCorrectedBrand), which
  * is the value actually applied (per the contract appliedColors semantics).
- * Logo upload (R2) is out of scope (ADM-001) — UI only. Tokens only.
+ * Logo upload (R2) is out of scope (ADM-001) — UI only. v2 — @sigfa/ui + tokens.
  * @module components/admin/identity-section
  */
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
+import { Badge, Button, Field } from "@sigfa/ui";
 import { autoCorrectedBrand, contrastRatio, DEFAULT_THEME } from "@/lib/theme";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -25,18 +26,17 @@ export interface IdentitySectionProps {
 }
 
 const MIN_RATIO = 4.5;
-
-const inputStyle: CSSProperties = {
-  minHeight: "40px",
-  padding: "0 0.75rem",
-  border: "1px solid var(--ink-soft)",
-  borderRadius: "0.375rem",
-  backgroundColor: "var(--surface-0)",
-  color: "var(--ink-strong)",
-  fontSize: "1rem",
-};
-
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+
+const overlineStyle: CSSProperties = {
+  fontFamily: "var(--font-text)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--ink-faint)",
+  margin: "0 0 var(--space-4)",
+};
 
 /**
  * Bank identity configuration section.
@@ -57,53 +57,69 @@ export function IdentitySection({ onSave, initialBrand = DEFAULT_THEME.brand, lo
   const appliedBrand = needsCorrection ? corrected : brand;
 
   return (
-    <section data-testid="identity-section" aria-label={t("admin.section.identity", locale)}>
-      <label htmlFor="brand-input" style={{ fontSize: "var(--caption)", color: "var(--ink-soft)" }}>
-        {t("admin.brand_label", locale)}
-      </label>
-      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginTop: "0.25rem" }}>
-        <input
-          id="brand-input"
-          data-testid="brand-input"
-          style={inputStyle}
-          value={brand}
-          onChange={(e) => setBrand(e.target.value)}
-          aria-invalid={needsCorrection}
-        />
+    <section data-testid="identity-section" aria-label={t("admin.section.identity", locale)} style={{ maxWidth: "28rem" }}>
+      <p style={overlineStyle}>{t("admin.section.identity", locale)}</p>
+
+      <div style={{ display: "flex", gap: "var(--space-4)", alignItems: "flex-end" }}>
+        <div style={{ flex: 1 }}>
+          <Field
+            id="brand-input"
+            data-testid="brand-input"
+            label={t("admin.brand_label", locale)}
+            aria-required="true"
+            aria-invalid={needsCorrection || undefined}
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+          />
+        </div>
         <span
           data-testid="brand-swatch"
           aria-hidden="true"
-          style={{ width: "40px", height: "40px", borderRadius: "0.375rem", backgroundColor: appliedBrand, border: "1px solid var(--ink-soft)" }}
+          style={{
+            width: "44px",
+            height: "44px",
+            borderRadius: "var(--r-md)",
+            backgroundColor: appliedBrand,
+            border: "1px solid var(--hairline)",
+            boxShadow: "var(--shadow-1)",
+            flexShrink: 0,
+          }}
         />
       </div>
 
       {needsCorrection && (
-        <div data-testid="brand-warning" role="status" style={{ marginTop: "0.5rem", fontSize: "var(--caption)", color: "var(--warning)" }}>
-          {t("admin.brand_warning", locale)}{" "}
+        <div
+          data-testid="brand-warning"
+          role="status"
+          style={{
+            marginTop: "var(--space-3)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "var(--space-2)",
+            alignItems: "center",
+            fontSize: "var(--text-sm)",
+            color: "var(--ink-soft)",
+          }}
+        >
+          <Badge tone="warning" dot>
+            {t("admin.brand_warning", locale)}
+          </Badge>
           <span data-testid="brand-corrected">
             {t("admin.brand_corrected", locale)} : {corrected}
           </span>
         </div>
       )}
 
-      <button
-        type="button"
-        data-testid="identity-save"
-        onClick={() => onSave({ primary: appliedBrand, secondary: DEFAULT_THEME.brandSoft, background: DEFAULT_THEME.surface0 })}
-        style={{
-          marginTop: "1rem",
-          minHeight: "40px",
-          padding: "0 1rem",
-          border: "none",
-          borderRadius: "0.375rem",
-          backgroundColor: "var(--brand)",
-          color: "var(--brand-contrast)",
-          cursor: "pointer",
-          fontSize: "1rem",
-        }}
-      >
-        {t("admin.save", locale)}
-      </button>
+      <div style={{ marginTop: "var(--space-6)" }}>
+        <Button
+          type="button"
+          data-testid="identity-save"
+          variant="primary"
+          onClick={() => onSave({ primary: appliedBrand, secondary: DEFAULT_THEME.brandSoft, background: DEFAULT_THEME.surface0 })}
+        >
+          {t("admin.save", locale)}
+        </Button>
+      </div>
     </section>
   );
 }

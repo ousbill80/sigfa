@@ -103,10 +103,8 @@ describe("announceCall / speech", () => {
     errSpy.mockRestore();
   });
 
-  it("TV-002: speechLang mappe les locales (Dioula/Baoulé → repli FR)", () => {
+  it("TV-002: speechLang mappe les locales (FR/EN)", () => {
     expect(speechLang("en")).toBe("en-US");
     expect(speechLang("fr")).toBe("fr-FR");
-    expect(speechLang("dioula")).toBe("fr-FR");
-    expect(speechLang("baoule")).toBe("fr-FR");
   });
 });

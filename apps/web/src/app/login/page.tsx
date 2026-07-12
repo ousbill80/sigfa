@@ -15,10 +15,12 @@ export default function LoginPage(): ReactElement {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "var(--surface-1)",
+        padding: "var(--space-6)",
+        background:
+          "radial-gradient(120% 80% at 50% -10%, var(--surface-2) 0%, var(--paper) 60%)",
       }}
     >
-      <Suspense fallback={<div>Chargement…</div>}>
+      <Suspense fallback={<div style={{ color: "var(--ink-soft)" }}>Chargement…</div>}>
         <LoginForm />
       </Suspense>
     </main>

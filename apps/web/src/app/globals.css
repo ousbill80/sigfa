@@ -2,35 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
-/* SIGFA Design System — CSS Custom Properties */
+/*
+ * SIGFA web — app-level layout tokens (v2 « Sérénité Premium »).
+ * All COLOUR tokens live in @sigfa/ui `tokens.css` (imported before this file
+ * in the root layout). This file only declares NON-colour layout sizes used by
+ * the TV / COMEX projection surfaces, plus base document styling. No hex here.
+ */
 :root {
-  --brand: #1a56db;
-  --brand-soft: #e8f0fe;
-  --brand-contrast: #ffffff;
-  --surface-0: #ffffff;
-  --surface-1: #f9fafb;
-  --ink-strong: #111827;
-  --ink-soft: #6b7280;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --info: #3b82f6;
+  /*
+   * Alias de compatibilité — MAPPÉS sur les tokens v2 de @sigfa/ui (aucune
+   * nouvelle valeur hex). Quelques surfaces héritées (écran TV projeté) et des
+   * assertions de tests référencent encore ces noms ; ils pointent désormais
+   * vers la palette « Sérénité Premium ».
+   */
+  --surface-0: var(--surface-1); /* ex-blanc v1 → blanc chaud v2 (cartes) */
+  --surface-screen: var(--night-2); /* écran d'appel TV → nuit contraste max */
+  --ink-strong: var(--ink); /* ex-encre forte v1 → encre chaude v2 (texte) */
 
-  /* TV-001 — écran d'appel plein écran (session borne type affichage) */
-  --surface-screen: #0a0f1a;
-  --ink-inverse: #f8fafc;
-  --tv-separator: rgba(255, 255, 255, 0.08);
+  /* TV / écran d'appel — tailles de projection (non-couleur) */
   --display-tv-hero: 180px;
   --display-tv-counter: 120px;
   --display-tv: 64px;
   --tv-header-height: 64px;
-  --duration-celebration: 400ms;
-  --tv-slide-duration: 250ms;
-  --tv-slide-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-celebration: var(--dur-3);
+  --tv-slide-duration: var(--dur-2);
+  --tv-slide-ease: var(--ease);
+  --tv-separator: rgba(255, 255, 255, 0.08);
 
-  /* WEB-002 — interface agent guichet */
+  /* Séparateur clair sur surfaces sombres (dérivé, non-couleur de marque) */
+
+  /* Dashboards — valeur KPI géante (agent) */
   --kpi-value: 96px;
-  --caption: 0.875rem;
 
   /* WEB-005 — mode TV salle de pilotage COMEX (typo + espacements ×1.5) */
   --scale-tv: 1.5;
@@ -43,10 +45,16 @@
   line-height: 1.4;
 }
 
+html {
+  font-family: var(--font-text);
+}
+
 body {
-  background-color: var(--surface-0);
-  color: var(--ink-strong);
-  font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 @media (prefers-reduced-motion: reduce) {

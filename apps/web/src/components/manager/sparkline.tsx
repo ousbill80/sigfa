@@ -18,22 +18,36 @@ export interface SparklineProps {
   height?: number;
   /** Accessible label. */
   label?: string;
+  /** Stroke token — one of the v2 accent tokens. */
+  stroke?: "var(--brand)" | "var(--forest)" | "var(--gold)";
 }
 
 /**
- * Renders a sparkline (no axes, no grid) with a --brand stroke.
+ * Renders a sparkline (no axes, no grid) with a tokenised stroke.
  * @param props - {@link SparklineProps}.
  * @returns The sparkline element.
  */
-export function Sparkline({ data, width = 160, height = 40, label = "sparkline" }: SparklineProps): ReactElement {
+export function Sparkline({
+  data,
+  width = 168,
+  height = 44,
+  label = "sparkline",
+  stroke = "var(--brand)",
+}: SparklineProps): ReactElement {
   const points = data.map((value, i) => ({ i, value }));
   return (
-    <div data-testid="sparkline" data-points={data.length} aria-label={label} role="img" style={{ background: "transparent" }}>
+    <div
+      data-testid="sparkline"
+      data-points={data.length}
+      aria-label={label}
+      role="img"
+      style={{ background: "transparent", marginTop: "var(--space-2)" }}
+    >
       <LineChart width={width} height={height} data={points}>
         <Line
           type="monotone"
           dataKey="value"
-          stroke="var(--brand)"
+          stroke={stroke}
           strokeWidth={2}
           dot={false}
           isAnimationActive={false}

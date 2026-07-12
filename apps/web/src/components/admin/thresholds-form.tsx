@@ -3,13 +3,14 @@
  *
  * Validates against the contract bounds (queueCriticalThreshold 1–500,
  * agentInactivityMinutes 1–60, noShowTimeoutMinutes 1–30) before submit, with
- * inline errors (no modal). Persists via PATCH /banks/{id}/thresholds. Tokens
- * only.
+ * inline errors (no modal). Persists via PATCH /banks/{id}/thresholds.
+ * v2 « Sérénité Premium » — @sigfa/ui + tokens only.
  * @module components/admin/thresholds-form
  */
 "use client";
 
 import { useState, type CSSProperties, type FormEvent, type ReactElement } from "react";
+import { Button, Field } from "@sigfa/ui";
 import { validateThresholds, isValid, type FieldErrors } from "@/lib/admin-validation";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -23,10 +24,17 @@ export interface ThresholdsFormProps {
   locale?: Locale;
 }
 
-const fieldStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "0.25rem", marginBottom: "0.75rem" };
-const labelStyle: CSSProperties = { fontSize: "var(--caption)", color: "var(--ink-soft)" };
-const inputStyle: CSSProperties = { minHeight: "40px", padding: "0 0.75rem", border: "1px solid var(--ink-soft)", borderRadius: "0.375rem", backgroundColor: "var(--surface-0)", color: "var(--ink-strong)", fontSize: "1rem" };
-const errorStyle: CSSProperties = { fontSize: "var(--caption)", color: "var(--danger)" };
+const overlineStyle: CSSProperties = {
+  fontFamily: "var(--font-text)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--ink-faint)",
+  margin: "0 0 var(--space-4)",
+};
+const errorStyle: CSSProperties = { fontSize: "var(--text-sm)", color: "var(--danger)", marginTop: "var(--space-1)" };
+const rowStyle: CSSProperties = { marginBottom: "var(--space-4)" };
 
 /**
  * Bank thresholds form.
@@ -48,25 +56,48 @@ export function ThresholdsForm({ onSubmit, initial, locale = "fr" }: ThresholdsF
   }
 
   return (
-    <form data-testid="thresholds-form" onSubmit={handleSubmit} noValidate style={{ maxWidth: "24rem" }}>
-      <div style={fieldStyle}>
-        <label htmlFor="th-queue" style={labelStyle}>File critique (nb tickets)</label>
-        <input id="th-queue" data-testid="th-queue" type="number" style={inputStyle} value={queueCriticalThreshold} onChange={(e) => setQueue(Number(e.target.value))} />
-        {errors.queueCriticalThreshold && <span data-testid="error-queue" style={errorStyle}>{errors.queueCriticalThreshold}</span>}
+    <form data-testid="thresholds-form" onSubmit={handleSubmit} noValidate style={{ maxWidth: "26rem" }}>
+      <p style={overlineStyle}>{t("admin.section.thresholds", locale)}</p>
+
+      <div style={rowStyle}>
+        <Field
+          id="th-queue"
+          data-testid="th-queue"
+          label="File critique (nb tickets)"
+          type="number"
+          aria-invalid={errors.queueCriticalThreshold ? true : undefined}
+          value={queueCriticalThreshold}
+          onChange={(e) => setQueue(Number(e.target.value))}
+        />
+        {errors.queueCriticalThreshold && <p data-testid="error-queue" role="alert" style={errorStyle}>{errors.queueCriticalThreshold}</p>}
       </div>
-      <div style={fieldStyle}>
-        <label htmlFor="th-inactivity" style={labelStyle}>Inactivité agent (min)</label>
-        <input id="th-inactivity" data-testid="th-inactivity" type="number" style={inputStyle} value={agentInactivityMinutes} onChange={(e) => setInactivity(Number(e.target.value))} />
-        {errors.agentInactivityMinutes && <span data-testid="error-inactivity" style={errorStyle}>{errors.agentInactivityMinutes}</span>}
+      <div style={rowStyle}>
+        <Field
+          id="th-inactivity"
+          data-testid="th-inactivity"
+          label="Inactivité agent (min)"
+          type="number"
+          aria-invalid={errors.agentInactivityMinutes ? true : undefined}
+          value={agentInactivityMinutes}
+          onChange={(e) => setInactivity(Number(e.target.value))}
+        />
+        {errors.agentInactivityMinutes && <p data-testid="error-inactivity" role="alert" style={errorStyle}>{errors.agentInactivityMinutes}</p>}
       </div>
-      <div style={fieldStyle}>
-        <label htmlFor="th-noshow" style={labelStyle}>Délai no-show (min)</label>
-        <input id="th-noshow" data-testid="th-noshow" type="number" style={inputStyle} value={noShowTimeoutMinutes} onChange={(e) => setNoShow(Number(e.target.value))} />
-        {errors.noShowTimeoutMinutes && <span data-testid="error-noshow" style={errorStyle}>{errors.noShowTimeoutMinutes}</span>}
+      <div style={rowStyle}>
+        <Field
+          id="th-noshow"
+          data-testid="th-noshow"
+          label="Délai no-show (min)"
+          type="number"
+          aria-invalid={errors.noShowTimeoutMinutes ? true : undefined}
+          value={noShowTimeoutMinutes}
+          onChange={(e) => setNoShow(Number(e.target.value))}
+        />
+        {errors.noShowTimeoutMinutes && <p data-testid="error-noshow" role="alert" style={errorStyle}>{errors.noShowTimeoutMinutes}</p>}
       </div>
-      <button type="submit" data-testid="thresholds-submit" style={{ minHeight: "40px", padding: "0 1rem", border: "none", borderRadius: "0.375rem", backgroundColor: "var(--brand)", color: "var(--brand-contrast)", cursor: "pointer", fontSize: "1rem" }}>
+      <Button type="submit" variant="primary" data-testid="thresholds-submit">
         {t("admin.save", locale)}
-      </button>
+      </Button>
     </form>
   );
 }

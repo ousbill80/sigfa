@@ -104,7 +104,7 @@ describe("TvScreen — 5 états", () => {
 });
 
 describe("TvScreen — i18n & motion", () => {
-  it("TV-001: i18n — labels header rendus dans les 4 langues sans crash", () => {
+  it("TV-001: i18n — labels header rendus en FR/EN sans crash", () => {
     for (const locale of SUPPORTED_LOCALES) {
       const { unmount } = render(<TvScreen state={nominal} locale={locale} />);
       expect(screen.getByText(t("tv.title", locale))).toBeInTheDocument();

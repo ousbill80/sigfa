@@ -24,7 +24,9 @@ import type { TvState } from "@/lib/tv-state";
 /** Tenant theming resolved for the TV display (would come from the tenant claim). */
 const TENANT = {
   name: "Banque du Commerce",
-  brand: "#1a56db",
+  // Marque du tenant démo alignée sur la palette v2 « Or & Forêt » (terracotta).
+  // Le theming banque surcharge --brand ; passé par autoCorrectedBrand (WCAG).
+  brand: "#c25a16",
   locale: "fr" as const,
 };
 
@@ -56,14 +58,20 @@ export default function TvPage(): ReactElement {
   }, [isRealtime, simState, socket.tv, socket.connected, online]);
 
   // Contrast auto-correction : le --brand tenant est foncé si son ratio sur
-  // --surface-screen (fond très sombre) est insuffisant côté clair.
+  // le fond nuit (--night-2, très sombre) est insuffisant côté clair.
   const brand = autoCorrectedBrand(TENANT.brand);
 
   return (
     <div
       data-testid="tv-root"
       data-realtime={isRealtime ? "on" : "off"}
-      style={{ "--brand": brand } as React.CSSProperties}
+      style={
+        {
+          "--brand": brand,
+          backgroundColor: "var(--night-2, var(--surface-screen))",
+          minHeight: "100vh",
+        } as React.CSSProperties
+      }
     >
       <TvScreen
         state={state}

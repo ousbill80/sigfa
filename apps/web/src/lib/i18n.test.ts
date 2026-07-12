@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { t, SUPPORTED_LOCALES, FR, LOCALES } from "./i18n";
 
-describe("WEB-001: i18n — labels de navigation en FR (base), extensible 4 langues", () => {
+describe("WEB-001: i18n — labels de navigation en FR (base), FR/EN uniquement", () => {
   it("returns French nav labels by default", () => {
     expect(t("nav.dashboard")).toBe("Tableau de bord");
     expect(t("nav.admin")).toBe("Administration");
@@ -20,21 +20,10 @@ describe("WEB-001: i18n — labels de navigation en FR (base), extensible 4 lang
     expect(t("auth.login", "en")).toBe("Login");
   });
 
-  it("supports Dioula locale", () => {
-    expect(t("nav.dashboard", "dioula")).toBe("Tableau de bord");
-    expect(t("auth.login", "dioula")).toBe("Dòmini");
-  });
-
-  it("supports Baoulé locale", () => {
-    expect(t("nav.logout", "baoule")).toBe("Fite");
-  });
-
-  it("supports exactly 4 locales", () => {
-    expect(SUPPORTED_LOCALES).toHaveLength(4);
+  it("supports exactly 2 locales (FR/EN)", () => {
+    expect(SUPPORTED_LOCALES).toHaveLength(2);
     expect(SUPPORTED_LOCALES).toContain("fr");
     expect(SUPPORTED_LOCALES).toContain("en");
-    expect(SUPPORTED_LOCALES).toContain("dioula");
-    expect(SUPPORTED_LOCALES).toContain("baoule");
   });
 
   it("all locales have same keys as FR (base)", () => {

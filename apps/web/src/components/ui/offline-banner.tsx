@@ -6,6 +6,7 @@
 
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
+import { OfflineBanner as UiOfflineBanner } from "@sigfa/ui";
 import { t } from "@/lib/i18n";
 
 /** Offline banner component */
@@ -37,25 +38,16 @@ export function OfflineBanner(): ReactElement | null {
   if (!isOffline) return null;
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
+    <UiOfflineBanner
+      message={t("offline.banner")}
       style={{
         position: "fixed",
-        bottom: "1rem",
+        bottom: "var(--space-4)",
         left: "50%",
         transform: "translateX(-50%)",
-        backgroundColor: "var(--warning)",
-        color: "var(--ink-strong)",
-        padding: "0.5rem 1rem",
-        borderRadius: "0.5rem",
-        fontSize: "0.875rem",
-        fontWeight: "500",
         zIndex: 9999,
-        boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+        boxShadow: "var(--shadow-2)",
       }}
-    >
-      {t("offline.banner")}
-    </div>
+    />
   );
 }

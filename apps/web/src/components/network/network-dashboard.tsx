@@ -1,15 +1,18 @@
 /**
  * NetworkDashboard — network direction dashboard (WEB-004).
  *
- * Layout: agency ranking (sorted TMA-desc, coloured badges) + static CI SVG map
- * (Leaflet-free) + aggregated alert panel + network overview. `--danger` is
- * reserved for TMA > 2×SLA breaches and is never decorative; offline agencies
- * are shown with `--info`. Tokens only. Realtime is simulated (RT-001).
+ * Layout: agency ranking (sorted TMA-desc, token-coloured status pills) + static
+ * CI SVG map (Leaflet-free) + aggregated alert panel + network overview. Visual
+ * refonte on design system v2 « Sérénité Premium »: calm surfaces, --font-display
+ * rank numerals, --gold accent for #1. `--danger` stays reserved for TMA > 2×SLA
+ * breaches (pill/dot, never a solid fill); offline agencies use `--info`. Tokens
+ * only. Realtime is simulated (RT-001).
  * @module components/network/network-dashboard
  */
 "use client";
 
 import { useState, type CSSProperties, type ReactElement } from "react";
+import { Badge, Button, Card, EmptyState, KpiTile, OfflineBanner, Skeleton } from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 import {
   benchmarkBadge,
@@ -36,27 +39,45 @@ export interface NetworkDashboardProps {
   locale?: Locale;
 }
 
+/** Soft-tinted background derived from a functional token. */
+const softOf: Record<string, string> = {
+  "var(--success)": "var(--success-soft)",
+  "var(--warning)": "var(--warning-soft)",
+  "var(--danger)": "var(--danger-soft)",
+  "var(--info)": "var(--info-soft)",
+};
+
+/**
+ * Status pill for a ranking row. The functional token is carried in the inline
+ * style (dot + border + ink), never as a solid fill — `--danger` stays a
+ * bordered/dotted pill per the design system.
+ */
 const badgeStyle = (token: string): CSSProperties => ({
-  display: "inline-block",
-  minWidth: "3.5rem",
-  padding: "0.15rem 0.5rem",
-  borderRadius: "0.375rem",
-  backgroundColor: token,
-  color: "var(--brand-contrast)",
-  fontSize: "var(--caption)",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  minWidth: "5rem",
+  padding: "var(--space-1) var(--space-3)",
+  borderRadius: "var(--r-full)",
+  backgroundColor: softOf[token] ?? "var(--surface-2)",
+  border: `1px solid ${token}`,
+  color: "var(--ink)",
+  fontSize: "var(--text-xs)",
   fontWeight: 600,
-  textAlign: "center",
+  fontVariantNumeric: "tabular-nums",
+  letterSpacing: "var(--tracking-numeric)",
+  justifyContent: "center",
+  whiteSpace: "nowrap",
 });
 
-const pageButton: CSSProperties = {
-  minHeight: "40px",
-  padding: "0 1rem",
-  border: "1px solid var(--ink-soft)",
-  borderRadius: "0.375rem",
-  backgroundColor: "var(--surface-1)",
-  color: "var(--ink-strong)",
-  cursor: "pointer",
-  fontSize: "var(--caption)",
+const sectionLabel: CSSProperties = {
+  fontFamily: "var(--font-display)",
+  fontSize: "var(--text-sm)",
+  fontWeight: 600,
+  letterSpacing: "var(--tracking-tight)",
+  textTransform: "uppercase",
+  color: "var(--ink-soft)",
+  marginBottom: "var(--space-3)",
 };
 
 /**
@@ -75,123 +96,221 @@ export function NetworkDashboard({
 
   if (load === "loading") {
     return (
-      <div data-testid="network-skeleton" aria-busy="true" style={{ padding: "1.5rem", backgroundColor: "var(--surface-0)" }}>
-        <div style={{ height: "40px", backgroundColor: "var(--surface-1)", borderRadius: "0.5rem", marginBottom: "1rem" }} />
-        <div style={{ height: "320px", backgroundColor: "var(--surface-1)", borderRadius: "0.5rem" }} />
+      <div
+        data-testid="network-skeleton"
+        aria-busy="true"
+        style={{ padding: "var(--space-6)", backgroundColor: "var(--paper)", maxWidth: "1200px", margin: "0 auto" }}
+      >
+        <Skeleton style={{ height: "44px", marginBottom: "var(--space-6)" }} />
+        <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap" }}>
+          <Skeleton style={{ flex: "2 1 480px", height: "360px" }} />
+          <Skeleton style={{ flex: "1 1 320px", height: "360px" }} />
+        </div>
       </div>
     );
   }
 
   if (load === "error") {
     return (
-      <div data-testid="network-error" role="alert" style={{ padding: "1.5rem", color: "var(--ink-strong)" }}>
-        {t("network.error", locale)}
+      <div style={{ padding: "var(--space-6)", maxWidth: "1200px", margin: "0 auto" }}>
+        <Card data-testid="network-error" role="alert" style={{ padding: "var(--space-8)", textAlign: "center", color: "var(--ink)" }}>
+          <p style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-lg)", fontWeight: 600 }}>
+            {t("network.error", locale)}
+          </p>
+        </Card>
       </div>
     );
   }
 
   if (load === "empty" || state.agencies.length === 0) {
     return (
-      <div data-testid="network-empty" style={{ padding: "1.5rem", color: "var(--ink-strong)" }}>
-        <p>{t("network.empty", locale)}</p>
-        <a data-testid="network-empty-cta" href={CREATE_AGENCY_HREF} style={{ ...pageButton, display: "inline-block", textDecoration: "none", marginTop: "0.75rem" }}>
-          {t("network.empty_cta", locale)}
-        </a>
+      <div style={{ padding: "var(--space-6)", maxWidth: "1200px", margin: "0 auto" }}>
+        <Card style={{ padding: "var(--space-8)" }}>
+          <EmptyState
+            data-testid="network-empty"
+            icon="🏦"
+            title={t("network.empty", locale)}
+            action={
+              <a
+                data-testid="network-empty-cta"
+                href={CREATE_AGENCY_HREF}
+                className="sig-btn sig-btn--primary sig-btn--md"
+                style={{ textDecoration: "none" }}
+              >
+                {t("network.empty_cta", locale)}
+              </a>
+            }
+          />
+        </Card>
       </div>
     );
   }
 
   const totalPages = Math.max(1, Math.ceil(state.agencies.length / 20));
   const rows = paginate(state.agencies, page);
+  // Rank offset so #1 stays #1 across pages (page 2 continues 21, 22…).
+  const rankBase = (page - 1) * 20;
 
   return (
-    <div data-testid="network-dashboard" style={{ padding: "1.5rem", maxWidth: "1200px", margin: "0 auto" }}>
-      {state.connection === "offline" && (
-        <div
-          data-testid="network-offline-badge"
-          role="status"
-          style={{ backgroundColor: "var(--info)", color: "var(--brand-contrast)", padding: "0.5rem 1rem", borderRadius: "0.5rem", marginBottom: "1rem", fontSize: "var(--caption)" }}
+    <div
+      data-testid="network-dashboard"
+      style={{ padding: "var(--space-6)", maxWidth: "1200px", margin: "0 auto", backgroundColor: "var(--paper)" }}
+    >
+      <header style={{ marginBottom: "var(--space-6)" }}>
+        <h1
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--text-3xl)",
+            fontWeight: 600,
+            letterSpacing: "var(--tracking-tight)",
+            lineHeight: "var(--leading-tight)",
+            color: "var(--ink)",
+          }}
         >
-          {t("network.offline", locale)}
+          {t("network.title", locale)}
+        </h1>
+      </header>
+
+      {state.connection === "offline" && (
+        <div data-testid="network-offline-badge" style={{ marginBottom: "var(--space-6)" }}>
+          <OfflineBanner message={t("network.offline", locale)} />
         </div>
       )}
 
       {/* Synthèse réseau (network-overview) */}
       {overview && (
-        <section data-testid="network-overview" aria-label={t("network.overview", locale)} style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
-          <div style={{ flex: 1, padding: "1rem", border: "1px solid var(--surface-1)", borderRadius: "0.5rem" }}>
-            <div style={{ fontSize: "var(--caption)", color: "var(--ink-soft)" }}>{t("network.overview", locale)}</div>
-            <div style={{ fontSize: "28px", fontWeight: 600 }}>{overview.agencyCount}</div>
-          </div>
+        <section
+          data-testid="network-overview"
+          aria-label={t("network.overview", locale)}
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-8)" }}
+        >
+          <Card style={{ padding: "var(--space-4)" }}>
+            <KpiTile label={t("network.overview", locale)} value={String(overview.agencyCount)} />
+          </Card>
+          <Card style={{ padding: "var(--space-4)" }}>
+            <KpiTile label="TMA moyen" value={`${overview.avgTma} min`} />
+          </Card>
+          <Card style={{ padding: "var(--space-4)" }}>
+            <KpiTile label="Taux SLA moyen" value={`${overview.avgTauxSLA} %`} />
+          </Card>
         </section>
       )}
 
-      <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap", alignItems: "flex-start" }}>
         {/* Classement */}
         <section aria-label={t("network.ranking", locale)} style={{ flex: "2 1 480px", minWidth: 0 }}>
-          <div style={{ fontSize: "var(--caption)", marginBottom: "0.5rem", color: "var(--ink-soft)" }}>{t("network.ranking", locale)}</div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <tbody>
-              {rows.map((a) => {
-                const token = benchmarkBadge(a.tma, slaMinutes, a.offline);
-                const label = a.offline ? t("network.agency_offline", locale) : `${a.tma} min`;
-                return (
-                  <tr
-                    key={a.agencyId}
-                    data-testid="rank-row"
-                    data-offline={a.offline ? "on" : "off"}
-                    style={{ borderBottom: "1px solid var(--surface-1)", color: "var(--ink-strong)" }}
-                  >
-                    <td style={{ padding: "0.5rem", fontWeight: 600 }}>{a.agencyName}</td>
-                    <td style={{ padding: "0.5rem", color: "var(--ink-soft)" }}>{a.city}</td>
-                    <td style={{ padding: "0.5rem", textAlign: "right" }}>
-                      <span data-testid="rank-badge" role="img" aria-label={label} style={badgeStyle(token)}>
-                        {label}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div style={sectionLabel}>{t("network.ranking", locale)}</div>
+          <Card style={{ padding: "var(--space-2)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {rows.map((a, i) => {
+                  const token = benchmarkBadge(a.tma, slaMinutes, a.offline);
+                  const label = a.offline ? t("network.agency_offline", locale) : `${a.tma} min`;
+                  const rank = rankBase + i + 1;
+                  const isTop = rank === 1;
+                  return (
+                    <tr
+                      key={a.agencyId}
+                      data-testid="rank-row"
+                      data-offline={a.offline ? "on" : "off"}
+                      style={{ borderBottom: "1px solid var(--hairline)", color: "var(--ink)" }}
+                    >
+                      <td style={{ padding: "var(--space-3)", width: "3rem", textAlign: "right" }}>
+                        <span
+                          style={{
+                            fontFamily: "var(--font-display)",
+                            fontSize: "var(--text-lg)",
+                            fontWeight: 700,
+                            fontVariantNumeric: "tabular-nums",
+                            letterSpacing: "var(--tracking-numeric)",
+                            color: isTop ? "var(--gold)" : "var(--ink-faint)",
+                          }}
+                        >
+                          {rank}
+                        </span>
+                      </td>
+                      <td style={{ padding: "var(--space-3)", fontWeight: 600 }}>
+                        {a.agencyName}
+                        {isTop && (
+                          <span aria-hidden="true" style={{ marginLeft: "var(--space-2)", color: "var(--gold)" }}>
+                            ★
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "var(--space-3)", color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}>
+                        {a.city}
+                      </td>
+                      <td style={{ padding: "var(--space-3)", textAlign: "right" }}>
+                        <span data-testid="rank-badge" role="img" aria-label={label} style={badgeStyle(token)}>
+                          <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "var(--r-full)", backgroundColor: token }} />
+                          {label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
 
           {totalPages > 1 && (
-            <nav aria-label={t("network.page", locale)} style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginTop: "0.75rem" }}>
-              <button type="button" data-testid="page-prev" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} style={pageButton}>
+            <nav
+              aria-label={t("network.page", locale)}
+              style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", marginTop: "var(--space-4)" }}
+            >
+              <Button
+                variant="secondary"
+                size="dense"
+                data-testid="page-prev"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
                 {t("network.prev", locale)}
-              </button>
-              <span data-testid="page-indicator" style={{ fontSize: "var(--caption)" }}>
+              </Button>
+              <span data-testid="page-indicator" style={{ fontSize: "var(--text-sm)", color: "var(--ink-soft)", fontVariantNumeric: "tabular-nums" }}>
                 {t("network.page", locale)} {page} / {totalPages}
               </span>
-              <button type="button" data-testid="page-next" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} style={pageButton}>
+              <Button
+                variant="secondary"
+                size="dense"
+                data-testid="page-next"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
                 {t("network.next", locale)}
-              </button>
+              </Button>
             </nav>
           )}
         </section>
 
         {/* Carte SVG statique CI */}
         <section aria-label={t("network.map", locale)} style={{ flex: "1 1 320px", minWidth: 0 }}>
-          <div style={{ fontSize: "var(--caption)", marginBottom: "0.5rem", color: "var(--ink-soft)" }}>{t("network.map", locale)}</div>
-          <CiMap agencies={state.agencies} slaMinutes={slaMinutes} />
+          <div style={sectionLabel}>{t("network.map", locale)}</div>
+          <Card style={{ padding: "var(--space-4)" }}>
+            <CiMap agencies={state.agencies} slaMinutes={slaMinutes} />
+          </Card>
         </section>
       </div>
 
       {/* Panneau alertes agrégé */}
-      <section data-testid="network-alerts" aria-label={t("network.alerts", locale)} style={{ marginTop: "1.5rem" }}>
-        <div style={{ fontSize: "var(--caption)", marginBottom: "0.5rem", color: "var(--ink-soft)" }}>{t("network.alerts", locale)}</div>
-        {state.alerts.map((al) => (
-          <div
-            key={al.id}
-            data-testid="network-alert"
-            role="alert"
-            style={{ display: "flex", gap: "0.75rem", alignItems: "center", padding: "0.75rem 1rem", marginBottom: "0.5rem", backgroundColor: "var(--danger)", color: "var(--brand-contrast)", borderRadius: "0.5rem" }}
-          >
-            <span aria-hidden="true">⚠</span>
-            <span style={{ fontWeight: 600 }}>{al.agencyName || al.agencyId}</span>
-            <span>{al.type}</span>
-          </div>
-        ))}
+      <section data-testid="network-alerts" aria-label={t("network.alerts", locale)} style={{ marginTop: "var(--space-8)" }}>
+        <div style={sectionLabel}>{t("network.alerts", locale)}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {state.alerts.map((al) => (
+            <Card
+              key={al.id}
+              data-testid="network-alert"
+              role="alert"
+              style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", padding: "var(--space-4)" }}
+            >
+              <Badge tone="danger" dot>
+                {al.type}
+              </Badge>
+              <span style={{ fontWeight: 600, color: "var(--ink)" }}>{al.agencyName || al.agencyId}</span>
+            </Card>
+          ))}
+        </div>
       </section>
     </div>
   );

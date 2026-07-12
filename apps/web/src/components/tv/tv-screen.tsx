@@ -32,17 +32,23 @@ export interface TvScreenProps {
   reducedMotion?: boolean;
 }
 
-/** Root screen surface style — always on --surface-screen. */
+/**
+ * Root screen surface — v2 « Sérénité Premium » projected board.
+ * Background sits on --night-2 (max-contrast dark) but keeps a --surface-screen
+ * fallback so the token contract (and the "no white flash" guarantee) holds.
+ */
 const screenStyle: CSSProperties = {
-  backgroundColor: "var(--surface-screen)",
+  backgroundColor: "var(--night-2, var(--surface-screen))",
   color: "var(--ink-inverse)",
   minHeight: "100vh",
   display: "flex",
   flexDirection: "column",
+  fontFamily: "var(--font-text)",
 };
 
 /**
  * Renders a single previous-call card at the mandated --display-tv size.
+ * Recent calls are in retreat: --ink-inverse-soft, tabular --font-display digits.
  * @param call - The previous call to render.
  * @returns The card element.
  */
@@ -52,14 +58,27 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
       data-testid="tv-previous-card"
       style={{
         borderRight: "1px solid var(--tv-separator)",
-        padding: "0 2rem",
+        padding: "0 var(--space-8)",
         fontSize: "var(--display-tv)",
-        lineHeight: 1.1,
-        color: "var(--ink-inverse)",
+        lineHeight: "var(--leading-tight)",
+        color: "var(--ink-inverse-soft)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-1)",
       }}
     >
-      <div style={{ fontSize: "var(--display-tv)" }}>{call.displayNumber}</div>
-      <div style={{ fontSize: "var(--caption)", color: "var(--ink-inverse)" }}>{call.counterLabel}</div>
+      <div
+        style={{
+          fontSize: "var(--display-tv)",
+          fontFamily: "var(--font-display)",
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "var(--tracking-numeric)",
+          color: "var(--ink-inverse-soft)",
+        }}
+      >
+        {call.displayNumber}
+      </div>
+      <div style={{ fontSize: "var(--text-lg)", color: "var(--ink-inverse-soft)" }}>{call.counterLabel}</div>
     </div>
   );
 }
@@ -86,7 +105,7 @@ export function TvScreen({
       data-state={loading ? "loading" : isEmpty ? "empty" : "nominal"}
       style={screenStyle}
     >
-      {/* Header */}
+      {/* Header — sobre, en retrait sur le fond nuit */}
       <header
         data-testid="tv-header"
         style={{
@@ -94,13 +113,22 @@ export function TvScreen({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 2rem",
+          padding: "0 var(--space-12)",
           borderBottom: "1px solid var(--tv-separator)",
+          color: "var(--ink-inverse-soft)",
+          fontSize: "var(--text-lg)",
+          flexShrink: 0,
         }}
       >
-        <span style={{ fontWeight: 600 }}>{tenantName}</span>
-        <span style={{ letterSpacing: "0.1em" }}>{t("tv.title", locale)}</span>
-        <span data-testid="tv-clock" aria-hidden={clock === ""}>
+        <span style={{ fontWeight: 600, color: "var(--ink-inverse)" }}>{tenantName}</span>
+        <span style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontSize: "var(--text-md)" }}>
+          {t("tv.title", locale)}
+        </span>
+        <span
+          data-testid="tv-clock"
+          aria-hidden={clock === ""}
+          style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "var(--tracking-numeric)" }}
+        >
           {clock}
         </span>
       </header>
@@ -111,11 +139,11 @@ export function TvScreen({
           aria-busy="true"
           style={{
             flex: 1,
-            backgroundColor: "var(--surface-screen)",
+            backgroundColor: "var(--night-2, var(--surface-screen))",
             display: "flex",
             flexDirection: "column",
-            gap: "1rem",
-            padding: "2rem",
+            gap: "var(--space-6)",
+            padding: "var(--space-12)",
           }}
         >
           <div
@@ -123,10 +151,10 @@ export function TvScreen({
             style={{
               height: "var(--display-tv-hero)",
               backgroundColor: "var(--tv-separator)",
-              borderRadius: "0.5rem",
+              borderRadius: "var(--r-xl)",
             }}
           />
-          <div style={{ display: "flex", gap: "1rem" }}>
+          <div style={{ display: "flex", gap: "var(--space-6)" }}>
             {Array.from({ length: TV_PREVIOUS_COUNT }).map((_, i) => (
               <div
                 key={i}
@@ -134,7 +162,7 @@ export function TvScreen({
                   height: "var(--display-tv-counter)",
                   flex: 1,
                   backgroundColor: "var(--tv-separator)",
-                  borderRadius: "0.5rem",
+                  borderRadius: "var(--r-lg)",
                 }}
               />
             ))}
@@ -142,22 +170,25 @@ export function TvScreen({
         </div>
       ) : (
         <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          {/* Hero */}
+          {/* Hero — le « Moment Ticket » : numéro servi géant en --brand,
+              cerclé d'un halo --gold (--shadow-gold) pour l'instant fort. */}
           <section
             data-testid="tv-hero"
             data-celebration={celebration ? "on" : "off"}
             aria-live="polite"
             style={{
+              flex: 1,
               minHeight: "var(--display-tv-hero)",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
+              gap: "var(--space-4)",
+              padding: "var(--space-12) var(--space-8)",
               // TV-002: flash --brand pendant la fenêtre de célébration, sinon
-              // retour à --surface-screen. Couleur 100% tokenisée (aucun dur).
+              // retour au fond nuit (--surface-screen conservé pour le contrat).
               backgroundColor: celebration ? "var(--brand)" : "var(--surface-screen)",
-              // TV-002: glissement héros→précédents en 250ms ; désactivé si
-              // reduced-motion (changement d'état instantané).
+              // TV-002: glissement héros→précédents ; désactivé si reduced-motion.
               transition: reducedMotion
                 ? "none"
                 : "background-color var(--duration-celebration) linear, transform var(--tv-slide-duration) var(--tv-slide-ease)",
@@ -166,36 +197,76 @@ export function TvScreen({
             {isEmpty ? (
               <div
                 data-testid="tv-empty"
-                style={{ fontSize: "var(--display-tv)", color: "var(--ink-inverse)", textAlign: "center" }}
+                style={{
+                  fontSize: "var(--display-tv)",
+                  color: "var(--ink-inverse-soft)",
+                  textAlign: "center",
+                  fontFamily: "var(--font-display)",
+                }}
               >
                 {t("tv.empty", locale)}
               </div>
             ) : (
               <>
-                <div style={{ fontSize: "var(--display-tv-counter)", fontWeight: 600 }}>
+                <div
+                  style={{
+                    fontSize: "var(--text-3xl)",
+                    fontWeight: 600,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: celebration ? "var(--ink-inverse)" : "var(--gold)",
+                  }}
+                >
                   {state.hero!.counterLabel} — {t("tv.now_serving", locale)}
                 </div>
                 <div
                   data-testid="tv-hero-number"
-                  style={{ fontSize: "var(--display-tv-hero)", fontWeight: 600, lineHeight: 1 }}
+                  style={{
+                    fontSize: "var(--display-tv-hero)",
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 600,
+                    lineHeight: "var(--leading-tight)",
+                    fontVariantNumeric: "tabular-nums",
+                    letterSpacing: "var(--tracking-numeric)",
+                    color: celebration ? "var(--ink-inverse)" : "var(--brand)",
+                    padding: "var(--space-6) var(--space-16)",
+                    borderRadius: "var(--r-xl)",
+                    // Halo « Moment Ticket » — cerclage or premium.
+                    boxShadow: "var(--shadow-gold)",
+                  }}
                 >
                   {state.hero!.displayNumber}
                 </div>
-                <div style={{ fontSize: "var(--display-tv)" }}>
+                <div style={{ fontSize: "var(--text-3xl)", color: "var(--ink-inverse-soft)" }}>
                   {t("tv.please_proceed", locale)} {state.hero!.counterLabel}
                 </div>
               </>
             )}
           </section>
 
-          {/* Previous calls — always rendered at --display-tv, structure preserved */}
-          <section data-testid="tv-previous" aria-label={t("tv.recent_calls", locale)}>
-            <div style={{ padding: "0 2rem", fontSize: "var(--caption)" }}>{t("tv.recent_calls", locale)}</div>
+          {/* Previous calls — en retrait (--ink-inverse-soft), structure préservée */}
+          <section
+            data-testid="tv-previous"
+            aria-label={t("tv.recent_calls", locale)}
+            style={{ borderTop: "1px solid var(--tv-separator)", paddingTop: "var(--space-6)" }}
+          >
+            <div
+              style={{
+                padding: "0 var(--space-12)",
+                fontSize: "var(--text-md)",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--ink-inverse-soft)",
+              }}
+            >
+              {t("tv.recent_calls", locale)}
+            </div>
             <div
               style={{
                 display: "flex",
                 minHeight: "var(--display-tv-counter)",
                 alignItems: "center",
+                padding: "0 var(--space-4)",
               }}
             >
               {state.previous.map((call) => (
@@ -204,17 +275,37 @@ export function TvScreen({
             </div>
           </section>
 
-          {/* Queue */}
-          <section data-testid="tv-queue" aria-label={t("tv.waiting", locale)}>
-            <div style={{ padding: "0 2rem", fontSize: "var(--caption)" }}>
+          {/* Queue — file d'attente, encre secondaire discrète */}
+          <section
+            data-testid="tv-queue"
+            aria-label={t("tv.waiting", locale)}
+            style={{
+              borderTop: "1px solid var(--tv-separator)",
+              paddingTop: "var(--space-6)",
+              paddingBottom: "var(--space-8)",
+            }}
+          >
+            <div
+              style={{
+                padding: "0 var(--space-12)",
+                fontSize: "var(--text-md)",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--ink-inverse-soft)",
+              }}
+            >
               {t("tv.waiting", locale)} ({state.queue.length})
             </div>
             <div
               style={{
                 display: "flex",
-                gap: "1.5rem",
-                padding: "0 2rem",
+                gap: "var(--space-8)",
+                padding: "var(--space-4) var(--space-12) 0",
                 fontSize: "var(--display-tv)",
+                fontFamily: "var(--font-display)",
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "var(--tracking-numeric)",
+                color: "var(--ink-inverse-soft)",
                 overflow: "hidden",
               }}
             >
@@ -226,18 +317,20 @@ export function TvScreen({
         </main>
       )}
 
-      {/* Offline banner — discreet, keeps last known state visible */}
+      {/* Offline banner — discret, --info neutre, dernier état conservé */}
       {state.connection === "offline" && (
         <div
           data-testid="tv-offline-banner"
           role="status"
           aria-live="polite"
           style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "var(--warning)",
-            color: "var(--surface-screen)",
+            padding: "var(--space-2) var(--space-4)",
+            backgroundColor: "var(--info)",
+            color: "var(--ink-inverse)",
             textAlign: "center",
-            fontSize: "var(--caption)",
+            fontSize: "var(--text-md)",
+            letterSpacing: "0.08em",
+            flexShrink: 0,
           }}
         >
           {t("tv.offline", locale)}

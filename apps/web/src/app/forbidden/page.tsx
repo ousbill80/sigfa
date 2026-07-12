@@ -23,24 +23,49 @@ export default async function ForbiddenPage({ searchParams }: ForbiddenPageProps
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "var(--surface-0)",
-        color: "var(--ink-strong)",
+        gap: "var(--space-3)",
+        padding: "var(--space-8)",
+        background: "var(--paper)",
+        color: "var(--ink)",
       }}
     >
-      <h1 style={{ fontSize: "4rem", fontWeight: "bold", color: "var(--danger)" }}>403</h1>
-      <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Accès refusé</h2>
-      <p style={{ color: "var(--ink-soft)", marginBottom: "2rem" }}>
+      <h1
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "var(--text-4xl)",
+          fontWeight: 700,
+          letterSpacing: "var(--tracking-numeric)",
+          color: "var(--ink)",
+          margin: 0,
+        }}
+      >
+        403
+      </h1>
+      <h2
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "var(--text-xl)",
+          fontWeight: 600,
+          color: "var(--ink)",
+          margin: 0,
+        }}
+      >
+        Accès refusé
+      </h2>
+      <p
+        style={{
+          color: "var(--ink-soft)",
+          marginBottom: "var(--space-6)",
+          lineHeight: "var(--leading-body)",
+          textAlign: "center",
+        }}
+      >
         Vous n&apos;avez pas les droits pour accéder à cette page.
       </p>
       <Link
         href={dashboardUrl}
-        style={{
-          backgroundColor: "var(--brand)",
-          color: "var(--brand-contrast)",
-          padding: "0.75rem 1.5rem",
-          borderRadius: "0.5rem",
-          textDecoration: "none",
-        }}
+        className="sig-btn sig-btn--primary sig-btn--md"
+        style={{ textDecoration: "none" }}
       >
         Retour au tableau de bord
       </Link>

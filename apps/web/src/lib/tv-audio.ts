@@ -79,9 +79,6 @@ export function speechLang(locale: Locale): string {
   switch (locale) {
     case "en":
       return "en-US";
-    // Dioula/Baoulé n'ont pas de voix de synthèse standard → repli FR.
-    case "dioula":
-    case "baoule":
     case "fr":
     default:
       return "fr-FR";

@@ -12,6 +12,9 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { cookies } from "next/headers";
+import "@sigfa/ui/tokens.css";
+import "@sigfa/ui/fonts.css";
+import "@sigfa/ui/components.css";
 import "./globals.css";
 import { SocketProvider, type RealtimeMode } from "@/lib/socket-provider";
 import { firstAgencyIdFromToken } from "@/lib/socket-wiring";

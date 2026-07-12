@@ -5,12 +5,14 @@
  * services → counters → agents → qr. The create step calls onCreateAgency
  * (POST /agencies) and records the returned id; the final step calls
  * onGenerateQr (POST /agencies/{id}/kiosk-access) and shows the QR image.
- * End-to-end testable without a network (callbacks are injected). Tokens only.
+ * End-to-end testable without a network (callbacks are injected).
+ * v2 « Sérénité Premium » — @sigfa/ui Stepper + tokens only.
  * @module components/admin/onboarding-wizard
  */
 "use client";
 
 import { useReducer, useState, type CSSProperties, type ReactElement } from "react";
+import { Button, Field, Stepper } from "@sigfa/ui";
 import {
   initialOnboardingState,
   onboardingReducer,
@@ -21,7 +23,7 @@ import {
   ONBOARDING_STEP_COUNT,
   type OnboardingStep,
 } from "@/lib/onboarding";
-import { t, type Locale } from "@/lib/i18n";
+import { t, type Locale, type TranslationKey } from "@/lib/i18n";
 
 /** Props for {@link OnboardingWizard}. */
 export interface OnboardingWizardProps {
@@ -33,21 +35,24 @@ export interface OnboardingWizardProps {
   locale?: Locale;
 }
 
-const btnStyle: CSSProperties = {
-  minHeight: "40px",
-  padding: "0 1rem",
-  borderRadius: "0.375rem",
-  cursor: "pointer",
-  fontSize: "1rem",
-  border: "none",
-  backgroundColor: "var(--brand)",
-  color: "var(--brand-contrast)",
+/** i18n key for each onboarding step label (used by the Stepper). */
+const STEP_LABEL: Record<OnboardingStep, TranslationKey> = {
+  create: "admin.section.agencies",
+  template: "admin.section.sms_templates",
+  services: "admin.section.services",
+  counters: "admin.section.counters",
+  agents: "admin.section.agents",
+  qr: "admin.wizard_generate_qr",
 };
-const secondaryBtn: CSSProperties = {
-  ...btnStyle,
-  backgroundColor: "var(--surface-1)",
-  color: "var(--ink-strong)",
-  border: "1px solid var(--ink-soft)",
+
+const overlineStyle: CSSProperties = {
+  fontFamily: "var(--font-text)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--ink-faint)",
+  margin: "0 0 var(--space-4)",
 };
 
 /**
@@ -59,7 +64,9 @@ export function OnboardingWizard({ onCreateAgency, onGenerateQr, locale = "fr" }
   const [state, dispatch] = useReducer(onboardingReducer, undefined, initialOnboardingState);
   const [agencyName, setAgencyName] = useState("");
   const step: OnboardingStep = currentStep(state);
-  const stepNumber = ONBOARDING_STEPS.indexOf(step) + 1;
+  const stepIndex = ONBOARDING_STEPS.indexOf(step);
+
+  const stepLabels = ONBOARDING_STEPS.map((s) => t(STEP_LABEL[s], locale));
 
   async function handleCreate(): Promise<void> {
     if (agencyName.trim().length === 0) return;
@@ -75,62 +82,77 @@ export function OnboardingWizard({ onCreateAgency, onGenerateQr, locale = "fr" }
 
   return (
     <section data-testid="onboarding-wizard" aria-label={t("admin.section.onboarding", locale)}>
-      <div data-testid="wizard-progress" style={{ fontSize: "var(--caption)", color: "var(--ink-soft)", marginBottom: "1rem" }}>
-        {t("admin.wizard_step", locale)} {stepNumber} / {ONBOARDING_STEP_COUNT}
+      <p style={overlineStyle}>{t("admin.section.onboarding", locale)}</p>
+
+      <Stepper steps={stepLabels} current={stepIndex} style={{ marginBottom: "var(--space-6)" }} />
+
+      <div
+        data-testid="wizard-progress"
+        style={{ fontSize: "var(--text-sm)", color: "var(--ink-soft)", marginBottom: "var(--space-6)" }}
+      >
+        {t("admin.wizard_step", locale)} {stepIndex + 1} / {ONBOARDING_STEP_COUNT}
       </div>
 
-      <div data-testid={`wizard-step-${step}`} style={{ minHeight: "6rem" }}>
+      <div data-testid={`wizard-step-${step}`} style={{ minHeight: "7rem" }}>
         {step === "create" && (
-          <div>
-            <label htmlFor="wizard-agency-name" style={{ fontSize: "var(--caption)", color: "var(--ink-soft)" }}>
-              {t("admin.section.agencies", locale)}
-            </label>
-            <input
+          <div style={{ maxWidth: "26rem" }}>
+            <Field
               id="wizard-agency-name"
               data-testid="wizard-agency-name"
+              label={t("admin.section.agencies", locale)}
               value={agencyName}
               onChange={(e) => setAgencyName(e.target.value)}
-              style={{ display: "block", minHeight: "40px", padding: "0 0.75rem", border: "1px solid var(--ink-soft)", borderRadius: "0.375rem", margin: "0.25rem 0", fontSize: "1rem", backgroundColor: "var(--surface-0)", color: "var(--ink-strong)" }}
             />
-            <button type="button" data-testid="wizard-create-submit" onClick={() => void handleCreate()} style={btnStyle}>
-              {t("admin.confirm", locale)}
-            </button>
+            <div style={{ marginTop: "var(--space-4)" }}>
+              <Button type="button" variant="primary" data-testid="wizard-create-submit" onClick={() => void handleCreate()}>
+                {t("admin.confirm", locale)}
+              </Button>
+            </div>
           </div>
         )}
 
         {(step === "template" || step === "services" || step === "counters" || step === "agents") && (
           <div>
-            <p style={{ color: "var(--ink-strong)" }}>{t(`admin.section.${step === "template" ? "sms_templates" : step}` as never, locale)}</p>
-            <button type="button" data-testid="wizard-complete-step" onClick={() => dispatch({ type: "COMPLETE_STEP", step })} style={secondaryBtn}>
+            <p style={{ color: "var(--ink)", fontSize: "var(--text-lg)", fontWeight: 500, margin: "0 0 var(--space-4)" }}>
+              {t(STEP_LABEL[step], locale)}
+            </p>
+            <Button type="button" variant="secondary" data-testid="wizard-complete-step" onClick={() => dispatch({ type: "COMPLETE_STEP", step })}>
               {t("admin.confirm", locale)}
-            </button>
+            </Button>
           </div>
         )}
 
         {step === "qr" && (
           <div>
-            <button type="button" data-testid="wizard-generate-qr" onClick={() => void handleQr()} style={btnStyle}>
+            <Button type="button" variant="primary" data-testid="wizard-generate-qr" onClick={() => void handleQr()}>
               {t("admin.wizard_generate_qr", locale)}
-            </button>
+            </Button>
             {state.qrCodeDataUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img data-testid="wizard-qr-image" src={state.qrCodeDataUrl} alt={t("admin.wizard_generate_qr", locale)} style={{ display: "block", marginTop: "1rem", width: "160px", height: "160px" }} />
+              <img
+                data-testid="wizard-qr-image"
+                src={state.qrCodeDataUrl}
+                alt={t("admin.wizard_generate_qr", locale)}
+                style={{ display: "block", marginTop: "var(--space-4)", width: "160px", height: "160px", borderRadius: "var(--r-md)", border: "1px solid var(--hairline)" }}
+              />
             )}
             {isOnboardingComplete(state) && (
-              <p data-testid="wizard-done" style={{ color: "var(--success)" }}>{t("admin.wizard_done", locale)}</p>
+              <p data-testid="wizard-done" style={{ color: "var(--success)", marginTop: "var(--space-3)", fontWeight: 600 }}>
+                {t("admin.wizard_done", locale)}
+              </p>
             )}
           </div>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
-        <button type="button" data-testid="wizard-back" onClick={() => dispatch({ type: "BACK" })} disabled={state.stepIndex === 0} style={{ ...secondaryBtn, opacity: state.stepIndex === 0 ? 0.5 : 1 }}>
+      <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-6)" }}>
+        <Button type="button" variant="secondary" data-testid="wizard-back" onClick={() => dispatch({ type: "BACK" })} disabled={state.stepIndex === 0}>
           {t("admin.wizard_back", locale)}
-        </button>
+        </Button>
         {step !== "qr" && (
-          <button type="button" data-testid="wizard-next" onClick={() => dispatch({ type: "NEXT" })} disabled={!canAdvance(state)} style={{ ...btnStyle, opacity: canAdvance(state) ? 1 : 0.5 }}>
+          <Button type="button" variant="primary" data-testid="wizard-next" onClick={() => dispatch({ type: "NEXT" })} disabled={!canAdvance(state)}>
             {t("admin.wizard_next", locale)}
-          </button>
+          </Button>
         )}
       </div>
     </section>

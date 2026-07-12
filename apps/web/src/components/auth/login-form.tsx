@@ -1,5 +1,7 @@
 /**
- * Login form component.
+ * Login form component — refonte visuelle v2 « Sérénité Premium ».
+ * Consomme @sigfa/ui (Card / Field / Button). Comportement inchangé :
+ * POST /api/auth/login, redirection `next`, erreurs FR/EN via i18n.
  * @module components/auth/login-form
  */
 "use client";
@@ -7,6 +9,7 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Button, Card, Field } from "@sigfa/ui";
 import { t } from "@/lib/i18n";
 
 /** Login form state */
@@ -57,111 +60,123 @@ export function LoginForm(): ReactElement {
   }
 
   return (
-    <div
-      style={{
-        backgroundColor: "var(--surface-0)",
-        borderRadius: "0.75rem",
-        padding: "2rem",
-        width: "100%",
-        maxWidth: "400px",
-        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-      }}
-    >
-      <h1
+    <Card style={{ width: "100%", maxWidth: "26rem" }}>
+      <div
         style={{
-          fontSize: "1.5rem",
-          fontWeight: "bold",
-          color: "var(--ink-strong)",
-          marginBottom: "1.5rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          marginBottom: "var(--space-6)",
         }}
       >
-        {t("auth.login")}
-      </h1>
-
-      <form onSubmit={(e) => void handleSubmit(e)}>
-        <div style={{ marginBottom: "1rem" }}>
-          <label
-            htmlFor="email"
-            style={{ display: "block", marginBottom: "0.5rem", color: "var(--ink-strong)" }}
-          >
-            {t("auth.email")}
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={state.email}
-            onChange={(e) => setState((s) => ({ ...s, email: e.target.value }))}
-            required
+        <span
+          aria-hidden="true"
+          style={{
+            display: "grid",
+            placeItems: "center",
+            width: "3rem",
+            height: "3rem",
+            borderRadius: "var(--r-md)",
+            background: "var(--brand)",
+            color: "var(--brand-contrast)",
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: "var(--text-xl)",
+            boxShadow: "var(--shadow-brand)",
+          }}
+        >
+          S
+        </span>
+        <div>
+          <h1
             style={{
-              width: "100%",
-              padding: "0.5rem",
-              border: "1px solid var(--ink-soft)",
-              borderRadius: "0.375rem",
-              backgroundColor: "var(--surface-1)",
-              color: "var(--ink-strong)",
-              boxSizing: "border-box",
+              fontFamily: "var(--font-display)",
+              fontSize: "var(--text-2xl)",
+              fontWeight: 600,
+              lineHeight: "var(--leading-tight)",
+              letterSpacing: "var(--tracking-tight)",
+              color: "var(--ink)",
+              margin: 0,
             }}
-          />
-        </div>
-
-        <div style={{ marginBottom: "1.5rem" }}>
-          <label
-            htmlFor="password"
-            style={{ display: "block", marginBottom: "0.5rem", color: "var(--ink-strong)" }}
           >
-            {t("auth.password")}
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={state.password}
-            onChange={(e) => setState((s) => ({ ...s, password: e.target.value }))}
-            required
+            {t("auth.login")}
+          </h1>
+          <p
             style={{
-              width: "100%",
-              padding: "0.5rem",
-              border: "1px solid var(--ink-soft)",
-              borderRadius: "0.375rem",
-              backgroundColor: "var(--surface-1)",
-              color: "var(--ink-strong)",
-              boxSizing: "border-box",
+              fontSize: "var(--text-sm)",
+              color: "var(--ink-soft)",
+              margin: 0,
             }}
-          />
+          >
+            SIGFA
+          </p>
         </div>
+      </div>
+
+      <form
+        onSubmit={(e) => void handleSubmit(e)}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-4)",
+        }}
+      >
+        <Field
+          id="email"
+          label={t("auth.email")}
+          type="email"
+          value={state.email}
+          onChange={(e) => setState((s) => ({ ...s, email: e.target.value }))}
+          aria-required="true"
+          placeholder="awa@banque.ci"
+        />
+
+        <Field
+          id="password"
+          label={t("auth.password")}
+          type="password"
+          value={state.password}
+          onChange={(e) => setState((s) => ({ ...s, password: e.target.value }))}
+          aria-required="true"
+        />
 
         {state.error && (
           <div
             role="alert"
             style={{
-              backgroundColor: "#fef2f2",
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-2)",
+              background: "var(--danger-soft)",
               color: "var(--danger)",
-              padding: "0.75rem",
-              borderRadius: "0.375rem",
-              marginBottom: "1rem",
+              padding: "var(--space-3) var(--space-4)",
+              borderRadius: "var(--r-md)",
+              fontSize: "var(--text-sm)",
             }}
           >
+            <span
+              aria-hidden="true"
+              style={{
+                width: "0.5rem",
+                height: "0.5rem",
+                borderRadius: "var(--r-full)",
+                background: "var(--danger)",
+                flexShrink: 0,
+              }}
+            />
             {state.error}
           </div>
         )}
 
-        <button
+        <Button
           type="submit"
+          variant="primary"
           disabled={state.loading}
-          style={{
-            width: "100%",
-            padding: "0.75rem",
-            backgroundColor: "var(--brand)",
-            color: "var(--brand-contrast)",
-            border: "none",
-            borderRadius: "0.375rem",
-            fontWeight: "600",
-            cursor: state.loading ? "not-allowed" : "pointer",
-            opacity: state.loading ? 0.7 : 1,
-          }}
+          style={{ width: "100%" }}
         >
           {state.loading ? t("loading") : t("auth.submit")}
-        </button>
+        </Button>
       </form>
-    </div>
+    </Card>
   );
 }

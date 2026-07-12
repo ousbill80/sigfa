@@ -5,40 +5,41 @@ exports[`WEB-005: snapshot visuel mode TV (ratio 16:9) > WEB-005: mode TV — sn
   class="comex-tv"
   data-testid="comex-dashboard"
   data-tv="on"
-  style="padding: 2.25rem; margin: 0px auto; aspect-ratio: 16 / 9; max-width: 1920px; background-color: var(--surface-0);"
+  style="padding: var(--space-8); margin: 0px auto; aspect-ratio: 16 / 9; max-width: 1920px; background: var(--paper);"
 >
   <header
-    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;"
+    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); gap: var(--space-4);"
   >
     <h1
-      style="font-size: 1.5rem; color: var(--ink-strong); margin: 0px;"
+      style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600; color: var(--ink); letter-spacing: var(--tracking-tight); margin: 0px;"
     >
       PILOTAGE QUALITÉ — COMEX
     </h1>
   </header>
   <section
     aria-label="PILOTAGE QUALITÉ — COMEX"
-    style="display: flex; gap: 1rem; flex-wrap: wrap;"
+    style="display: flex; gap: var(--space-4); flex-wrap: wrap;"
   >
     <div
+      class="sig-card"
       data-testid="comex-kpi"
-      style="flex: 1 1 0%; min-width: 12rem; padding: 1rem; border: 1px solid var(--surface-1); border-radius: 0.5rem; background-color: var(--surface-0);"
+      style="display: flex; flex-direction: column; gap: var(--space-2); flex: 1 1 0%; min-width: 12rem; padding: var(--space-6); background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--r-lg); box-shadow: var(--shadow-1);"
     >
       <div
         data-testid="kpi-nps"
-        style="font-size: var(--caption); color: var(--ink-soft);"
+        style="font-family: var(--font-text); font-size: var(--text-sm); font-weight: 500; color: var(--ink-soft); letter-spacing: 0.01em;"
       >
         NPS GLOBAL RÉSEAU
       </div>
       <div
         data-testid="kpi-nps-value"
-        style="font-size: 40px; font-weight: 600; line-height: 1; color: var(--ink-strong); transition: color 200ms linear;"
+        style="font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-numeric); color: var(--ink-strong); transition: color 200ms linear;"
       >
         40
       </div>
       <div
         data-testid="kpi-nps-delta"
-        style="font-size: var(--caption); color: var(--ink-soft);"
+        style="font-family: var(--font-text); font-size: var(--text-sm); font-weight: 600; color: var(--ink-soft);"
       >
         ▲ 10
          
@@ -46,41 +47,43 @@ exports[`WEB-005: snapshot visuel mode TV (ratio 16:9) > WEB-005: mode TV — sn
       </div>
     </div>
     <div
+      class="sig-card"
       data-testid="comex-kpi"
-      style="flex: 1 1 0%; min-width: 12rem; padding: 1rem; border: 1px solid var(--surface-1); border-radius: 0.5rem; background-color: var(--surface-0);"
+      style="display: flex; flex-direction: column; gap: var(--space-2); flex: 1 1 0%; min-width: 12rem; padding: var(--space-6); background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--r-lg); box-shadow: var(--shadow-1);"
     >
       <div
         data-testid="kpi-tma"
-        style="font-size: var(--caption); color: var(--ink-soft);"
+        style="font-family: var(--font-text); font-size: var(--text-sm); font-weight: 500; color: var(--ink-soft); letter-spacing: 0.01em;"
       >
         TMA MOYEN RÉSEAU
       </div>
       <div
         data-testid="kpi-tma-value"
-        style="font-size: 40px; font-weight: 600; line-height: 1; color: var(--success); transition: color 200ms linear;"
+        style="font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-numeric); color: var(--success); transition: color 200ms linear;"
       >
         12
       </div>
     </div>
     <div
+      class="sig-card"
       data-testid="comex-kpi"
-      style="flex: 1 1 0%; min-width: 12rem; padding: 1rem; border: 1px solid var(--surface-1); border-radius: 0.5rem; background-color: var(--surface-0);"
+      style="display: flex; flex-direction: column; gap: var(--space-2); flex: 1 1 0%; min-width: 12rem; padding: var(--space-6); background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--r-lg); box-shadow: var(--shadow-1);"
     >
       <div
         data-testid="kpi-volume"
-        style="font-size: var(--caption); color: var(--ink-soft);"
+        style="font-family: var(--font-text); font-size: var(--text-sm); font-weight: 500; color: var(--ink-soft); letter-spacing: 0.01em;"
       >
         VOLUME CLIENTS SERVIS
       </div>
       <div
         data-testid="kpi-volume-value"
-        style="font-size: 40px; font-weight: 600; line-height: 1; color: var(--ink-strong); transition: color 200ms linear;"
+        style="font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-numeric); color: var(--ink); transition: color 200ms linear;"
       >
         45230
       </div>
       <div
         data-testid="kpi-volume-delta"
-        style="font-size: var(--caption); color: var(--ink-soft);"
+        style="font-family: var(--font-text); font-size: var(--text-sm); font-weight: 600; color: var(--success);"
       >
         ▲ 12.5 %
          

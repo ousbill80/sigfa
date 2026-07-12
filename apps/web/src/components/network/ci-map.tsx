@@ -5,7 +5,8 @@
  * ZERO external map dependency (Leaflet/mapbox excluded, offline-friendly).
  * Each agency is positioned on its `city` via the CI_CITY_COORDINATES lookup
  * and coloured with the same badge token as the ranking (--success / --warning
- * / --danger, or --info when offline). Tokens only — no hard-coded hex.
+ * / --danger, or --info when offline) over a soft --surface-2 landmass with
+ * --hairline strokes. Tokens only — no hard-coded hex.
  * @module components/network/ci-map
  */
 "use client";
@@ -41,13 +42,18 @@ export function CiMap({ agencies, slaMinutes }: CiMapProps): ReactElement {
       role="img"
       aria-label="Carte du réseau — Côte d'Ivoire"
       viewBox="0 0 100 100"
-      style={{ width: "100%", height: "auto", maxHeight: "420px" }}
+      style={{
+        width: "100%",
+        height: "auto",
+        maxHeight: "420px",
+        display: "block",
+      }}
     >
       <path
         d={CI_OUTLINE}
-        fill="var(--surface-1)"
-        stroke="var(--ink-soft)"
-        strokeWidth={0.8}
+        fill="var(--surface-2)"
+        stroke="var(--hairline)"
+        strokeWidth={1}
         strokeLinejoin="round"
       />
       {agencies.map((a) => {
@@ -56,14 +62,22 @@ export function CiMap({ agencies, slaMinutes }: CiMapProps): ReactElement {
         const fill = benchmarkBadge(a.tma, slaMinutes, a.offline);
         return (
           <g key={a.agencyId}>
+            {/* Halo doux — présence calme sous le marqueur. */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={4.2}
+              fill={fill}
+              opacity={0.16}
+            />
             <circle
               data-testid={`marker-${a.agencyId}`}
               cx={point.x}
               cy={point.y}
               r={2.6}
               fill={fill}
-              stroke="var(--surface-0)"
-              strokeWidth={0.6}
+              stroke="var(--surface-1)"
+              strokeWidth={0.9}
             >
               <title>
                 {a.agencyName} — {a.city}

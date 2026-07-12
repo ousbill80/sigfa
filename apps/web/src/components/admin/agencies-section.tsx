@@ -5,12 +5,13 @@
  * (role="dialog") listing the concerned tickets; the user can cancel (no call)
  * or confirm the forced closure (→ onConfirmDeactivate, which the caller maps to
  * PATCH /agencies/{id} active:false or DELETE /agencies/{id}). Empty state when
- * no agency is configured. Tokens only.
+ * no agency is configured. v2 « Sérénité Premium » — @sigfa/ui + tokens only.
  * @module components/admin/agencies-section
  */
 "use client";
 
 import { useState, type CSSProperties, type ReactElement } from "react";
+import { Badge, Button, Dialog, EmptyState } from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 
 /** A minimal agency row for the list. */
@@ -32,28 +33,23 @@ export interface AgenciesSectionProps {
   locale?: Locale;
 }
 
-const dialogStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
+const overlineStyle: CSSProperties = {
+  fontFamily: "var(--font-text)",
+  fontSize: "var(--text-xs)",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--ink-faint)",
+  margin: "0 0 var(--space-4)",
+};
+
+const rowStyle: CSSProperties = {
   display: "flex",
+  justifyContent: "space-between",
   alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: "rgba(0,0,0,0.4)",
-};
-const panelStyle: CSSProperties = {
-  backgroundColor: "var(--surface-0)",
-  color: "var(--ink-strong)",
-  padding: "1.5rem",
-  borderRadius: "0.5rem",
-  maxWidth: "28rem",
-  width: "90%",
-};
-const btnStyle: CSSProperties = {
-  minHeight: "40px",
-  padding: "0 1rem",
-  borderRadius: "0.375rem",
-  cursor: "pointer",
-  fontSize: "1rem",
+  gap: "var(--space-4)",
+  padding: "var(--space-3) 0",
+  borderBottom: "1px solid var(--hairline)",
 };
 
 /**
@@ -76,58 +72,65 @@ export function AgenciesSection({ agencies, openTickets, onConfirmDeactivate, lo
 
   return (
     <section data-testid="agencies-section" aria-label={t("admin.section.agencies", locale)}>
+      <p style={overlineStyle}>{t("admin.section.agencies", locale)}</p>
+
       {agencies.length === 0 ? (
-        <div data-testid="agencies-empty" style={{ color: "var(--ink-soft)", padding: "1rem" }}>
-          {t("admin.empty_agencies", locale)}
+        <div data-testid="agencies-empty">
+          <EmptyState title={t("admin.empty_agencies", locale)} />
         </div>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0 }}>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {agencies.map((agency) => (
-            <li key={agency.id} data-testid={`agency-row-${agency.id}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--surface-1)" }}>
-              <span style={{ color: "var(--ink-strong)" }}>{agency.name}</span>
-              <button
+            <li key={agency.id} data-testid={`agency-row-${agency.id}`} style={rowStyle}>
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", color: "var(--ink)", fontWeight: 500 }}>
+                {agency.name}
+                <Badge tone={agency.active ? "success" : "info"} dot>
+                  {agency.active ? t("admin.confirm", locale) : t("admin.deactivate", locale)}
+                </Badge>
+              </span>
+              <Button
                 type="button"
+                variant="danger"
+                size="dense"
                 data-testid={`deactivate-${agency.id}`}
                 onClick={() => requestDeactivate(agency)}
-                style={{ ...btnStyle, border: "1px solid var(--danger)", backgroundColor: "var(--surface-0)", color: "var(--danger)" }}
               >
                 {t("admin.deactivate", locale)}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
       )}
 
-      {pending && (
-        <div style={dialogStyle}>
-          <div role="dialog" aria-modal="true" aria-labelledby="deactivate-title" data-testid="deactivate-dialog" style={panelStyle}>
-            <h2 id="deactivate-title" style={{ fontSize: "1.125rem", margin: "0 0 0.75rem" }}>
-              {t("admin.deactivate_tickets_title", locale)} — {pending.name}
-            </h2>
-            <ul data-testid="deactivate-tickets" style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-              {pendingTickets.map((ticket) => (
-                <li key={ticket} style={{ color: "var(--ink-strong)" }}>{ticket}</li>
-              ))}
-            </ul>
-            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
-              <button type="button" data-testid="dialog-cancel" onClick={() => setPending(null)} style={{ ...btnStyle, border: "1px solid var(--ink-soft)", backgroundColor: "var(--surface-1)", color: "var(--ink-strong)" }}>
-                {t("admin.cancel", locale)}
-              </button>
-              <button
-                type="button"
-                data-testid="dialog-confirm"
-                onClick={() => {
-                  onConfirmDeactivate(pending.id);
-                  setPending(null);
-                }}
-                style={{ ...btnStyle, border: "none", backgroundColor: "var(--danger)", color: "var(--brand-contrast)" }}
-              >
-                {t("admin.confirm", locale)}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        title={pending ? `${t("admin.deactivate_tickets_title", locale)} — ${pending.name}` : ""}
+        actions={
+          <>
+            <Button type="button" variant="secondary" data-testid="dialog-cancel" onClick={() => setPending(null)}>
+              {t("admin.cancel", locale)}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              data-testid="dialog-confirm"
+              onClick={() => {
+                if (pending) onConfirmDeactivate(pending.id);
+                setPending(null);
+              }}
+            >
+              {t("admin.confirm", locale)}
+            </Button>
+          </>
+        }
+      >
+        <ul data-testid="deactivate-tickets" style={{ margin: 0, paddingLeft: "var(--space-6)", color: "var(--ink)" }}>
+          {pendingTickets.map((ticket) => (
+            <li key={ticket}>{ticket}</li>
+          ))}
+        </ul>
+      </Dialog>
     </section>
   );
 }
