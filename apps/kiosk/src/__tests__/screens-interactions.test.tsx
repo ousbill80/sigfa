@@ -92,6 +92,7 @@ const servicesMessages = {
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
     offlineBanner: "Mode hors connexion",
   },
+  voice008: { playLabel: "Écouter" },
   degraded007: {
     longQueueTitle: "Forte affluence — environ {estimate} min",
     longQueueMessage: "Recevez un SMS et revenez à l'heure de votre passage.",
@@ -111,6 +112,7 @@ const confirmationMessages = {
     loadingMessage: "Émission de votre ticket...",
     offlineBanner: "Mode hors connexion — ticket local généré",
   },
+  voice008: { playLabel: "Écouter" },
   degraded007: {
     systemError: "Un problème est survenu. Adressez-vous à l'accueil, on s'occupe de vous.",
   },
@@ -128,6 +130,7 @@ const ticketMessages = {
     offlineInfo: "Ticket local — synchronisation dès reconnexion",
     printerError: "Imprimante indisponible — un agent vous remettra votre ticket",
   },
+  voice008: { playLabel: "Écouter" },
   degraded007: {
     photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
     photographNumberShort: "Photographiez votre numéro",

@@ -15,6 +15,12 @@ import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { deriveDegradedState, type PrinterStatus } from "@/hooks/useDegradedState";
+import { useVoiceAnnouncement } from "@/hooks/useVoiceAnnouncement";
+import { VoiceButton } from "@/components/VoiceButton";
+import {
+  A11Y_BASE_FONT_PX,
+  accessibilityFontSizePx,
+} from "@/lib/kiosk-voice";
 
 interface TicketScreenProps {
   displayNumber: string;
@@ -66,6 +72,13 @@ export function TicketScreen({
   const params = useParams();
   const currentLocale = (params?.locale as string) ?? "fr";
   const hasAnnouncedRef = useRef(false);
+  const { announce } = useVoiceAnnouncement(isAccessibilityMode);
+
+  // KIOSK-008 — Taille de police de base : 28 px nominal, ≥ 34 px (28 × 1.2)
+  // en mode accessibilité. Le texte annoncé et le rendu partagent la locale.
+  const baseTextPx = isAccessibilityMode
+    ? accessibilityFontSizePx()
+    : A11Y_BASE_FONT_PX;
 
   // KIOSK-007 : bascule transparente. L'affichage dégradé prolonge à 8 s ;
   // le mode accessibilité prolonge lui aussi à 8 s → on prend le max.
@@ -84,24 +97,13 @@ export function TicketScreen({
     return () => clearTimeout(timer);
   }, [returnDelay, router, currentLocale]);
 
-  // Voice announcement (once only)
+  // Voice announcement (once only) — KIOSK-008 : registre SIGFA, langue de
+  // session, voix ralentie (rate 0.8) et repli FR gérés par le hook.
   useEffect(() => {
     if (hasAnnouncedRef.current) return;
-    if (typeof window === "undefined") return;
-    if (!("speechSynthesis" in window)) return;
-
     hasAnnouncedRef.current = true;
-
-    const utterance = new SpeechSynthesisUtterance(
-      t("voiceAnnounce", {
-        displayNumber,
-        position,
-        minutes: estimatedWaitMinutes,
-      })
-    );
-    utterance.lang = currentLocale === "fr" ? "fr-FR" : "en-US";
-    window.speechSynthesis.speak(utterance);
-  }, [displayNumber, position, estimatedWaitMinutes, t, currentLocale]);
+    announce({ displayNumber, position, estimatedWaitMinutes });
+  }, [displayNumber, position, estimatedWaitMinutes, announce]);
 
   const reducedMotion = prefersReducedMotion();
 
@@ -139,11 +141,13 @@ export function TicketScreen({
         {displayNumber}
       </div>
 
-      {/* Position in queue */}
+      {/* Position in queue — KIOSK-008 : texte de base (28 px nominal,
+          ≥ 34 px en accessibilité), contraste --ink-inverse/--surface-kiosk ≥ 7:1 */}
       <p
         data-testid="ticket-position"
+        data-a11y-text="true"
         style={{
-          fontSize: "40px",
+          fontSize: `${baseTextPx}px`,
           color: "var(--ink-inverse)",
           textAlign: "center",
           fontWeight: "bold",
@@ -152,11 +156,12 @@ export function TicketScreen({
         {t("position", { position })}
       </p>
 
-      {/* Estimated wait */}
+      {/* Estimated wait — KIOSK-008 : texte de base identique */}
       <p
         data-testid="ticket-wait"
+        data-a11y-text="true"
         style={{
-          fontSize: "40px",
+          fontSize: `${baseTextPx}px`,
           color: "var(--ink-inverse)",
           textAlign: "center",
         }}
@@ -207,6 +212,13 @@ export function TicketScreen({
           {t("smsSent", { maskedPhone: maskPhoneNumber(phoneNumber) })}
         </p>
       )}
+
+      {/* KIOSK-008 — Bouton 🔊 permanent : relecture manuelle de l'écran
+          courant dans la langue de session (rate ralentie en accessibilité). */}
+      <VoiceButton
+        announcement={{ displayNumber, position, estimatedWaitMinutes }}
+        isAccessibilityMode={isAccessibilityMode}
+      />
     </main>
   );
 }

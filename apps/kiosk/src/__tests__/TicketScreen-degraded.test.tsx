@@ -45,6 +45,7 @@ const frMessages = {
     voiceAnnounce: "Votre numéro est {displayNumber}.",
     printerError: "Imprimante indisponible",
   },
+  voice008: { playLabel: "Écouter" },
   degraded007: {
     photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
     photographNumberShort: "Photographiez votre numéro",

@@ -64,6 +64,9 @@
     "offlineInfo": "Ticket local — synchronisation dès reconnexion",
     "printerError": "Imprimante indisponible — un agent vous remettra votre ticket"
   },
+  "voice008": {
+    "playLabel": "Écouter"
+  },
   "degraded007": {
     "photographNumber": "Photographiez votre numéro ou recevez-le par SMS",
     "photographNumberShort": "Photographiez votre numéro",
