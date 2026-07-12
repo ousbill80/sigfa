@@ -4,6 +4,125 @@
  */
 
 export interface paths {
+    "/tv/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Créer une session d'affichage TV public (token DISPLAY lecture seule, TTL 12 h)
+         * @description Émet un **token d'affichage TV public** à privilèges MINIMAUX permettant à
+         *     l'écran mural plein écran (`/tv/{agencyId}`) de rejoindre la room socket
+         *     `agency:{agencyId}` en **LECTURE SEULE**, sans réutiliser le JWT d'un agent.
+         *
+         *     **Token retourné** : JWT `role = "DISPLAY"`, **lecture seule**, **scope une
+         *     seule agence**, TTL **12 heures (43200 secondes)**, non renouvelable. Il ne
+         *     permet que la réception d'événements temps réel (`sync:state`, `ticket:called`,
+         *     `queue:updated`) via `join:agency` — aucune mutation, aucun accès aux PII.
+         *
+         *     **Données concernées** : numéros d'appel, files, libellés de comptoir — les
+         *     mêmes que l'écran mural du hall, ce ne sont **pas des PII**. Aucun secret
+         *     n'est requis dans la requête (seul `agencyId`).
+         *
+         *     **Rate-limited** : route publique sans authentification, limitée par IP
+         *     (429 `TOO_MANY_REQUESTS`), aligné sur les autres routes publiques.
+         *
+         *     **Anti-énumération** : si l'agence n'existe pas, la réponse est un **404
+         *     opaque** (`AGENCY_NOT_FOUND`), sans divulguer d'information exploitable.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "agencyId": "33333333-3333-4333-a333-333333333333"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["TvSessionRequest"];
+                };
+            };
+            responses: {
+                /** @description Session TV créée — JWT DISPLAY lecture seule, TTL 12 h (43200 s) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "accessToken": "eyJhbGciOiJIUzI1NiJ9.displayPayload.sig",
+                         *       "expiresIn": 43200,
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *       "role": "DISPLAY"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["TvSessionResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /**
+                 * @description Agence introuvable — réponse **opaque** (anti-énumération). Le message
+                 *     ne révèle aucune information exploitable sur l'existence de l'agence.
+                 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "AGENCY_NOT_FOUND",
+                         *         "message": "Agence introuvable."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                /** @description Trop de requêtes — rate-limit par IP (route publique) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "TOO_MANY_REQUESTS",
+                         *         "message": "Limite de débit atteinte. Réessayez dans 60 secondes.",
+                         *         "details": {
+                         *           "retryAfterSeconds": 60
+                         *         }
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/kiosk/session": {
         parameters: {
             query?: never;
@@ -862,6 +981,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Requête de session d'affichage TV public. Aucun secret : les données TV
+         *     (numéros d'appel, files, libellés de comptoir) ne sont pas des PII.
+         */
+        TvSessionRequest: {
+            /**
+             * Format: uuid
+             * @description Identifiant de l'agence dont l'écran TV veut rejoindre la room
+             * @example 33333333-3333-4333-a333-333333333333
+             */
+            agencyId: string;
+        };
+        /**
+         * @description Token d'affichage TV public — **lecture seule, scope une seule agence**,
+         *     TTL 12 h (43200 s), non renouvelable. Ne permet que la réception d'événements
+         *     temps réel via `join:agency`. Aucune mutation, aucun accès PII.
+         */
+        TvSessionResponse: {
+            /** @description JWT DISPLAY — lecture seule, scope agency, TTL 12 h (43200 s), non renouvelable */
+            accessToken: string;
+            /**
+             * @description Durée de vie du token en secondes (toujours 43200 = 12 h)
+             * @example 43200
+             */
+            expiresIn: number;
+            /**
+             * Format: uuid
+             * @description Identifiant de l'agence à laquelle le token est scopé (unique)
+             */
+            agencyId: string;
+            /**
+             * @description Rôle de contrat — constante DISPLAY (lecture seule, orthogonale RBAC)
+             * @example DISPLAY
+             * @constant
+             */
+            role: "DISPLAY";
+        };
         KioskSessionRequest: {
             /**
              * @description Identifiant unique de la borne
@@ -1288,23 +1444,6 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Ressource introuvable */
-        NotFound: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                /**
-                 * @example {
-                 *       "error": {
-                 *         "code": "NOT_FOUND",
-                 *         "message": "La ressource demandée est introuvable."
-                 *       }
-                 *     }
-                 */
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
         /** @description Conflit (ressource existante ou transition illégale) */
         Conflict: {
             headers: {
@@ -1339,23 +1478,6 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Trop de requêtes — limite de débit atteinte */
-        TooManyRequests: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                /**
-                 * @example {
-                 *       "error": {
-                 *         "code": "TOO_MANY_REQUESTS",
-                 *         "message": "Limite de débit atteinte. Réessayez ultérieurement."
-                 *       }
-                 *     }
-                 */
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
         /** @description Erreur interne du serveur */
         InternalServerError: {
             headers: {
@@ -1367,6 +1489,40 @@ export interface components {
                  *       "error": {
                  *         "code": "INTERNAL_SERVER_ERROR",
                  *         "message": "Une erreur interne s'est produite."
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Ressource introuvable */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "NOT_FOUND",
+                 *         "message": "La ressource demandée est introuvable."
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Trop de requêtes — limite de débit atteinte */
+        TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "TOO_MANY_REQUESTS",
+                 *         "message": "Limite de débit atteinte. Réessayez ultérieurement."
                  *       }
                  *     }
                  */

@@ -29,6 +29,7 @@
     "@sigfa/config": "workspace:*",
     "@stoplight/prism-cli": "5.14.2",
     "@stoplight/spectral-cli": "^6",
+    "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^3.0.0",
     "eslint": "^9.0.0",
     "eslint-plugin-import": "^2.29.0",
