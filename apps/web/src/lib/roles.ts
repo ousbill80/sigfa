@@ -24,6 +24,10 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // Network direction dashboard (WEB-004): BANK_ADMIN / AGENCY_DIRECTOR JWT scope only.
   // AGENT is excluded (→ 403). Must precede "/dashboard" so the prefix match wins.
   "/dashboard/network": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR"],
+  // COMEX quality dashboard (WEB-005): BANK_ADMIN+ only. AGENT / MANAGER /
+  // AGENCY_DIRECTOR are excluded (→ 403). Must precede "/dashboard" so the prefix
+  // match wins.
+  "/dashboard/comex": ["SUPER_ADMIN", "BANK_ADMIN"],
   "/dashboard/agent": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AGENT"],
   "/agent": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AGENT"],
   "/audit": ["SUPER_ADMIN", "BANK_ADMIN", "AUDITOR"],

@@ -47,6 +47,26 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("MANAGER", "/dashboard/network")).toBe(false);
     });
 
+    it("WEB-005: RBAC AGENT → /dashboard/comex retourne 403", () => {
+      expect(canAccess("AGENT", "/dashboard/comex")).toBe(false);
+    });
+
+    it("WEB-005: RBAC MANAGER → /dashboard/comex retourne 403", () => {
+      expect(canAccess("MANAGER", "/dashboard/comex")).toBe(false);
+    });
+
+    it("WEB-005: RBAC AGENCY_DIRECTOR → /dashboard/comex retourne 403 (BANK_ADMIN+ uniquement)", () => {
+      expect(canAccess("AGENCY_DIRECTOR", "/dashboard/comex")).toBe(false);
+    });
+
+    it("WEB-005: RBAC BANK_ADMIN — /dashboard/comex autorisé", () => {
+      expect(canAccess("BANK_ADMIN", "/dashboard/comex")).toBe(true);
+    });
+
+    it("WEB-005: RBAC SUPER_ADMIN — /dashboard/comex autorisé", () => {
+      expect(canAccess("SUPER_ADMIN", "/dashboard/comex")).toBe(true);
+    });
+
     it("SUPER_ADMIN has access to all routes", () => {
       expect(canAccess("SUPER_ADMIN", "/admin")).toBe(true);
       expect(canAccess("SUPER_ADMIN", "/dashboard/manager")).toBe(true);

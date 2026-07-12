@@ -31,6 +31,16 @@
   /* WEB-002 — interface agent guichet */
   --kpi-value: 96px;
   --caption: 0.875rem;
+
+  /* WEB-005 — mode TV salle de pilotage COMEX (typo + espacements ×1.5) */
+  --scale-tv: 1.5;
+}
+
+/* WEB-005 — mode TV : la classe racine amplifie typo et espacements ×1.5.
+   Lecture seule projetée : les contrôles interactifs sont retirés côté React. */
+.comex-tv {
+  font-size: calc(1rem * var(--scale-tv));
+  line-height: 1.4;
 }
 
 body {

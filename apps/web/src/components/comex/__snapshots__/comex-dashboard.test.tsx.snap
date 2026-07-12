@@ -1,0 +1,92 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WEB-005: snapshot visuel mode TV (ratio 16:9) > WEB-005: mode TV — snapshot visuel commité (ratio 16:9) 1`] = `
+<div
+  class="comex-tv"
+  data-testid="comex-dashboard"
+  data-tv="on"
+  style="padding: 2.25rem; margin: 0px auto; aspect-ratio: 16 / 9; max-width: 1920px; background-color: var(--surface-0);"
+>
+  <header
+    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;"
+  >
+    <h1
+      style="font-size: 1.5rem; color: var(--ink-strong); margin: 0px;"
+    >
+      PILOTAGE QUALITÉ — COMEX
+    </h1>
+  </header>
+  <section
+    aria-label="PILOTAGE QUALITÉ — COMEX"
+    style="display: flex; gap: 1rem; flex-wrap: wrap;"
+  >
+    <div
+      data-testid="comex-kpi"
+      style="flex: 1 1 0%; min-width: 12rem; padding: 1rem; border: 1px solid var(--surface-1); border-radius: 0.5rem; background-color: var(--surface-0);"
+    >
+      <div
+        data-testid="kpi-nps"
+        style="font-size: var(--caption); color: var(--ink-soft);"
+      >
+        NPS GLOBAL RÉSEAU
+      </div>
+      <div
+        data-testid="kpi-nps-value"
+        style="font-size: 40px; font-weight: 600; line-height: 1; color: var(--ink-strong); transition: color 200ms linear;"
+      >
+        40
+      </div>
+      <div
+        data-testid="kpi-nps-delta"
+        style="font-size: var(--caption); color: var(--ink-soft);"
+      >
+        ▲ 10
+         
+        vs mois précédent
+      </div>
+    </div>
+    <div
+      data-testid="comex-kpi"
+      style="flex: 1 1 0%; min-width: 12rem; padding: 1rem; border: 1px solid var(--surface-1); border-radius: 0.5rem; background-color: var(--surface-0);"
+    >
+      <div
+        data-testid="kpi-tma"
+        style="font-size: var(--caption); color: var(--ink-soft);"
+      >
+        TMA MOYEN RÉSEAU
+      </div>
+      <div
+        data-testid="kpi-tma-value"
+        style="font-size: 40px; font-weight: 600; line-height: 1; color: var(--success); transition: color 200ms linear;"
+      >
+        12
+      </div>
+    </div>
+    <div
+      data-testid="comex-kpi"
+      style="flex: 1 1 0%; min-width: 12rem; padding: 1rem; border: 1px solid var(--surface-1); border-radius: 0.5rem; background-color: var(--surface-0);"
+    >
+      <div
+        data-testid="kpi-volume"
+        style="font-size: var(--caption); color: var(--ink-soft);"
+      >
+        VOLUME CLIENTS SERVIS
+      </div>
+      <div
+        data-testid="kpi-volume-value"
+        style="font-size: 40px; font-weight: 600; line-height: 1; color: var(--ink-strong); transition: color 200ms linear;"
+      >
+        45230
+      </div>
+      <div
+        data-testid="kpi-volume-delta"
+        style="font-size: var(--caption); color: var(--ink-soft);"
+      >
+        ▲ 12.5 %
+         
+        vs mois précédent
+      </div>
+    </div>
+  </section>
+</div>
+`;

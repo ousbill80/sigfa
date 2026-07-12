@@ -69,7 +69,17 @@ export type TranslationKey =
   | "network.page"
   | "network.prev"
   | "network.next"
-  | "network.agency_offline";
+  | "network.agency_offline"
+  | "comex.title"
+  | "comex.nps"
+  | "comex.tma"
+  | "comex.volume"
+  | "comex.vs_previous"
+  | "comex.partial"
+  | "comex.offline"
+  | "comex.error"
+  | "comex.tv_on"
+  | "comex.tv_off";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -133,6 +143,16 @@ export const FR: TranslationDict = {
   "network.prev": "Précédent",
   "network.next": "Suivant",
   "network.agency_offline": "Hors ligne",
+  "comex.title": "PILOTAGE QUALITÉ — COMEX",
+  "comex.nps": "NPS GLOBAL RÉSEAU",
+  "comex.tma": "TMA MOYEN RÉSEAU",
+  "comex.volume": "VOLUME CLIENTS SERVIS",
+  "comex.vs_previous": "vs mois précédent",
+  "comex.partial": "Données partielles",
+  "comex.offline": "Hors ligne",
+  "comex.error": "Impossible de charger le tableau de bord COMEX. Veuillez réessayer.",
+  "comex.tv_on": "Activer le mode TV",
+  "comex.tv_off": "Quitter le mode TV",
 };
 
 /** English translations */
@@ -194,6 +214,16 @@ export const EN: TranslationDict = {
   "network.prev": "Previous",
   "network.next": "Next",
   "network.agency_offline": "Offline",
+  "comex.title": "QUALITY STEERING — COMEX",
+  "comex.nps": "NETWORK GLOBAL NPS",
+  "comex.tma": "NETWORK AVERAGE AWT",
+  "comex.volume": "CLIENTS SERVED VOLUME",
+  "comex.vs_previous": "vs previous month",
+  "comex.partial": "Partial data",
+  "comex.offline": "Offline",
+  "comex.error": "Unable to load the COMEX dashboard. Please try again.",
+  "comex.tv_on": "Enable TV mode",
+  "comex.tv_off": "Exit TV mode",
 };
 
 /** Dioula translations (Mandé language, Burkina Faso / Côte d'Ivoire) */
@@ -255,6 +285,16 @@ export const DIOULA: TranslationDict = {
   "network.prev": "Kɔfɛ",
   "network.next": "Ɲɛfɛ",
   "network.agency_offline": "Hors ligne",
+  "comex.title": "ƝUMANƝA LADILI — COMEX",
+  "comex.nps": "RÉSƆ NPS",
+  "comex.tma": "RÉSƆ MAKƆNƆNI WAATI",
+  "comex.volume": "KILIYANW MINNU SƆRƆLA",
+  "comex.vs_previous": "ka ɲɛsin kalo tɛmɛnen ma",
+  "comex.partial": "Kunnafoni dama",
+  "comex.offline": "Hors ligne",
+  "comex.error": "COMEX tableau tɛ se ka yɛlɛ. I ka segin.",
+  "comex.tv_on": "TV cogo daminɛ",
+  "comex.tv_off": "TV cogo bɔ",
 };
 
 /** Baoulé translations (Akan language, Côte d'Ivoire) */
@@ -316,6 +356,16 @@ export const BAOULE: TranslationDict = {
   "network.prev": "Sin",
   "network.next": "Ɲrun",
   "network.agency_offline": "Hors ligne",
+  "comex.title": "NGUAN NIANLƐ — COMEX",
+  "comex.nps": "RÉSO NPS",
+  "comex.tma": "RÉSO MINDƐ BLƐ'N",
+  "comex.volume": "SRAN NGA BE DILI'N",
+  "comex.vs_previous": "nin anglo laa'n",
+  "comex.partial": "Ndɛ wie",
+  "comex.offline": "Hors ligne",
+  "comex.error": "COMEX tableau'n kwlá nianman. Sɛ i ekun.",
+  "comex.tv_on": "TV atin'n bo i bo",
+  "comex.tv_off": "Fite TV atin'n nun",
 };
 
 /** All locales map */
