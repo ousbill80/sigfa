@@ -24,6 +24,13 @@ const vitestDefaultCoverageExcludes = [
 
 export default defineConfig({
   test: {
+    // Timeout généreux (30 s) pour absorber la contention CI 2 cœurs sous couverture v8.
+    // Les tests d'inventaire (CONTRACT-009, ~l.295/314/332) sont de la pure I/O+parse synchrone
+    // déterministe : ils ne doivent JAMAIS être limités par le défaut vitest de 5 s, qui provoque
+    // des « Test timed out in 5000ms » intermittents (VERT en local, FLAKY en CI 2 cœurs).
+    // Classe timeout CI — ref leçon : .claude/lessons/etat-local-residuel-masque-la-ci.md
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     // Exclure les tests runtime lourds du gate couverture rapide.
     //
     // Tests exclus et leur justification (T8 contention CI) :
