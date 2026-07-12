@@ -28,7 +28,7 @@ F4 (partiel) ─┘
 
 | ID | Story | Dépend de | Agent | Statut |
 |---|---|---|---|---|
-| RT-001a | Serveur : bootstrap câblé + adaptateur bus↔contrat (`createSocketBus`, `emit(event,agencyId,payload)`, 7 événements) + retouche sites d'émission F3 + graceful shutdown | F3 DONE | agent-api | TODO |
+| RT-001a | Serveur : bootstrap câblé + adaptateur bus↔contrat (`createSocketBus`, `emit(event,agencyId,payload)`, 7 événements) + retouche sites d'émission F3 + graceful shutdown | F3 DONE | agent-api | **DONE** (`bbbfc54`, 476 tests, parité contrat 7 événements, intégration route→socket réel) |
 | RT-001b | Clients : web `SocketProvider` activé + kiosk socket créé + convergence resync + états d'échec ; mobile PENDING (polling) | RT-001a ; F4 partiel | agent-web/kiosk | TODO |
 | RT-002 | Suite `realtime-guarantees` : `ticket:called` p95 <500 ms bout-en-bout, reconnexion WS → resync, course 2 agents | RT-001 | agent-api + agent-web | TODO |
 | RT-003 | E2E Playwright : borne → appel TV → service agent → feedback, coupure réseau mi-parcours (+ run Electron kiosk réel différé de F4) | RT-002 | direct | TODO |
