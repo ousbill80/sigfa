@@ -26,6 +26,11 @@ export interface OfflineTicketRow {
   localUuid: string;
   /** Service demandé (référence contrat). */
   serviceId: string;
+  /**
+   * MODEL-KIOSK-A : opération demandée (additif, optionnel). Le `serviceId`
+   * reste stocké (rétrocompat + dérivation serveur). Absent = parcours 1 niveau.
+   */
+  operationId?: string;
   /** Agence dérivée de la session kiosque. */
   agencyId: string;
   /** Canal d'émission (toujours KIOSK). */

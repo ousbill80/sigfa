@@ -57,8 +57,32 @@ function normalize(value: string): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
+/** Ensemble des clés d'icônes valides — pour honorer un `iconKey` explicite. */
+const ICON_NAMES: ReadonlySet<string> = new Set<ServiceIconName>([
+  "deposit",
+  "withdrawal",
+  "transfer",
+  "complaint",
+  "account",
+  "credit",
+  "savings",
+  "exchange",
+  "advisor",
+  "generic",
+]);
+
+/** Vrai si `value` est une clé d'icône connue du jeu (`iconKey` contrat). */
+export function isServiceIconName(value: string): value is ServiceIconName {
+  return ICON_NAMES.has(value);
+}
+
 /** Résout un libellé/code de service en clé d'icône, avec fallback générique. */
 export function resolveServiceIcon(keyword: string): ServiceIconName {
+  // MODEL-KIOSK-A : un `iconKey` contrat identique à une clé du jeu est honoré
+  // tel quel (ex: "deposit", "credit"), avant la recherche par mot-clé.
+  if (isServiceIconName(keyword)) {
+    return keyword;
+  }
   const normalized = normalize(keyword);
   for (const [tokens, iconName] of KEYWORD_MAP) {
     if (tokens.some((token) => normalized.includes(token))) {

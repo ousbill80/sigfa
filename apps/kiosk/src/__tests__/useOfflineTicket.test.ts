@@ -16,7 +16,13 @@ const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface SyncBody {
-  tickets: { localUuid: string; serviceId: string; channel: string; createdOfflineAt: string }[];
+  tickets: {
+    localUuid: string;
+    serviceId: string;
+    operationId?: string;
+    channel: string;
+    createdOfflineAt: string;
+  }[];
 }
 
 const server = setupServer();
@@ -61,6 +67,39 @@ describe("KIOSK-006: useOfflineTicket", () => {
     const ticket2 = await result.current.createOfflineTicket({ serviceId: "svc-1" });
     expect(ticket2.displayNumber).toBe("H002");
     expect(ticket2.trackingId).not.toBe(ticket.trackingId);
+  });
+
+  it("MODEL-KIOSK-A: operationId persisté offline + transmis dans /tickets/sync (serviceId reste porté)", async () => {
+    const { result } = renderHook(() => useOfflineTicket());
+
+    const ticket = await result.current.createOfflineTicket({
+      serviceId: "svc-1",
+      operationId: "op-1",
+      agencyId: "agt-001",
+    });
+
+    const db = getOfflineDb();
+    const row = await db.tickets.get(ticket.trackingId);
+    expect(row?.operationId).toBe("op-1");
+    expect(row?.serviceId).toBe("svc-1");
+
+    let syncBody: SyncBody | null = null;
+    server.use(
+      http.post("*/tickets/sync", async ({ request }) => {
+        syncBody = (await request.json()) as SyncBody;
+        return HttpResponse.json(
+          { synced: [{ localUuid: ticket.trackingId, serverId: "srv-1", number: "A100" }], skipped: [] },
+          { status: 200 }
+        );
+      })
+    );
+
+    await result.current.syncPendingTickets();
+
+    expect(syncBody).not.toBeNull();
+    const item = syncBody!.tickets[0];
+    expect(item.operationId).toBe("op-1");
+    expect(item.serviceId).toBe("svc-1");
   });
 
   it("KIOSK-006: retour réseau → POST /tickets/sync déclenché automatiquement", async () => {

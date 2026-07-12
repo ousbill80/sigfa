@@ -71,9 +71,13 @@ export function ServicesScreen({
     .reduce((max, s) => Math.max(max, s.estimatedMinutes), 0);
   const isLongQueue = longestOpenWait >= longQueueThresholdMinutes;
 
+  // MODEL-KIOSK-A : parcours 2 niveaux — un service mène à l'écran OPÉRATIONS
+  // (grille v2), qui décidera d'un éventuel saut vers la confirmation si le
+  // service n'a qu'une seule opération. La borne ne saute plus directement à
+  // la confirmation depuis le service.
   const handleServiceSelect = (service: ServiceItem) => {
     if (!service.isOpen) return;
-    router.push(`/${currentLocale}/confirmation?serviceId=${service.id}&agencyId=${agencyId}`);
+    router.push(`/${currentLocale}/operations?serviceId=${service.id}&agencyId=${agencyId}`);
   };
 
   if (services.length === 0) {

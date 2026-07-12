@@ -40,6 +40,19 @@
     "emptyMessage": "Please go to reception — a staff member will assist you.",
     "offlineBanner": "Offline mode"
   },
+  "operationsModelA": {
+    "title": "Which operation do you need?",
+    "backButton": "Back",
+    "waitEstimate": "~{minutes} min",
+    "accessibilityButton": "Priority access",
+    "loadingMessage": "Loading operations...",
+    "emptyTitle": "No operations available",
+    "emptyMessage": "Please go to reception — a staff member will assist you.",
+    "errorTitle": "Operations unavailable",
+    "errorMessage": "Unable to load operations. Retry or go to reception.",
+    "retryButton": "Retry",
+    "offlineBanner": "Offline mode"
+  },
   "confirmation004": {
     "title": "Your phone number (optional)",
     "phonePrefix": "+225",

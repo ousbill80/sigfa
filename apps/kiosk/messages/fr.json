@@ -40,6 +40,19 @@
     "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
     "offlineBanner": "Mode hors connexion"
   },
+  "operationsModelA": {
+    "title": "Quelle opération souhaitez-vous ?",
+    "backButton": "Retour",
+    "waitEstimate": "~{minutes} min",
+    "accessibilityButton": "Accès prioritaire",
+    "loadingMessage": "Chargement des opérations...",
+    "emptyTitle": "Aucune opération disponible",
+    "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
+    "errorTitle": "Opérations indisponibles",
+    "errorMessage": "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
+    "retryButton": "Réessayer",
+    "offlineBanner": "Mode hors connexion"
+  },
   "confirmation004": {
     "title": "Votre numéro de téléphone (facultatif)",
     "phonePrefix": "+225",

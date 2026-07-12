@@ -16,6 +16,19 @@ export const handlers = [
       { status: 201 }
     );
   }),
+  // MODEL-KIOSK-A: GET /public/agencies/{agencyId}/operations?serviceId=
+  // Liste des opérations actives d'un service (SLA résolu) pour la grille borne.
+  http.get("*/public/agencies/:agencyId/operations", () => {
+    return HttpResponse.json(
+      {
+        data: [
+          { id: "op-dep", code: "DEP", name: "Dépôt espèces", slaMinutes: 8, iconKey: "deposit" },
+          { id: "op-ret", code: "RET", name: "Retrait espèces", slaMinutes: 10 },
+        ],
+      },
+      { status: 200 }
+    );
+  }),
   // KIOSK-004: POST /public/tickets handler
   http.post("*/public/tickets", () => {
     return HttpResponse.json(

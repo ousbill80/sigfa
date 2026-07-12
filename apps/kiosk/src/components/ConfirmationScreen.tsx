@@ -22,6 +22,12 @@ import {
 
 interface ConfirmationScreenProps {
   serviceId: string;
+  /**
+   * MODEL-KIOSK-A : opération choisie (parcours 2 niveaux, additif). Envoyée
+   * au serveur avec le ticket ; `serviceId` reste transmis (rétrocompat +
+   * dérivation serveur). Absente pour un parcours 1 niveau (service direct).
+   */
+  operationId?: string;
   agencyId: string;
   /**
    * KIOSK-007 : sink d'événement simulé (F4) pour `alert:manager
@@ -46,6 +52,7 @@ const KEYPAD_ROWS = [
 
 export function ConfirmationScreen({
   serviceId,
+  operationId,
   agencyId,
   systemErrorSink = noopDegradedSink,
 }: ConfirmationScreenProps) {
@@ -160,6 +167,9 @@ export function ConfirmationScreen({
           },
           body: {
             serviceId,
+            // MODEL-KIOSK-A : operationId additif si présent (le serveur dérive
+            // serviceId = operation.serviceId). serviceId reste envoyé (rétrocompat).
+            ...(operationId ? { operationId } : {}),
             channel: "KIOSK",
             phoneNumber: finalPhone,
             smsConsent: finalConsent,
@@ -201,7 +211,7 @@ export function ConfirmationScreen({
 
       // Autres non-201 (4xx…) : repli offline pour ne pas bloquer l'usager.
       setIsOffline(true);
-      const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
+      const offlineTicket = await createOfflineTicket({ serviceId, ...(operationId ? { operationId } : {}), agencyId });
       router.push(buildTicketUrl(
         {
           trackingId: offlineTicket.trackingId,
@@ -215,7 +225,7 @@ export function ConfirmationScreen({
     } catch {
       // Network error: use offline fallback
       setIsOffline(true);
-      const offlineTicket = await createOfflineTicket({ serviceId, agencyId });
+      const offlineTicket = await createOfflineTicket({ serviceId, ...(operationId ? { operationId } : {}), agencyId });
       router.push(buildTicketUrl(
         {
           trackingId: offlineTicket.trackingId,

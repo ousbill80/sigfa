@@ -8,6 +8,7 @@ import "@testing-library/jest-dom/vitest";
 import {
   ServiceIcon,
   resolveServiceIcon,
+  isServiceIconName,
   type ServiceIconName,
 } from "@/components/icons/ServiceIcon";
 import {
@@ -39,6 +40,25 @@ describe("ServiceIcon: mapping par mot-clé", () => {
     ["Service inconnu XYZ", "generic"],
   ])("%s → %s", (keyword, expected) => {
     expect(resolveServiceIcon(keyword)).toBe(expected);
+  });
+});
+
+describe("MODEL-KIOSK-A: iconKey contrat honoré tel quel (opérations)", () => {
+  it.each<[string, ServiceIconName]>([
+    ["deposit", "deposit"],
+    ["credit", "credit"],
+    ["transfer", "transfer"],
+    ["generic", "generic"],
+  ])("iconKey %s → %s (clé exacte du jeu)", (iconKey, expected) => {
+    expect(isServiceIconName(iconKey)).toBe(true);
+    expect(resolveServiceIcon(iconKey)).toBe(expected);
+  });
+
+  it("iconKey inconnu retombe sur le mapping mot-clé puis generic", () => {
+    expect(isServiceIconName("cash")).toBe(false);
+    // "cash" n'est pas une clé du jeu mais est un mot-clé mappé (withdrawal).
+    expect(resolveServiceIcon("cash")).toBe("withdrawal");
+    expect(resolveServiceIcon("xyz-unknown")).toBe("generic");
   });
 });
 

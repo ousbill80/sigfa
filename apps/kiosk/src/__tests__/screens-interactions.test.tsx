@@ -251,7 +251,7 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
     sessionStorage.clear();
   });
 
-  it("KIOSK-003: clicking an open service navigates to confirmation screen", () => {
+  it("MODEL-KIOSK-A: clicking an open service navigates to the OPERATIONS screen (2 niveaux)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={servicesMessages}>
         <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />
@@ -261,8 +261,9 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
     const cards = screen.getAllByTestId("service-card");
     fireEvent.click(cards[0]); // svc-1, open
 
+    // Parcours 2 niveaux : le service mène désormais à l'écran opérations.
     expect(mockPush).toHaveBeenCalledWith(
-      "/fr/confirmation?serviceId=svc-1&agencyId=agt-001"
+      "/fr/operations?serviceId=svc-1&agencyId=agt-001"
     );
   });
 

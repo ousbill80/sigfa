@@ -43,6 +43,8 @@ export interface OfflineTicketResult {
 /** Options d'émission d'un ticket offline. */
 export interface CreateOfflineTicketOptions {
   serviceId?: string;
+  /** MODEL-KIOSK-A : opération choisie (additif). `serviceId` reste porté. */
+  operationId?: string;
   agencyId?: string;
 }
 
@@ -92,6 +94,7 @@ async function persistOfflineTicket(
   const row: OfflineTicketRow = {
     localUuid,
     serviceId: options.serviceId ?? "",
+    ...(options.operationId ? { operationId: options.operationId } : {}),
     agencyId: options.agencyId ?? "",
     channel: KIOSK_CHANNEL,
     localSequence,
@@ -137,6 +140,8 @@ async function syncBatch(
       tickets: rows.map((r) => ({
         localUuid: r.localUuid,
         serviceId: r.serviceId,
+        // MODEL-KIOSK-A : operationId additif si présent (serviceId reste porté).
+        ...(r.operationId ? { operationId: r.operationId } : {}),
         channel: "KIOSK" as const,
         createdOfflineAt: r.createdOfflineAt,
       })),
