@@ -140,6 +140,7 @@ import { HomeScreen } from "@/components/HomeScreen";
 import { ServicesScreen, type ServiceItem } from "@/components/ServicesScreen";
 import { ConfirmationScreen } from "@/components/ConfirmationScreen";
 import { TicketScreen } from "@/components/TicketScreen";
+import { readTicketMomentPii } from "@/lib/ticket-moment-store";
 
 const MOCK_SERVICES: ServiceItem[] = [
   { id: "svc-1", name: "Dépôt", icon: "💰", estimatedMinutes: 5, isOpen: true },
@@ -463,7 +464,9 @@ describe("KIOSK-004: ConfirmationScreen additional branches", () => {
     expect(checkbox.checked).toBe(true);
   });
 
-  it("KIOSK-004: phone + smsConsent = true → URL includes phoneNumber and smsConsent params", async () => {
+  // Boucle 2 F4 (S6) : la PII ne transite PLUS par l'URL d'une borne PARTAGÉE —
+  // elle passe par le store mémoire (ticket-moment-store), purgé après affichage.
+  it("KIOSK-004/S6: phone + smsConsent = true → URL SANS PII, téléphone via store mémoire", async () => {
     server.use(
       http.post("*/public/tickets", () => {
         return HttpResponse.json(
@@ -517,11 +520,17 @@ describe("KIOSK-004: ConfirmationScreen additional branches", () => {
     fireEvent.click(ctaBtn!);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("phoneNumber=0707474747"));
+      expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("/fr/ticket"));
     });
 
     const pushedUrl = mockPush.mock.calls[0][0] as string;
-    expect(pushedUrl).toContain("smsConsent=true");
+    expect(pushedUrl).not.toContain("phoneNumber");
+    expect(pushedUrl).not.toContain("smsConsent");
+    expect(pushedUrl).not.toContain("0707474747");
+    expect(readTicketMomentPii()).toEqual({
+      phoneNumber: "0707474747",
+      smsConsent: true,
+    });
   });
 
   // KIOSK-007 : les 5xx sont désormais traités comme ERREUR SYSTÈME (message
