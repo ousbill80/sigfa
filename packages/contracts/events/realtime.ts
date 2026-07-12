@@ -38,6 +38,20 @@ export const TICKET_CALLED_SLA_MS = 500 as const;
  */
 export const SYNC_RECENT_CALLS = 4 as const;
 
+/**
+ * CONTRACT-013 : Durée de vie du token d'affichage TV public en secondes (12 h).
+ * Alignée sur la session borne (KioskSessionResponse). Le token est lecture seule,
+ * scope une seule agence, et non renouvelable.
+ */
+export const TV_SESSION_TTL_SECONDS = 43200 as const;
+
+/**
+ * CONTRACT-013 : Rôle de contrat du token d'affichage TV public.
+ * Sémantique RBAC (lecture seule, orthogonale) implémentée côté serveur (agent-api).
+ * Ici, valeur de contrat uniquement, exposée dans TvSessionResponse.role.
+ */
+export const TV_DISPLAY_ROLE = "DISPLAY" as const;
+
 // ─── Schémas partiels réutilisés ──────────────────────────────────────────
 
 /**
@@ -325,6 +339,32 @@ export type KioskPrinterErrorPayload = z.infer<
 >;
 
 /**
+ * join:agency — Demande de rattachement à la room d'une agence
+ * Sémantique : QUAND un client (écran TV, borne, dashboard) veut recevoir les
+ * événements temps réel d'une agence, il émet join:agency avec l'agencyId cible.
+ * Le serveur valide le scope tenant (JWT : bankId + agencyId, ou token DISPLAY
+ * public scope agency) avant de rattacher le socket à la room agency:{agencyId}.
+ *
+ * CONTRACT-013 : forme UNIQUE et validée du rattachement — web et kiosk s'alignent
+ * dessus. Émise aujourd'hui par les clients sans schéma au contrat (couture consignée).
+ * Émis par : client (écran TV, borne, dashboard, mobile)
+ * Consommateurs : serveur API
+ */
+export const joinAgencyEvent = {
+  name: "join:agency",
+  payloadSchema: z.object({
+    /** Identifiant UUID de l'agence dont on veut rejoindre la room temps réel */
+    agencyId: uuidSchema,
+  }),
+  emitter: "client",
+  consumers: ["api-server"],
+  room: "agency:{agencyId}",
+} as const;
+
+/** Type inféré du payload join:agency */
+export type JoinAgencyPayload = z.infer<typeof joinAgencyEvent.payloadSchema>;
+
+/**
  * sync:request — Demande de resynchronisation après reconnexion
  * Sémantique : QUAND un client se reconnecte, il émet cet événement
  * Le serveur répond avec sync:state contenant l'état courant de la file.
@@ -426,6 +466,7 @@ export const ALL_EVENTS = [
   agencyOfflineEvent,
   alertManagerEvent,
   kioskPrinterErrorEvent,
+  joinAgencyEvent,
   syncRequestEvent,
   syncStateEvent,
 ] as const;
