@@ -1,6 +1,6 @@
 ## KIOSK-008 : Synthèse vocale 4 langues + mode accessibilité (+20 % textes, voix ralentie, timeout doublé)
 
-**Module** : F4 — Kiosque · **Agent** : agent-kiosk · **Dépend de** : KIOSK-005 · **Statut** : TODO
+**Module** : F4 — Kiosque · **Agent** : agent-kiosk · **Dépend de** : KIOSK-005 · **Statut** : DONE (2026-07-12)
 
 **Révision** : v2 — arbitrage 19
 
