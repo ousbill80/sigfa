@@ -56,12 +56,25 @@ export const queueUpdatedSchema = z
   })
   .strict();
 
+/**
+ * Schéma du payload `alert:manager` — API-004 (QUEUE_CRITICAL + débordement).
+ * `overflowQueueIds` liste les files de services compatibles pour absorber.
+ */
+export const alertManagerSchema = z.object({
+  event: z.literal("QUEUE_CRITICAL"),
+  queueId: z.string().uuid(),
+  serviceId: z.string().uuid(),
+  length: z.number().int().nonnegative(),
+  overflowQueueIds: z.array(z.string().uuid()),
+});
+
 /** Association nom d'événement → schéma Zod du payload. */
 const EVENT_SCHEMAS = {
   "ticket:created": ticketCreatedSchema,
   "ticket:called": ticketCalledSchema,
   "ticket:closed": ticketClosedSchema,
   "queue:updated": queueUpdatedSchema,
+  "alert:manager": alertManagerSchema,
 } as const;
 
 /** Noms d'événements supportés. */

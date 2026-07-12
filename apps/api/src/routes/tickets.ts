@@ -1,15 +1,16 @@
 /**
- * Routes du cycle de vie du ticket — API-003.
+ * Routes du cycle de vie du ticket — API-003/004.
  *
  * POST   /tickets              — émission idempotente (X-Idempotency-Key requis)
- * GET    /tickets/:id          — détail + position temps réel
+ *                                 → 422 QUEUE_PAUSED si file fermée (API-004)
+ * GET    /tickets/:id          — détail + position temps réel (priorités, API-004)
  * POST   /tickets/:id/call     — appel ciblé (verrou Redis SET NX)
  * POST   /tickets/:id/serve    — CALLED → SERVING
  * POST   /tickets/:id/close    — SERVING → DONE (+ durées)
  * POST   /tickets/:id/no-show  — CALLED → NO_SHOW (après timeout banque)
  * POST   /tickets/:id/transfer — → TRANSFERRED + réinsertion WAITING file cible
  * POST   /tickets/:id/abandon  — WAITING/CALLED → ABANDONED
- * POST   /counters/:counterId/call-next — sélection FIFO
+ * POST   /counters/:counterId/call-next — sélection prioritaire VIP>PMR>SENIOR>PRIORITY>STANDARD (API-004)
  *
  * @module
  */
@@ -29,12 +30,16 @@ import {
   type TicketStatus,
 } from "src/services/sla-engine.js";
 import {
-  selectNextFifo,
-  computePosition,
   queueLength,
   type TicketSelector,
   type Tx,
 } from "src/services/queue-strategy.js";
+import {
+  selectNextPriority,
+  computePositionPriority,
+  shouldAlertOverflow,
+  findOverflowQueues,
+} from "src/services/queue-engine.js";
 import {
   estimateWaitMinutes,
   invalidateEstimate,
@@ -64,6 +69,8 @@ const createSchema = z.object({
   phoneNumber: z.string().regex(/^\+[1-9]\d{6,14}$/).optional(),
   priority: z.enum(["STANDARD", "PRIORITY", "VIP", "PMR", "SENIOR"]).optional(),
   smsConsent: z.boolean().optional(),
+  /** Langue requise pour le routage (API-004 — préférence, pas un blocage). */
+  requiredLanguage: z.string().max(10).optional(),
 });
 
 /** Schéma d'appel ciblé / call-next avec guichet. */
@@ -102,10 +109,10 @@ function errorResponse(c: TicketCtx, err: unknown): Response {
  * Crée le routeur des tickets. Le bus temps réel est injectable (tests) ;
  * défaut : bus no-op validant.
  *
- * @param selector - Stratégie de sélection FIFO (défaut `selectNextFifo`)
+ * @param selector - Stratégie de sélection (défaut `selectNextPriority` — API-004)
  * @returns Routeur Hono monté sous /api/v1
  */
-export function createTicketRouter(selector: TicketSelector = selectNextFifo): Hono<TicketEnv> {
+export function createTicketRouter(selector: TicketSelector = selectNextPriority): Hono<TicketEnv> {
   const router = new Hono<TicketEnv>();
   registerCreate(router);
   registerGet(router);
@@ -239,7 +246,8 @@ async function issueTicket(
       trackingId,
       phone,
     });
-    const position = await computePosition(inserted.id, db);
+    // API-004 : position utilise l'ordre prioritaire (VIP>PMR>SENIOR>PRIORITY>STANDARD)
+    const position = await computePositionPriority(inserted.id, db);
     const estimate = await estimateWaitMinutes(position, input.serviceId, db);
     await db.query("COMMIT");
     await emitCreated(bus, redis, db, { inserted, ctx, tenant, displayNumber });
@@ -273,23 +281,35 @@ function buildPhone(input: CreateInput): { encrypted: string | null; hash: strin
   };
 }
 
-/** Résout la file (queue) + code service pour l'agence du JWT. */
+/**
+ * Résout la file (queue) + code service pour l'agence du JWT.
+ * Vérifie que la file est ouverte (API-004 : 422 QUEUE_PAUSED si PAUSED/CLOSED).
+ */
 async function resolveServiceQueue(
   db: Client,
   tenant: TenantContext,
   serviceId: string
-): Promise<{ queueId: string; agencyId: string; code: string }> {
+): Promise<{ queueId: string; agencyId: string; code: string; bankId: string }> {
   const agencyId = tenant.agencyIds[0];
   if (!agencyId) throw new SigfaError("FORBIDDEN", "Aucune agence dans le scope du JWT.", 403);
   const res = await db.query(
-    `SELECT q.id AS queue_id, q.agency_id, s.code
+    `SELECT q.id AS queue_id, q.agency_id, q.bank_id, q.status, s.code
        FROM queues q JOIN services s ON s.id = q.service_id
       WHERE q.service_id = $1 AND q.agency_id = $2 AND q.bank_id = $3`,
     [serviceId, agencyId, tenant.bankId]
   );
-  const row = res.rows[0] as { queue_id: string; agency_id: string; code: string } | undefined;
+  const row = res.rows[0] as
+    | { queue_id: string; agency_id: string; bank_id: string; status: string; code: string }
+    | undefined;
   if (!row) throw new SigfaError("NOT_FOUND", "File introuvable pour ce service.", 404);
-  return { queueId: row.queue_id, agencyId: row.agency_id, code: row.code };
+  // API-004 : file en pause → 422 QUEUE_PAUSED (tickets existants servables)
+  if (row.status === "PAUSED" || row.status === "CLOSED") {
+    throw new SigfaError("QUEUE_PAUSED", "La file est actuellement fermée.", 422, {
+      queueId: row.queue_id,
+      status: row.status,
+    });
+  }
+  return { queueId: row.queue_id, agencyId: row.agency_id, code: row.code, bankId: row.bank_id };
 }
 
 /**
@@ -331,8 +351,9 @@ async function insertTicket(
   const res = await db.query(
     `INSERT INTO tickets
        (bank_id, agency_id, queue_id, service_id, number, display_number,
-        tracking_id, channel, status, priority, phone_encrypted, phone_hash, sms_consent)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'WAITING',$9,$10,$11,$12)
+        tracking_id, channel, status, priority, phone_encrypted, phone_hash, sms_consent,
+        required_language)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'WAITING',$9,$10,$11,$12,$13)
      RETURNING id, issued_at`,
     [
       args.tenant.bankId,
@@ -347,6 +368,7 @@ async function insertTicket(
       args.phone.encrypted,
       args.phone.hash,
       args.phone.consent,
+      args.input.requiredLanguage ?? null,
     ]
   );
   return res.rows[0] as { id: string; issued_at: Date };
@@ -386,14 +408,15 @@ async function emitQueueUpdated(bus: RealtimeBus, redis: Redis, db: Tx, queueId:
 
 // ── GET /tickets/:id ─────────────────────────────────────────────────────────
 
-/** Enregistre la route de détail + position. */
+/** Enregistre la route de détail + position (API-004 : position prioritaire). */
 function registerGet(router: Hono<TicketEnv>): void {
   router.get("/tickets/:id", async (c) => {
     const tenant = c.get("tenant");
     const db = c.get("db");
     try {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
-      const position = await computePosition(row.id, db);
+      // API-004 : position reflète l'ordre VIP>PMR>SENIOR>PRIORITY>STANDARD
+      const position = await computePositionPriority(row.id, db);
       const estimate = await estimateWaitMinutes(position, row.service_id, db);
       return c.json(ticketView(row, position, estimate), 200);
     } catch (err) {
@@ -426,7 +449,7 @@ function ticketView(row: TicketRow, position: number, estimate: number): Record<
 
 // ── POST /counters/:counterId/call-next ──────────────────────────────────────
 
-/** Enregistre la route call-next (sélection FIFO). */
+/** Enregistre la route call-next (sélection prioritaire API-004). */
 function registerCallNext(router: Hono<TicketEnv>, selector: TicketSelector): void {
   router.post("/counters/:counterId/call-next", async (c) => {
     const tenant = c.get("tenant");
@@ -441,7 +464,7 @@ function registerCallNext(router: Hono<TicketEnv>, selector: TicketSelector): vo
   });
 }
 
-/** Sélectionne FIFO le prochain WAITING d'un guichet et le passe CALLED. */
+/** Sélectionne le prochain WAITING prioritaire d'un guichet et le passe CALLED. */
 async function callNext(
   db: Client,
   redis: Redis,
@@ -452,7 +475,7 @@ async function callNext(
 ): Promise<Record<string, unknown>> {
   await db.query("BEGIN");
   try {
-    const queueId = await counterQueue(db, tenant, counterId);
+    const { queueId, serviceId, bankId } = await counterQueueFull(db, tenant, counterId);
     const selected = await selector(queueId, counterId, db);
     if (!selected) throw new SigfaError("QUEUE_EMPTY", "Aucun ticket éligible dans la file.", 404);
     const now = new Date();
@@ -462,6 +485,8 @@ async function callNext(
     );
     await db.query("COMMIT");
     await afterCall(bus, redis, db, { ticketId: selected.id, queueId, counterId });
+    // API-004 : vérification débordement après chaque appel
+    await checkAndEmitOverflow(db, redis, bus, queueId, serviceId, bankId);
     return callView(selected.id, selected.serviceId, counterId, now);
   } catch (err) {
     await db.query("ROLLBACK");
@@ -469,10 +494,39 @@ async function callNext(
   }
 }
 
-/** Résout la file desservie par un guichet (via son service courant/queue agence). */
-async function counterQueue(db: Client, tenant: TenantContext, counterId: string): Promise<string> {
+/**
+ * Vérifie le seuil critique et émet `alert:manager` QUEUE_CRITICAL si nécessaire.
+ * Une seule alerte par franchissement (flag Redis). Services compatibles inclus.
+ */
+async function checkAndEmitOverflow(
+  db: Client,
+  redis: Redis,
+  bus: RealtimeBus,
+  queueId: string,
+  serviceId: string,
+  bankId: string
+): Promise<void> {
+  const length = await queueLength(queueId, db);
+  const doAlert = await shouldAlertOverflow(queueId, length, bankId, db, redis);
+  if (!doAlert) return;
+  const overflowQueues = await findOverflowQueues(serviceId, bankId, db);
+  bus.emit("alert:manager", {
+    event: "QUEUE_CRITICAL",
+    queueId,
+    serviceId,
+    length,
+    overflowQueueIds: overflowQueues.map((q) => q.queueId),
+  });
+}
+
+/** Résout la file + serviceId + bankId desservis par un guichet. */
+async function counterQueueFull(
+  db: Client,
+  tenant: TenantContext,
+  counterId: string
+): Promise<{ queueId: string; serviceId: string; bankId: string }> {
   const res = await db.query(
-    `SELECT q.id AS queue_id
+    `SELECT q.id AS queue_id, q.service_id, q.bank_id
        FROM counters c
        JOIN queues q ON q.agency_id = c.agency_id
       WHERE c.id = $1 AND c.bank_id = $2
@@ -480,9 +534,11 @@ async function counterQueue(db: Client, tenant: TenantContext, counterId: string
       LIMIT 1`,
     [counterId, tenant.bankId]
   );
-  const row = res.rows[0] as { queue_id: string } | undefined;
+  const row = res.rows[0] as
+    | { queue_id: string; service_id: string; bank_id: string }
+    | undefined;
   if (!row) throw new SigfaError("NOT_FOUND", "Guichet ou file introuvable.", 404);
-  return row.queue_id;
+  return { queueId: row.queue_id, serviceId: row.service_id, bankId: row.bank_id };
 }
 
 /** Émet ticket:called + queue:updated après un appel. */

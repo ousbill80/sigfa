@@ -64,6 +64,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
     CREATE TABLE IF NOT EXISTS banks (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
       no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3,
+      queue_critical_threshold INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
   await client.query(`
@@ -82,7 +83,10 @@ async function runMigrations(client: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
       agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id),
       current_ticket_number INTEGER NOT NULL DEFAULT 0, is_open BOOLEAN NOT NULL DEFAULT true,
-      status queue_status NOT NULL DEFAULT 'OPEN', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+      status queue_status NOT NULL DEFAULT 'OPEN',
+      open_at TEXT, close_at TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
   await client.query(`
     CREATE TABLE IF NOT EXISTS counters (
@@ -90,6 +94,21 @@ async function runMigrations(client: pg.Client): Promise<void> {
       agency_id UUID NOT NULL REFERENCES agencies(id), number INTEGER NOT NULL, label TEXT NOT NULL,
       status counter_status NOT NULL DEFAULT 'OPEN', agent_id UUID, current_ticket_id UUID,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      bank_id UUID REFERENCES banks(id),
+      email TEXT NOT NULL UNIQUE,
+      languages TEXT[] NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS counter_services (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      counter_id UUID NOT NULL REFERENCES counters(id),
+      service_id UUID NOT NULL REFERENCES services(id),
+      UNIQUE(counter_id, service_id));
   `);
   await client.query(`
     CREATE TABLE IF NOT EXISTS tickets (
@@ -100,6 +119,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
       priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT,
       sms_consent BOOLEAN NOT NULL DEFAULT false,
+      required_language TEXT,
       issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ,
       closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER,
       issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED,

@@ -17,6 +17,7 @@ import { buildError } from "src/lib/errors.js";
 import { logger } from "src/lib/logger.js";
 import { createAuthRouter } from "src/routes/auth.js";
 import { createTicketRouter } from "src/routes/tickets.js";
+import { createQueueRouter } from "src/routes/queues.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
@@ -87,9 +88,13 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   const authRouter = createAuthRouter();
   app.route("/api/v1/auth", authRouter);
 
-  // Routes tickets (API-003) sous /api/v1 (chemins /tickets, /counters/…)
+  // Routes tickets (API-003/004) sous /api/v1 (chemins /tickets, /counters/…)
   const ticketRouter = createTicketRouter();
   app.route("/api/v1", ticketRouter);
+
+  // Routes files d'attente (API-004) sous /api/v1 (PATCH /queues/:id)
+  const queueRouter = createQueueRouter();
+  app.route("/api/v1", queueRouter);
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>
