@@ -704,6 +704,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/agencies/{agencyId}/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lister les opérations actives d'un service (affichage borne)
+         * @description Retourne les **opérations actives** d'un service pour l'affichage borne (grille
+         *     d'opérations). Le `slaMinutes` exposé est **RÉSOLU** (`operation.slaMinutes ?? service.slaMinutes`)
+         *     pour l'estimation d'attente. Aucune donnée sensible : ni serviceId interne obligatoire,
+         *     ni configuration admin.
+         *
+         *     **Sans authentification** (role NONE).
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Identifiant du service dont on liste les opérations actives */
+                    serviceId: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Identifiant UUID de l'agence */
+                    agencyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Liste des opérations actives (SLA résolu) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "data": [
+                         *         {
+                         *           "id": "a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1",
+                         *           "code": "DEP",
+                         *           "name": "Dépôt espèces",
+                         *           "slaMinutes": 8,
+                         *           "iconKey": "cash"
+                         *         },
+                         *         {
+                         *           "id": "b2b2b2b2-b2b2-4b2b-ab2b-b2b2b2b2b2b2",
+                         *           "code": "RET",
+                         *           "name": "Retrait espèces",
+                         *           "slaMinutes": 10
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["PublicOperationListResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /** @description Agence ou service introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "SERVICE_NOT_FOUND",
+                         *         "message": "Service introuvable pour cet identifiant."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agencies/{id}/qr": {
         parameters: {
             query?: never;
@@ -827,6 +920,14 @@ export interface components {
             serviceId: string;
             /**
              * Format: uuid
+             * @description Opération choisie (optionnel, additif — MODEL-CONTRACT-A). Si fourni, le serveur
+             *     dérive `serviceId = operation.serviceId` ; incohérence serviceId/operationId → 422
+             *     `SERVICE_OPERATION_MISMATCH` ; operationId inconnu/inactif → 404 `OPERATION_NOT_FOUND`.
+             *     `serviceId` **reste requis** (rétrocompat totale).
+             */
+            operationId?: string;
+            /**
+             * Format: uuid
              * @description Identifiant de l'agence
              */
             agencyId: string;
@@ -923,6 +1024,11 @@ export interface components {
             estimatedWaitMinutes: number;
             /** Format: uuid */
             serviceId: string;
+            /**
+             * Format: uuid
+             * @description Opération résolue du ticket (additif, nullable).
+             */
+            operationId?: string | null;
             /** Format: uuid */
             agencyId: string;
             /** Format: date-time */
@@ -954,6 +1060,11 @@ export interface components {
             agencyId: string;
             /** Format: uuid */
             serviceId: string;
+            /**
+             * Format: uuid
+             * @description Opération résolue du ticket (additif, nullable).
+             */
+            operationId?: string | null;
             /**
              * Format: date-time
              * @description Heure d'appel (null si pas encore appelé)
@@ -1042,6 +1153,25 @@ export interface components {
              * @example 2026-07-12T09:00:00Z
              */
             expiresAt?: string | null;
+        };
+        /**
+         * @description Vue publique d'une opération active pour l'affichage borne.
+         *     Le `slaMinutes` est **RÉSOLU** (`operation.slaMinutes ?? service.slaMinutes`),
+         *     exposé pour l'estimation d'attente.
+         */
+        PublicOperation: {
+            /** Format: uuid */
+            id: string;
+            /** @example DEP */
+            code: string;
+            name: string;
+            /** @description SLA résolu de l'opération (héritage service appliqué). */
+            slaMinutes: number;
+            /** @description Clé d'icône optionnelle (mapping ServiceIcon). */
+            iconKey?: string;
+        };
+        PublicOperationListResponse: {
+            data: components["schemas"]["PublicOperation"][];
         };
         ErrorResponse: {
             error: {

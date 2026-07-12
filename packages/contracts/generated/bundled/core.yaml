@@ -26,6 +26,8 @@ tags:
     description: Agences d'une banque
   - name: Services
     description: Services proposés par une agence
+  - name: Operations
+    description: Opérations (actions précises) rattachées à un service — MODEL-CONTRACT-A
   - name: Counters
     description: Guichets et sélection du ticket suivant
   - name: Queues
@@ -771,6 +773,327 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /services/{serviceId}/operations:
+    get:
+      tags:
+        - Operations
+      summary: Lister les opérations d'un service
+      description: |
+        Retourne la liste paginée des opérations rattachées à un service.
+        Une opération est une action précise proposée dans le cadre d'un service
+        (ex. « Dépôt espèces » dans le service « Opérations Courantes »).
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          description: Identifiant UUID du service parent
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Liste paginée des opérations du service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationListResponse'
+              example:
+                data:
+                  - id: a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1
+                    serviceId: 77777777-7777-4777-a777-777777777777
+                    code: DEP
+                    name: Dépôt espèces
+                    slaMinutes: null
+                    displayOrder: 1
+                    isActive: true
+                    iconKey: cash
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Service parent introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SERVICE_NOT_FOUND
+                  message: Service introuvable pour cet identifiant.
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Operations
+      summary: Créer une opération dans un service
+      description: |
+        Crée une nouvelle opération rattachée au service `serviceId`.
+        Le `code` (regex `^[A-Z0-9]{2,6}$`) doit être **unique par service**
+        (409 `OPERATION_CODE_DUPLICATE` sinon). `slaMinutes` est optionnel et
+        **nullable** : s'il est absent/null, le SLA résolu hérite de celui du service (D4).
+
+        **additionalProperties: false** : tout champ hors schéma → 422.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          description: Identifiant UUID du service parent
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOperationRequest'
+            example:
+              code: DEP
+              name: Dépôt espèces
+              slaMinutes: 8
+              displayOrder: 1
+              iconKey: cash
+      responses:
+        '201':
+          description: Opération créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+              example:
+                id: a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1
+                serviceId: 77777777-7777-4777-a777-777777777777
+                code: DEP
+                name: Dépôt espèces
+                slaMinutes: 8
+                displayOrder: 1
+                isActive: true
+                iconKey: cash
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Service parent introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SERVICE_NOT_FOUND
+                  message: Service introuvable pour cet identifiant.
+        '409':
+          description: Conflit — code d'opération déjà utilisé dans ce service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: OPERATION_CODE_DUPLICATE
+                  message: Une opération avec ce code existe déjà dans ce service.
+                  details:
+                    code: DEP
+                    serviceId: 77777777-7777-4777-a777-777777777777
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /operations/{id}:
+    get:
+      tags:
+        - Operations
+      summary: Obtenir une opération
+      description: Retourne le détail d'une opération par son identifiant UUID.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Détail de l'opération
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+              example:
+                id: a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1
+                serviceId: 77777777-7777-4777-a777-777777777777
+                code: DEP
+                name: Dépôt espèces
+                slaMinutes: null
+                displayOrder: 1
+                isActive: true
+                iconKey: cash
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Opération introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: OPERATION_NOT_FOUND
+                  message: Opération introuvable pour cet identifiant.
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags:
+        - Operations
+      summary: Mettre à jour une opération (nom, SLA, ordre, statut, icône)
+      description: |
+        Mise à jour partielle d'une opération. `slaMinutes` peut être positionné à
+        `null` pour re-hériter du SLA du service parent (D4). Le `code` reste unique
+        par service (409 `OPERATION_CODE_DUPLICATE`).
+
+        **additionalProperties: false** : tout champ hors schéma → 422.
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOperationRequest'
+            example:
+              name: Dépôt espèces (guichet rapide)
+              slaMinutes: 5
+              displayOrder: 2
+              isActive: false
+      responses:
+        '200':
+          description: Opération mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+              example:
+                id: a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1
+                serviceId: 77777777-7777-4777-a777-777777777777
+                code: DEP
+                name: Dépôt espèces (guichet rapide)
+                slaMinutes: 5
+                displayOrder: 2
+                isActive: false
+                iconKey: cash
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Opération introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: OPERATION_NOT_FOUND
+                  message: Opération introuvable pour cet identifiant.
+        '409':
+          description: Conflit — code d'opération déjà utilisé dans ce service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: OPERATION_CODE_DUPLICATE
+                  message: Une opération avec ce code existe déjà dans ce service.
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - Operations
+      summary: Supprimer (désactiver) une opération
+      description: |
+        Supprime logiquement une opération (soft delete / désactivation).
+        Les tickets déjà émis pour cette opération conservent leur `operationId`
+        (dénormalisation `serviceId` intacte — D1/D2).
+      x-tenant-scope: agency
+      x-required-role: AGENCY_DIRECTOR
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Opération supprimée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+              example:
+                success: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Opération introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: OPERATION_NOT_FOUND
+                  message: Opération introuvable pour cet identifiant.
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /counters:
     get:
       tags:
@@ -1112,6 +1435,13 @@ paths:
 
         Les variantes multi-canal détaillées (borne, QR, WhatsApp…) sont dans
         CONTRACT-003.
+
+        **Résolution par opération (MODEL-CONTRACT-A, additif)** : `operationId` est
+        **optionnel**. S'il est fourni, le serveur dérive `serviceId = operation.serviceId` ;
+        si `serviceId` est aussi fourni et **incohérent** avec l'opération → 422
+        `SERVICE_OPERATION_MISMATCH`. `operationId` inconnu/inactif/hors agence → 404
+        `OPERATION_NOT_FOUND`. Si `operationId` est absent, `serviceId` est utilisé tel quel
+        (comportement F2/F3 inchangé).
       x-tenant-scope: agency
       x-required-role: AGENT
       parameters:
@@ -1122,11 +1452,21 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateTicketRequest'
-            example:
-              serviceId: 77777777-7777-4777-a777-777777777777
-              channel: KIOSK
-              phoneNumber: '+2250700000001'
-              priority: STANDARD
+            examples:
+              par_service:
+                summary: Émission par service (rétrocompat — operationId absent)
+                value:
+                  serviceId: 77777777-7777-4777-a777-777777777777
+                  channel: KIOSK
+                  phoneNumber: '+2250700000001'
+                  priority: STANDARD
+              par_operation:
+                summary: Émission par opération (serviceId dérivé de l'opération)
+                value:
+                  serviceId: 77777777-7777-4777-a777-777777777777
+                  operationId: a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1
+                  channel: KIOSK
+                  priority: STANDARD
       responses:
         '201':
           description: Ticket créé en état WAITING
@@ -1162,7 +1502,24 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Service ou opération introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                service_not_found:
+                  summary: Service introuvable
+                  value:
+                    error:
+                      code: SERVICE_NOT_FOUND
+                      message: Service introuvable pour cet identifiant.
+                operation_not_found:
+                  summary: Opération inconnue / inactive / hors agence
+                  value:
+                    error:
+                      code: OPERATION_NOT_FOUND
+                      message: Opération introuvable pour cet identifiant.
         '409':
           description: Conflit d'idempotence (même clé, payload différent)
           content:
@@ -1174,7 +1531,28 @@ paths:
                   code: IDEMPOTENCY_CONFLICT
                   message: Même X-Idempotency-Key avec un payload différent.
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: |
+            Données sémantiquement invalides — dont incohérence serviceId/operationId.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                service_operation_mismatch:
+                  summary: serviceId fourni incohérent avec operation.serviceId
+                  value:
+                    error:
+                      code: SERVICE_OPERATION_MISMATCH
+                      message: Le serviceId fourni ne correspond pas au service de l'opération.
+                      details:
+                        serviceId: 77777777-7777-4777-a777-777777777777
+                        operationServiceId: 88888888-8888-4888-a888-888888888888
+                unprocessable:
+                  summary: Autres données invalides
+                  value:
+                    error:
+                      code: UNPROCESSABLE_ENTITY
+                      message: Les données fournies sont sémantiquement invalides.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -2212,6 +2590,118 @@ components:
             $ref: '#/components/schemas/Service'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    Operation:
+      type: object
+      description: |
+        Opération = action précise proposée dans le cadre d'un service (enfant du service).
+        **Aucune notion de priorité** (D4) : la priorité reste l'enum porteur `TicketPriority`
+        du ticket. `slaMinutes` est **nullable** : SLA résolu = `operation.slaMinutes ?? service.slaMinutes`.
+      required:
+        - id
+        - serviceId
+        - code
+        - name
+        - displayOrder
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        serviceId:
+          type: string
+          format: uuid
+          description: Identifiant du service parent
+        code:
+          type: string
+          pattern: ^[A-Z0-9]{2,6}$
+          description: |
+            Code mnémotechnique de l'opération — 2 à 6 caractères A-Z/0-9, **unique par service**.
+          example: DEP
+        name:
+          type: string
+        slaMinutes:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+          description: |
+            SLA propre à l'opération, en minutes. **Nullable** : si null, hérite du SLA du service (D4).
+        displayOrder:
+          type: integer
+          minimum: 0
+          description: Ordre d'affichage de l'opération dans la grille borne
+        isActive:
+          type: boolean
+        iconKey:
+          type: string
+          description: Clé d'icône optionnelle (mapping composant ServiceIcon — D10)
+    CreateOperationRequest:
+      type: object
+      description: |
+        Requête de création d'une opération. Le `serviceId` est dérivé du path
+        (`/services/{serviceId}/operations`) — il ne doit pas être fourni dans le corps.
+      required:
+        - code
+        - name
+        - displayOrder
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9]{2,6}$
+          description: Code unique par service (2–6 caractères A-Z/0-9).
+          example: DEP
+        name:
+          type: string
+        slaMinutes:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+          description: SLA propre (minutes). Null ou absent → hérite du service (D4).
+        displayOrder:
+          type: integer
+          minimum: 0
+        isActive:
+          type: boolean
+          default: true
+        iconKey:
+          type: string
+    UpdateOperationRequest:
+      type: object
+      description: Mise à jour partielle d'une opération. Tous les champs sont optionnels.
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9]{2,6}$
+        name:
+          type: string
+        slaMinutes:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+          description: SLA propre (minutes). `null` → re-hérite du service (D4).
+        displayOrder:
+          type: integer
+          minimum: 0
+        isActive:
+          type: boolean
+        iconKey:
+          type: string
+    OperationListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Operation'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
     Counter:
       type: object
       required:
@@ -2358,6 +2848,14 @@ components:
         serviceId:
           type: string
           format: uuid
+        operationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: |
+            Opération résolue du ticket (additif, nullable). `null` si le ticket a été
+            émis par service sans opération.
         agencyId:
           type: string
           format: uuid
@@ -2436,6 +2934,13 @@ components:
         serviceId:
           type: string
           format: uuid
+        operationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: |
+            Opération résolue du ticket (additif, nullable). `null` si émis par service seul.
         agencyId:
           type: string
           format: uuid
@@ -2530,6 +3035,12 @@ components:
       description: |
         Requête d'émission d'un ticket. L'`agencyId` est dérivé du JWT de l'appelant
         (kiosque ou agent) — il ne doit pas être fourni dans le corps.
+
+        **Émission par opération (MODEL-CONTRACT-A, additif)** : `operationId` est
+        **optionnel**. S'il est fourni, le serveur dérive `serviceId = operation.serviceId` ;
+        si `serviceId` est aussi fourni et incohérent → 422 `SERVICE_OPERATION_MISMATCH`.
+        `serviceId` **reste requis** (rétrocompat totale) : en l'absence d'`operationId`,
+        il est utilisé tel quel.
       required:
         - serviceId
         - channel
@@ -2538,6 +3049,13 @@ components:
         serviceId:
           type: string
           format: uuid
+        operationId:
+          type: string
+          format: uuid
+          description: |
+            Opération choisie (optionnel, additif). Si fourni, le serveur dérive
+            `serviceId = operation.serviceId`. Incohérence serviceId/operationId → 422
+            `SERVICE_OPERATION_MISMATCH`.
         channel:
           $ref: '#/components/schemas/TicketChannel'
         phoneNumber:
@@ -2594,6 +3112,13 @@ components:
         serviceId:
           type: string
           format: uuid
+        operationId:
+          type: string
+          format: uuid
+          description: |
+            Opération choisie (optionnel, additif — offline-sync D8). Si fourni, le serveur
+            dérive `serviceId = operation.serviceId` ; incohérence → skip
+            `SERVICE_OPERATION_MISMATCH`. `serviceId` reste requis (rétrocompat).
         channel:
           $ref: '#/components/schemas/TicketChannel'
         createdOfflineAt:

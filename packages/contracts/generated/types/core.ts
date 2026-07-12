@@ -995,6 +995,431 @@ export interface paths {
         };
         trace?: never;
     };
+    "/services/{serviceId}/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lister les opérations d'un service
+         * @description Retourne la liste paginée des opérations rattachées à un service.
+         *     Une opération est une action précise proposée dans le cadre d'un service
+         *     (ex. « Dépôt espèces » dans le service « Opérations Courantes »).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Numéro de page (≥1, défaut 1) */
+                    page?: components["parameters"]["PageParam"];
+                    /** @description Taille de page (1–100, défaut 20) */
+                    limit?: components["parameters"]["LimitParam"];
+                };
+                header?: never;
+                path: {
+                    /** @description Identifiant UUID du service parent */
+                    serviceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Liste paginée des opérations du service */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "data": [
+                         *         {
+                         *           "id": "a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1",
+                         *           "serviceId": "77777777-7777-4777-a777-777777777777",
+                         *           "code": "DEP",
+                         *           "name": "Dépôt espèces",
+                         *           "slaMinutes": null,
+                         *           "displayOrder": 1,
+                         *           "isActive": true,
+                         *           "iconKey": "cash"
+                         *         }
+                         *       ],
+                         *       "meta": {
+                         *         "page": 1,
+                         *         "limit": 20,
+                         *         "total": 3
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["OperationListResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /** @description Service parent introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "SERVICE_NOT_FOUND",
+                         *         "message": "Service introuvable pour cet identifiant."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        /**
+         * Créer une opération dans un service
+         * @description Crée une nouvelle opération rattachée au service `serviceId`.
+         *     Le `code` (regex `^[A-Z0-9]{2,6}$`) doit être **unique par service**
+         *     (409 `OPERATION_CODE_DUPLICATE` sinon). `slaMinutes` est optionnel et
+         *     **nullable** : s'il est absent/null, le SLA résolu hérite de celui du service (D4).
+         *
+         *     **additionalProperties: false** : tout champ hors schéma → 422.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant UUID du service parent */
+                    serviceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "DEP",
+                     *       "name": "Dépôt espèces",
+                     *       "slaMinutes": 8,
+                     *       "displayOrder": 1,
+                     *       "iconKey": "cash"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["CreateOperationRequest"];
+                };
+            };
+            responses: {
+                /** @description Opération créée */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "id": "a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
+                         *       "code": "DEP",
+                         *       "name": "Dépôt espèces",
+                         *       "slaMinutes": 8,
+                         *       "displayOrder": 1,
+                         *       "isActive": true,
+                         *       "iconKey": "cash"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["Operation"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /** @description Service parent introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "SERVICE_NOT_FOUND",
+                         *         "message": "Service introuvable pour cet identifiant."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Conflit — code d'opération déjà utilisé dans ce service */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "OPERATION_CODE_DUPLICATE",
+                         *         "message": "Une opération avec ce code existe déjà dans ce service.",
+                         *         "details": {
+                         *           "code": "DEP",
+                         *           "serviceId": "77777777-7777-4777-a777-777777777777"
+                         *         }
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/operations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtenir une opération
+         * @description Retourne le détail d'une opération par son identifiant UUID.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Détail de l'opération */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "id": "a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
+                         *       "code": "DEP",
+                         *       "name": "Dépôt espèces",
+                         *       "slaMinutes": null,
+                         *       "displayOrder": 1,
+                         *       "isActive": true,
+                         *       "iconKey": "cash"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["Operation"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /** @description Opération introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "OPERATION_NOT_FOUND",
+                         *         "message": "Opération introuvable pour cet identifiant."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Supprimer (désactiver) une opération
+         * @description Supprime logiquement une opération (soft delete / désactivation).
+         *     Les tickets déjà émis pour cette opération conservent leur `operationId`
+         *     (dénormalisation `serviceId` intacte — D1/D2).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Opération supprimée */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true
+                         *     }
+                         */
+                        "application/json": {
+                            success?: boolean;
+                        };
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /** @description Opération introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "OPERATION_NOT_FOUND",
+                         *         "message": "Opération introuvable pour cet identifiant."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Mettre à jour une opération (nom, SLA, ordre, statut, icône)
+         * @description Mise à jour partielle d'une opération. `slaMinutes` peut être positionné à
+         *     `null` pour re-hériter du SLA du service parent (D4). Le `code` reste unique
+         *     par service (409 `OPERATION_CODE_DUPLICATE`).
+         *
+         *     **additionalProperties: false** : tout champ hors schéma → 422.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "name": "Dépôt espèces (guichet rapide)",
+                     *       "slaMinutes": 5,
+                     *       "displayOrder": 2,
+                     *       "isActive": false
+                     *     }
+                     */
+                    "application/json": components["schemas"]["UpdateOperationRequest"];
+                };
+            };
+            responses: {
+                /** @description Opération mise à jour */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "id": "a1a1a1a1-a1a1-4a1a-aa1a-a1a1a1a1a1a1",
+                         *       "serviceId": "77777777-7777-4777-a777-777777777777",
+                         *       "code": "DEP",
+                         *       "name": "Dépôt espèces (guichet rapide)",
+                         *       "slaMinutes": 5,
+                         *       "displayOrder": 2,
+                         *       "isActive": false,
+                         *       "iconKey": "cash"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["Operation"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /** @description Opération introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "OPERATION_NOT_FOUND",
+                         *         "message": "Opération introuvable pour cet identifiant."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Conflit — code d'opération déjà utilisé dans ce service */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "OPERATION_CODE_DUPLICATE",
+                         *         "message": "Une opération avec ce code existe déjà dans ce service."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        trace?: never;
+    };
     "/counters": {
         parameters: {
             query?: never;
@@ -1461,6 +1886,13 @@ export interface paths {
          *
          *     Les variantes multi-canal détaillées (borne, QR, WhatsApp…) sont dans
          *     CONTRACT-003.
+         *
+         *     **Résolution par opération (MODEL-CONTRACT-A, additif)** : `operationId` est
+         *     **optionnel**. S'il est fourni, le serveur dérive `serviceId = operation.serviceId` ;
+         *     si `serviceId` est aussi fourni et **incohérent** avec l'opération → 422
+         *     `SERVICE_OPERATION_MISMATCH`. `operationId` inconnu/inactif/hors agence → 404
+         *     `OPERATION_NOT_FOUND`. Si `operationId` est absent, `serviceId` est utilisé tel quel
+         *     (comportement F2/F3 inchangé).
          */
         post: {
             parameters: {
@@ -1480,14 +1912,6 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    /**
-                     * @example {
-                     *       "serviceId": "77777777-7777-4777-a777-777777777777",
-                     *       "channel": "KIOSK",
-                     *       "phoneNumber": "+2250700000001",
-                     *       "priority": "STANDARD"
-                     *     }
-                     */
                     "application/json": components["schemas"]["CreateTicketRequest"];
                 };
             };
@@ -1536,7 +1960,15 @@ export interface paths {
                 };
                 401: components["responses"]["Unauthorized"];
                 403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
+                /** @description Service ou opération introuvable */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description Conflit d'idempotence (même clé, payload différent) */
                 409: {
                     headers: {
@@ -1554,7 +1986,15 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                422: components["responses"]["UnprocessableEntity"];
+                /** @description Données sémantiquement invalides — dont incohérence serviceId/operationId. */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 429: components["responses"]["TooManyRequests"];
                 500: components["responses"]["InternalServerError"];
             };
@@ -2575,6 +3015,65 @@ export interface components {
             data: components["schemas"]["Service"][];
             meta: components["schemas"]["PaginationMeta"];
         };
+        /**
+         * @description Opération = action précise proposée dans le cadre d'un service (enfant du service).
+         *     **Aucune notion de priorité** (D4) : la priorité reste l'enum porteur `TicketPriority`
+         *     du ticket. `slaMinutes` est **nullable** : SLA résolu = `operation.slaMinutes ?? service.slaMinutes`.
+         */
+        Operation: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Identifiant du service parent
+             */
+            serviceId: string;
+            /**
+             * @description Code mnémotechnique de l'opération — 2 à 6 caractères A-Z/0-9, **unique par service**.
+             * @example DEP
+             */
+            code: string;
+            name: string;
+            /** @description SLA propre à l'opération, en minutes. **Nullable** : si null, hérite du SLA du service (D4). */
+            slaMinutes?: number | null;
+            /** @description Ordre d'affichage de l'opération dans la grille borne */
+            displayOrder: number;
+            isActive: boolean;
+            /** @description Clé d'icône optionnelle (mapping composant ServiceIcon — D10) */
+            iconKey?: string;
+        };
+        /**
+         * @description Requête de création d'une opération. Le `serviceId` est dérivé du path
+         *     (`/services/{serviceId}/operations`) — il ne doit pas être fourni dans le corps.
+         */
+        CreateOperationRequest: {
+            /**
+             * @description Code unique par service (2–6 caractères A-Z/0-9).
+             * @example DEP
+             */
+            code: string;
+            name: string;
+            /** @description SLA propre (minutes). Null ou absent → hérite du service (D4). */
+            slaMinutes?: number | null;
+            displayOrder: number;
+            /** @default true */
+            isActive: boolean;
+            iconKey?: string;
+        };
+        /** @description Mise à jour partielle d'une opération. Tous les champs sont optionnels. */
+        UpdateOperationRequest: {
+            code?: string;
+            name?: string;
+            /** @description SLA propre (minutes). `null` → re-hérite du service (D4). */
+            slaMinutes?: number | null;
+            displayOrder?: number;
+            isActive?: boolean;
+            iconKey?: string;
+        };
+        OperationListResponse: {
+            data: components["schemas"]["Operation"][];
+            meta: components["schemas"]["PaginationMeta"];
+        };
         Counter: {
             /** Format: uuid */
             id: string;
@@ -2641,6 +3140,12 @@ export interface components {
             status: components["schemas"]["TicketStatus"];
             /** Format: uuid */
             serviceId: string;
+            /**
+             * Format: uuid
+             * @description Opération résolue du ticket (additif, nullable). `null` si le ticket a été
+             *     émis par service sans opération.
+             */
+            operationId?: string | null;
             /** Format: uuid */
             agencyId: string;
             channel: components["schemas"]["TicketChannel"];
@@ -2687,6 +3192,11 @@ export interface components {
             priority?: components["schemas"]["TicketPriority"];
             /** Format: uuid */
             serviceId: string;
+            /**
+             * Format: uuid
+             * @description Opération résolue du ticket (additif, nullable). `null` si émis par service seul.
+             */
+            operationId?: string | null;
             /** Format: uuid */
             agencyId: string;
             channel: components["schemas"]["TicketChannel"];
@@ -2734,10 +3244,23 @@ export interface components {
         /**
          * @description Requête d'émission d'un ticket. L'`agencyId` est dérivé du JWT de l'appelant
          *     (kiosque ou agent) — il ne doit pas être fourni dans le corps.
+         *
+         *     **Émission par opération (MODEL-CONTRACT-A, additif)** : `operationId` est
+         *     **optionnel**. S'il est fourni, le serveur dérive `serviceId = operation.serviceId` ;
+         *     si `serviceId` est aussi fourni et incohérent → 422 `SERVICE_OPERATION_MISMATCH`.
+         *     `serviceId` **reste requis** (rétrocompat totale) : en l'absence d'`operationId`,
+         *     il est utilisé tel quel.
          */
         CreateTicketRequest: {
             /** Format: uuid */
             serviceId: string;
+            /**
+             * Format: uuid
+             * @description Opération choisie (optionnel, additif). Si fourni, le serveur dérive
+             *     `serviceId = operation.serviceId`. Incohérence serviceId/operationId → 422
+             *     `SERVICE_OPERATION_MISMATCH`.
+             */
+            operationId?: string;
             channel: components["schemas"]["TicketChannel"];
             /**
              * @description Numéro de téléphone E.164 pour les notifications SMS/WhatsApp (ex: +2250700000001)
@@ -2772,6 +3295,13 @@ export interface components {
             localUuid: string;
             /** Format: uuid */
             serviceId: string;
+            /**
+             * Format: uuid
+             * @description Opération choisie (optionnel, additif — offline-sync D8). Si fourni, le serveur
+             *     dérive `serviceId = operation.serviceId` ; incohérence → skip
+             *     `SERVICE_OPERATION_MISMATCH`. `serviceId` reste requis (rétrocompat).
+             */
+            operationId?: string;
             channel: components["schemas"]["TicketChannel"];
             /** Format: date-time */
             createdOfflineAt: string;
