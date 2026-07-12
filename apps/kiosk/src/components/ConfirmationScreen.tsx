@@ -93,7 +93,8 @@ export function ConfirmationScreen({ serviceId, agencyId }: ConfirmationScreenPr
     try {
       const client = createSigfaClient(
         "public",
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"
+        // RT-001b : défaut mock canonique unifié web/kiosk (mock Prism :4010).
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4010"
       );
 
       const { data, response } = await client.POST("/public/tickets", {

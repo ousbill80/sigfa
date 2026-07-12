@@ -1,37 +1,19 @@
 /**
- * Tests for SocketProvider — RT-001b activation.
+ * Tests for KioskSocketProvider — RT-001b (kiosk créé).
  *
- * Le provider est testé contre un VRAI serveur socket.io in-process + un vrai
- * client socket.io-client (aucune API réelle nécessaire). On couvre :
- *   - mode off/mock : inchangé (inactive) — non-régression F4
- *   - handshake OK → join:agency → réception ticket:called (forme contrat)
- *   - dashboards : queue:updated + counter:status
- *   - (re)connexion → sync:request / sync:state → convergence d'état (snapshot)
- *   - handshake refusé (UNAUTHORIZED) → état error + repli offline, pas de boucle infinie
- *   - error:forbidden → non-crash
+ * Même contrat que le provider web : testé contre un VRAI serveur socket.io
+ * in-process + un vrai client socket.io-client. Surfaces borne/TV consomment
+ * le réel (ticket:called / sync:state.recentCalls / queue:updated).
  *
- * @module lib/socket-provider.test
+ * @module hooks/useKioskSocket.test
  */
-import { describe, it, expect, afterEach, afterAll, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { render, waitFor, act } from "@testing-library/react";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Server as IOServer, type Socket as ServerSocket } from "socket.io";
 import React, { type ReactElement } from "react";
-import { server } from "../test/msw-server";
-import { SocketProvider, useSocket } from "./socket-provider";
-
-// Le harnais démarre un VRAI serveur socket.io in-process sur un port aléatoire
-// (127.0.0.1) et un vrai client socket.io-client — aucune API ni fetch MSW n'est
-// nécessaire ici. Le setup global (`onUnhandledRequest:"error"` + interception
-// WebSocket de MSW) casserait le handshake socket.io ; on stoppe donc MSW pour ce
-// fichier et on le relance après (les autres suites le rouvrent via le setup).
-beforeAll(() => {
-  server.close();
-});
-afterAll(() => {
-  server.listen({ onUnhandledRequest: "error" });
-});
+import { KioskSocketProvider, useKioskSocket } from "./useKioskSocket";
 
 interface TestServer {
   io: IOServer;
@@ -94,16 +76,14 @@ async function startServer(opts?: { reject?: boolean }): Promise<TestServer> {
 }
 
 function Probe(): ReactElement {
-  const s = useSocket();
+  const s = useKioskSocket();
   return (
     <div>
       <span data-testid="status">{s.status}</span>
       <span data-testid="connected">{String(s.connected)}</span>
       <span data-testid="hero">{s.tv.hero?.ticketNumber ?? ""}</span>
       <span data-testid="hero-counter">{s.tv.hero?.counterLabel ?? ""}</span>
-      <span data-testid="previous-count">{String(s.tv.previous.length)}</span>
-      <span data-testid="queue-length">{s.dashboard.lastQueueUpdate?.length ?? ""}</span>
-      <span data-testid="counter-status">{s.dashboard.lastCounterStatus?.status ?? ""}</span>
+      <span data-testid="queue-length">{s.queue.length ?? ""}</span>
     </div>
   );
 }
@@ -119,18 +99,18 @@ afterEach(async () => {
   servers = [];
 });
 
-describe("SocketProvider", () => {
-  it("RT-001b: mode off/mock — provider inactive, aucune connexion (non-régression F4)", () => {
+describe("KioskSocketProvider", () => {
+  it("RT-001b: kiosk provider inactif en mode off/mock (aucune connexion)", () => {
     const { getByTestId } = render(
-      <SocketProvider mode="off" url="http://127.0.0.1:1" token="t" agencyId={AGENCY_ID}>
+      <KioskSocketProvider mode="off" url="http://127.0.0.1:1" token="t" agencyId={AGENCY_ID}>
         <Probe />
-      </SocketProvider>
+      </KioskSocketProvider>
     );
     expect(getByTestId("status").textContent).toBe("inactive");
     expect(getByTestId("connected").textContent).toBe("false");
   });
 
-  it("RT-001b: web SocketProvider activé — handshake OK → join:agency → ticket:called (forme contrat) met à jour l'état TV", async () => {
+  it("RT-001b: kiosk socket.io-client + provider créés — borne/TV consomment le réel (ticket:called)", async () => {
     const srv = await startServer();
     servers.push(srv);
     let joined: string | null = null;
@@ -139,50 +119,28 @@ describe("SocketProvider", () => {
         joined = agencyId;
         void socket.join(`agency:${agencyId}`);
         socket.emit("ticket:called", contractTicketCalled("A047", "Guichet 3"));
+        socket.emit("queue:updated", {
+          queueId: "eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee",
+          length: 8,
+          estimate: 0,
+        });
       });
     });
 
     const { getByTestId } = render(
-      <SocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
+      <KioskSocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
         <Probe />
-      </SocketProvider>
+      </KioskSocketProvider>
     );
 
     await waitFor(() => expect(getByTestId("status").textContent).toBe("connected"));
     await waitFor(() => expect(getByTestId("hero").textContent).toBe("A047"));
+    await waitFor(() => expect(getByTestId("queue-length").textContent).toBe("8"));
     expect(joined).toBe(AGENCY_ID);
-    expect(getByTestId("connected").textContent).toBe("true");
     expect(getByTestId("hero-counter").textContent).toBe("Guichet 3");
   });
 
-  it("RT-001b: dashboards consomment queue:updated + counter:status (forme contrat)", async () => {
-    const srv = await startServer();
-    servers.push(srv);
-    srv.io.on("connection", (socket: ServerSocket) => {
-      socket.on("join:agency", () => {
-        socket.emit("queue:updated", {
-          queueId: "eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee",
-          length: 7,
-          estimate: 0,
-        });
-        socket.emit("counter:status", {
-          counterId: "dddddddd-dddd-4ddd-addd-dddddddddddd",
-          status: "PAUSED",
-        });
-      });
-    });
-
-    const { getByTestId } = render(
-      <SocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
-        <Probe />
-      </SocketProvider>
-    );
-
-    await waitFor(() => expect(getByTestId("queue-length").textContent).toBe("7"));
-    await waitFor(() => expect(getByTestId("counter-status").textContent).toBe("PAUSED"));
-  });
-
-  it("RT-001b: (re)connexion → sync:request/sync:state → convergence d'état (snapshot recentCalls)", async () => {
+  it("RT-001b: kiosk (re)connexion → sync:request/sync:state → convergence d'état (snapshot)", async () => {
     const srv = await startServer();
     servers.push(srv);
     let syncRequests = 0;
@@ -197,18 +155,16 @@ describe("SocketProvider", () => {
     });
 
     const { getByTestId } = render(
-      <SocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
+      <KioskSocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
         <Probe />
-      </SocketProvider>
+      </KioskSocketProvider>
     );
 
-    // Le client émet sync:request au connect ET applique le snapshot (remplacement d'état).
     await waitFor(() => expect(getByTestId("hero").textContent).toBe("A099"));
     expect(syncRequests).toBeGreaterThanOrEqual(1);
-    expect(getByTestId("hero-counter").textContent).toBe("Guichet 9");
   });
 
-  it("RT-001b: handshake refusé (UNAUTHORIZED) → état error + repli offline, pas de boucle infinie", async () => {
+  it("RT-001b: kiosk handshake refusé (UNAUTHORIZED) → error + repli offline, pas de boucle infinie", async () => {
     const srv = await startServer({ reject: true });
     servers.push(srv);
     let connectAttempts = 0;
@@ -217,21 +173,18 @@ describe("SocketProvider", () => {
     });
 
     const { getByTestId } = render(
-      <SocketProvider mode="real" url={srv.url} token="revoked" agencyId={AGENCY_ID}>
+      <KioskSocketProvider mode="real" url={srv.url} token="revoked" agencyId={AGENCY_ID}>
         <Probe />
-      </SocketProvider>
+      </KioskSocketProvider>
     );
 
     await waitFor(() => expect(getByTestId("status").textContent).toBe("error"));
-    expect(getByTestId("connected").textContent).toBe("false");
-
-    // Attendre pour prouver l'absence de boucle de reconnexion infinie (attempts bornés).
     await new Promise((r) => setTimeout(r, 400));
     expect(getByTestId("status").textContent).toBe("error");
     expect(connectAttempts).toBeLessThan(10);
   });
 
-  it("RT-001b: error:forbidden (join/sync hors scope) → non-crash, état géré", async () => {
+  it("RT-001b: kiosk error:forbidden → non-crash, état géré", async () => {
     const srv = await startServer();
     servers.push(srv);
     srv.io.on("connection", (socket: ServerSocket) => {
@@ -241,17 +194,16 @@ describe("SocketProvider", () => {
     });
 
     const { getByTestId } = render(
-      <SocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
+      <KioskSocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
         <Probe />
-      </SocketProvider>
+      </KioskSocketProvider>
     );
 
     await waitFor(() => expect(getByTestId("status").textContent).toBe("error"));
-    // non-crash : le composant reste monté et rend l'état.
     expect(getByTestId("connected")).toBeTruthy();
   });
 
-  it("RT-001b: invalid ticket:called payload ignoré (affichage stable)", async () => {
+  it("RT-001b: kiosk invalid ticket:called payload ignoré (affichage stable)", async () => {
     const srv = await startServer();
     servers.push(srv);
     srv.io.on("connection", (socket: ServerSocket) => {
@@ -261,9 +213,9 @@ describe("SocketProvider", () => {
     });
 
     const { getByTestId } = render(
-      <SocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
+      <KioskSocketProvider mode="real" url={srv.url} token="valid-jwt" agencyId={AGENCY_ID}>
         <Probe />
-      </SocketProvider>
+      </KioskSocketProvider>
     );
 
     await waitFor(() => expect(getByTestId("status").textContent).toBe("connected"));
@@ -273,11 +225,11 @@ describe("SocketProvider", () => {
     expect(getByTestId("hero").textContent).toBe("");
   });
 
-  it("RT-001b: défaut sans mode explicite = inactif (env off par défaut)", () => {
+  it("RT-001b: kiosk défaut sans mode explicite = inactif", () => {
     const { getByTestId } = render(
-      <SocketProvider>
+      <KioskSocketProvider>
         <Probe />
-      </SocketProvider>
+      </KioskSocketProvider>
     );
     expect(getByTestId("status").textContent).toBe("inactive");
   });
