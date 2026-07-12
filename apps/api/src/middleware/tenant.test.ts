@@ -103,8 +103,13 @@ async function setupSchema(client: pg.Client): Promise<void> {
       name TEXT NOT NULL,
       slug TEXT NOT NULL UNIQUE,
       active BOOLEAN NOT NULL DEFAULT true,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      queue_critical_threshold INTEGER NOT NULL DEFAULT 50,
+      agent_inactivity_minutes INTEGER NOT NULL DEFAULT 15,
+      no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at TIMESTAMPTZ
     );
   `);
 
@@ -114,9 +119,14 @@ async function setupSchema(client: pg.Client): Promise<void> {
       bank_id UUID NOT NULL REFERENCES banks(id),
       name TEXT NOT NULL,
       city TEXT NOT NULL DEFAULT '',
+      address TEXT,
+      phone TEXT,
+      timezone TEXT NOT NULL DEFAULT 'Africa/Abidjan',
       active BOOLEAN NOT NULL DEFAULT true,
+      is_active BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at TIMESTAMPTZ
     );
   `);
 

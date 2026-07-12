@@ -27,6 +27,8 @@ import {
   type AgentStatus,
 } from "src/services/agent-status.js";
 import { computeAgentStats, type StatsPeriod } from "src/services/agent-stats.js";
+import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { parseStrict } from "src/lib/admin-helpers.js";
 
 /** Variables de contexte Hono du routeur agents (bus injecté par app.ts). */
 interface AgentEnv {
@@ -63,6 +65,36 @@ const statusSchema = z.object({
 /** Query de GET /agents/:id/stats. */
 const periodSchema = z.enum(["day", "week", "month"]).default("day");
 
+/** Schéma d'un jour de travail (LA LOI WorkSchedule DaySchedule). */
+const workDaySchema = z
+  .object({
+    start: z.string().regex(/^[0-2][0-9]:[0-5][0-9]$/),
+    end: z.string().regex(/^[0-2][0-9]:[0-5][0-9]$/),
+  })
+  .strict();
+
+/** WorkSchedule hebdomadaire (LA LOI, additionalProperties: false). */
+const workScheduleSchema = z
+  .object(
+    Object.fromEntries(
+      ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(
+        (d) => [d, workDaySchema.optional()]
+      )
+    )
+  )
+  .strict();
+
+/** Corps de PATCH /agents/:id (LA LOI UpdateAgentProfileRequest). */
+const updateProfileSchema = z
+  .object({
+    languages: z.array(z.enum(["FR", "DIOULA", "BAOULE", "EN"])).min(1).optional(),
+    serviceIds: z.array(z.string().uuid()).optional(),
+    agencyIds: z.array(z.string().uuid()).optional(),
+    workSchedule: workScheduleSchema.optional(),
+    phoneMasked: z.string().optional(),
+  })
+  .strict();
+
 /**
  * Crée le routeur agents (monté sous /api/v1).
  *
@@ -71,6 +103,7 @@ const periodSchema = z.enum(["day", "week", "month"]).default("day");
 export function createAgentRouter(): Hono<AgentEnv> {
   const router = new Hono<AgentEnv>();
   registerGetProfile(router);
+  registerPatchProfile(router);
   registerPostStatus(router);
   registerGetStats(router);
   return router;
@@ -244,6 +277,114 @@ async function listServiceIds(db: Client, agentId: string): Promise<string[]> {
     [agentId]
   );
   return (res.rows as Array<{ service_id: string }>).map((r) => r.service_id);
+}
+
+// ── PATCH /agents/:id — profil (services, langues, agences, horaires) ────────
+
+/** Enregistre PATCH /agents/:id (merge partiel du profil) + audit. */
+function registerPatchProfile(router: Hono<AgentEnv>): void {
+  router.patch("/agents/:id", async (c) => {
+    const db = c.get("db");
+    const tenant = c.get("tenant");
+    try {
+      const agentId = paramUuid(c, "id");
+      await assertAgentInTenantScope(db, tenant, agentId);
+      const input = parseStrict(updateProfileSchema, await parseJson(c));
+      const before = await loadAgentProfile(db, tenant, agentId);
+      await applyProfileUpdate(db, tenant, agentId, input);
+      const after = await loadAgentProfile(db, tenant, agentId);
+      await recordAudit({
+        db,
+        tenant,
+        action: "PATCH /agents/:id",
+        entityType: "user",
+        entityId: agentId,
+        ip: extractIp((n) => c.req.header(n)),
+        diff: buildDiff(
+          { languages: before["languages"], serviceIds: before["serviceIds"], agencyIds: before["agencyIds"], workSchedule: before["workSchedule"] },
+          { languages: after["languages"], serviceIds: after["serviceIds"], agencyIds: after["agencyIds"], workSchedule: after["workSchedule"] }
+        ),
+      });
+      return c.json(after, 200);
+    } catch (err) {
+      return errorResponse(c, err);
+    }
+  });
+}
+
+/**
+ * Applique un merge partiel du profil : langues/horaires en place, services et
+ * agences remplacés (liste complète) quand fournis. Chaque set fourni est réécrit.
+ */
+async function applyProfileUpdate(
+  db: Client,
+  tenant: TenantContext,
+  agentId: string,
+  input: z.infer<typeof updateProfileSchema>
+): Promise<void> {
+  const bankId = requireBankId(tenant);
+  if (input.languages !== undefined || input.workSchedule !== undefined) {
+    await db.query(
+      `UPDATE users
+          SET languages = COALESCE($3::text[], languages),
+              work_schedule = COALESCE($4::jsonb, work_schedule),
+              updated_at = NOW()
+        WHERE id=$1 AND bank_id=$2`,
+      [agentId, bankId, input.languages ?? null, input.workSchedule ? JSON.stringify(input.workSchedule) : null]
+    );
+  }
+  if (input.serviceIds !== undefined) {
+    await replaceUserServices(db, bankId, agentId, input.serviceIds);
+  }
+  if (input.agencyIds !== undefined) {
+    await replaceAgencyUsers(db, bankId, agentId, input.agencyIds);
+  }
+}
+
+/** Remplace les compétences service d'un agent (valide l'appartenance tenant). */
+async function replaceUserServices(
+  db: Client,
+  bankId: string,
+  agentId: string,
+  serviceIds: string[]
+): Promise<void> {
+  await db.query(`DELETE FROM user_services WHERE user_id=$1 AND bank_id=$2`, [agentId, bankId]);
+  for (const serviceId of serviceIds) {
+    const ok = await db.query(
+      `SELECT 1 FROM services WHERE id=$1 AND bank_id=$2 AND deleted_at IS NULL`,
+      [serviceId, bankId]
+    );
+    if (ok.rows.length === 0) {
+      throw new SigfaError("UNPROCESSABLE_ENTITY", "Service inconnu pour cet agent.", 422, { serviceId });
+    }
+    await db.query(
+      `INSERT INTO user_services (bank_id, user_id, service_id) VALUES ($1,$2,$3)`,
+      [bankId, agentId, serviceId]
+    );
+  }
+}
+
+/** Remplace les affectations d'agence d'un agent (valide l'appartenance tenant). */
+async function replaceAgencyUsers(
+  db: Client,
+  bankId: string,
+  agentId: string,
+  agencyIds: string[]
+): Promise<void> {
+  await db.query(`DELETE FROM agency_users WHERE user_id=$1 AND bank_id=$2`, [agentId, bankId]);
+  for (const agencyId of agencyIds) {
+    const ok = await db.query(
+      `SELECT 1 FROM agencies WHERE id=$1 AND bank_id=$2 AND deleted_at IS NULL`,
+      [agencyId, bankId]
+    );
+    if (ok.rows.length === 0) {
+      throw new SigfaError("UNPROCESSABLE_ENTITY", "Agence inconnue pour cet agent.", 422, { agencyId });
+    }
+    await db.query(
+      `INSERT INTO agency_users (bank_id, agency_id, user_id) VALUES ($1,$2,$3)`,
+      [bankId, agencyId, agentId]
+    );
+  }
 }
 
 // ── POST /agents/:id/status — machine à états (§164) ─────────────────────────

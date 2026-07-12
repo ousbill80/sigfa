@@ -20,6 +20,13 @@ import { createTicketRouter } from "src/routes/tickets.js";
 import { createTicketSyncRouter } from "src/routes/tickets-sync.js";
 import { createQueueRouter } from "src/routes/queues.js";
 import { createAgentRouter } from "src/routes/agents.js";
+import { createBankRouter } from "src/routes/banks.js";
+import { createAgencyRouter } from "src/routes/agencies.js";
+import { createServiceRouter } from "src/routes/services.js";
+import { createCounterRouter } from "src/routes/counters.js";
+import { createHoursRouter } from "src/routes/hours.js";
+import { createThresholdsRouter } from "src/routes/thresholds.js";
+import { createSmsTemplateRouter } from "src/routes/sms-templates.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
@@ -107,6 +114,28 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // Routes agents (API-007) sous /api/v1 (/agents/:id, /agents/:id/status, /agents/:id/stats)
   const agentRouter = createAgentRouter();
   app.route("/api/v1", agentRouter);
+
+  // Routes CRUD admin (API-008) — banques (platform + bank).
+  const bankRouter = createBankRouter();
+  app.route("/api/v1", bankRouter);
+
+  // Routes CRUD admin (API-008) — agences (CRUD + soft-delete).
+  const agencyRouter = createAgencyRouter();
+  app.route("/api/v1", agencyRouter);
+
+  // Routes CRUD admin (API-008) — services & guichets (scope agence).
+  const serviceRouter = createServiceRouter();
+  app.route("/api/v1", serviceRouter);
+  const counterRouter = createCounterRouter();
+  app.route("/api/v1", counterRouter);
+
+  // Routes admin config (API-008, admin.yaml) — horaires, seuils, templates SMS.
+  const hoursRouter = createHoursRouter();
+  app.route("/api/v1", hoursRouter);
+  const thresholdsRouter = createThresholdsRouter();
+  app.route("/api/v1", thresholdsRouter);
+  const smsTemplateRouter = createSmsTemplateRouter();
+  app.route("/api/v1", smsTemplateRouter);
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>

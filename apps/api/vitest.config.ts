@@ -32,6 +32,15 @@ export default defineConfig({
     },
   },
   test: {
+    // Clés crypto de test : le barrel @sigfa/database (importé par les routeurs
+    // admin API-008 via insertAuditEntry) charge le module crypto avec fail-fast
+    // sur les clés au chargement. Fournies ici pour tout le suite de tests API.
+    env: {
+      PHONE_ENCRYPTION_KEY:
+        "1111111111111111111111111111111111111111111111111111111111111111",
+      PHONE_HASH_KEY:
+        "2222222222222222222222222222222222222222222222222222222222222222",
+    },
     // Les beforeAll démarrent des conteneurs Testcontainers (PostgreSQL 16 + Redis 7) —
     // sur un runner CI plus lent, le pull d'image + démarrage dépasse 5 s par défaut.
     // Leçon : .claude/lessons/etat-local-residuel-masque-la-ci.md
@@ -54,6 +63,7 @@ export default defineConfig({
         ...vitestDefaultCoverageExcludes,
         // API-specific exclusions
         "src/index.ts", // Point d'entrée serveur — non testable unitairement (démarre le serveur)
+        "src/routes/admin-test-harness.ts", // Support de test partagé API-008 (Testcontainers)
       ],
     },
   },
