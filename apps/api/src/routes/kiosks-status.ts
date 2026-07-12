@@ -2,9 +2,10 @@
  * Route de supervision des bornes — API-011 (reporting.yaml `GET /kiosks/status`).
  *
  * MANAGER+ (scope agency). Liste les bornes avec un statut DÉRIVÉ du dernier
- * heartbeat : `SILENT` si `last_seen < NOW() - KIOSK_SILENT_THRESHOLD_S` (180 s =
- * 3× l'intervalle nominal de 60 s), sinon `ONLINE`. Une borne n'ayant jamais émis
- * de heartbeat (`last_seen IS NULL`) est également `SILENT`.
+ * heartbeat : `OFFLINE` (borne silencieuse >3 min) si `last_seen < NOW() -
+ * KIOSK_SILENT_THRESHOLD_S` (180 s = 3× l'intervalle nominal de 60 s), sinon
+ * `ONLINE`. Une borne n'ayant jamais émis de heartbeat (`last_seen IS NULL`) est
+ * également `OFFLINE`. Statut conforme à l'enum LA LOI `ONLINE | OFFLINE | DEGRADED`.
  *
  * Le seuil est dérivé en SQL de `NOW()` : il suit l'horloge base, ce qui permet
  * aux tests d'antidater `last_seen` pour franchir le seuil de façon déterministe.
@@ -96,7 +97,7 @@ function buildScope(
 
 /**
  * Projette une ligne kiosk vers l'item de statut LA LOI, avec le statut dérivé
- * ONLINE/SILENT.
+ * ONLINE/OFFLINE (borne silencieuse >3 min).
  *
  * @param row - Ligne brute + `is_silent`
  * @returns Item de statut conforme
@@ -105,7 +106,7 @@ function toKioskStatus(row: KioskStatusRow): Record<string, unknown> {
   return {
     kioskId: row.kiosk_id,
     agencyId: row.agency_id,
-    status: row.is_silent ? "SILENT" : "ONLINE",
+    status: row.is_silent ? "OFFLINE" : "ONLINE",
     lastSeen: row.last_seen ? row.last_seen.toISOString() : null,
     printerStatus: row.printer_status,
   };

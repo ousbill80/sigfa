@@ -5,7 +5,7 @@
  *  1. rate-limit par route → 429 + Retry-After, fenêtres indépendantes ;
  *  2. health <100 ms ; postgres coupé → 503 avec check précis ;
  *  3. heartbeat → last_seen/printer ; ERROR → UN kiosk:printer-error ; retour OK → nouvel épisode ;
- *  4. kiosks/status — SILENT si last_seen < NOW()-3min ;
+ *  4. kiosks/status — OFFLINE (silencieuse >3min) si last_seen < NOW()-3min ;
  *  5. audit-logs — filtres, AUDITOR OK, MANAGER → 403, lecture seule ;
  *  6. devices — 201 puis 200 idempotent, DELETE ownership.
  *
@@ -192,10 +192,10 @@ describe("API-011: heartbeat & épisode printer-error (anti-répétition)", () =
   });
 });
 
-// ── Critère 4 : kiosks/status SILENT ─────────────────────────────────────────
+// ── Critère 4 : kiosks/status OFFLINE (silencieuse >3min) ────────────────────
 
-describe("API-011: kiosks/status (ONLINE/SILENT dérivé)", () => {
-  it("API-011: SILENT si last_seen < NOW()-3min ; ONLINE sinon (MANAGER+)", async () => {
+describe("API-011: kiosks/status (ONLINE/OFFLINE dérivé)", () => {
+  it("API-011: OFFLINE (silencieuse >3min) si last_seen < NOW()-3min ; ONLINE sinon (MANAGER+)", async () => {
     await h.db.query(`UPDATE kiosks SET last_seen = now() WHERE id=$1`, [kioskAId]);
     const online = await fetch(`${baseUrl}/kiosks/status?agencyId=${bankA.agencyId}`, {
       headers: { Authorization: `Bearer ${managerAToken}` },
@@ -204,13 +204,13 @@ describe("API-011: kiosks/status (ONLINE/SILENT dérivé)", () => {
     const onlineBody = (await online.json()) as { kiosks: { kioskId: string; status: string }[] };
     expect(onlineBody.kiosks.find((k) => k.kioskId === kioskAId)?.status).toBe("ONLINE");
 
-    // Antidater le dernier heartbeat au-delà du seuil (181 s) → SILENT.
+    // Antidater le dernier heartbeat au-delà du seuil (181 s) → OFFLINE (silencieuse >3 min).
     await h.db.query(`UPDATE kiosks SET last_seen = now() - interval '181 seconds' WHERE id=$1`, [kioskAId]);
     const silent = await fetch(`${baseUrl}/kiosks/status?agencyId=${bankA.agencyId}`, {
       headers: { Authorization: `Bearer ${managerAToken}` },
     });
     const silentBody = (await silent.json()) as { kiosks: { kioskId: string; status: string }[] };
-    expect(silentBody.kiosks.find((k) => k.kioskId === kioskAId)?.status).toBe("SILENT");
+    expect(silentBody.kiosks.find((k) => k.kioskId === kioskAId)?.status).toBe("OFFLINE");
   });
 
   it("API-011: kiosks/status avec agencyId hors scope du JWT → 403", async () => {

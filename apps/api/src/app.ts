@@ -173,7 +173,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 
   // Routes API-011 (dernière story F3) : santé, supervision bornes, audit, devices.
   // - /health : public, sans auth/tenant (checks postgres+redis, 503 si down).
-  // - /kiosks/status : supervision MANAGER+ (ONLINE/SILENT dérivé de last_seen).
+  // - /kiosks/status : supervision MANAGER+ (ONLINE/OFFLINE dérivé de last_seen).
   // - /audit-logs : lecture seule stricte (AUDITOR|SUPER_ADMIN).
   // - /notifications/devices : enregistrement idempotent + DELETE ownership.
   app.route("/api/v1", createHealthRouter());
