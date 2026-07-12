@@ -26,7 +26,7 @@ CONTRACT-012 est prérequis de : KIOSK-007, TV-002
 
 | Piste | Stories | Agent | Statut |
 |---|---|---|---|
-| Kiosque | KIOSK-001..009 (002-005 DONE) | agent-kiosk | EN COURS |
+| Kiosque | KIOSK-001..009 (002-006 DONE ; reste 007-009) | agent-kiosk | EN COURS |
 | TV + Dashboards | TV+WEB-001-002-003 DONE | agent-web | EN COURS |
 | Mobile | MOB-001..005 | agent-mobile | DONE |
 
