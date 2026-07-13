@@ -714,9 +714,11 @@ export interface components {
          *     - AGENT : agent de guichet
          *     - AUDITOR : lecture seule, audit
          *     - NONE : accès sans authentification (routes publiques)
+         *     - COMEX : comité exécutif — abonnement reporting réseau (CONTRACT-013 / REP-002). Lecture agrégats.
+         *     - QUALITY : cellule qualité — abonnement reporting/feedback (CONTRACT-013 / REP-003, IA-004). Lecture.
          * @enum {string}
          */
-        Role: "SUPER_ADMIN" | "BANK_ADMIN" | "AGENCY_DIRECTOR" | "MANAGER" | "AGENT" | "AUDITOR" | "NONE";
+        Role: "SUPER_ADMIN" | "BANK_ADMIN" | "AGENCY_DIRECTOR" | "MANAGER" | "AGENT" | "AUDITOR" | "NONE" | "COMEX" | "QUALITY";
         ErrorResponse: {
             error: {
                 /**

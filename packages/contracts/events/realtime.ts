@@ -338,6 +338,97 @@ export type KioskPrinterErrorPayload = z.infer<
   typeof kioskPrinterErrorEvent.payloadSchema
 >;
 
+// ─── CONTRACT-013 (F6-F11 / ADM-003) : supervision borne temps réel ──────────
+
+/**
+ * Statut de supervision d'une borne (aligné sur admin.yaml KioskStatus).
+ * - ONLINE : heartbeat récent, borne opérationnelle
+ * - DEGRADED : heartbeat récent mais anomalie (ex. imprimante) signalée
+ * - SILENT : aucun heartbeat depuis silentThresholdSec (borne muette)
+ * - NEVER_SEEN : borne provisionnée sans jamais avoir émis de heartbeat
+ */
+const kioskSupervisionStatusSchema = z.enum([
+  "ONLINE",
+  "DEGRADED",
+  "SILENT",
+  "NEVER_SEEN",
+]);
+
+/**
+ * kiosk:silent — Une borne est passée muette (aucun heartbeat au-delà du seuil).
+ * Additif CONTRACT-013 (ADM-003). Émis par : serveur API (détection de silence).
+ * Consommateurs : dashboard supervision. Payload PII-free (identifiants uniquement).
+ */
+export const kioskSilentEvent = {
+  name: "kiosk:silent",
+  payloadSchema: z.object({
+    /** Identifiant UUID de la borne devenue muette */
+    kioskId: uuidSchema,
+    /** Identifiant UUID de l'agence hébergeant la borne */
+    agencyId: uuidSchema,
+    /** Statut au moment de l'émission (attendu : SILENT) */
+    status: kioskSupervisionStatusSchema,
+    /** Horodatage ISO 8601 du dernier heartbeat connu (début du silence) */
+    since: z.string().datetime(),
+  }),
+  emitter: "api-server",
+  consumers: ["supervision-dashboard"],
+  room: "agency:{agencyId}",
+} as const;
+
+/** Type inféré du payload kiosk:silent */
+export type KioskSilentPayload = z.infer<typeof kioskSilentEvent.payloadSchema>;
+
+/**
+ * kiosk:recovered — Une borne muette a repris ses heartbeats (retour ONLINE/DEGRADED).
+ * Additif CONTRACT-013 (ADM-003). Émis par : serveur API. PII-free.
+ */
+export const kioskRecoveredEvent = {
+  name: "kiosk:recovered",
+  payloadSchema: z.object({
+    /** Identifiant UUID de la borne rétablie */
+    kioskId: uuidSchema,
+    /** Identifiant UUID de l'agence hébergeant la borne */
+    agencyId: uuidSchema,
+    /** Statut au moment de la reprise (ONLINE ou DEGRADED) */
+    status: kioskSupervisionStatusSchema,
+    /** Horodatage ISO 8601 de la reprise (heartbeat de rétablissement) */
+    since: z.string().datetime(),
+  }),
+  emitter: "api-server",
+  consumers: ["supervision-dashboard"],
+  room: "agency:{agencyId}",
+} as const;
+
+/** Type inféré du payload kiosk:recovered */
+export type KioskRecoveredPayload = z.infer<
+  typeof kioskRecoveredEvent.payloadSchema
+>;
+
+/**
+ * kiosk:status — Changement de statut de supervision d'une borne (agrégat unitaire).
+ * Additif CONTRACT-013 (ADM-003). Émis par : serveur API. PII-free.
+ */
+export const kioskStatusEvent = {
+  name: "kiosk:status",
+  payloadSchema: z.object({
+    /** Identifiant UUID de la borne */
+    kioskId: uuidSchema,
+    /** Identifiant UUID de l'agence hébergeant la borne */
+    agencyId: uuidSchema,
+    /** Nouveau statut de supervision de la borne */
+    status: kioskSupervisionStatusSchema,
+    /** Horodatage ISO 8601 du changement de statut */
+    since: z.string().datetime(),
+  }),
+  emitter: "api-server",
+  consumers: ["supervision-dashboard"],
+  room: "agency:{agencyId}",
+} as const;
+
+/** Type inféré du payload kiosk:status */
+export type KioskStatusPayload = z.infer<typeof kioskStatusEvent.payloadSchema>;
+
 /**
  * join:agency — Demande de rattachement à la room d'une agence
  * Sémantique : QUAND un client (écran TV, borne, dashboard) veut recevoir les
@@ -466,6 +557,9 @@ export const ALL_EVENTS = [
   agencyOfflineEvent,
   alertManagerEvent,
   kioskPrinterErrorEvent,
+  kioskSilentEvent,
+  kioskRecoveredEvent,
+  kioskStatusEvent,
   joinAgencyEvent,
   syncRequestEvent,
   syncStateEvent,

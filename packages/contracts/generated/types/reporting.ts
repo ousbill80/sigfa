@@ -275,6 +275,8 @@ export interface paths {
                 query?: {
                     /** @description Période de benchmark (YYYY-MM). Défaut : mois courant. */
                     period?: string;
+                    /** @description KPI de tri du classement (additif CONTRACT-013). Optionnel. Défaut : `tauxSLA`. */
+                    sortKpi?: "tauxSLA" | "tma" | "tmt" | "tts" | "tauxAbandon" | "nps" | "occupation";
                     /** @description Numéro de page (≥1, défaut 1) */
                     page?: components["parameters"]["PageParam"];
                     /** @description Taille de page (1–100, défaut 20) */
@@ -630,7 +632,14 @@ export interface paths {
          *     basés sur le schéma `AnonymizedNetworkAggregate` (défini dans ce fichier,
          *     référencé par CONTRACT-008/ai.yaml).
          *
-         *     Les identifiants des banques individuelles ne sont pas exposés dans cette vue.
+         *     **Allow-list explicite** : la réponse `NetworkOverviewResponse` est en allow-list stricte
+         *     (`additionalProperties: false`) — uniquement des agrégats/compteurs, jamais de PII ni de
+         *     contenu métier. Les banques peuvent être exposées par `bankId` + `bankLabel` (agrégats
+         *     par banque), jamais par des données client.
+         *
+         *     **Lecture seule** : le périmètre platform est en lecture seule. Toute tentative de mutation
+         *     (POST/PATCH/PUT/DELETE) sur une ressource platform est refusée avec le code d'erreur
+         *     `PLATFORM_READ_ONLY` (403) — hors-scope définitif (aucune écriture cross-tenant).
          */
         get: {
             parameters: {
@@ -672,7 +681,18 @@ export interface paths {
                 };
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
+                /**
+                 * @description Permissions insuffisantes, OU tentative de mutation sur le périmètre platform
+                 *     (lecture seule) — code `PLATFORM_READ_ONLY` (additif CONTRACT-013 / NET-001).
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 404: components["responses"]["NotFound"];
                 409: components["responses"]["Conflict"];
                 422: components["responses"]["UnprocessableEntity"];
@@ -838,6 +858,37 @@ export interface components {
              */
             occupation: components["schemas"]["KpiValue"];
         };
+        /**
+         * @description Métadonnées de période normalisées (additif CONTRACT-013). Optionnel.
+         *     Fournit une clé de période stable (idempotence des rapports) et les bornes
+         *     exactes en **jour Abidjan** (Africa/Abidjan, UTC+00 sans DST — jamais codé « UTC » en dur).
+         */
+        PeriodMeta: {
+            /**
+             * @description Clé de période normalisée et stable (ex. `2026-07-12` jour, `2026-W28` semaine,
+             *     `2026-07` mois). Utilisée comme clé d'idempotence des rapports planifiés.
+             * @example 2026-07
+             */
+            periodKey: string;
+            /**
+             * Format: date-time
+             * @description Borne inférieure incluse de la période (début de jour Abidjan)
+             * @example 2026-07-01T00:00:00+00:00
+             */
+            start: string;
+            /**
+             * Format: date-time
+             * @description Borne supérieure exclue de la période (fin de jour Abidjan)
+             * @example 2026-08-01T00:00:00+00:00
+             */
+            end: string;
+            /**
+             * @description Fuseau de référence des bornes (toujours Africa/Abidjan)
+             * @example Africa/Abidjan
+             * @enum {string}
+             */
+            timezone?: "Africa/Abidjan";
+        };
         KpiResponse: {
             /** @enum {string} */
             scope: "agency";
@@ -853,6 +904,15 @@ export interface components {
              */
             agencyId?: string;
             kpis: components["schemas"]["KpiSet"];
+            /**
+             * @description Additif CONTRACT-013 (REP-001). Optionnel. `true` si la période inclut le jour
+             *     courant non encore figé (jour figé à J+2 07 h Abidjan) — les KPIs peuvent évoluer.
+             *     Absent ou `false` sur période close.
+             * @example false
+             */
+            partial?: boolean;
+            /** @description Métadonnées de période normalisées (optionnel — additif CONTRACT-013). */
+            periodMeta?: components["schemas"]["PeriodMeta"];
         };
         NetworkKpiResponse: {
             /** @enum {string} */
@@ -860,15 +920,24 @@ export interface components {
             /** @example 2026-07 */
             period: string;
             aggregate: components["schemas"]["AnonymizedNetworkAggregate"];
+            /**
+             * @description Additif CONTRACT-013 (REP-001). Optionnel. `true` si la période inclut le jour
+             *     courant non encore figé — les agrégats peuvent évoluer.
+             * @example false
+             */
+            partial?: boolean;
+            /** @description Métadonnées de période normalisées (optionnel — additif CONTRACT-013). */
+            periodMeta?: components["schemas"]["PeriodMeta"];
         };
         /**
          * @description Statut de performance d'une agence dans le benchmark inter-agences.
          *     - **VERT** : tauxSLA ≥ 80% ET TMA ≤ 15 min — performance optimale
          *     - **ORANGE** : tauxSLA entre 60–80% OU TMA entre 15–25 min — à surveiller
          *     - **ROUGE** : tauxSLA < 60% OU TMA > 25 min — intervention requise
+         *     - **n/a** : agence sans donnée sur la période (non classable) — additif CONTRACT-013
          * @enum {string}
          */
-        BenchmarkStatus: "VERT" | "ORANGE" | "ROUGE";
+        BenchmarkStatus: "VERT" | "ORANGE" | "ROUGE" | "n/a";
         BenchmarkEntry: {
             /** @description Rang dans le classement */
             rank: number;
@@ -1045,6 +1114,39 @@ export interface components {
          * @enum {string}
          */
         HealthStatus: "UP" | "DEGRADED" | "DOWN";
+        /**
+         * @description État de santé d'une queue BullMQ (additif CONTRACT-013).
+         *     Exposé dans `HealthResponse.checks` pour la supervision des workers de notification.
+         *     Aucune donnée métier ni PII — uniquement des compteurs de jobs.
+         */
+        QueueHealthCheck: {
+            /**
+             * @description Nom de la queue (ex. "notifications:sms", "notifications:email", "reports")
+             * @example notifications:sms
+             */
+            name: string;
+            status: components["schemas"]["HealthStatus"];
+            /**
+             * @description Nombre de jobs en attente
+             * @example 12
+             */
+            waiting?: number;
+            /**
+             * @description Nombre de jobs en cours de traitement
+             * @example 3
+             */
+            active?: number;
+            /**
+             * @description Nombre de jobs en échec (dead-letter)
+             * @example 0
+             */
+            failed?: number;
+            /**
+             * @description Nombre de jobs différés (retry/backoff)
+             * @example 1
+             */
+            delayed?: number;
+        };
         HealthResponse: {
             status: components["schemas"]["HealthStatus"];
             /**
@@ -1058,13 +1160,82 @@ export interface components {
              * @example 2026-07-11T09:00:00Z
              */
             timestamp: string;
+            /**
+             * @description Détail des checks de santé (additif CONTRACT-013 / NOTIF-001). Optionnel.
+             *     Inclut la santé des queues BullMQ (workers de notification/reporting).
+             */
+            checks?: {
+                /** @description Santé des queues BullMQ (getQueueHealth) */
+                queues?: components["schemas"]["QueueHealthCheck"][];
+            };
         };
+        /**
+         * @description Agrégat de supervision réseau pour une banque (allow-list stricte, CONTRACT-013 / NET-001).
+         *     La plateforme connaît l'identité commerciale de ses banques : `bankId` + `bankLabel`
+         *     sont autorisés. **Zéro PII client, zéro contenu métier** : seuls des compteurs/agrégats.
+         */
+        NetworkBankAggregate: {
+            /**
+             * Format: uuid
+             * @description Identifiant de la banque (autorisé — connu de la plateforme par contrat)
+             * @example 11111111-1111-4111-a111-111111111111
+             */
+            bankId: string;
+            /**
+             * @description Libellé commercial de la banque (autorisé — pas une PII client)
+             * @example Banque Nationale de Côte d'Ivoire
+             */
+            bankLabel: string;
+            /**
+             * @description Nombre d'agences de la banque
+             * @example 24
+             */
+            agencyCount: number;
+            /**
+             * @description Nombre de bornes en ligne
+             * @example 40
+             */
+            kiosksOnline: number;
+            /**
+             * @description Nombre de bornes hors ligne
+             * @example 2
+             */
+            kiosksOffline: number;
+            /**
+             * @description Nombre total de tickets agrégés sur la période
+             * @example 45230
+             */
+            totalTickets?: number;
+            /**
+             * Format: float
+             * @description Disponibilité agrégée du parc borne en %
+             * @example 99.4
+             */
+            uptimePercent?: number;
+            /**
+             * @description Santé agrégée (feu vert/orange/rouge)
+             * @example VERT
+             * @enum {string}
+             */
+            health?: "VERT" | "ORANGE" | "ROUGE";
+        };
+        /**
+         * @description Vue de supervision réseau cross-tenant — **agrégats et compteurs uniquement**.
+         *     Allow-list explicite : `additionalProperties: false`. **Absence documentée de PII** et
+         *     de contenu métier (conformité UEMOA + hors-scope définitif : lecture seule, aucune donnée
+         *     client). Toute tentative de mutation sur le périmètre platform → 403 `PLATFORM_READ_ONLY`.
+         */
         NetworkOverviewResponse: {
             /** @example 2026-07 */
             period: string;
             /** Format: date-time */
             generatedAt: string;
             aggregate: components["schemas"]["AnonymizedNetworkAggregate"];
+            /**
+             * @description Agrégats par banque (allow-list — id + libellé + compteurs, zéro PII).
+             *     Additif CONTRACT-013 (NET-001). Optionnel.
+             */
+            banks?: components["schemas"]["NetworkBankAggregate"][];
         };
         ErrorResponse: {
             error: {

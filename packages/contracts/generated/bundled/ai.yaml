@@ -678,6 +678,19 @@ components:
           type: string
           description: 'Fenêtre temporelle des données d''entraînement utilisées (ISO 8601 interval : YYYY-MM-DD/YYYY-MM-DD)'
           example: 2026-01-05/2026-07-14
+        featureSetVersion:
+          type: string
+          description: |
+            Version du jeu de features utilisé pour le calcul (additif CONTRACT-013 / IA-001-002). Optionnel.
+            Permet de tracer les changements de pipeline de features côté front.
+          example: fs-v3
+        availableDays:
+          type: integer
+          minimum: 0
+          description: |
+            Nombre de jours d'historique réellement disponibles (additif CONTRACT-013 / IA-001-002).
+            Optionnel. Alimente l'état « X/90 jours » côté front.
+          example: 62
     ContextualFactor:
       type: string
       description: |
@@ -693,6 +706,33 @@ components:
         - PUBLIC_HOLIDAY
         - SCHOOL_START
         - NONE
+    ForecastDriver:
+      type: object
+      description: |
+        Facteur explicatif contribuant à une prédiction (explicabilité forecast, additif CONTRACT-013).
+      required:
+        - factor
+        - direction
+        - weight
+      properties:
+        factor:
+          type: string
+          description: Nom du facteur (ex. "END_OF_MONTH", "history_trend")
+          example: END_OF_MONTH
+        direction:
+          type: string
+          description: Sens de contribution du facteur
+          enum:
+            - up
+            - down
+          example: up
+        weight:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Poids relatif du facteur (0.0 à 1.0)
+          example: 0.35
     ForecastHour:
       type: object
       description: Prédiction d'affluence pour une heure donnée.
@@ -723,6 +763,18 @@ components:
             - 0.5–0.7 : confiance modérée (données récentes insuffisantes)
             - < 0.5 : confiance faible (utiliser avec précaution)
           example: 0.87
+        drivers:
+          type: array
+          description: |
+            Facteurs explicatifs de la prédiction (explicabilité, additif CONTRACT-013 / IA-002). Optionnel.
+          items:
+            $ref: '#/components/schemas/ForecastDriver'
+        lowConfidence:
+          type: boolean
+          description: |
+            Marqueur de faible confiance (additif CONTRACT-013 / IA-002). Optionnel.
+            `true` si `confidence < 0.5` — la prédiction est à utiliser avec précaution.
+          example: false
     ForecastResponse:
       type: object
       description: Réponse de prédiction d'affluence horaire pour une agence.
@@ -886,6 +938,34 @@ components:
         - open
         - acked
         - resolved
+    AnomalyEvidence:
+      type: object
+      description: |
+        Preuve structurée expliquant une anomalie (explicabilité, additif CONTRACT-013).
+        Référence les métriques ayant déclenché la détection, sans double comptage des alertes.
+      required:
+        - metric
+        - threshold
+        - window
+        - sample
+      properties:
+        metric:
+          type: string
+          description: Métrique observée (ex. "wait_seconds", "sla_rate", "inactive_alerts")
+          example: inactive_alerts
+        threshold:
+          type: number
+          description: Seuil configuré ayant été franchi
+          example: 3
+        window:
+          type: string
+          description: Fenêtre temporelle d'observation (ex. "7d", "PT30M")
+          example: 7d
+        sample:
+          type: integer
+          minimum: 0
+          description: Taille de l'échantillon ayant servi à la détection
+          example: 4
     Anomaly:
       type: object
       description: Anomalie agrégée détectée par le module IA SIGFA.
@@ -953,6 +1033,12 @@ components:
           minimum: 1
           description: Fenêtre temporelle glissante utilisée pour la détection (jours)
           example: 7
+        evidence:
+          type: array
+          description: |
+            Preuves structurées de l'anomalie (explicabilité, additif CONTRACT-013 / IA-003). Optionnel.
+          items:
+            $ref: '#/components/schemas/AnomalyEvidence'
         meta:
           $ref: '#/components/schemas/AiMeta'
     AnomaliesListResponse:
@@ -1032,6 +1118,44 @@ components:
             - neutral
             - negative
           example: negative
+    FeedbackTheme:
+      type: string
+      description: |
+        Thèmes de feedback détectables par NLP (enum FERMÉ, additif CONTRACT-013 / IA-004).
+        Aucun thème libre : garantit l'absence de fuite de verbatim/PII dans les insights.
+      enum:
+        - WAIT_TIME
+        - STAFF_ATTITUDE
+        - SERVICE_QUALITY
+        - CLEANLINESS
+        - DIGITAL_EXPERIENCE
+        - ACCESSIBILITY
+        - OTHER
+    FeedbackLanguage:
+      type: string
+      description: |
+        Langue prise en charge par l'analyse NLP (additif CONTRACT-013 / IA-004). FR/EN uniquement.
+        `unsupported` : commentaire dans une langue hors périmètre (non analysé, tracé).
+      enum:
+        - fr
+        - en
+        - unsupported
+    QualityScoreComponent:
+      type: object
+      description: Contribution décomposée au score de qualité (explicabilité, additif CONTRACT-013).
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+          description: Dimension de qualité (ex. "sentiment", "resolution", "wait")
+          example: sentiment
+        value:
+          type: number
+          format: float
+          description: Contribution de cette dimension au score
+          example: 1.8
     QualityScore:
       type: object
       description: Score de qualité agrégé (anonymisé — pas d'identifiant agent individuel dans la vue réseau).
@@ -1055,6 +1179,19 @@ components:
           minimum: 1
           description: Échelle maximale du score (ex. 5 pour une note sur 5)
           example: 5
+        components:
+          type: array
+          description: |
+            Décomposition explicable du score (additif CONTRACT-013 / IA-004). Optionnel.
+            Jamais de sanction RH automatique — usage advisory.
+          items:
+            $ref: '#/components/schemas/QualityScoreComponent'
+        insufficientSample:
+          type: boolean
+          description: |
+            `true` si l'échantillon est sous le seuil de publication (INSUFFICIENT_SAMPLE,
+            défaut < 30 feedbacks) — le score n'est alors pas publié. Additif CONTRACT-013 / IA-004.
+          example: false
     QualityScores:
       type: object
       description: Scores de qualité agrégés (agence et/ou réseau).
@@ -1111,6 +1248,24 @@ components:
             $ref: '#/components/schemas/RecurrentTheme'
         qualityScores:
           $ref: '#/components/schemas/QualityScores'
+        themes:
+          type: array
+          description: |
+            Thèmes détectés depuis l'enum fermé `FeedbackTheme` (additif CONTRACT-013 / IA-004). Optionnel.
+            Enum fermé = zéro fuite de verbatim/PII.
+          items:
+            $ref: '#/components/schemas/FeedbackTheme'
+        language:
+          description: |
+            Langue de l'analyse NLP (additif CONTRACT-013 / IA-004). Optionnel. FR/EN, ou
+            `unsupported` si les commentaires sont hors périmètre linguistique (non analysés).
+          $ref: '#/components/schemas/FeedbackLanguage'
+        insufficientSample:
+          type: boolean
+          description: |
+            `true` si le volume de feedbacks est sous le seuil de publication
+            (INSUFFICIENT_SAMPLE, défaut < 30) — additif CONTRACT-013 / IA-004. Optionnel.
+          example: false
         networkAggregate:
           $ref: '#/components/schemas/AnonymizedNetworkAggregate'
         meta:

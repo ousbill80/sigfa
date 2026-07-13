@@ -1028,9 +1028,17 @@ export interface paths {
         /**
          * Obtenir le payload QR d'une agence (URL PWA + identifiant signé)
          * @description Retourne le payload du QR code d'une agence : URL de la PWA SIGFA
-         *     avec l'identifiant d'agence signé (HMAC ou JWT court-circuit).
+         *     avec l'identifiant d'agence signé.
          *     Ce QR est affiché en agence et scanné par les clients pour émettre
          *     un ticket via le canal QR.
+         *
+         *     **Format du `signedAgencyToken` (CONTRACT-013 / NOTIF-005-A)** — aligné sur le
+         *     durcissement des tokens TV/borne :
+         *     - Algorithme : **HMAC-SHA256** sur `{ agencyId, exp, keyVersion }`.
+         *     - TTL : **30 jours** (le QR imprimé reste valide 30 j puis doit être réémis).
+         *     - **Clé rotative versionnée** : chaque token porte `keyVersion` ; la rotation de la
+         *       clé de signature invalide progressivement les anciens tokens sans casser les QR
+         *       encore dans leur fenêtre (vérification multi-version côté serveur).
          */
         get: {
             parameters: {
@@ -1423,9 +1431,24 @@ export interface components {
              */
             payload: string;
             /**
+             * @description Jeton d'agence signé (additif CONTRACT-013 / NOTIF-005-A). Optionnel.
+             *     Format : **HMAC-SHA256** sur `{ agencyId, exp, keyVersion }`, **TTL 30 jours**,
+             *     **clé rotative versionnée** (voir `keyVersion`). Aligné sur le durcissement des
+             *     tokens TV/borne. Encodé dans `qrUrl` ; exposé ici pour vérification/débogage.
+             * @example v2.eyJhZ2VuY3lJZCI6IjMzMzMzMzMzIiwiZXhwIjoxNzU1MDAwMDAwfQ.hmacsha256sig
+             */
+            signedAgencyToken?: string;
+            /**
+             * @description Version de la clé de signature HMAC utilisée (additif CONTRACT-013). Optionnel.
+             *     Permet la rotation de clé sans invalider les QR encore dans leur fenêtre de 30 j.
+             * @example 2
+             */
+            keyVersion?: number;
+            /**
              * Format: date-time
-             * @description Date d'expiration du payload signé (null si permanent)
-             * @example 2026-07-12T09:00:00Z
+             * @description Date d'expiration du token signé (null si non applicable).
+             *     Pour `signedAgencyToken` : émission + 30 jours (TTL CONTRACT-013).
+             * @example 2026-08-11T09:00:00Z
              */
             expiresAt?: string | null;
         };

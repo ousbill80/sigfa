@@ -775,6 +775,15 @@ export interface components {
             deliveredAt?: string;
             /** @description Raison d'échec (null si livraison réussie ou en cours) */
             failureReason?: components["schemas"]["NotificationFailureReason"];
+            /**
+             * Format: uri
+             * @description Lien signé de téléchargement de la pièce jointe email (additif CONTRACT-013 / NOTIF-004).
+             *     Repli lorsqu'une pièce jointe dépasse la limite du fournisseur email : le corps porte
+             *     un lien signé à durée de vie courte (défaut 24 h) au lieu du fichier. `null` pour les
+             *     notifications sans pièce jointe (SMS/WhatsApp/PUSH ou email sans document).
+             * @example https://storage.sigfa.ci/attachments/report-2026-07.pdf?sig=abc123&expires=1752400000
+             */
+            attachmentSignedUrl?: string | null;
         };
         /** @description Réponse paginée du journal d'envoi */
         NotificationLogResponse: {
@@ -820,6 +829,18 @@ export interface components {
             registeredAt: string;
         };
         /**
+         * @description Origine tracée d'un consentement opt-in (traçabilité UEMOA).
+         *     Additif CONTRACT-013 — enum fermée, optionnelle sur ConsentRequest.
+         *     - AGENT : opt-in saisi par un agent en agence
+         *     - KIOSK : opt-in recueilli à la borne
+         *     - WEB : opt-in via la surface web publique
+         *     - INBOUND_WHATSAPP : opt-in créé par un message WhatsApp entrant de l'abonné
+         *       (l'utilisateur a initié le contact — base légale UEMOA tracée). NOTIF-003.
+         *     - IMPORT : opt-in issu d'un import administratif tracé
+         * @enum {string}
+         */
+        ConsentSource: "AGENT" | "KIOSK" | "WEB" | "INBOUND_WHATSAPP" | "IMPORT";
+        /**
          * @description Corps de la requête opt-in ou opt-out.
          *     `phone` est en E.164 — jamais retourné en clair dans les réponses.
          */
@@ -830,6 +851,11 @@ export interface components {
              */
             phone: string;
             channel: components["schemas"]["NotificationChannel"];
+            /**
+             * @description Source de traçabilité du consentement (optionnel — additif CONTRACT-013).
+             *     Permet de tracer un opt-in créé par message WhatsApp entrant (INBOUND_WHATSAPP).
+             */
+            source?: components["schemas"]["ConsentSource"];
         };
         /** @description Réponse minimale au opt-in / opt-out */
         ConsentStatusResponse: {
@@ -955,9 +981,17 @@ export interface components {
          *     - POSITION_UPDATE : mise à jour de la position dans la file (ex. « vous êtes 3e »)
          *     - YOUR_TURN : alerte d'appel imminent (ex. « vous êtes le suivant, préparez vos documents »)
          *     - DAILY_REPORT : rapport quotidien de l'agence à destination du directeur
+         *
+         *     **Additifs CONTRACT-013 (F6-F11)** — tous purement additifs, aucun retrait :
+         *     - POSITION_NEAR : le client approche (ex. « vous êtes 3e ») — déclenché au seuil
+         *       `smsNearThreshold` (CONTRACT-005, défaut 3). NOTIF-002/003.
+         *     - POSITION_NEXT : le client est le suivant. Supprime POSITION_NEAR si trop proche. NOTIF-002/003.
+         *     - MANAGER_ALERT : alerte interne (email) vers un manager/directeur. NOTIF-004.
+         *     - WEEKLY_REPORT : rapport hebdomadaire (email interne). NOTIF-004.
+         *     - MONTHLY_REPORT : rapport mensuel (email interne). NOTIF-004.
          * @enum {string}
          */
-        NotificationType: "TICKET_CONFIRMATION" | "POSITION_UPDATE" | "YOUR_TURN" | "DAILY_REPORT";
+        NotificationType: "TICKET_CONFIRMATION" | "POSITION_UPDATE" | "YOUR_TURN" | "DAILY_REPORT" | "POSITION_NEAR" | "POSITION_NEXT" | "MANAGER_ALERT" | "WEEKLY_REPORT" | "MONTHLY_REPORT";
         PaginationMeta: {
             /** @description Numéro de page courant */
             page: number;

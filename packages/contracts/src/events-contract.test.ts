@@ -125,8 +125,9 @@ describe("CONTRACT-002: les 8 événements + sync:request/sync:state sont défin
     expect(syncStateEvent.name).toBe("sync:state");
   });
 
-  it("ALL_EVENTS contient exactement 11 événements", () => {
-    expect(ALL_EVENTS).toHaveLength(11);
+  it("ALL_EVENTS contient les 11 événements de base plus les additifs kiosk:* (CONTRACT-013)", () => {
+    // 11 événements de base + 3 additifs de supervision borne (CONTRACT-013 batch F6-F11).
+    expect(ALL_EVENTS).toHaveLength(14);
     const names = ALL_EVENTS.map((e: RealtimeEvent) => e.name);
     expect(names).toContain("ticket:created");
     expect(names).toContain("ticket:called");
@@ -139,6 +140,10 @@ describe("CONTRACT-002: les 8 événements + sync:request/sync:state sont défin
     expect(names).toContain("sync:request");
     expect(names).toContain("sync:state");
     expect(names).toContain("join:agency");
+    // Additifs CONTRACT-013 (ADM-003) — supervision borne temps réel.
+    expect(names).toContain("kiosk:silent");
+    expect(names).toContain("kiosk:recovered");
+    expect(names).toContain("kiosk:status");
   });
 });
 

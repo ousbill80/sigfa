@@ -710,7 +710,16 @@ components:
           example: "2026-07-11T09:00:07Z"
         failureReason:
           description: Raison d'échec (null si livraison réussie ou en cours)
-          $ref: "#/components/schemas/NotificationFailureReason" 
+          $ref: "#/components/schemas/NotificationFailureReason"
+        attachmentSignedUrl:
+          type: ["string", "null"]
+          format: uri
+          description: |
+            Lien signé de téléchargement de la pièce jointe email (additif CONTRACT-013 / NOTIF-004).
+            Repli lorsqu'une pièce jointe dépasse la limite du fournisseur email : le corps porte
+            un lien signé à durée de vie courte (défaut 24 h) au lieu du fichier. `null` pour les
+            notifications sans pièce jointe (SMS/WhatsApp/PUSH ou email sans document).
+          example: "https://storage.sigfa.ci/attachments/report-2026-07.pdf?sig=abc123&expires=1752400000"
 
     NotificationLogResponse:
       type: object
@@ -779,6 +788,25 @@ components:
 
     # ── Consentement opt-in/opt-out ───────────────────────────────────────────
 
+    # ── Source de consentement (CONTRACT-013 / NOTIF-003) ─────────────────────
+    ConsentSource:
+      type: string
+      description: |
+        Origine tracée d'un consentement opt-in (traçabilité UEMOA).
+        Additif CONTRACT-013 — enum fermée, optionnelle sur ConsentRequest.
+        - AGENT : opt-in saisi par un agent en agence
+        - KIOSK : opt-in recueilli à la borne
+        - WEB : opt-in via la surface web publique
+        - INBOUND_WHATSAPP : opt-in créé par un message WhatsApp entrant de l'abonné
+          (l'utilisateur a initié le contact — base légale UEMOA tracée). NOTIF-003.
+        - IMPORT : opt-in issu d'un import administratif tracé
+      enum:
+        - AGENT
+        - KIOSK
+        - WEB
+        - INBOUND_WHATSAPP
+        - IMPORT
+
     ConsentRequest:
       type: object
       description: |
@@ -795,6 +823,11 @@ components:
           example: "+2250700000047"
         channel:
           $ref: "./core.yaml#/components/schemas/NotificationChannel"
+        source:
+          description: |
+            Source de traçabilité du consentement (optionnel — additif CONTRACT-013).
+            Permet de tracer un opt-in créé par message WhatsApp entrant (INBOUND_WHATSAPP).
+          $ref: "#/components/schemas/ConsentSource"
 
     ConsentStatusResponse:
       type: object

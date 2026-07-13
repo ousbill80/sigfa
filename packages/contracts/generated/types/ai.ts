@@ -712,6 +712,18 @@ export interface components {
              * @example 2026-01-05/2026-07-14
              */
             dataWindow: string;
+            /**
+             * @description Version du jeu de features utilisé pour le calcul (additif CONTRACT-013 / IA-001-002). Optionnel.
+             *     Permet de tracer les changements de pipeline de features côté front.
+             * @example fs-v3
+             */
+            featureSetVersion?: string;
+            /**
+             * @description Nombre de jours d'historique réellement disponibles (additif CONTRACT-013 / IA-001-002).
+             *     Optionnel. Alimente l'état « X/90 jours » côté front.
+             * @example 62
+             */
+            availableDays?: number;
         };
         /**
          * @description Facteurs contextuels influençant les prédictions d'affluence.
@@ -723,6 +735,26 @@ export interface components {
          * @enum {string}
          */
         ContextualFactor: "END_OF_MONTH" | "CIVIL_SERVICE_PAY" | "PUBLIC_HOLIDAY" | "SCHOOL_START" | "NONE";
+        /** @description Facteur explicatif contribuant à une prédiction (explicabilité forecast, additif CONTRACT-013). */
+        ForecastDriver: {
+            /**
+             * @description Nom du facteur (ex. "END_OF_MONTH", "history_trend")
+             * @example END_OF_MONTH
+             */
+            factor: string;
+            /**
+             * @description Sens de contribution du facteur
+             * @example up
+             * @enum {string}
+             */
+            direction: "up" | "down";
+            /**
+             * Format: float
+             * @description Poids relatif du facteur (0.0 à 1.0)
+             * @example 0.35
+             */
+            weight: number;
+        };
         /** @description Prédiction d'affluence pour une heure donnée. */
         ForecastHour: {
             /**
@@ -745,6 +777,14 @@ export interface components {
              * @example 0.87
              */
             confidence: number;
+            /** @description Facteurs explicatifs de la prédiction (explicabilité, additif CONTRACT-013 / IA-002). Optionnel. */
+            drivers?: components["schemas"]["ForecastDriver"][];
+            /**
+             * @description Marqueur de faible confiance (additif CONTRACT-013 / IA-002). Optionnel.
+             *     `true` si `confidence < 0.5` — la prédiction est à utiliser avec précaution.
+             * @example false
+             */
+            lowConfidence?: boolean;
         };
         /** @description Réponse de prédiction d'affluence horaire pour une agence. */
         ForecastResponse: {
@@ -873,6 +913,32 @@ export interface components {
          * @enum {string}
          */
         AnomalyStatus: "open" | "acked" | "resolved";
+        /**
+         * @description Preuve structurée expliquant une anomalie (explicabilité, additif CONTRACT-013).
+         *     Référence les métriques ayant déclenché la détection, sans double comptage des alertes.
+         */
+        AnomalyEvidence: {
+            /**
+             * @description Métrique observée (ex. "wait_seconds", "sla_rate", "inactive_alerts")
+             * @example inactive_alerts
+             */
+            metric: string;
+            /**
+             * @description Seuil configuré ayant été franchi
+             * @example 3
+             */
+            threshold: number;
+            /**
+             * @description Fenêtre temporelle d'observation (ex. "7d", "PT30M")
+             * @example 7d
+             */
+            window: string;
+            /**
+             * @description Taille de l'échantillon ayant servi à la détection
+             * @example 4
+             */
+            sample: number;
+        };
         /** @description Anomalie agrégée détectée par le module IA SIGFA. */
         Anomaly: {
             /**
@@ -937,6 +1003,8 @@ export interface components {
              * @example 7
              */
             windowDays?: number;
+            /** @description Preuves structurées de l'anomalie (explicabilité, additif CONTRACT-013 / IA-003). Optionnel. */
+            evidence?: components["schemas"]["AnomalyEvidence"][];
             meta: components["schemas"]["AiMeta"];
         };
         /**
@@ -992,6 +1060,32 @@ export interface components {
              */
             sentiment: "positive" | "neutral" | "negative";
         };
+        /**
+         * @description Thèmes de feedback détectables par NLP (enum FERMÉ, additif CONTRACT-013 / IA-004).
+         *     Aucun thème libre : garantit l'absence de fuite de verbatim/PII dans les insights.
+         * @enum {string}
+         */
+        FeedbackTheme: "WAIT_TIME" | "STAFF_ATTITUDE" | "SERVICE_QUALITY" | "CLEANLINESS" | "DIGITAL_EXPERIENCE" | "ACCESSIBILITY" | "OTHER";
+        /**
+         * @description Langue prise en charge par l'analyse NLP (additif CONTRACT-013 / IA-004). FR/EN uniquement.
+         *     `unsupported` : commentaire dans une langue hors périmètre (non analysé, tracé).
+         * @enum {string}
+         */
+        FeedbackLanguage: "fr" | "en" | "unsupported";
+        /** @description Contribution décomposée au score de qualité (explicabilité, additif CONTRACT-013). */
+        QualityScoreComponent: {
+            /**
+             * @description Dimension de qualité (ex. "sentiment", "resolution", "wait")
+             * @example sentiment
+             */
+            key: string;
+            /**
+             * Format: float
+             * @description Contribution de cette dimension au score
+             * @example 1.8
+             */
+            value: number;
+        };
         /** @description Score de qualité agrégé (anonymisé — pas d'identifiant agent individuel dans la vue réseau). */
         QualityScore: {
             /**
@@ -1011,6 +1105,17 @@ export interface components {
              * @example 5
              */
             scale: number;
+            /**
+             * @description Décomposition explicable du score (additif CONTRACT-013 / IA-004). Optionnel.
+             *     Jamais de sanction RH automatique — usage advisory.
+             */
+            components?: components["schemas"]["QualityScoreComponent"][];
+            /**
+             * @description `true` si l'échantillon est sous le seuil de publication (INSUFFICIENT_SAMPLE,
+             *     défaut < 30 feedbacks) — le score n'est alors pas publié. Additif CONTRACT-013 / IA-004.
+             * @example false
+             */
+            insufficientSample?: boolean;
         };
         /** @description Scores de qualité agrégés (agence et/ou réseau). */
         QualityScores: {
@@ -1053,6 +1158,22 @@ export interface components {
             /** @description Thèmes récurrents détectés par NLP (top N thèmes) */
             recurrentThemes: components["schemas"]["RecurrentTheme"][];
             qualityScores: components["schemas"]["QualityScores"];
+            /**
+             * @description Thèmes détectés depuis l'enum fermé `FeedbackTheme` (additif CONTRACT-013 / IA-004). Optionnel.
+             *     Enum fermé = zéro fuite de verbatim/PII.
+             */
+            themes?: components["schemas"]["FeedbackTheme"][];
+            /**
+             * @description Langue de l'analyse NLP (additif CONTRACT-013 / IA-004). Optionnel. FR/EN, ou
+             *     `unsupported` si les commentaires sont hors périmètre linguistique (non analysés).
+             */
+            language?: components["schemas"]["FeedbackLanguage"];
+            /**
+             * @description `true` si le volume de feedbacks est sous le seuil de publication
+             *     (INSUFFICIENT_SAMPLE, défaut < 30) — additif CONTRACT-013 / IA-004. Optionnel.
+             * @example false
+             */
+            insufficientSample?: boolean;
             networkAggregate?: components["schemas"]["AnonymizedNetworkAggregate"];
             meta: components["schemas"]["AiMeta"];
         };

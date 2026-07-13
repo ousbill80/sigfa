@@ -149,20 +149,15 @@ export interface paths {
                 403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
                 409: components["responses"]["Conflict"];
-                /** @description Champ hors schéma ou données sémantiquement invalides */
+                /**
+                 * @description Champ hors schéma ou données sémantiquement invalides. Codes (additif CONTRACT-013) :
+                 *     `INVALID_BRAND` (couleur `--brand` invalide), `UNKNOWN_FIELD` (token de structure interdit).
+                 */
                 422: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        /**
-                         * @example {
-                         *       "error": {
-                         *         "code": "UNPROCESSABLE_ENTITY",
-                         *         "message": "Champ inconnu : 'fontFamily'. additionalProperties est false."
-                         *       }
-                         *     }
-                         */
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
@@ -267,6 +262,274 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/banks/{id}/theme/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Uploader le logo de la banque (multipart, additif CONTRACT-013)
+         * @description Upload direct du logo (multipart/form-data) — alternative à l'URL présignée.
+         *     Retourne `{ logoUrl }`. Un logo hors format/dimensions → 422 `INVALID_LOGO`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description Fichier logo (image/png, image/svg+xml, image/jpeg ; ≤ 2 Mo ; ≥ 200×200 px)
+                         */
+                        file: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Logo uploadé */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "logoUrl": "https://cdn.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ThemeLogoUploadResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                /** @description Logo invalide (format, taille ou dimensions non conformes) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "INVALID_LOGO",
+                         *         "message": "Logo invalide : format non supporté ou dimensions < 200×200 px."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/banks/{id}/theme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Projection publique du thème d'une banque (additif CONTRACT-013)
+         * @description Retourne l'habillage public effectif d'une banque (couleurs appliquées, logo,
+         *     messages de bienvenue). **Route publique** (aucune authentification), **zéro PII**.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Projection publique du thème */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "logoUrl": "https://cdn.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png",
+                         *       "appliedColors": {
+                         *         "primary": "#003f7f",
+                         *         "secondary": "#c07800",
+                         *         "background": "#ffffff"
+                         *       },
+                         *       "welcomeMessages": {
+                         *         "fr": "Bienvenue à la BNCI",
+                         *         "en": "Welcome to BNCI"
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["PublicBankTheme"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/banks/{id}/whatsapp-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtenir la configuration WhatsApp Business de la banque (additif CONTRACT-013)
+         * @description Retourne la config WhatsApp Business (numéro, mapping menu→service).
+         *     Le `webhookSecret` est masqué en lecture (jamais re-exposé en clair).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Configuration WhatsApp Business */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "businessNumber": "+2252700000001",
+                         *       "webhookSecret": null,
+                         *       "menuMapping": [
+                         *         {
+                         *           "keyword": "1",
+                         *           "serviceId": "88888888-8888-4888-a888-888888888888"
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WhatsAppConfig"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mettre à jour la configuration WhatsApp Business (additif CONTRACT-013) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "businessNumber": "+2252700000001",
+                     *       "menuMapping": [
+                     *         {
+                     *           "keyword": "1",
+                     *           "serviceId": "88888888-8888-4888-a888-888888888888"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/json": components["schemas"]["UpdateWhatsAppConfigRequest"];
+                };
+            };
+            responses: {
+                /** @description Configuration mise à jour */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "businessNumber": "+2252700000001",
+                         *       "webhookSecret": null,
+                         *       "menuMapping": [
+                         *         {
+                         *           "keyword": "1",
+                         *           "serviceId": "88888888-8888-4888-a888-888888888888"
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WhatsAppConfig"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
         trace?: never;
     };
     "/agencies/{id}/hours": {
@@ -1174,6 +1437,371 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/banks/{id}/agencies:clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cloner une agence (template ou agence source) et démarrer l'onboarding
+         * @description Crée une nouvelle agence à partir d'un template OU d'une agence source, et démarre
+         *     un parcours d'onboarding. Exactement une source requise (`templateId` XOR `sourceAgencyId`)
+         *     sinon 422 `CLONE_SOURCE_REQUIRED`. Additif CONTRACT-013 (ADM-002).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "name": "Agence Marcory",
+                     *       "templateId": "33333333-3333-4333-a333-333333333333"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["CloneAgencyRequest"];
+                };
+            };
+            responses: {
+                /** @description Agence clonée + onboarding démarré */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "agencyId": "66666666-6666-4666-a666-666666666666",
+                         *       "onboardingId": "77777777-7777-4777-a777-777777777777",
+                         *       "createdAt": "2026-07-12T10:00:00Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["CloneAgencyProvisionResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                /** @description Source de clonage manquante ou ambiguë */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "CLONE_SOURCE_REQUIRED",
+                         *         "message": "Exactement une source de clonage est requise : templateId OU sourceAgencyId."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agencies/{id}/kiosks:provision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Provisionner une borne (jeton d'enrôlement à usage unique)
+         * @description Provisionne une borne pour l'agence et retourne un jeton d'enrôlement à usage
+         *     unique (opaque, TTL court, jamais loggé) + l'URL/QR d'installation. L'échange
+         *     du jeton contre les credentials borne échoue avec 401/403 opaque `KIOSK_ENROLLMENT_INVALID`.
+         *     Additif CONTRACT-013 (ADM-002).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Borne provisionnée + jeton d'enrôlement */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "kioskId": "14141414-1414-4141-a141-141414141414",
+                         *       "enrollmentToken": "enr_9fA2kQ7bZ1...",
+                         *       "enrollmentQrUrl": "https://app.sigfa.ci/enroll/14141414-1414-4141-a141-141414141414",
+                         *       "expiresAt": "2026-07-12T10:30:00Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ProvisionKioskResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                /** @description Jeton d'enrôlement invalide (opaque, anti-énumération) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": {
+                         *         "code": "KIOSK_ENROLLMENT_INVALID",
+                         *         "message": "Enrôlement invalide."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agencies/{id}/onboarding/{onboardingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suivre l'état d'un parcours d'onboarding (étapes + horodatages)
+         * @description Retourne les étapes de l'onboarding d'une agence avec leurs statuts et horodatages.
+         *     Additif CONTRACT-013 (ADM-002).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                    /** @description Identifiant du parcours d'onboarding */
+                    onboardingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description État de l'onboarding */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "onboardingId": "77777777-7777-4777-a777-777777777777",
+                         *       "agencyId": "66666666-6666-4666-a666-666666666666",
+                         *       "steps": [
+                         *         {
+                         *           "key": "clone",
+                         *           "status": "DONE",
+                         *           "completedAt": "2026-07-12T10:01:00Z"
+                         *         },
+                         *         {
+                         *           "key": "kiosk-provision",
+                         *           "status": "IN_PROGRESS",
+                         *           "completedAt": null
+                         *         }
+                         *       ],
+                         *       "startedAt": "2026-07-12T10:00:00Z",
+                         *       "completedAt": null
+                         *     }
+                         */
+                        "application/json": components["schemas"]["OnboardingStatusResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/kiosks/{id}/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Battement de cœur d'une borne (heartbeat)
+         * @description Reçoit le heartbeat d'une borne (tolérance de skew ±5 min). Alimente le calcul
+         *     de statut de supervision (ONLINE/DEGRADED/SILENT/NEVER_SEEN). Additif CONTRACT-013 (ADM-003).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "ts": "2026-07-12T10:00:00Z",
+                     *       "fw": "1.4.2",
+                     *       "printerOk": true,
+                     *       "queueDepth": 7
+                     *     }
+                     */
+                    "application/json": components["schemas"]["KioskHeartbeatRequest"];
+                };
+            };
+            responses: {
+                /** @description Heartbeat enregistré (pas de contenu) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agencies/{id}/kiosks/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * État de supervision des bornes d'une agence
+         * @description Statut calculé à la lecture de chaque borne de l'agence (ONLINE/DEGRADED/SILENT/NEVER_SEEN).
+         *     Additif CONTRACT-013 (ADM-003).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identifiant unique de la ressource (UUID v4) */
+                    id: components["parameters"]["IdParam"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description États de supervision des bornes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "kiosks": [
+                         *         {
+                         *           "kioskId": "14141414-1414-4141-a141-141414141414",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *           "status": "ONLINE",
+                         *           "lastSeen": "2026-07-12T09:59:30Z"
+                         *         },
+                         *         {
+                         *           "kioskId": "15151515-1515-4151-a151-151515151515",
+                         *           "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *           "status": "SILENT",
+                         *           "lastSeen": "2026-07-12T09:40:00Z"
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["KioskSupervisionStatusResponse"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+                429: components["responses"]["TooManyRequests"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1383,6 +2011,13 @@ export interface components {
              * @example 3
              */
             noShowTimeoutMinutes: number;
+            /**
+             * @description Seuil de position déclenchant la notification POSITION_NEAR (additif CONTRACT-013 / NOTIF-002).
+             *     Optionnel — défaut 3 (« vous êtes 3e »).
+             * @default 3
+             * @example 3
+             */
+            smsNearThreshold: number;
         };
         /** @description Mise à jour partielle des seuils (tous champs optionnels) */
         UpdateBankThresholdsRequest: {
@@ -1401,6 +2036,11 @@ export interface components {
              * @example 5
              */
             noShowTimeoutMinutes?: number;
+            /**
+             * @description Nouveau seuil POSITION_NEAR (additif CONTRACT-013). Optionnel.
+             * @example 3
+             */
+            smsNearThreshold?: number;
         };
         /** @description Acteur de l'entrée d'audit */
         AuditActor: {
@@ -1606,6 +2246,266 @@ export interface components {
              */
             createdAt: string;
         };
+        /** @description Association d'une entrée de menu / mot-clé entrant à un service. */
+        WhatsAppMenuMapping: {
+            /**
+             * @description Entrée de menu numérotée ou mot-clé (ex. "1", "DEPOT")
+             * @example 1
+             */
+            keyword: string;
+            /**
+             * Format: uuid
+             * @description Service SIGFA ciblé par cette entrée
+             * @example 88888888-8888-4888-a888-888888888888
+             */
+            serviceId: string;
+        };
+        /**
+         * @description Configuration WhatsApp Business par banque (additif CONTRACT-013 / NOTIF-003).
+         *     Le `webhookSecret` n'est jamais re-exposé en clair après création (masqué en lecture).
+         */
+        WhatsAppConfig: {
+            /**
+             * @description Numéro WhatsApp Business vérifié de la banque (E.164)
+             * @example +2252700000001
+             */
+            businessNumber: string;
+            /**
+             * @description Secret de vérification de signature du webhook entrant (masqué en lecture,
+             *     fourni en écriture). `null` en lecture si déjà configuré (jamais re-exposé).
+             * @example wa_secret_••••
+             */
+            webhookSecret?: string | null;
+            /** @description Mapping menu/mot-clé entrant → service SIGFA (parcours « prendre un ticket ») */
+            menuMapping: components["schemas"]["WhatsAppMenuMapping"][];
+        };
+        /** @description Mise à jour partielle de la configuration WhatsApp Business. */
+        UpdateWhatsAppConfigRequest: {
+            /** @example +2252700000001 */
+            businessNumber?: string;
+            /**
+             * @description Nouveau secret de signature du webhook (écriture seule)
+             * @example wa_secret_new_value
+             */
+            webhookSecret?: string;
+            menuMapping?: components["schemas"]["WhatsAppMenuMapping"][];
+        };
+        /**
+         * @description Projection publique du thème d'une banque (additif CONTRACT-013 / ADM-001).
+         *     **Zéro PII** : uniquement l'habillage effectif (couleurs corrigées, logo, messages).
+         */
+        PublicBankTheme: {
+            /**
+             * Format: uri
+             * @description URL publique du logo (null si aucun logo)
+             * @example https://cdn.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png
+             */
+            logoUrl?: string | null;
+            appliedColors: components["schemas"]["ColorSet"];
+            welcomeMessages: components["schemas"]["WelcomeMessages"];
+        };
+        /** @description Résultat de l'upload direct du logo (additif CONTRACT-013 / ADM-001). */
+        ThemeLogoUploadResponse: {
+            /**
+             * Format: uri
+             * @description URL publique du logo uploadé
+             * @example https://cdn.sigfa.ci/logos/11111111-1111-4111-a111-111111111111/logo.png
+             */
+            logoUrl: string;
+        };
+        /**
+         * @description Requête de clonage d'agence (additif CONTRACT-013 / ADM-002).
+         *     Exactement une source doit être fournie : `templateId` OU `sourceAgencyId`
+         *     (sinon 422 `CLONE_SOURCE_REQUIRED`).
+         */
+        CloneAgencyRequest: {
+            /**
+             * @description Nom de la nouvelle agence
+             * @example Agence Marcory
+             */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Identifiant d'un template d'agence source (mutuellement exclusif avec sourceAgencyId)
+             * @example 33333333-3333-4333-a333-333333333333
+             */
+            templateId?: string;
+            /**
+             * Format: uuid
+             * @description Identifiant d'une agence existante à cloner (mutuellement exclusif avec templateId)
+             * @example 44444444-4444-4444-a444-444444444444
+             */
+            sourceAgencyId?: string;
+        };
+        /** @description Résultat du clonage + démarrage de l'onboarding (additif CONTRACT-013 / ADM-002). */
+        CloneAgencyProvisionResponse: {
+            /**
+             * Format: uuid
+             * @description Identifiant de l'agence créée
+             * @example 66666666-6666-4666-a666-666666666666
+             */
+            agencyId: string;
+            /**
+             * Format: uuid
+             * @description Identifiant du parcours d'onboarding démarré
+             * @example 77777777-7777-4777-a777-777777777777
+             */
+            onboardingId: string;
+            /**
+             * Format: date-time
+             * @example 2026-07-12T10:00:00Z
+             */
+            createdAt: string;
+        };
+        /**
+         * @description Enrôlement d'une borne (additif CONTRACT-013 / ADM-002).
+         *     Le `enrollmentToken` est à usage unique, à TTL court, opaque et jamais loggé.
+         */
+        ProvisionKioskResponse: {
+            /**
+             * Format: uuid
+             * @description Identifiant de la borne provisionnée
+             * @example 14141414-1414-4141-a141-141414141414
+             */
+            kioskId: string;
+            /**
+             * @description Jeton d'enrôlement opaque à usage unique (échangé contre les credentials borne)
+             * @example enr_9fA2kQ7bZ1...
+             */
+            enrollmentToken: string;
+            /**
+             * Format: uri
+             * @description URL d'enrôlement (encodée dans le QR d'installation — jamais le token en clair)
+             * @example https://app.sigfa.ci/enroll/14141414-1414-4141-a141-141414141414
+             */
+            enrollmentQrUrl: string;
+            /**
+             * Format: date-time
+             * @description Expiration du jeton d'enrôlement (TTL court)
+             * @example 2026-07-12T10:30:00Z
+             */
+            expiresAt: string;
+        };
+        /**
+         * @description Statut d'une étape d'onboarding.
+         * @enum {string}
+         */
+        OnboardingStepStatus: "PENDING" | "IN_PROGRESS" | "DONE" | "SKIPPED";
+        /** @description Étape d'un parcours d'onboarding avec ses horodatages. */
+        OnboardingStep: {
+            /**
+             * @description Clé de l'étape (ex. "clone", "kiosk-provision", "hours", "theme")
+             * @example kiosk-provision
+             */
+            key: string;
+            status: components["schemas"]["OnboardingStepStatus"];
+            /**
+             * Format: date-time
+             * @description Horodatage de complétion (null si non terminée)
+             * @example 2026-07-12T10:12:00Z
+             */
+            completedAt?: string | null;
+        };
+        /** @description État d'un parcours d'onboarding d'agence (additif CONTRACT-013 / ADM-002). */
+        OnboardingStatusResponse: {
+            /**
+             * Format: uuid
+             * @example 77777777-7777-4777-a777-777777777777
+             */
+            onboardingId: string;
+            /**
+             * Format: uuid
+             * @example 66666666-6666-4666-a666-666666666666
+             */
+            agencyId: string;
+            steps: components["schemas"]["OnboardingStep"][];
+            /**
+             * Format: date-time
+             * @example 2026-07-12T10:00:00Z
+             */
+            startedAt: string;
+            /**
+             * Format: date-time
+             * @description Horodatage de fin de l'onboarding (null si en cours)
+             * @example null
+             */
+            completedAt?: string | null;
+        };
+        /**
+         * @description Statut de supervision d'une borne (additif CONTRACT-013 / ADM-003).
+         *     - ONLINE : heartbeat récent, borne opérationnelle
+         *     - DEGRADED : heartbeat récent mais anomalie signalée (ex. imprimante)
+         *     - SILENT : aucun heartbeat depuis `silentThresholdSec` (borne muette)
+         *     - NEVER_SEEN : borne provisionnée n'ayant jamais émis de heartbeat
+         * @enum {string}
+         */
+        KioskStatus: "ONLINE" | "DEGRADED" | "SILENT" | "NEVER_SEEN";
+        /**
+         * @description Configuration de supervision borne par agence (additif CONTRACT-013 / ADM-003).
+         *     Défauts globaux surchargés par agence. Tolérance de skew heartbeat ±5 min côté serveur.
+         */
+        KioskSupervisionConfig: {
+            /**
+             * @description Intervalle attendu entre deux heartbeats (secondes, défaut 30)
+             * @default 30
+             * @example 30
+             */
+            heartbeatIntervalSec: number;
+            /**
+             * @description Délai sans heartbeat au-delà duquel la borne est SILENT (secondes, défaut 90)
+             * @default 90
+             * @example 90
+             */
+            silentThresholdSec: number;
+        };
+        /** @description Battement de cœur émis par une borne (additif CONTRACT-013 / ADM-003). */
+        KioskHeartbeatRequest: {
+            /**
+             * Format: date-time
+             * @description Horodatage UTC du heartbeat (tolérance de skew ±5 min)
+             * @example 2026-07-12T10:00:00Z
+             */
+            ts: string;
+            /**
+             * @description Version firmware de la borne (optionnel)
+             * @example 1.4.2
+             */
+            fw?: string;
+            /**
+             * @description État de l'imprimante (optionnel)
+             * @example true
+             */
+            printerOk?: boolean;
+            /**
+             * @description Profondeur de file observée localement (optionnel)
+             * @example 7
+             */
+            queueDepth?: number;
+        };
+        /** @description État de supervision d'une borne (additif CONTRACT-013 / ADM-003). */
+        KioskSupervisionStatusEntry: {
+            /**
+             * Format: uuid
+             * @example 14141414-1414-4141-a141-141414141414
+             */
+            kioskId: string;
+            /**
+             * Format: uuid
+             * @example 33333333-3333-4333-a333-333333333333
+             */
+            agencyId: string;
+            status: components["schemas"]["KioskStatus"];
+            /**
+             * Format: date-time
+             * @description Dernier heartbeat reçu (null si NEVER_SEEN)
+             * @example 2026-07-12T09:59:30Z
+             */
+            lastSeen?: string | null;
+        };
+        /** @description Liste des états de supervision des bornes (additif CONTRACT-013 / ADM-003). */
+        KioskSupervisionStatusResponse: {
+            kiosks: components["schemas"]["KioskSupervisionStatusEntry"][];
+        };
         ErrorResponse: {
             error: {
                 /**
@@ -1631,9 +2531,17 @@ export interface components {
          *     - POSITION_UPDATE : mise à jour de la position dans la file (ex. « vous êtes 3e »)
          *     - YOUR_TURN : alerte d'appel imminent (ex. « vous êtes le suivant, préparez vos documents »)
          *     - DAILY_REPORT : rapport quotidien de l'agence à destination du directeur
+         *
+         *     **Additifs CONTRACT-013 (F6-F11)** — tous purement additifs, aucun retrait :
+         *     - POSITION_NEAR : le client approche (ex. « vous êtes 3e ») — déclenché au seuil
+         *       `smsNearThreshold` (CONTRACT-005, défaut 3). NOTIF-002/003.
+         *     - POSITION_NEXT : le client est le suivant. Supprime POSITION_NEAR si trop proche. NOTIF-002/003.
+         *     - MANAGER_ALERT : alerte interne (email) vers un manager/directeur. NOTIF-004.
+         *     - WEEKLY_REPORT : rapport hebdomadaire (email interne). NOTIF-004.
+         *     - MONTHLY_REPORT : rapport mensuel (email interne). NOTIF-004.
          * @enum {string}
          */
-        NotificationType: "TICKET_CONFIRMATION" | "POSITION_UPDATE" | "YOUR_TURN" | "DAILY_REPORT";
+        NotificationType: "TICKET_CONFIRMATION" | "POSITION_UPDATE" | "YOUR_TURN" | "DAILY_REPORT" | "POSITION_NEAR" | "POSITION_NEXT" | "MANAGER_ALERT" | "WEEKLY_REPORT" | "MONTHLY_REPORT";
         /**
          * @description Rôles utilisateur SIGFA (matrice RBAC v5 §MODULE 4).
          *     - SUPER_ADMIN : accès platform complet
@@ -1643,9 +2551,11 @@ export interface components {
          *     - AGENT : agent de guichet
          *     - AUDITOR : lecture seule, audit
          *     - NONE : accès sans authentification (routes publiques)
+         *     - COMEX : comité exécutif — abonnement reporting réseau (CONTRACT-013 / REP-002). Lecture agrégats.
+         *     - QUALITY : cellule qualité — abonnement reporting/feedback (CONTRACT-013 / REP-003, IA-004). Lecture.
          * @enum {string}
          */
-        Role: "SUPER_ADMIN" | "BANK_ADMIN" | "AGENCY_DIRECTOR" | "MANAGER" | "AGENT" | "AUDITOR" | "NONE";
+        Role: "SUPER_ADMIN" | "BANK_ADMIN" | "AGENCY_DIRECTOR" | "MANAGER" | "AGENT" | "AUDITOR" | "NONE" | "COMEX" | "QUALITY";
         PaginationMeta: {
             /** @description Numéro de page courant */
             page: number;

@@ -209,8 +209,9 @@ describe("CONTRACT-013: joinAgencyEvent (join:agency, client→serveur)", () => 
     expect(() => joinAgencyEvent.payloadSchema.parse({})).toThrow();
   });
 
-  it("CONTRACT-013: ALL_EVENTS contient 11 événements dont join:agency, sans casser l'existant", () => {
-    expect(ALL_EVENTS).toHaveLength(11);
+  it("CONTRACT-013: ALL_EVENTS contient au moins 11 événements dont join:agency, sans casser l'existant", () => {
+    // ≥ 11 : join:agency (CONTRACT-013 S2) + additifs kiosk:* (CONTRACT-013 batch F6-F11).
+    expect(ALL_EVENTS.length).toBeGreaterThanOrEqual(11);
     const names = ALL_EVENTS.map((e) => e.name);
     expect(names).toContain("join:agency");
     // Non-régression : les événements existants restent présents

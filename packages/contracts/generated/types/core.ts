@@ -2817,9 +2817,11 @@ export interface components {
          *     - AGENT : agent de guichet
          *     - AUDITOR : lecture seule, audit
          *     - NONE : accès sans authentification (routes publiques)
+         *     - COMEX : comité exécutif — abonnement reporting réseau (CONTRACT-013 / REP-002). Lecture agrégats.
+         *     - QUALITY : cellule qualité — abonnement reporting/feedback (CONTRACT-013 / REP-003, IA-004). Lecture.
          * @enum {string}
          */
-        Role: "SUPER_ADMIN" | "BANK_ADMIN" | "AGENCY_DIRECTOR" | "MANAGER" | "AGENT" | "AUDITOR" | "NONE";
+        Role: "SUPER_ADMIN" | "BANK_ADMIN" | "AGENCY_DIRECTOR" | "MANAGER" | "AGENT" | "AUDITOR" | "NONE" | "COMEX" | "QUALITY";
         /**
          * @description Canaux de livraison des notifications SIGFA.
          *     Schéma transverse référencé par CONTRACT-007 (journal par canal, opt-in par canal).
@@ -2837,9 +2839,17 @@ export interface components {
          *     - POSITION_UPDATE : mise à jour de la position dans la file (ex. « vous êtes 3e »)
          *     - YOUR_TURN : alerte d'appel imminent (ex. « vous êtes le suivant, préparez vos documents »)
          *     - DAILY_REPORT : rapport quotidien de l'agence à destination du directeur
+         *
+         *     **Additifs CONTRACT-013 (F6-F11)** — tous purement additifs, aucun retrait :
+         *     - POSITION_NEAR : le client approche (ex. « vous êtes 3e ») — déclenché au seuil
+         *       `smsNearThreshold` (CONTRACT-005, défaut 3). NOTIF-002/003.
+         *     - POSITION_NEXT : le client est le suivant. Supprime POSITION_NEAR si trop proche. NOTIF-002/003.
+         *     - MANAGER_ALERT : alerte interne (email) vers un manager/directeur. NOTIF-004.
+         *     - WEEKLY_REPORT : rapport hebdomadaire (email interne). NOTIF-004.
+         *     - MONTHLY_REPORT : rapport mensuel (email interne). NOTIF-004.
          * @enum {string}
          */
-        NotificationType: "TICKET_CONFIRMATION" | "POSITION_UPDATE" | "YOUR_TURN" | "DAILY_REPORT";
+        NotificationType: "TICKET_CONFIRMATION" | "POSITION_UPDATE" | "YOUR_TURN" | "DAILY_REPORT" | "POSITION_NEAR" | "POSITION_NEXT" | "MANAGER_ALERT" | "WEEKLY_REPORT" | "MONTHLY_REPORT";
         /**
          * @description Canal d'émission du ticket.
          * @enum {string}
