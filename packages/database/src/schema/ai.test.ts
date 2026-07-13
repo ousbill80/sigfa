@@ -5,6 +5,7 @@ import {
   aiStaffingRecommendations,
   aiAnomalies,
   aiQualityScores,
+  aiFeatures,
   contextualFactorEnum,
   staffingAckStatusEnum,
   anomalyTypeEnum,
@@ -299,5 +300,118 @@ describe("DB-007: modèle ai_quality_scores (structure)", () => {
       );
     });
     expect(hasFirstBankId, "ai_quality_scores doit avoir un index bank_id-first").toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Table ai_features (DB-AI-FEATURES — couture IA-001)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DB-AI-FEATURES: modèle ai_features (structure)", () => {
+  it("DB-AI-FEATURES: ai_features — toutes les colonnes du FeatureRecord IA-001 présentes", () => {
+    const config = getTableConfig(aiFeatures);
+    const names = config.columns.map((c) => c.name);
+    // Clé canonique + mesures bucket + calendaires + lags + métadonnées.
+    for (const col of [
+      "bank_id",
+      "agency_id",
+      "service_id",
+      "date",
+      "hour_bucket",
+      "bucket_minutes",
+      "arrivals",
+      "served",
+      "no_show",
+      "abandoned",
+      "avg_wait_seconds",
+      "p90_wait_seconds",
+      "avg_service_seconds",
+      "counters_open",
+      "agents_active",
+      "day_of_week",
+      "is_month_end",
+      "is_public_pay_day",
+      "is_public_holiday",
+      "is_eve_of_holiday",
+      "factors",
+      "arrivals_lag_1d",
+      "arrivals_lag_7d",
+      "arrivals_roll_mean_4w",
+      "is_partial",
+      "available_days",
+      "feature_set_version",
+    ]) {
+      expect(names, `colonne ${col} manquante`).toContain(col);
+    }
+  });
+
+  it("DB-AI-FEATURES: ai_features — service_id nullable (agrégat tous services, sans FK)", () => {
+    const config = getTableConfig(aiFeatures);
+    const serviceId = config.columns.find((c) => c.name === "service_id");
+    expect(serviceId?.notNull).toBeFalsy();
+  });
+
+  it("DB-AI-FEATURES: ai_features — lags et moyennes nullables (aucune imputation)", () => {
+    const config = getTableConfig(aiFeatures);
+    for (const col of [
+      "avg_wait_seconds",
+      "avg_service_seconds",
+      "arrivals_lag_1d",
+      "arrivals_lag_7d",
+      "arrivals_roll_mean_4w",
+    ]) {
+      const c = config.columns.find((x) => x.name === col);
+      expect(c?.notNull, `${col} doit être nullable`).toBeFalsy();
+    }
+  });
+
+  it("DB-AI-FEATURES: ai_features — clé unique (bank,agency,service,date,hour_bucket,feature_set_version)", () => {
+    const config = getTableConfig(aiFeatures);
+    const unique = config.indexes.find((idx) => idx.config.unique === true);
+    expect(unique, "index unique attendu").toBeDefined();
+    const cols = (unique?.config.columns ?? []).map((c) =>
+      "name" in c ? (c as { name: string }).name : ""
+    );
+    expect(cols).toEqual([
+      "bank_id",
+      "agency_id",
+      "service_id",
+      "date",
+      "hour_bucket",
+      "feature_set_version",
+    ]);
+  });
+
+  it("DB-AI-FEATURES: ai_features — factors est JSONB", () => {
+    const config = getTableConfig(aiFeatures);
+    const factors = config.columns.find((c) => c.name === "factors");
+    expect(factors?.columnType).toBe("PgJsonb");
+  });
+
+  it("DB-AI-FEATURES: ai_features — aucun champ personnel brut (agrégats uniquement)", () => {
+    const config = getTableConfig(aiFeatures);
+    const names = config.columns.map((c) => c.name);
+    const personalFields = names.filter(
+      (n) =>
+        n === "phone" ||
+        n === "email" ||
+        n === "first_name" ||
+        n === "last_name" ||
+        (n.includes("phone") && !n.endsWith("_hash") && !n.endsWith("_encrypted"))
+    );
+    expect(personalFields).toHaveLength(0);
+  });
+
+  it("DB-AI-FEATURES: ai_features — index bank_id-first présent", () => {
+    const config = getTableConfig(aiFeatures);
+    const hasFirstBankId = config.indexes.some((idx) => {
+      const first = idx.config.columns[0];
+      return (
+        first !== undefined &&
+        "name" in first &&
+        (first as { name: string }).name === "bank_id"
+      );
+    });
+    expect(hasFirstBankId, "ai_features doit avoir un index bank_id-first").toBe(true);
   });
 });

@@ -19,7 +19,8 @@ import { assertTenantIsolated } from "@sigfa/testing/tenant-isolation";
  * DB-009 : ajout de banks (SELECT only, REVOKE mutations) et retention_policies.
  * MODEL-DB-A : ajout de operations (RLS FORCE + tenant_isolation, D8).
  * DB-NOTIF : ajout des 3 tables WhatsApp (RLS FORCE + tenant_isolation, migration 0012).
- * Total : 31 tables (scan exhaustif RLS).
+ * DB-AI-FEATURES : ajout de ai_features (RLS FORCE + tenant_isolation, migration 0013).
+ * Total : 32 tables (scan exhaustif RLS).
  */
 const BUSINESS_TABLES = [
   // DB-009 : banks avec RLS SELECT only + REVOKE INSERT/UPDATE/DELETE sigfa_app
@@ -60,6 +61,8 @@ const BUSINESS_TABLES = [
   "ai_staffing_recommendations",
   "ai_anomalies",
   "ai_quality_scores",
+  // DB-AI-FEATURES : table ai_features (migration 0013)
+  "ai_features",
 ] as const;
 
 describe("DB-002 — RLS + tenant-isolation", () => {
