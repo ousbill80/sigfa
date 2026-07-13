@@ -12,6 +12,8 @@ export function ConfirmationPageClient() {
   const serviceId = searchParams.get("serviceId") ?? "";
   // MODEL-KIOSK-A : opération choisie (parcours 2 niveaux) — optionnelle.
   const operationId = searchParams.get("operationId") ?? undefined;
+  // KIOSK-BORNE : libellé public de l'opération (ticket imprimé) — optionnel.
+  const operationLabel = searchParams.get("operationLabel") ?? undefined;
   // MODEL-KIOSK-B : conseiller ciblé (parcours « voir mon conseiller ») — optionnel.
   const targetManagerId = searchParams.get("targetManagerId") ?? undefined;
   // MODEL-KIOSK-B (finition) : nom du conseiller (public, non-PII) pour le rappel.
@@ -22,6 +24,7 @@ export function ConfirmationPageClient() {
     <ConfirmationScreen
       serviceId={serviceId}
       operationId={operationId}
+      operationLabel={operationLabel}
       targetManagerId={targetManagerId}
       managerName={managerName}
       agencyId={agencyId}

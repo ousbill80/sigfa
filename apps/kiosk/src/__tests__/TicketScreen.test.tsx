@@ -77,6 +77,15 @@ const frMessages = {
   degraded007: {
     photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
   },
+  print: {
+    welcome: "Bienvenue à l'agence {agency}",
+    yourNumber: "Votre numéro de passage",
+    peopleAhead: "Personnes avant vous : {count}",
+    estimatedWait: "Attente estimée : ~{minutes} min",
+    trackingLabel: "Code de suivi : {code}",
+    smsNotice: "Vous serez prévenu par SMS avant votre passage.",
+    courtesy: "Merci de patienter, nous allons vous recevoir.",
+  },
 };
 
 const enMessages = {
@@ -95,6 +104,15 @@ const enMessages = {
   voice008: { playLabel: "Écouter" },
   degraded007: {
     photographNumber: "Take a photo of your number or receive it by SMS",
+  },
+  print: {
+    welcome: "Welcome to the {agency} branch",
+    yourNumber: "Your queue number",
+    peopleAhead: "People ahead of you: {count}",
+    estimatedWait: "Estimated wait: ~{minutes} min",
+    trackingLabel: "Tracking code: {code}",
+    smsNotice: "You will be notified by SMS before your turn.",
+    courtesy: "Thank you for waiting, we will be with you shortly.",
   },
 };
 

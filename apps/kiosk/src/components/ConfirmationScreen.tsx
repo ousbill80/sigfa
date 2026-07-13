@@ -29,6 +29,12 @@ interface ConfirmationScreenProps {
    */
   operationId?: string;
   /**
+   * KIOSK-BORNE : libellé PUBLIC (non-PII) de l'opération/du service choisi.
+   * Porté jusqu'au Moment Ticket (`serviceLabel`) pour figurer sur le ticket
+   * IMPRIMÉ. Jamais de PII : c'est un libellé d'enseigne.
+   */
+  operationLabel?: string;
+  /**
    * MODEL-KIOSK-B : conseiller ciblé (parcours « voir mon conseiller », additif).
    * Envoyé au serveur avec le ticket → il rejoint la file personnelle du
    * conseiller (MODEL-API-B/D6). `serviceId` reste requis par le contrat.
@@ -66,6 +72,7 @@ const KEYPAD_ROWS = [
 export function ConfirmationScreen({
   serviceId,
   operationId,
+  operationLabel,
   targetManagerId,
   managerName,
   agencyId,
@@ -148,6 +155,10 @@ export function ConfirmationScreen({
     // Moment Ticket pour rappeler QUI le client va voir. Chemin conseiller seul.
     if (targetManagerId && managerName) {
       params.set("managerName", managerName);
+    }
+    // KIOSK-BORNE : libellé public de l'opération → ticket imprimé (non-PII).
+    if (operationLabel) {
+      params.set("serviceLabel", operationLabel);
     }
     return `/${currentLocale}/ticket?${params.toString()}`;
   };

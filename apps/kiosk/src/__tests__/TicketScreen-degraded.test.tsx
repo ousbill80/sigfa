@@ -50,6 +50,15 @@ const frMessages = {
     photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
     photographNumberShort: "Photographiez votre numéro",
   },
+  print: {
+    welcome: "Bienvenue à l'agence {agency}",
+    yourNumber: "Votre numéro de passage",
+    peopleAhead: "Personnes avant vous : {count}",
+    estimatedWait: "Attente estimée : ~{minutes} min",
+    trackingLabel: "Code de suivi : {code}",
+    smsNotice: "Vous serez prévenu par SMS avant votre passage.",
+    courtesy: "Merci de patienter, nous allons vous recevoir.",
+  },
 };
 
 import { TicketScreen } from "@/components/TicketScreen";

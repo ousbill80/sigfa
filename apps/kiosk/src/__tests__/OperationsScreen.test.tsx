@@ -159,9 +159,15 @@ describe("MODEL-KIOSK-A: OperationsScreen", () => {
 
     screen.getAllByTestId("operation-card")[0].click();
 
-    expect(mockPush).toHaveBeenCalledWith(
-      `/fr/confirmation?serviceId=${SERVICE_ID}&operationId=op-1&agencyId=${AGENCY_ID}`
-    );
+    // KIOSK-BORNE : le libellé public de l'opération est porté jusqu'au ticket
+    // imprimé via `operationLabel` (non-PII).
+    const expectedQuery = new URLSearchParams({
+      serviceId: SERVICE_ID,
+      operationId: "op-1",
+      agencyId: AGENCY_ID,
+      operationLabel: "Dépôt espèces",
+    }).toString();
+    expect(mockPush).toHaveBeenCalledWith(`/fr/confirmation?${expectedQuery}`);
   });
 
   it("MODEL-KIOSK-A: SAUT opération unique → confirmation directe (pas de choix inutile)", async () => {
@@ -169,10 +175,14 @@ describe("MODEL-KIOSK-A: OperationsScreen", () => {
     renderScreen();
 
     // Une seule opération → on ne montre PAS la grille, on navigue direct.
+    const expectedQuery = new URLSearchParams({
+      serviceId: SERVICE_ID,
+      operationId: "op-1",
+      agencyId: AGENCY_ID,
+      operationLabel: "Dépôt espèces",
+    }).toString();
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith(
-        `/fr/confirmation?serviceId=${SERVICE_ID}&operationId=op-1&agencyId=${AGENCY_ID}`
-      );
+      expect(mockPush).toHaveBeenCalledWith(`/fr/confirmation?${expectedQuery}`);
     });
     // Aucune carte affichée : l'écran a été sauté.
     expect(screen.queryByTestId("operation-card")).not.toBeInTheDocument();

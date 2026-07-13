@@ -105,6 +105,15 @@
   "voice008": {
     "playLabel": "Écouter"
   },
+  "print": {
+    "welcome": "Bienvenue à l'agence {agency}",
+    "yourNumber": "Votre numéro de passage",
+    "peopleAhead": "Personnes avant vous : {count}",
+    "estimatedWait": "Attente estimée : ~{minutes} min",
+    "trackingLabel": "Code de suivi : {code}",
+    "smsNotice": "Vous serez prévenu par SMS avant votre passage.",
+    "courtesy": "Merci de patienter, nous allons vous recevoir."
+  },
   "feedback009": {
     "title": "Comment s'est passé votre passage ?",
     "starLabel": "Note {n} sur 5",

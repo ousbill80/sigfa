@@ -105,6 +105,15 @@
   "voice008": {
     "playLabel": "Listen"
   },
+  "print": {
+    "welcome": "Welcome to the {agency} branch",
+    "yourNumber": "Your queue number",
+    "peopleAhead": "People ahead of you: {count}",
+    "estimatedWait": "Estimated wait: ~{minutes} min",
+    "trackingLabel": "Tracking code: {code}",
+    "smsNotice": "You will be notified by SMS before your turn.",
+    "courtesy": "Thank you for waiting, we will be with you shortly."
+  },
   "feedback009": {
     "title": "How was your visit?",
     "starLabel": "Rating {n} out of 5",

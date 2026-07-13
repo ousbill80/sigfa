@@ -72,12 +72,17 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
     router.push(`/${currentLocale}`);
   }, timeoutMs);
 
-  /** Navigue vers la confirmation en portant serviceId ET operationId. */
+  /** Navigue vers la confirmation en portant serviceId, operationId ET le
+   *  libellé public de l'opération (ticket imprimé — non-PII). */
   const goToConfirmation = useCallback(
-    (operationId: string) => {
-      router.push(
-        `/${currentLocale}/confirmation?serviceId=${serviceId}&operationId=${operationId}&agencyId=${agencyId}`
-      );
+    (operationId: string, operationLabel?: string) => {
+      const query = new URLSearchParams({
+        serviceId,
+        operationId,
+        agencyId,
+      });
+      if (operationLabel) query.set("operationLabel", operationLabel);
+      router.push(`/${currentLocale}/confirmation?${query.toString()}`);
     },
     [router, currentLocale, serviceId, agencyId]
   );
@@ -98,7 +103,7 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
       const ops = (data.data ?? []) as OperationItem[];
       // Saut « opération unique » : une seule opération → confirmation directe.
       if (ops.length === 1) {
-        goToConfirmation(ops[0].id);
+        goToConfirmation(ops[0].id, ops[0].name);
         return;
       }
       if (ops.length === 0) {
@@ -306,7 +311,7 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
             <button
               key={operation.id}
               data-testid="operation-card"
-              onClick={() => goToConfirmation(operation.id)}
+              onClick={() => goToConfirmation(operation.id, operation.name)}
               style={{
                 minHeight: "96px",
                 backgroundColor: "var(--surface-1)",

@@ -20,6 +20,9 @@ import { TicketMoment } from "@sigfa/ui";
 import { deriveDegradedState, type PrinterStatus } from "@/hooks/useDegradedState";
 import { useVoiceAnnouncement } from "@/hooks/useVoiceAnnouncement";
 import { VoiceButton } from "@/components/VoiceButton";
+import { PrintTicket } from "@/components/PrintTicket";
+import { shouldAutoPrintTicket, triggerTicketPrint } from "@/lib/kiosk-print";
+import { kioskAgencyName, kioskBankName } from "@/lib/kiosk-branding";
 import {
   A11Y_BASE_FONT_PX,
   accessibilityFontSizePx,
@@ -45,6 +48,16 @@ interface TicketScreenProps {
    * confirmation imprimante → bascule dégradée identique (affichage 8 s).
    */
   networkLostBeforePrinterConfirm?: boolean;
+  /**
+   * KIOSK-BORNE : trackingId public (nanoid 21) — code de suivi court sur le
+   * ticket imprimé. Donnée publique, non-PII.
+   */
+  trackingId?: string;
+  /**
+   * KIOSK-BORNE : libellé public de l'opération/service choisi, imprimé sur
+   * le ticket (transite par l'URL — non-PII).
+   */
+  serviceLabel?: string;
 }
 
 /**
@@ -75,6 +88,8 @@ export function TicketScreen({
   managerName,
   isAccessibilityMode = false,
   networkLostBeforePrinterConfirm = false,
+  trackingId,
+  serviceLabel,
 }: TicketScreenProps) {
   const t = useTranslations("ticket005");
   const tDeg = useTranslations("degraded007");
@@ -115,6 +130,24 @@ export function TicketScreen({
     announce({ displayNumber, position, estimatedWaitMinutes });
   }, [displayNumber, position, estimatedWaitMinutes, announce]);
 
+  // KIOSK-BORNE — Impression automatique UNE SEULE FOIS, UNIQUEMENT si
+  // l'imprimante est confirmée OK et hors de tout état dégradé/offline
+  // (décision pure `shouldAutoPrintTicket`). En Electron : impression
+  // silencieuse via IPC ; sinon repli window.print(). Le mode dégradé
+  // KIOSK-007 (« Photographiez votre numéro ») n'imprime JAMAIS.
+  const shouldPrint = shouldAutoPrintTicket({
+    printerStatus,
+    networkLostBeforePrinterConfirm,
+    isBrowserOnline:
+      typeof navigator === "undefined" ? undefined : navigator.onLine,
+  });
+  const hasPrintedRef = useRef(false);
+  useEffect(() => {
+    if (!shouldPrint || hasPrintedRef.current) return;
+    hasPrintedRef.current = true;
+    triggerTicketPrint();
+  }, [shouldPrint]);
+
   const reducedMotion = prefersReducedMotion();
 
   return (
@@ -131,6 +164,22 @@ export function TicketScreen({
         gap: "var(--space-6)",
       }}
     >
+      {/* KIOSK-BORNE — Ticket thermique 80 mm : masqué à l'écran, SEUL rendu
+          en @media print. Rendu uniquement quand l'impression est décidée
+          (imprimante OK, aucun état dégradé). */}
+      {shouldPrint && (
+        <PrintTicket
+          bankName={kioskBankName()}
+          agencyName={kioskAgencyName()}
+          serviceLabel={serviceLabel}
+          displayNumber={displayNumber}
+          position={position}
+          estimatedWaitMinutes={estimatedWaitMinutes}
+          trackingId={trackingId}
+          smsConsent={Boolean(phoneNumber && smsConsent)}
+        />
+      )}
+
       {/* Le HÉROS — numéro or sur night + halo, entrée spring (composant UI). */}
       <TicketMoment
         eyebrow={t("position", { position })}
