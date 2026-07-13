@@ -49,6 +49,7 @@ import { createReportRouter } from "src/routes/reports.js";
 import { createNotificationWebhookRouter } from "src/routes/webhooks-notifications.js";
 import { createWhatsAppInboundRouter } from "src/routes/webhooks-whatsapp-inbound.js";
 import { createAiForecastRouter } from "src/routes/ai-forecast.js";
+import { createAnomalyRouter } from "src/ai/anomaly-route.js";
 import type { AppOptions } from "src/app.js";
 
 /**
@@ -162,5 +163,7 @@ export function buildRouteRegistry(opts: AppOptions): readonly RouteDescriptor[]
     // Prévision d'affluence IA (IA-002, CONTRACT-008) : GET /ai/forecast. Runtime
     // GATED sur données réelles — provider par défaut → 422 INSUFFICIENT_HISTORY.
     mount("/api/v1", createAiForecastRouter()),
+    // Anomalies IA agrégées (IA-003, CONTRACT-008) : GET /ai/anomalies (lecture seule).
+    mount("/api/v1", createAnomalyRouter()),
   ];
 }
