@@ -210,3 +210,62 @@ describe("SEC-002: campagne tenant-isolation EXHAUSTIVE (table × attaque, PG r�
     ).toBe(0);
   }, 60_000);
 });
+
+/**
+ * NET-001 — Extension de la campagne SEC-002 au RÔLE PLATEFORME (SUPER_ADMIN,
+ * `bank_id IS NULL`). La console réseau cross-tenant est STRICTEMENT en LECTURE
+ * SEULE : le SUPER_ADMIN ne peut MUTER aucune donnée d'une banque et ne voit que
+ * des agrégats. Ces axes prouvent, sur PG réelle via la connexion applicative
+ * `sigfa_app` NOBYPASSRLS (le rôle par lequel toute requête HTTP tenant est armée),
+ * l'invariant « lecture seule + aucune fuite PII cross-tenant » du rôle plateforme.
+ */
+describe("NET-001: rôle plateforme (SUPER_ADMIN) — lecture seule cross-tenant, aucune écriture, aucune fuite PII", () => {
+  it("NET-001: PLATFORM_READ_ONLY — sans contexte tenant (session plateforme), aucune ÉCRITURE cross-tenant n'aboutit sur AUCUNE table bank_id", async () => {
+    for (const table of tables) {
+      const ref = seeded.rowIds.get(table);
+      if (!ref?.a && !ref?.b) continue;
+      const targetId = ref.a ?? ref.b;
+      // Session applicative SANS `app.current_bank_id` (posture plateforme sur la
+      // connexion armée). Toute mutation d'une ligne tenant doit être impossible :
+      // soit refusée (REVOKE/append-only), soit sans effet (0 ligne — RLS masque tout).
+      const affected = await inAppCtx(h, null, async () => {
+        const res = await h.appQuery(
+          `UPDATE ${table} SET bank_id = bank_id WHERE id = '${targetId}' RETURNING id`
+        );
+        return res.rows.length;
+      }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        // `audit_log` est append-only (REVOKE UPDATE) → « permission denied » : une
+        // isolation ENCORE plus forte (aucune écriture possible), pas une régression.
+        expect(
+          /permission denied/i.test(msg),
+          `${table}: écriture plateforme refusée pour une raison autre qu'un REVOKE : ${msg}`
+        ).toBe(true);
+        return 0;
+      });
+      expect(
+        affected,
+        `${table}: une session plateforme (sans contexte tenant) a MUTÉ une ligne tenant (PLATFORM_READ_ONLY violé)`
+      ).toBe(0);
+      // La ligne existe toujours (vérif via migrateur BYPASSRLS) : rien n'a été détruit.
+      const stillThere = await h.query(`SELECT 1 FROM ${table} WHERE id = '${targetId}'`);
+      expect(stillThere.rows.length, `${table}: ligne tenant altérée par la plateforme`).toBe(1);
+    }
+  }, 120_000);
+
+  it("NET-001: PLATFORM_LEAK (agrégats) — une session plateforme (sans contexte) ne voit AUCUNE ligne métier brute sur les tables bank_id (0 ligne)", async () => {
+    // La lecture cross-tenant du SUPER_ADMIN passe par des agrégats (network-overview),
+    // JAMAIS par une lecture de lignes brutes sur la connexion armée sans contexte.
+    // Sans `app.current_bank_id`, la connexion `sigfa_app` ne doit exposer aucune ligne.
+    for (const table of tables) {
+      const rows = await inAppCtx(h, null, async () => {
+        const res = await h.appQuery(`SELECT bank_id FROM ${table}`);
+        return res.rows.length;
+      });
+      expect(
+        rows,
+        `${table}: une session plateforme sans contexte voit des lignes métier brutes (fuite cross-tenant)`
+      ).toBe(0);
+    }
+  }, 120_000);
+});

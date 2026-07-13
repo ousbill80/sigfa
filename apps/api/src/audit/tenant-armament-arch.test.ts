@@ -50,6 +50,10 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
   "health.ts", // GET /health — public, checks infra, aucune table tenant.
   "audit-logs.ts", // GET /audit-logs — AUDITOR/SUPER_ADMIN, connexion plateforme (cross-banques).
   "auth.ts", // /auth/* — résolution d'identité pré-tenant (login/refresh), avant contexte.
+  // NET-001 — GET /admin/network-overview : SUPER_ADMIN, connexion plateforme
+  // (withPlatform, cross-banques). LECTURE SEULE agrégée : n'arme JAMAIS
+  // `app.current_bank_id` (pas de contexte tenant), mutations → 403 PLATFORM_READ_ONLY.
+  "network-overview.ts",
 ];
 
 /**
