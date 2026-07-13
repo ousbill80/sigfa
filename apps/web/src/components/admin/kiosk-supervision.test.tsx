@@ -180,7 +180,10 @@ describe("ADM-003b: cinq états d'écran", () => {
 
   it("ADM-003b: error → carte d'erreur role=alert", () => {
     render(<KioskSupervision state={initialKioskSupervisionState} load="error" nowMs={NOW} />);
-    expect(screen.getByTestId("supervision-error")).toBeInTheDocument();
+    const error = screen.getByTestId("supervision-error");
+    expect(error).toBeInTheDocument();
+    // ICONS-001 : icône alerte du set SIGFA (plus de SVG ad hoc).
+    expect(error.querySelector('svg[data-icon="alerte"]')).not.toBeNull();
   });
 
   it("ADM-003b: stale (API indisponible) → bandeau info + dernier état connu", () => {

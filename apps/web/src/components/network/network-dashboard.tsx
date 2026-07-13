@@ -12,7 +12,17 @@
 "use client";
 
 import { useState, type CSSProperties, type ReactElement } from "react";
-import { Badge, Button, Card, EmptyState, KpiTile, OfflineBanner, Skeleton } from "@sigfa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  IconEntreprise,
+  IconEtoile,
+  KpiTile,
+  OfflineBanner,
+  Skeleton,
+} from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 import {
   benchmarkBadge,
@@ -128,7 +138,7 @@ export function NetworkDashboard({
         <Card style={{ padding: "var(--space-8)" }}>
           <EmptyState
             data-testid="network-empty"
-            icon="🏦"
+            icon={<IconEntreprise size="xl" />}
             title={t("network.empty", locale)}
             action={
               <a
@@ -233,8 +243,16 @@ export function NetworkDashboard({
                       <td style={{ padding: "var(--space-3)", fontWeight: 600 }}>
                         {a.agencyName}
                         {isTop && (
-                          <span aria-hidden="true" style={{ marginLeft: "var(--space-2)", color: "var(--gold)" }}>
-                            ★
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              marginLeft: "var(--space-2)",
+                              color: "var(--gold)",
+                              verticalAlign: "-2px",
+                              display: "inline-flex",
+                            }}
+                          >
+                            <IconEtoile size="sm" />
                           </span>
                         )}
                       </td>

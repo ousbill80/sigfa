@@ -185,7 +185,7 @@ describe("IA-005: refonte design — barre irréprochable", () => {
     render(<AiInsightsDashboard insights={model()} load="ready" history={null} />);
     const flag = screen.getByTestId("ai-lowconf-flag");
     expect(flag.getAttribute("style")).toContain("var(--warning-soft)");
-    expect(flag.querySelector("svg")).not.toBeNull();
+    expect(flag.querySelector('svg[data-icon="alerte"]')).not.toBeNull();
   });
 
   it("IA-005: état error dédié — icône + Réessayer (pas le titre nominal recyclé)", () => {
@@ -194,7 +194,7 @@ describe("IA-005: refonte design — barre irréprochable", () => {
     const err = screen.getByTestId("ai-error");
     // Not the nominal title.
     expect(err).not.toHaveTextContent("INSIGHTS IA — DIRECTION");
-    expect(err.querySelector("svg")).not.toBeNull();
+    expect(err.querySelector('svg[data-icon="alerte"]')).not.toBeNull();
     fireEvent.click(screen.getByTestId("ai-retry"));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

@@ -213,7 +213,10 @@ describe("ThemingConsole — 5 états", () => {
   it("ADM-001b: error → message + retry", () => {
     const onRetry = vi.fn();
     renderReady({ status: "error", theme: null, onRetry });
-    expect(screen.getByTestId("theming-error")).toBeInTheDocument();
+    const error = screen.getByTestId("theming-error");
+    expect(error).toBeInTheDocument();
+    // ICONS-001 : icône alerte du set SIGFA (plus de SVG ad hoc).
+    expect(error.querySelector('svg[data-icon="alerte"]')).not.toBeNull();
     expect(screen.getByTestId("theming-retry")).toBeInTheDocument();
   });
 
