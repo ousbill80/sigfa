@@ -11,6 +11,8 @@ import {
   extractIp,
   buildDiff,
   recordAudit,
+  isSensitiveKey,
+  stripSensitive,
 } from "src/lib/audit-context.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 
@@ -71,6 +73,57 @@ describe("API-008: audit-context helpers", () => {
   it("API-008: buildDiff gère les valeurs undefined/null", () => {
     const diff = buildDiff({ x: undefined }, { x: 5 });
     expect(diff).toEqual({ before: { x: null }, after: { x: 5 } });
+  });
+
+  it("SEC-001a: isSensitiveKey exclut suffixes DB-004 et noms téléphone/secret", () => {
+    expect(isSensitiveKey("phone_encrypted")).toBe(true);
+    expect(isSensitiveKey("phone_hash")).toBe(true);
+    expect(isSensitiveKey("credentials_cipher")).toBe(true);
+    expect(isSensitiveKey("phoneNumber")).toBe(true);
+    expect(isSensitiveKey("kioskSecret")).toBe(true);
+    expect(isSensitiveKey("password_hash")).toBe(true);
+    // Champs non sensibles conservés.
+    expect(isSensitiveKey("status")).toBe(false);
+    expect(isSensitiveKey("serviceId")).toBe(false);
+    expect(isSensitiveKey("name")).toBe(false);
+  });
+
+  it("SEC-001a: stripSensitive retire en profondeur téléphone/hash/secret", () => {
+    const cleaned = stripSensitive({
+      before: { status: "WAITING", phoneNumber: "+2250700000000", phone_hash: "abc" },
+      after: { status: "DONE", note: 5, credentials_encrypted: "xxx" },
+    });
+    expect(cleaned).toEqual({
+      before: { status: "WAITING" },
+      after: { status: "DONE", note: 5 },
+    });
+  });
+
+  it("SEC-001a: buildDiff n'expose JAMAIS le téléphone en clair même modifié", () => {
+    const diff = buildDiff(
+      { status: "WAITING", phoneNumber: null },
+      { status: "DONE", phoneNumber: "+2250700000000" }
+    );
+    expect(diff).toEqual({ before: { status: "WAITING" }, after: { status: "DONE" } });
+    expect(JSON.stringify(diff)).not.toContain("+2250700000000");
+  });
+
+  it("SEC-001a: recordAudit assainit le diff avant persistance (téléphone exclu du SQL)", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ id: "a" }] });
+    const db = { query } as unknown as import("pg").Client;
+    await recordAudit({
+      db,
+      tenant,
+      action: "POST /public/tickets",
+      entityType: "ticket",
+      entityId: "22222222-2222-4222-a222-222222222222",
+      ip: "41.67.128.1",
+      diff: { after: { status: "WAITING", phoneNumber: "+2250700000000" } },
+    });
+    const sql = (query.mock.calls[0]?.[0] ?? "") as string;
+    expect(sql).not.toContain("+2250700000000");
+    expect(sql).not.toContain("phoneNumber");
+    expect(sql).toContain("WAITING");
   });
 
   it("API-008: recordAudit adapte pg.Client à insertAuditEntry et écrit qui/quoi/IP", async () => {

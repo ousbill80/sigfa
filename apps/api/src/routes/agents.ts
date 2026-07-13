@@ -28,6 +28,7 @@ import {
 } from "src/services/agent-status.js";
 import { computeAgentStats, type StatsPeriod } from "src/services/agent-stats.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withAudit, auditContextFrom } from "src/audit/with-audit.js";
 import { parseStrict } from "src/lib/admin-helpers.js";
 import { safeText } from "src/lib/safe-text.js";
 
@@ -451,12 +452,28 @@ function registerPostStatus(router: Hono<AgentEnv>): void {
           400
         );
       }
-      const result = await changeAgentStatus({
-        db,
-        bus: getBus(c),
-        bankId: requireBankId(tenant),
-        agentId,
-        target: parsed.data.status as AgentStatus,
+      // SEC-001a : changement de statut + audit dans UNE transaction. Un échec
+      // d'audit rollback l'écriture d'agent_status_history (pas de best-effort).
+      const result = await withAudit(auditContextFrom(c), async () => {
+        const changed = await changeAgentStatus({
+          db,
+          bus: getBus(c),
+          bankId: requireBankId(tenant),
+          agentId,
+          target: parsed.data.status as AgentStatus,
+        });
+        return {
+          result: changed,
+          audit: {
+            action: "POST /agents/:id/status",
+            entityType: "user",
+            entityId: agentId,
+            diff: buildDiff(
+              { status: changed.previousStatus },
+              { status: changed.status }
+            ),
+          },
+        };
       });
       return c.json(result, 200);
     } catch (err) {

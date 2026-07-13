@@ -56,6 +56,7 @@ import {
   changeAgentStatus,
   getCurrentStatus,
 } from "src/services/agent-status.js";
+import { recordAudit, extractIp } from "src/lib/audit-context.js";
 
 /** Variables de contexte Hono injectées par app.ts. */
 interface TicketEnv {
@@ -144,6 +145,64 @@ function getBus(c: TicketCtx): RealtimeBus {
   return (c.get("bus") as RealtimeBus | undefined) ?? createNoopBus();
 }
 
+/**
+ * Paramètres d'audit d'une mutation de ticket, journalisée DANS la transaction
+ * courante (SEC-001a). `actorId`/`actorRole` peuvent être null (chemin public).
+ */
+interface TicketAuditParams {
+  bankId: string | null;
+  actorId: string | null;
+  actorRole: string | null;
+  ip: string | null;
+  action: string;
+  entityId: string;
+  diff?: Record<string, unknown> | null;
+}
+
+/**
+ * Écrit une entrée d'audit `ticket` dans la transaction PG DÉJÀ ouverte.
+ * Réutilise `recordAudit` (qui assainit le diff : téléphone/hash exclus). Un
+ * échec ici propage l'erreur → rollback de la mutation (pas de best-effort).
+ *
+ * @param db     - Connexion PG (transaction ouverte)
+ * @param params - Acteur, IP, action, entité, diff
+ */
+async function auditTicketTx(db: Client, params: TicketAuditParams): Promise<void> {
+  await recordAudit({
+    db,
+    tenant: {
+      requestId: "",
+      userId: params.actorId ?? "",
+      bankId: params.bankId,
+      role: params.actorRole ?? "NONE",
+      agencyIds: [],
+    },
+    action: params.action,
+    entityType: "ticket",
+    entityId: params.entityId,
+    ip: params.ip,
+    diff: params.diff ?? null,
+  });
+}
+
+/**
+ * Construit le crochet d'audit d'une émission depuis le contexte tenant (chemin
+ * agent JWT). L'IP provient du trust-proxy XFF durci (F3), jamais du payload.
+ *
+ * @param c      - Contexte Hono
+ * @param action - Action journalisée
+ * @returns Crochet d'audit
+ */
+function issueAuditFromCtx(c: TicketCtx, action: string): IssueAuditHook {
+  const tenant = c.get("tenant");
+  return {
+    actorId: tenant.userId || null,
+    actorRole: tenant.role,
+    ip: extractIp(c),
+    action,
+  };
+}
+
 /** Regex UUID (canonique) pour valider les paramètres de chemin. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -218,7 +277,10 @@ function registerCreate(router: Hono<TicketEnv>): void {
       if (outcome.kind === "replay") return replayResponse(c, outcome.result);
       let bodyStr: string;
       try {
-        const result = await issueTicket(db, redis, tenant, parsed.data, getBus(c));
+        const result = await issueTicket(
+          db, redis, tenant, parsed.data, getBus(c),
+          issueAuditFromCtx(c, "POST /tickets")
+        );
         bodyStr = JSON.stringify(result);
       } catch (processErr) {
         // Échec du traitement : libérer le verrou pour permettre un nouvel essai.
@@ -275,6 +337,22 @@ export interface IssueTenant {
 }
 
 /**
+ * Crochet d'audit d'une émission de ticket (SEC-001a). Journalisé DANS la même
+ * transaction que l'insertion : appelé juste avant COMMIT. `actorId`/`actorRole`
+ * peuvent être null pour le chemin public (borne/QR) — action publique tracée.
+ */
+export interface IssueAuditHook {
+  /** ID de l'acteur (null pour un chemin public sans JWT). */
+  actorId: string | null;
+  /** Rôle de l'acteur (null pour un chemin public). */
+  actorRole: string | null;
+  /** IP réelle résolue (XFF durci F3), ou null. */
+  ip: string | null;
+  /** Action journalisée (« POST /tickets » ou « POST /public/tickets »). */
+  action: string;
+}
+
+/**
  * Émet un ticket : résout la file, alloue le numéro (lock-then-increment),
  * compose displayNumber, persiste, calcule position/estimation, émet events.
  */
@@ -283,11 +361,12 @@ async function issueTicket(
   redis: Redis,
   tenant: TenantContext,
   input: CreateInput,
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  audit: IssueAuditHook
 ): Promise<Record<string, unknown>> {
   const agencyId = tenant.agencyIds[0];
   if (!agencyId) throw new SigfaError("FORBIDDEN", "Aucune agence dans le scope du JWT.", 403);
-  return issueTicketFor(db, redis, { bankId: tenant.bankId, agencyId }, input, bus);
+  return issueTicketFor(db, redis, { bankId: tenant.bankId, agencyId }, input, bus, audit);
 }
 
 /**
@@ -309,7 +388,8 @@ export async function issueTicketFor(
   redis: Redis,
   at: IssueTenant,
   input: IssueTicketInput,
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  audit?: IssueAuditHook
 ): Promise<Record<string, unknown>> {
   await db.query("BEGIN");
   try {
@@ -339,6 +419,26 @@ export async function issueTicketFor(
     const position = await computePositionPriority(inserted.id, db);
     // D4 : SLA résolu (opération sinon service) en fallback TMT de l'estimation.
     const estimate = await estimateWaitMinutes(position, resolved.serviceId, db, resolved.operationId);
+    // SEC-001a : audit DANS la transaction (échec audit → rollback émission).
+    // Diff volontairement sans téléphone : seuls des champs non sensibles.
+    if (audit) {
+      await auditTicketTx(db, {
+        bankId: ctx.bankId,
+        actorId: audit.actorId,
+        actorRole: audit.actorRole,
+        ip: audit.ip,
+        action: audit.action,
+        entityId: inserted.id,
+        diff: {
+          after: {
+            status: "WAITING",
+            serviceId: resolved.serviceId,
+            channel: input.channel,
+            priority: input.priority ?? "STANDARD",
+          },
+        },
+      });
+    }
     await db.query("COMMIT");
     await emitCreated(bus, redis, db, {
       inserted,
@@ -656,7 +756,7 @@ function registerCallNext(router: Hono<TicketEnv>, selector: TicketSelector): vo
     const db = c.get("db");
     try {
       const counterId = paramUuid(c, "counterId");
-      const result = await callNext(db, c.get("redis"), tenant, counterId, selector, getBus(c));
+      const result = await callNext(db, c.get("redis"), tenant, counterId, selector, getBus(c), extractIp(c));
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -671,7 +771,8 @@ async function callNext(
   tenant: TenantContext,
   counterId: string,
   selector: TicketSelector,
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  ip: string | null
 ): Promise<Record<string, unknown>> {
   await db.query("BEGIN");
   try {
@@ -683,6 +784,13 @@ async function callNext(
       `UPDATE tickets SET status = 'CALLED', counter_id = $1, called_at = $2, updated_at = NOW() WHERE id = $3`,
       [counterId, now, selected.id]
     );
+    // SEC-001a : audit de l'appel prioritaire DANS la transaction.
+    await auditTicketTx(db, {
+      bankId, actorId: tenant.userId || null, actorRole: tenant.role, ip,
+      action: "POST /counters/:counterId/call-next",
+      entityId: selected.id,
+      diff: { after: { status: "CALLED", counterId } },
+    });
     await db.query("COMMIT");
     await afterCall(bus, redis, db, { ticketId: selected.id, queueId, counterId });
     // API-004 : vérification débordement après chaque appel
@@ -810,7 +918,7 @@ function registerCall(router: Hono<TicketEnv>): void {
       const body = await parseJson(c);
       const parsed = callSchema.safeParse(body);
       if (!parsed.success) return c.json(buildError("VALIDATION_ERROR", "Corps invalide."), 400);
-      const result = await callTargeted(db, redis, tenant, paramUuid(c, "id"), parsed.data.counterId, getBus(c));
+      const result = await callTargeted(db, redis, tenant, paramUuid(c, "id"), parsed.data.counterId, getBus(c), extractIp(c));
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -835,7 +943,8 @@ async function callTargeted(
   tenant: TenantContext,
   id: string,
   counterId: string,
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  ip: string | null
 ): Promise<Record<string, unknown>> {
   // Étape 1 : charger le ticket pour la vérification de transition
   const row = await loadTicket(db, tenant, id);
@@ -881,13 +990,27 @@ async function callTargeted(
     });
   }
 
-  // Étape 5 : UPDATE + COMMIT
+  // Étape 5 : UPDATE + audit (même transaction) + COMMIT. Un échec d'audit doit
+  // rollback ET libérer le verrou Redis (pas de best-effort — SEC-001a).
   const now = new Date();
-  await db.query(
-    `UPDATE tickets SET status = 'CALLED', counter_id = $1, called_at = COALESCE(called_at, $2), updated_at = NOW() WHERE id = $3`,
-    [counterId, now, id]
-  );
-  await db.query("COMMIT");
+  try {
+    await db.query(
+      `UPDATE tickets SET status = 'CALLED', counter_id = $1, called_at = COALESCE(called_at, $2), updated_at = NOW() WHERE id = $3`,
+      [counterId, now, id]
+    );
+    // SEC-001a : audit de l'appel ciblé DANS la transaction (verrou déjà tenu).
+    await auditTicketTx(db, {
+      bankId: tenant.bankId, actorId: tenant.userId || null, actorRole: tenant.role, ip,
+      action: "POST /tickets/:id/call",
+      entityId: id,
+      diff: { after: { status: "CALLED", counterId } },
+    });
+    await db.query("COMMIT");
+  } catch (err) {
+    await db.query("ROLLBACK");
+    await redis.del(lockKey);
+    throw err;
+  }
 
   // Post-commit: libérer le verrou et émettre les événements
   await redis.del(lockKey);
@@ -905,10 +1028,24 @@ function registerTransition(router: Hono<TicketEnv>, action: "serve"): void {
     try {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       const target = nextStatus(row.status, action);
-      await db.query(
-        `UPDATE tickets SET status = $1, served_at = COALESCE(served_at, NOW()), updated_at = NOW() WHERE id = $2`,
-        [target, row.id]
-      );
+      // SEC-001a : mutation + audit atomiques (transaction unique).
+      await db.query("BEGIN");
+      try {
+        await db.query(
+          `UPDATE tickets SET status = $1, served_at = COALESCE(served_at, NOW()), updated_at = NOW() WHERE id = $2`,
+          [target, row.id]
+        );
+        await auditTicketTx(db, {
+          bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
+          action: `POST /tickets/:id/${action}`,
+          entityId: row.id,
+          diff: { before: { status: row.status }, after: { status: target } },
+        });
+        await db.query("COMMIT");
+      } catch (err) {
+        await db.query("ROLLBACK");
+        throw err;
+      }
       // API-007 : le cycle ticket PILOTE le statut agent (AVAILABLE → SERVING).
       await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "SERVING");
       return c.json({ id: row.id, status: target, counterId: row.counter_id ?? undefined }, 200);
@@ -970,7 +1107,9 @@ function registerClose(router: Hono<TicketEnv>): void {
     try {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       nextStatus(row.status, "close");
-      const result = await closeTicket(db, redis, row, getBus(c));
+      const result = await closeTicket(db, redis, row, getBus(c), {
+        actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
+      });
       // API-007 : clôture → l'agent repasse AVAILABLE (piloté par le cycle).
       await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "AVAILABLE");
       return c.json(result, 200);
@@ -985,15 +1124,30 @@ async function closeTicket(
   db: Client,
   redis: Redis,
   row: TicketRow,
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  actor: { actorId: string | null; actorRole: string; ip: string | null }
 ): Promise<Record<string, unknown>> {
   const closedAt = new Date();
   const waitTime = row.called_at ? computeWaitSeconds(row.issued_at, row.called_at) : 0;
   const serviceTime = row.served_at ? computeServiceSeconds(row.served_at, closedAt) : 0;
-  await db.query(
-    `UPDATE tickets SET status = 'DONE', closed_at = $1, wait_time_seconds = $2, service_time_seconds = $3, updated_at = NOW() WHERE id = $4`,
-    [closedAt, waitTime, serviceTime, row.id]
-  );
+  // SEC-001a : clôture + audit atomiques (transaction unique).
+  await db.query("BEGIN");
+  try {
+    await db.query(
+      `UPDATE tickets SET status = 'DONE', closed_at = $1, wait_time_seconds = $2, service_time_seconds = $3, updated_at = NOW() WHERE id = $4`,
+      [closedAt, waitTime, serviceTime, row.id]
+    );
+    await auditTicketTx(db, {
+      bankId: row.bank_id, actorId: actor.actorId, actorRole: actor.actorRole, ip: actor.ip,
+      action: "POST /tickets/:id/close",
+      entityId: row.id,
+      diff: { before: { status: row.status }, after: { status: "DONE", waitTime, serviceTime } },
+    });
+    await db.query("COMMIT");
+  } catch (err) {
+    await db.query("ROLLBACK");
+    throw err;
+  }
   // Forme CONTRAT ticket:closed : { ticketId, waitTime, serviceTime }.
   bus.emit("ticket:closed", row.agency_id, {
     ticketId: row.id,
@@ -1015,10 +1169,24 @@ function registerNoShow(router: Hono<TicketEnv>): void {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       nextStatus(row.status, "no-show");
       await assertNoShowTimeout(db, row);
-      await db.query(
-        `UPDATE tickets SET status = 'NO_SHOW', no_show_at = NOW(), updated_at = NOW() WHERE id = $1`,
-        [row.id]
-      );
+      // SEC-001a : mutation + audit atomiques (transaction unique).
+      await db.query("BEGIN");
+      try {
+        await db.query(
+          `UPDATE tickets SET status = 'NO_SHOW', no_show_at = NOW(), updated_at = NOW() WHERE id = $1`,
+          [row.id]
+        );
+        await auditTicketTx(db, {
+          bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
+          action: "POST /tickets/:id/no-show",
+          entityId: row.id,
+          diff: { before: { status: row.status }, after: { status: "NO_SHOW" } },
+        });
+        await db.query("COMMIT");
+      } catch (err) {
+        await db.query("ROLLBACK");
+        throw err;
+      }
       await emitQueueUpdated(getBus(c), c.get("redis"), db, row.agency_id, row.queue_id);
       // API-007 : no-show → l'agent repasse AVAILABLE (piloté par le cycle).
       await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "AVAILABLE");
@@ -1062,7 +1230,7 @@ function registerTransfer(router: Hono<TicketEnv>): void {
       if (!parsed.success) return c.json(buildError("VALIDATION_ERROR", "Corps invalide."), 400);
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       nextStatus(row.status, "transfer");
-      const result = await transferTicket(db, c.get("redis"), tenant, row, parsed.data, getBus(c));
+      const result = await transferTicket(db, c.get("redis"), tenant, row, parsed.data, getBus(c), extractIp(c));
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -1077,7 +1245,8 @@ async function transferTicket(
   tenant: TenantContext,
   row: TicketRow,
   input: z.infer<typeof transferSchema>,
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  ip: string | null
 ): Promise<Record<string, unknown>> {
   await db.query("BEGIN");
   try {
@@ -1088,6 +1257,17 @@ async function transferTicket(
       [row.bank_id, row.id, row.counter_id, row.service_id, input.targetServiceId, input.targetCounterId ?? null, input.reason ?? null, tenant.userId]
     );
     const target = await reinsertTarget(db, tenant, row, input.targetServiceId);
+    // SEC-001a : audit du transfert DANS la transaction (le `reason` peut être
+    // libre mais non sensible ; jamais de téléphone dans le diff).
+    await auditTicketTx(db, {
+      bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip,
+      action: "POST /tickets/:id/transfer",
+      entityId: row.id,
+      diff: {
+        before: { status: row.status, serviceId: row.service_id },
+        after: { status: "TRANSFERRED", targetServiceId: input.targetServiceId, targetTicketId: target.ticketId },
+      },
+    });
     await db.query("COMMIT");
     // La réinsertion cible copie l'agency_id source → même agence pour les deux files.
     await emitQueueUpdated(bus, redis, db, row.agency_id, row.queue_id);
@@ -1131,7 +1311,21 @@ function registerAbandon(router: Hono<TicketEnv>): void {
     try {
       const row = await loadTicket(db, tenant, paramUuid(c, "id"));
       nextStatus(row.status, "abandon");
-      await db.query(`UPDATE tickets SET status = 'ABANDONED', updated_at = NOW() WHERE id = $1`, [row.id]);
+      // SEC-001a : mutation + audit atomiques (transaction unique).
+      await db.query("BEGIN");
+      try {
+        await db.query(`UPDATE tickets SET status = 'ABANDONED', updated_at = NOW() WHERE id = $1`, [row.id]);
+        await auditTicketTx(db, {
+          bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
+          action: "POST /tickets/:id/abandon",
+          entityId: row.id,
+          diff: { before: { status: row.status }, after: { status: "ABANDONED" } },
+        });
+        await db.query("COMMIT");
+      } catch (err) {
+        await db.query("ROLLBACK");
+        throw err;
+      }
       await emitQueueUpdated(getBus(c), c.get("redis"), db, row.agency_id, row.queue_id);
       return c.json({ id: row.id, status: "ABANDONED" }, 200);
     } catch (err) {

@@ -20,6 +20,7 @@ import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import { errorResponse, requireBankId } from "src/lib/admin-helpers.js";
+import { recordAudit, extractIp } from "src/lib/audit-context.js";
 import {
   parseAgentCsv,
   type ImportError,
@@ -62,7 +63,10 @@ export function createAgentImportRouter(): Hono<ImportEnv> {
       // Anti-escalade (Boucle 3 F3) : une ligne ne peut pas provisionner un rôle
       // strictement supérieur à l'importateur, et jamais un SUPER_ADMIN.
       const parsed = parseAgentCsv(csv, tenant.role);
-      const report = await importRows(db, bankId, parsed.rows, parsed.errors);
+      const report = await importRows(db, bankId, parsed.rows, parsed.errors, {
+        tenant,
+        ip: extractIp(c),
+      });
       return c.json(report, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -101,13 +105,14 @@ async function importRows(
   db: Client,
   bankId: string,
   rows: ParsedAgentRow[],
-  formatErrors: ImportError[]
+  formatErrors: ImportError[],
+  audit: ImportAuditCtx
 ): Promise<ImportReport> {
   const errors: ImportError[] = [...formatErrors];
   let created = 0;
   let skipped = 0;
   for (const row of rows) {
-    const outcome = await importOneRow(db, bankId, row);
+    const outcome = await importOneRow(db, bankId, row, audit);
     if (outcome === "created") created += 1;
     else {
       skipped += 1;
@@ -116,6 +121,12 @@ async function importRows(
   }
   errors.sort((a, b) => a.line - b.line);
   return { created, skipped, errors };
+}
+
+/** Contexte d'audit propagé à chaque ligne d'import (acteur + IP). */
+interface ImportAuditCtx {
+  tenant: TenantContext;
+  ip: string | null;
 }
 
 /**
@@ -130,13 +141,34 @@ async function importRows(
 async function importOneRow(
   db: Client,
   bankId: string,
-  row: ParsedAgentRow
+  row: ParsedAgentRow,
+  audit: ImportAuditCtx
 ): Promise<"created" | ImportError> {
   try {
     await db.query("BEGIN");
     const agencyId = await resolveAgency(db, bankId, row.agencyCode);
     const userId = await insertUser(db, bankId, row);
     if (agencyId) await linkAgency(db, bankId, agencyId, userId);
+    // SEC-001a : audit de la création d'agent DANS la transaction de la ligne.
+    // Le diff n'expose JAMAIS `password_hash` (assaini par recordAudit) ni le
+    // téléphone en clair — seuls des champs d'identité non sensibles.
+    await recordAudit({
+      db,
+      tenant: audit.tenant,
+      action: "POST /agents/import",
+      entityType: "user",
+      entityId: userId,
+      ip: audit.ip,
+      diff: {
+        after: {
+          email: row.email,
+          role: row.role,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          ...(agencyId ? { agencyId } : {}),
+        },
+      },
+    });
     await db.query("COMMIT");
     return "created";
   } catch (err) {

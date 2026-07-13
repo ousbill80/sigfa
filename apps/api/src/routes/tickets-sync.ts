@@ -35,6 +35,7 @@ import {
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
 import { queueLength } from "src/services/queue-strategy.js";
 import { estimateWaitMinutes, invalidateEstimate } from "src/services/queue-estimation.js";
+import { recordAudit, extractIp } from "src/lib/audit-context.js";
 
 /** Nombre maximum de tickets par batch de synchronisation (LA LOI). */
 const MAX_BATCH = 100;
@@ -131,7 +132,7 @@ async function handleSync(c: SyncCtx): Promise<Response> {
     const scope = `tickets-sync:${tenant.bankId ?? "_"}`;
     const replay = await findReplay(redis, scope, key, parsed.data);
     if (replay) return c.newResponse(replay.body, replay.status as 200, { "Content-Type": "application/json" });
-    const result = await processBatch(db, redis, tenant, parsed.data.tickets, getBus(c));
+    const result = await processBatch(db, redis, tenant, parsed.data.tickets, getBus(c), extractIp(c));
     const bodyStr = JSON.stringify(result);
     await storeReplay(redis, scope, key, parsed.data, 200, bodyStr);
     return c.newResponse(bodyStr, 200, { "Content-Type": "application/json" });
@@ -163,14 +164,15 @@ async function processBatch(
   redis: Redis,
   tenant: TenantContext,
   tickets: SyncItem[],
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  ip: string | null
 ): Promise<{ synced: SyncedTicket[]; skipped: SkippedTicket[] }> {
   const ordered = [...tickets].sort((a, b) => a.createdOfflineAt.localeCompare(b.createdOfflineAt));
   const synced: SyncedTicket[] = [];
   const skipped: SkippedTicket[] = [];
   const affectedQueues = new Set<string>();
   for (const it of ordered) {
-    const outcome = await syncOne(db, tenant, it);
+    const outcome = await syncOne(db, tenant, it, ip);
     if (outcome.kind === "synced") {
       synced.push(outcome.ticket);
       affectedQueues.add(outcome.queueId);
@@ -194,7 +196,7 @@ type Outcome =
  * Traite un item : filtres (CLOCK_SKEW, SERVICE_NOT_FOUND, ALREADY_SYNCED)
  * puis insertion transactionnelle idempotente. Échec isolé → skipped, journalisé.
  */
-async function syncOne(db: Client, tenant: TenantContext, it: SyncItem): Promise<Outcome> {
+async function syncOne(db: Client, tenant: TenantContext, it: SyncItem, ip: string | null): Promise<Outcome> {
   if (isClockSkewed(it.createdOfflineAt)) return skip(it.localUuid, "CLOCK_SKEW");
   // MODEL-API-A/D1 (offline-sync D8) : operationId optionnel/item → service_id dérivé.
   const resolved = await resolveOperation(db, tenant, it);
@@ -205,7 +207,7 @@ async function syncOne(db: Client, tenant: TenantContext, it: SyncItem): Promise
   const queue = await resolveQueue(db, tenant, resolved.serviceId);
   if (!queue) return skip(it.localUuid, "SERVICE_NOT_FOUND");
   try {
-    return await insertSynced(db, tenant, it, queue, resolved.serviceId, resolved.operationId, manager.targetManagerId);
+    return await insertSynced(db, tenant, it, queue, resolved.serviceId, resolved.operationId, manager.targetManagerId, ip);
   } catch (err) {
     logger.error({ localUuid: it.localUuid, err }, "sync:ticket-failed");
     return skip(it.localUuid, "SYNC_ERROR");
@@ -313,7 +315,8 @@ async function insertSynced(
   queue: { queueId: string; agencyId: string; code: string },
   serviceId: string,
   operationId: string | null,
-  targetManagerId: string | null
+  targetManagerId: string | null,
+  ip: string | null
 ): Promise<Outcome> {
   await db.query("BEGIN");
   try {
@@ -324,6 +327,24 @@ async function insertSynced(
       await db.query("ROLLBACK");
       return skip(it.localUuid, "ALREADY_SYNCED");
     }
+    // SEC-001a : audit du ticket synchronisé DANS la transaction de la ligne.
+    await recordAudit({
+      db,
+      tenant,
+      action: "POST /tickets/sync",
+      entityType: "ticket",
+      entityId: inserted.id,
+      ip,
+      diff: {
+        after: {
+          status: "WAITING",
+          serviceId,
+          channel: it.channel,
+          priority: it.priority ?? "STANDARD",
+          localUuid: it.localUuid,
+        },
+      },
+    });
     await db.query("COMMIT");
     return {
       kind: "synced",

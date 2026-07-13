@@ -25,6 +25,7 @@ import type http from "http";
 import { serve } from "@hono/node-server";
 import type { Server as SocketServer } from "socket.io";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 import { createSocketServer } from "src/services/socket-server.js";
 import { createSocketBus } from "src/services/socket-bus.js";
 import { ticketCalledEvent } from "@sigfa/contracts/events/realtime.js";
@@ -217,6 +218,7 @@ beforeAll(async () => {
   });
 
   await runMigrations(db);
+  await ensureAuditLogSchema(db);
   ids = await insertFixtures(db);
   agentToken = await forgeToken([ids.agencyId]);
 

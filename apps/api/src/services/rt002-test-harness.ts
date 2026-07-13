@@ -26,6 +26,7 @@ import type { AddressInfo } from "net";
 import type http from "http";
 import type { Server as SocketServer } from "socket.io";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 import { createSocketServer } from "src/services/socket-server.js";
 import { createSocketBus } from "src/services/socket-bus.js";
 
@@ -120,6 +121,7 @@ export async function startRtHarness(): Promise<RtHarness> {
   const db = new pg.Client({ connectionString: pgUrl });
   await db.connect();
   await applyRtSchema(db);
+  await ensureAuditLogSchema(db);
   const ids = await seedTenant(db);
 
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: null });

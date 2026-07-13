@@ -18,6 +18,7 @@ import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { SignJWT } from "jose";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 let pgContainer: StartedTestContainer;
 let redisContainer: StartedTestContainer;
@@ -77,6 +78,7 @@ beforeAll(async () => {
   await db.connect();
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
   await runMigrations(db);
+  await ensureAuditLogSchema(db);
   const bank = await db.query(`INSERT INTO banks (name, slug) VALUES ('B','b') RETURNING id`);
   bankId = (bank.rows[0] as { id: string }).id;
   const agency = await db.query(`INSERT INTO agencies (bank_id, name) VALUES ($1,'A') RETURNING id`, [bankId]);
