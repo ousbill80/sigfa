@@ -50,6 +50,10 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
   "health.ts", // GET /health — public, checks infra, aucune table tenant.
   "audit-logs.ts", // GET /audit-logs — AUDITOR/SUPER_ADMIN, connexion plateforme (cross-banques).
   "auth.ts", // /auth/* — résolution d'identité pré-tenant (login/refresh), avant contexte.
+  // NET-001 — GET /admin/network-overview : SUPER_ADMIN, connexion plateforme
+  // (withPlatform, cross-banques). LECTURE SEULE agrégée : n'arme JAMAIS
+  // `app.current_bank_id` (pas de contexte tenant), mutations → 403 PLATFORM_READ_ONLY.
+  "network-overview.ts",
 ];
 
 /**
@@ -106,6 +110,9 @@ const ARMED: readonly string[] = [
   // ADM-003a — supervision borne (GET /agencies/{id}/kiosks/status). Lecture
   // tenant routée via `withArmedTenant` (RLS armée) : première route basculée.
   "kiosk-supervision.ts",
+  // ADM-002a — onboarding agence < 2h (clone structurel + provisioning borne).
+  // Tout accès DB tenant est routé via `withArmedTenant` (services clone/provision).
+  "agency-onboarding.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */

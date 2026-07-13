@@ -45,3 +45,12 @@ export function getDatabaseUrl(): string {
     "postgresql://sigfa:sigfa_test@localhost:5432/sigfa_test"
   );
 }
+
+/**
+ * URL de base publique du parcours d'enrôlement borne (QR d'installation).
+ * Le QR encode `{ENROLL_BASE_URL}/enroll/{kioskId}` — jamais le token en clair.
+ * Défaut : https://app.sigfa.ci
+ */
+export function getEnrollBaseUrl(): string {
+  return process.env["ENROLL_BASE_URL"] ?? "https://app.sigfa.ci";
+}

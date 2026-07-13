@@ -132,6 +132,9 @@ export const MUTATION_REGISTRY: readonly MutationEntry[] = [
   // ── ADMIN — ONBOARDING (admin.yaml) ───────────────────────────────────────
   { method: "POST", path: "/agencies/{id}/kiosk-access", entityType: "kiosk", action: "POST /agencies/:id/kiosk-access", disposition: "app" },
   { method: "POST", path: "/agencies/{id}/clone-from/{templateId}", entityType: "agency", action: "POST /agencies/:id/clone-from/:templateId", disposition: "app" },
+  // ADM-002a — clone structurel d'agence (:clone) + provisioning borne (:provision).
+  { method: "POST", path: "/banks/{id}/agencies:clone", entityType: "agency", action: "POST /banks/:id/agencies:clone", disposition: "app" },
+  { method: "POST", path: "/agencies/{id}/kiosks:provision", entityType: "kiosk", action: "POST /agencies/:id/kiosks:provision", disposition: "app" },
 
   // ── ADMIN — DATA PRIVACY (admin.yaml) ─────────────────────────────────────
   { method: "POST", path: "/data/purge-phone", entityType: "ticket", action: "POST /data/purge-phone", disposition: "app" },

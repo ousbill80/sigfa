@@ -17,7 +17,10 @@ export type ErrorCode =
   | "UNPROCESSABLE_ENTITY"
   | "TOO_MANY_REQUESTS"
   | "INTERNAL_SERVER_ERROR"
-  | "BAD_REQUEST";
+  | "BAD_REQUEST"
+  // NET-001 — périmètre plateforme en LECTURE SEULE : toute mutation cross-tenant
+  // (POST/PATCH/PUT/DELETE sur une ressource platform) est refusée avec ce code (403).
+  | "PLATFORM_READ_ONLY";
 
 /** Corps d'une réponse d'erreur conforme LA LOI */
 export interface ErrorBody {

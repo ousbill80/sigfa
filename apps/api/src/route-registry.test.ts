@@ -47,6 +47,7 @@ const EXPECTED_BASE_PATHS: readonly string[] = [
   "/api/v1", // sms-templates
   "/api/v1", // theme
   "/api/v1", // onboarding
+  "/api/v1", // agency-onboarding (ADM-002a)
   "/api/v1", // kiosk-session
   "/api/v1", // tv-session
   "/api/v1", // agents-import
@@ -56,6 +57,7 @@ const EXPECTED_BASE_PATHS: readonly string[] = [
   "/api/v1", // kiosks-status
   "/api/v1", // kiosk-supervision (ADM-003a)
   "/api/v1", // audit-logs
+  "/api/v1", // network-overview (NET-001)
   "/api/v1", // devices
   "/api/v1", // reports
   "/api/v1", // webhooks-notifications
@@ -71,7 +73,7 @@ describe("route-registry", () => {
     expect(registry.map((r) => r.basePath)).toEqual(EXPECTED_BASE_PATHS);
   });
 
-  it("REFACTOR-REG-002: monte 31 routeurs (aucune route perdue ni ajoutée)", () => {
+  it("REFACTOR-REG-002: monte 32 routeurs (aucune route perdue ni ajoutée)", () => {
     const registry = buildRouteRegistry(baseOptions());
     expect(registry).toHaveLength(EXPECTED_BASE_PATHS.length);
   });

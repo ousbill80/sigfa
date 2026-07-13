@@ -212,6 +212,11 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "POST",   path: "/agencies/{id}/kiosk-access", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "POST",   path: "/agencies/{id}/clone-from/{templateId}", requiredRole: "BANK_ADMIN", tenantScope: "bank" },
 
+  // ── ADMIN — ONBOARDING AGENCE < 2h ADM-002a (admin.yaml, CONTRACT-013) ─────
+  { method: "POST", path: "/banks/{id}/agencies:clone",             requiredRole: "BANK_ADMIN",      tenantScope: "bank" },
+  { method: "POST", path: "/agencies/{id}/kiosks:provision",        requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+  { method: "GET",  path: "/agencies/{id}/onboarding/{onboardingId}", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+
   // ── ADMIN — AUDIT LOGS (admin.yaml) — platform ────────────────────────────
   { method: "GET", path: "/audit-logs", requiredRole: "AUDITOR", tenantScope: "platform" },
 
