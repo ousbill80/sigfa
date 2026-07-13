@@ -59,6 +59,12 @@ afterAll(async () => {
 }, 30_000);
 
 describe("API-009: import CSV — 500 OK, 501 → 422, lignes invalides précises", () => {
+  // Coût dominant et INCOMPRESSIBLE : 500 hachages bcrypt (coût 10) réalisés
+  // séquentiellement côté serveur (~25s CPU pur, mono-thread). Le batching SQL
+  // n'aide pas (les allers-retours d'insertion sont négligeables devant bcrypt)
+  // et casserait l'isolation par ligne (doublon email → 23505 sur une seule ligne).
+  // On ne peut pas non plus baisser le coût bcrypt (sécurité). Timeout CIBLÉ à
+  // 120s pour absorber la variance d'un runner CI chargé (flake `agents-import`).
   it("API-009: import CSV — 500 lignes OK", async () => {
     const rows = Array.from({ length: 500 }, () => `${uniqueEmail("ok500")},A,B,AGENT,,FR,`);
     const res = await importCsv(build(rows));
@@ -66,7 +72,7 @@ describe("API-009: import CSV — 500 OK, 501 → 422, lignes invalides précise
     const body = (await res.json()) as { created: number; errors: unknown[] };
     expect(body.created).toBe(500);
     expect(body.errors).toHaveLength(0);
-  }, 60_000);
+  }, 120_000);
 
   it("API-009: import CSV — 501 lignes → 422 IMPORT_TOO_LARGE", async () => {
     const rows = Array.from({ length: 501 }, () => `${uniqueEmail("big")},A,B,AGENT,,FR,`);
