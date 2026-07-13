@@ -94,8 +94,6 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   // handler : paths tenant → withArmedTenant ; path network → withPlatform), donc
   // hors périmètre d'un simple recâblage de connexion — reste PENDING jusqu'à ce split.
   "reports.ts",
-  "webhooks-notifications.ts",
-  "webhooks-whatsapp-inbound.ts",
 ];
 
 /**
@@ -208,6 +206,25 @@ const ARMED: readonly string[] = [
   "public-tickets.ts",
   "tv-session.ts",
   "kiosk-session.ts",
+  // SEC-002-CUTOVER-LOT8 — WEBHOOKS ENTRANTS : le tenant est RÉSOLU depuis le
+  // PAYLOAD/la CONFIG (jamais d'une auth), APRÈS vérification d'authenticité du
+  // webhook. Tout accès DB tenant post-résolution est routé via `withArmedTenant`.
+  // - webhooks-notifications.ts : callbacks provider (statut delivery). La
+  //   corrélation `provider_message_id → notification_log` résout le `bank_id`
+  //   (PRÉ-TENANT, seule lecture hors armement — c'est la résolution du tenant), puis
+  //   la mutation du journal (`applyDeliveryAck`) est ARMÉE (RLS `notification_log`
+  //   `tenant_isolation` + GRANT SELECT/INSERT/UPDATE `sigfa_app`, 0004). Un accusé
+  //   corrélé à A ne met à jour QUE le journal de A.
+  // - webhooks-whatsapp-inbound.ts : messages WhatsApp entrants. La résolution de la
+  //   config par `bankSlug` (`resolveWhatsAppConfig`) PRÉCÈDE légitimement l'armement
+  //   (chicken-and-egg : le tenant n'est connu QU'APRÈS lecture de sa config), puis
+  //   la signature banque est vérifiée ; TOUT le traitement tenant (idempotence
+  //   `whatsapp_inbound_messages`, opt-in `notification_consents`, lecture `tickets`,
+  //   émission `issueTicketFor` transaction-aware → SAVEPOINT) est routé DANS une
+  //   transaction ARMÉE `withArmedTenant(bankId)`. Tables : policy `tenant_isolation`
+  //   + GRANT CRUD `sigfa_app` (0012/0004/0001).
+  "webhooks-notifications.ts",
+  "webhooks-whatsapp-inbound.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */

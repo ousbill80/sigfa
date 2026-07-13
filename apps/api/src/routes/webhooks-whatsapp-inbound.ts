@@ -15,6 +15,19 @@
  * Routeur isolé pour minimiser le risque de conflit d'intégration sur `app.ts`
  * (un seul `app.route(...)` ajouté).
  *
+ * ## Armement RLS (SEC-002-CUTOVER-LOT8)
+ * Webhook PUBLIC : le tenant (bankId) n'est PAS porté par une auth. Il est RÉSOLU
+ * depuis le `bankSlug` via la config WhatsApp (`resolveWhatsAppConfig`). Cette
+ * résolution de config par `bankSlug` PRÉCÈDE légitimement l'armement (chicken-and-egg :
+ * on ne connaît le tenant QU'APRÈS avoir lu sa config — c'est la résolution du tenant
+ * elle-même) et reste donc hors armement, documentée. UNE FOIS le `bankId` dérivé ET
+ * la signature banque vérifiée, TOUT le traitement tenant (idempotence entrante,
+ * opt-in, lecture de statut, émission de ticket) est routé DANS une transaction ARMÉE
+ * `withArmedTenant(bankId)` (`app.current_bank_id` posé, RLS contraignante sur
+ * `whatsapp_inbound_messages` / `notification_consents` / `tickets`). L'émission
+ * (`issueTicketFor`, déjà transaction-aware depuis le lot 4) compose par SAVEPOINT
+ * (`inTransaction:true`) dans cette transaction armée. Cette route est classée `ARMED`.
+ *
  * @module
  */
 
@@ -24,6 +37,7 @@ import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import type { QueryFn } from "@sigfa/database";
 import { buildError } from "src/lib/errors.js";
+import { asArmable, withArmedTenant, type ArmableConnection } from "src/lib/armed-tenant.js";
 import {
   hashPhone,
   encryptPhone,
@@ -47,10 +61,32 @@ interface WebhookEnv {
 /** En-tête de signature WhatsApp (Meta). */
 const SIGNATURE_HEADER = "x-hub-signature-256";
 
-/** Construit un `QueryFn` applicatif au-dessus du client pg injecté. */
-function queryFnFrom(db: Client): QueryFn {
+/** Détecte un ordre transactionnel que la transaction ARMÉE englobante possède déjà. */
+function isEnvelopeTxnStatement(sql: string): boolean {
+  const s = sql.trim().toUpperCase();
+  return (
+    s === "BEGIN" ||
+    s === "COMMIT" ||
+    s === "ROLLBACK" ||
+    s.startsWith("SET LOCAL APP.CURRENT_BANK_ID")
+  );
+}
+
+/**
+ * Construit un `QueryFn` ARMÉ pour le service entrant : les vraies requêtes passent
+ * à la connexion déjà armée par `withArmedTenant`, mais les ordres transactionnels
+ * enveloppants (`BEGIN`/`COMMIT`/`ROLLBACK` et le `SET LOCAL app.current_bank_id`
+ * émis par le `withTenant` interne du service) sont NEUTRALISÉS : la transaction
+ * armée UNIQUE de la route les possède déjà. Le service conserve ainsi son code
+ * (garde tenant D5 inchangée) tout en exécutant ses écritures SOUS `app.current_bank_id`.
+ *
+ * @param conn - Connexion armée (transaction ouverte, `app.current_bank_id` posé)
+ * @returns `QueryFn` armé neutralisant les ordres d'enveloppe transactionnelle
+ */
+function armedQueryFnFrom(conn: ArmableConnection): QueryFn {
   return async (sql: string) => {
-    const res = await db.query(sql);
+    if (isEnvelopeTxnStatement(sql)) return { rows: [] };
+    const res = await conn.query(sql);
     return { rows: res.rows as Record<string, unknown>[] };
   };
 }
@@ -175,37 +211,47 @@ async function handleInbound(c: Context<WebhookEnv>): Promise<Response> {
     return c.json({ success: true }, 200);
   }
 
-  // 4. Port d'émission de ticket (réutilise le cycle de vie API-003).
   const redis = c.get("redis");
   const bus = (c.get("bus") as RealtimeBus | undefined) ?? createNoopBus();
-  const issueTicket: IssueTicketPort = {
-    issue: async (args) => {
-      const result = await issueTicketFor(
-        db,
-        redis,
-        { bankId: args.bankId, agencyId: args.agencyId },
-        {
-          serviceId: args.serviceId,
-          channel: "WHATSAPP",
-          phoneNumber: args.phoneNumber,
-          smsConsent: true,
-        },
-        bus
-      );
-      return {
-        number: String(result["number"]),
-        position: Number(result["position"]),
-        estimatedWaitMinutes: Number(result["estimatedWaitMinutes"]),
-      };
-    },
-  };
 
-  // 5. Traitement (idempotence, opt-in INBOUND_WHATSAPP, NLU règles, ticket API-003).
-  await processInboundMessage(message, {
-    queryFn: queryFnFrom(db),
-    config,
-    crypto: phoneCrypto,
-    issueTicket,
+  // 4-5. SEC-002 : TOUT le traitement tenant est routé DANS une transaction ARMÉE
+  //      (`app.current_bank_id = config.bankId`). Le port d'émission réutilise
+  //      `issueTicketFor` en mode transaction-aware (SAVEPOINT) sur la connexion armée.
+  await withArmedTenant(asArmable(db), config.bankId, async (conn) => {
+    const armedDb = conn as unknown as Client;
+    const issueTicket: IssueTicketPort = {
+      issue: async (args) => {
+        const result = await issueTicketFor(
+          armedDb,
+          redis,
+          { bankId: args.bankId, agencyId: args.agencyId },
+          {
+            serviceId: args.serviceId,
+            channel: "WHATSAPP",
+            phoneNumber: args.phoneNumber,
+            smsConsent: true,
+          },
+          bus,
+          undefined,
+          // Transaction armée englobante ouverte → composition par SAVEPOINT.
+          true
+        );
+        return {
+          number: String(result["number"]),
+          position: Number(result["position"]),
+          estimatedWaitMinutes: Number(result["estimatedWaitMinutes"]),
+        };
+      },
+    };
+
+    // Le service garde son `withTenant` interne ; l'`armedQueryFn` neutralise ses
+    // ordres d'enveloppe transactionnelle (la transaction armée UNIQUE les possède).
+    await processInboundMessage(message, {
+      queryFn: armedQueryFnFrom(conn),
+      config,
+      crypto: phoneCrypto,
+      issueTicket,
+    });
   });
 
   return c.json({ success: true }, 200);

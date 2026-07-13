@@ -12,6 +12,14 @@
  * La route est isolée dans son propre routeur pour minimiser le risque de conflit
  * d'intégration sur `app.ts` (un seul `app.route(...)` ajouté).
  *
+ * ## Armement RLS (SEC-002-CUTOVER-LOT8)
+ * Webhook PUBLIC : le tenant n'est PAS porté par une auth. La corrélation
+ * `provider_message_id → notification_log` résout le `bank_id` (PRÉ-TENANT, seule
+ * lecture hors armement — c'est la résolution du tenant elle-même). La mutation du
+ * journal est ensuite ARMÉE via `withArmedTenant` (`app.current_bank_id` posé, RLS
+ * `tenant_isolation` de `notification_log` contraignante) : un accusé corrélé à A ne
+ * met à jour QUE le journal de A. Cette route est classée `ARMED`.
+ *
  * @module
  */
 
@@ -20,10 +28,12 @@ import { z } from "zod";
 import type { Client } from "pg";
 import type { QueryFn } from "@sigfa/database";
 import { buildError } from "src/lib/errors.js";
+import { asArmable, withArmedTenant } from "src/lib/armed-tenant.js";
 import {
   applyDeliveryAck,
   verifyDeliverySignature,
   PROVIDER_SIGNATURE_HEADER,
+  type ArmedRunner,
   type DeliveryProvider,
 } from "src/services/notification-delivery.js";
 
@@ -57,6 +67,23 @@ function queryFnFrom(db: Client): QueryFn {
     const res = await db.query(sql);
     return { rows: res.rows as Record<string, unknown>[] };
   };
+}
+
+/**
+ * Fabrique l'exécuteur ARMÉ (`withArmedTenant`) passé au service : chaque mutation
+ * du journal s'exécute dans une transaction dont `app.current_bank_id` est posé sur
+ * le `bank_id` résolu (RLS `notification_log` contraignante, connexion `sigfa_app`).
+ * Le service reçoit une `QueryFn` déjà armée, sans coupler `notification-delivery`
+ * au driver `pg`.
+ *
+ * @param db - Client pg de la requête
+ * @returns Exécuteur armé conforme à `ArmedRunner`
+ */
+function armedRunnerFrom(db: Client): ArmedRunner {
+  return (bankId, fn) =>
+    withArmedTenant(asArmable(db), bankId, (conn) =>
+      fn((sql: string) => conn.query(sql) as Promise<{ rows: Record<string, unknown>[] }>)
+    );
 }
 
 /**
@@ -117,7 +144,9 @@ async function handleDelivery(c: Context<WebhookEnv>): Promise<Response> {
     );
   }
 
-  // 3. Application au journal par corrélation provider_message_id (garde tenant D5).
+  // 3. Application au journal par corrélation provider_message_id.
+  //    SEC-002 : la corrélation résout le bank_id (PRÉ-TENANT), puis la mutation est
+  //    ARMÉE via withArmedTenant (RLS notification_log contraignante).
   const db = c.get("db");
   const result = await applyDeliveryAck(
     {
@@ -128,7 +157,8 @@ async function handleDelivery(c: Context<WebhookEnv>): Promise<Response> {
         ? { failureReason: normalizeReason(failureReason) }
         : {}),
     },
-    queryFnFrom(db)
+    queryFnFrom(db),
+    armedRunnerFrom(db)
   );
   if (!result.updated) {
     return c.json(
