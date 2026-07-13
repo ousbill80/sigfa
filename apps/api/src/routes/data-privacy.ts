@@ -10,6 +10,19 @@
  * Réutilise `purgePhone` de @sigfa/database (branche DB-008) : la fonction
  * anonymise tickets + consentements ET écrit l'audit `DATA_PURGE` (sans PII).
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT5)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. L'effacement
+ * (`purgePhone`) — UPDATE `tickets` (anonymisation), DELETE `notification_consents`
+ * (PII pur) et INSERT `audit_log` — s'exécute dans UNE transaction armée sur le
+ * `bankId` de l'appelant. Sous RLS FORCE, la policy `tenant_isolation` de chaque
+ * table (0001/0003/0004) garantit que l'effacement ne PEUT toucher QUE les lignes de
+ * la banque armée : l'effacement de A n'atteint jamais B, et B ne peut déclencher
+ * l'effacement de A (armement toujours borné à `tenant.bankId`). La lecture de
+ * rétention (`retention_policies`, policy `tenant_isolation`, 0006) partage la même
+ * connexion armée.
+ *
  * @module
  */
 
@@ -24,8 +37,13 @@ import {
   errorResponse,
   parseJson,
   parseStrict,
-  requireBankId,
 } from "src/lib/admin-helpers.js";
+import {
+  withArmedTenant,
+  asArmable,
+  isCanonicalUuid,
+  type ArmableConnection,
+} from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur data-privacy. */
 interface DataPrivacyEnv {
@@ -59,10 +77,37 @@ export function createDataPrivacyRouter(): Hono<DataPrivacyEnv> {
   return router;
 }
 
-/** Adapte `pg.Client` en `QueryFn` pour @sigfa/database. */
-function toQueryFn(db: Client): QueryFn {
+/**
+ * Adapte une connexion armée (`ArmableConnection`) en `QueryFn` pour
+ * @sigfa/database. `purgePhone` n'appelle `query` qu'avec un SQL littéral (aucun
+ * paramètre lié) : l'adaptateur transmet la seule chaîne à la connexion armée, dont
+ * toutes les requêtes héritent du contexte RLS `app.current_bank_id`.
+ */
+function toQueryFn(conn: ArmableConnection): QueryFn {
   return (sql: string) =>
-    db.query(sql) as unknown as Promise<{ rows: Array<Record<string, unknown>> }>;
+    conn.query(sql) as unknown as Promise<{
+      rows: Array<Record<string, unknown>>;
+    }>;
+}
+
+/**
+ * Exige un `bankId` tenant en UUID canonique pour l'armement RLS (SEC-002).
+ * Absent (contexte plateforme) ou malformé → 403 : une route tenant ne s'arme
+ * jamais sans banque résolue (le `bank_id` est interpolé dans `SET LOCAL`).
+ *
+ * @param tenant - Contexte tenant résolu
+ * @throws {SigfaError} 403 FORBIDDEN si `bankId` absent/non-UUID
+ */
+function requireArmableBankId(tenant: TenantContext): string {
+  const bankId = tenant.bankId;
+  if (!bankId || !isCanonicalUuid(bankId)) {
+    throw new SigfaError(
+      "FORBIDDEN",
+      "Contexte de banque requis pour cette opération.",
+      403
+    );
+  }
+  return bankId;
 }
 
 /** Enregistre POST /data/purge-phone (idempotent + audit DATA_PURGE). */
@@ -79,11 +124,16 @@ function registerPurgePhone(router: Hono<DataPrivacyEnv>): void {
           400
         );
       }
-      const bankId = requireBankId(tenant);
+      const bankId = requireArmableBankId(tenant);
       const input = parseStrict(purgePhoneSchema, await parseJson(c));
-      const result = await purgePhone(toQueryFn(db), bankId, input.phone, {
-        actorId: tenant.userId || null,
-      });
+      // SEC-002 : l'effacement (UPDATE tickets / DELETE consents / INSERT audit)
+      // s'exécute dans UNE transaction ARMÉE. La policy `tenant_isolation` de
+      // chaque table borne l'effacement à la banque armée — jamais un autre tenant.
+      const result = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        purgePhone(toQueryFn(conn), bankId, input.phone, {
+          actorId: tenant.userId || null,
+        })
+      );
       return c.json(
         { purged: result.purged, affectedTickets: result.affectedTickets },
         200
@@ -100,8 +150,12 @@ function registerRetentionPolicy(router: Hono<DataPrivacyEnv>): void {
     const db = c.get("db");
     const tenant = c.get("tenant");
     try {
-      const bankId = requireBankId(tenant);
-      const months = await loadRetentionMonths(db, bankId);
+      const bankId = requireArmableBankId(tenant);
+      // SEC-002 : lecture de la rétention dans une transaction ARMÉE (RLS
+      // `app.current_bank_id` — `retention_policies` isolée par tenant).
+      const months = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        loadRetentionMonths(conn as unknown as Client, bankId)
+      );
       return c.json(
         {
           retentionMonths: months,

@@ -67,8 +67,6 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
  * DOIT être armée (sinon le test échoue).
  */
 const ARMED_CUTOVER_PENDING: readonly string[] = [
-  "agents-import.ts",
-  "agents.ts",
   // Routeurs IA (IA-002/003/004) — lectures tenant-scoped (`WHERE bank_id`), montés
   // sous `/ai/*`. Non encore basculés vers `withArmedTenant`, comme les autres routes
   // de lecture tenant. Vivent dans `src/ai/` (voir AI_DIR).
@@ -76,7 +74,6 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "anomaly-route.ts",
   "feedback-insights-route.ts",
   "banks.ts",
-  "data-privacy.ts",
   "kiosk-session.ts",
   "onboarding.ts",
   "public-tickets.ts",
@@ -154,6 +151,22 @@ const ARMED: readonly string[] = [
   "tickets.ts",
   "tickets-sync.ts",
   "queues.ts",
+  // SEC-002-CUTOVER-LOT5 — bascule conseillers / import CSV / droit à l'oubli
+  // tenant-scopé. Tout accès DB tenant routé via `withArmedTenant` (armement
+  // `app.current_bank_id`).
+  // - agents.ts : `users` / `agency_users` / `user_services` / `services` /
+  //   `agencies` / `agent_status_history` (policy `tenant_isolation` + GRANT CRUD,
+  //   0001). GET profil/stats lisent, PATCH + POST status mutent avec audit composé
+  //   SEC-001 (savepoint) dans la transaction armée.
+  // - agents-import.ts : batch offline — `users` / `agencies` / `agency_users` /
+  //   `audit_log` ; unité par ligne = SAVEPOINT dans la transaction armée du batch.
+  // - data-privacy.ts : droit à l'oubli — UPDATE `tickets` (anonymisation) + DELETE
+  //   `notification_consents` (0004) + INSERT `audit_log` (0003) + lecture
+  //   `retention_policies` (0006), tous en policy `tenant_isolation` + GRANT CRUD.
+  //   L'effacement est borné à la banque armée (jamais un autre tenant).
+  "agents.ts",
+  "agents-import.ts",
+  "data-privacy.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
