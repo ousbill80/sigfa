@@ -12,6 +12,14 @@
  * Le service parent hors scope tenant → 404 SERVICE_NOT_FOUND (opaque cross-tenant).
  * Opération inconnue/hors tenant → 404 OPERATION_NOT_FOUND.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT3)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Tables `operations` (et
+ * `services` lu pour le scope parent) : policy `tenant_isolation` + GRANT CRUD
+ * `sigfa_app` (0009 / 0001). Les lectures de scope + mutations + audit composé SEC-001
+ * s'exécutent dans UNE transaction armée ; le `WHERE bank_id` applicatif est conservé.
+ *
  * @module
  */
 
@@ -32,6 +40,7 @@ import {
   assertAgencyScope,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur operations. */
 interface OperationEnv {
@@ -162,23 +171,31 @@ function registerListOperations(router: Hono<OperationEnv>): void {
     try {
       const bankId = requireBankId(tenant);
       const serviceId = paramUuid(c, "serviceId");
-      const service = await loadServiceParent(db, bankId, serviceId);
-      assertAgencyScope(tenant, service.agency_id);
       const { page, limit, offset } = readPagination(c);
-      const res = await db.query(
-        `SELECT ${OP_COLS} FROM operations
-          WHERE bank_id=$1 AND service_id=$2
-          ORDER BY display_order ASC, created_at ASC LIMIT $3 OFFSET $4`,
-        [bankId, serviceId, limit, offset]
-      );
-      const count = await db.query(
-        `SELECT COUNT(*)::int AS total FROM operations WHERE bank_id=$1 AND service_id=$2`,
-        [bankId, serviceId]
-      );
+      // SEC-002 : scope parent + liste + comptage à travers la connexion ARMÉE.
+      const { rows, total } = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const service = await loadServiceParent(armedDb, bankId, serviceId);
+        assertAgencyScope(tenant, service.agency_id);
+        const res = await armedDb.query(
+          `SELECT ${OP_COLS} FROM operations
+            WHERE bank_id=$1 AND service_id=$2
+            ORDER BY display_order ASC, created_at ASC LIMIT $3 OFFSET $4`,
+          [bankId, serviceId, limit, offset]
+        );
+        const count = await armedDb.query(
+          `SELECT COUNT(*)::int AS total FROM operations WHERE bank_id=$1 AND service_id=$2`,
+          [bankId, serviceId]
+        );
+        return {
+          rows: res.rows as OperationRow[],
+          total: (count.rows[0] as { total: number }).total,
+        };
+      });
       return c.json(
         {
-          data: (res.rows as OperationRow[]).map(toOperation),
-          meta: { page, limit, total: (count.rows[0] as { total: number }).total },
+          data: rows.map(toOperation),
+          meta: { page, limit, total },
         },
         200
       );
@@ -196,18 +213,23 @@ function registerCreateOperation(router: Hono<OperationEnv>): void {
     try {
       const bankId = requireBankId(tenant);
       const serviceId = paramUuid(c, "serviceId");
-      const service = await loadServiceParent(db, bankId, serviceId);
-      assertAgencyScope(tenant, service.agency_id);
       const input = parseStrict(createOperationSchema, await parseJson(c));
-      const created = await insertOperation(db, service, input);
-      await recordAudit({
-        db,
-        tenant,
-        action: "POST /services/:serviceId/operations",
-        entityType: "operation",
-        entityId: created.id,
-        ip: extractIp(c),
-        diff: buildDiff({}, { code: created.code, name: created.name, serviceId }),
+      // SEC-002 : scope parent + insertion + audit atomiques dans la tx ARMÉE.
+      const created = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const service = await loadServiceParent(armedDb, bankId, serviceId);
+        assertAgencyScope(tenant, service.agency_id);
+        const row = await insertOperation(armedDb, service, input);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "POST /services/:serviceId/operations",
+          entityType: "operation",
+          entityId: row.id,
+          ip: extractIp(c),
+          diff: buildDiff({}, { code: row.code, name: row.name, serviceId }),
+        });
+        return row;
       });
       return c.json(toOperation(created), 201);
     } catch (err) {
@@ -259,7 +281,10 @@ function registerGetOperation(router: Hono<OperationEnv>): void {
     try {
       const bankId = requireBankId(tenant);
       const id = paramUuid(c, "id");
-      const row = await loadOperation(db, bankId, id);
+      // SEC-002 : lecture à travers la connexion ARMÉE (RLS contraignante).
+      const row = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        loadOperation(conn as unknown as Client, bankId, id)
+      );
       assertAgencyScope(tenant, row.agency_id);
       return c.json(toOperation(row), 200);
     } catch (err) {
@@ -276,22 +301,27 @@ function registerPatchOperation(router: Hono<OperationEnv>): void {
     try {
       const id = paramUuid(c, "id");
       const bankId = requireBankId(tenant);
-      const before = await loadOperation(db, bankId, id);
-      assertAgencyScope(tenant, before.agency_id);
       const input = parseStrict(updateOperationSchema, await parseJson(c));
-      await assertNoCodeDuplicate(db, before, input);
-      const after = await updateOperation(db, bankId, id, input);
-      await recordAudit({
-        db,
-        tenant,
-        action: "PATCH /operations/:id",
-        entityType: "operation",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff(
-          { code: before.code, name: before.name, slaMinutes: before.sla_minutes, displayOrder: before.display_order, isActive: before.is_active, iconKey: before.icon_key },
-          { code: after.code, name: after.name, slaMinutes: after.sla_minutes, displayOrder: after.display_order, isActive: after.is_active, iconKey: after.icon_key }
-        ),
+      // SEC-002 : lecture (avant) + garde unicité + update + audit dans la tx ARMÉE.
+      const after = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const before = await loadOperation(armedDb, bankId, id);
+        assertAgencyScope(tenant, before.agency_id);
+        await assertNoCodeDuplicate(armedDb, before, input);
+        const updated = await updateOperation(armedDb, bankId, id, input);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "PATCH /operations/:id",
+          entityType: "operation",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff(
+            { code: before.code, name: before.name, slaMinutes: before.sla_minutes, displayOrder: before.display_order, isActive: before.is_active, iconKey: before.icon_key },
+            { code: updated.code, name: updated.name, slaMinutes: updated.sla_minutes, displayOrder: updated.display_order, isActive: updated.is_active, iconKey: updated.icon_key }
+          ),
+        });
+        return updated;
       });
       return c.json(toOperation(after), 200);
     } catch (err) {
@@ -368,17 +398,21 @@ function registerDeleteOperation(router: Hono<OperationEnv>): void {
     try {
       const id = paramUuid(c, "id");
       const bankId = requireBankId(tenant);
-      const before = await loadOperation(db, bankId, id);
-      assertAgencyScope(tenant, before.agency_id);
-      await db.query(`DELETE FROM operations WHERE id=$1 AND bank_id=$2`, [id, bankId]);
-      await recordAudit({
-        db,
-        tenant,
-        action: "DELETE /operations/:id",
-        entityType: "operation",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff({ code: before.code, name: before.name }, {}),
+      // SEC-002 : lecture (scope) + suppression + audit atomiques dans la tx ARMÉE.
+      await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const before = await loadOperation(armedDb, bankId, id);
+        assertAgencyScope(tenant, before.agency_id);
+        await armedDb.query(`DELETE FROM operations WHERE id=$1 AND bank_id=$2`, [id, bankId]);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "DELETE /operations/:id",
+          entityType: "operation",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff({ code: before.code, name: before.name }, {}),
+        });
       });
       return c.body(null, 204);
     } catch (err) {

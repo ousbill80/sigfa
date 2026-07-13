@@ -8,6 +8,16 @@
  *   queueCriticalThreshold 1..500 · agentInactivityMinutes 1..60 · noShowTimeoutMinutes 1..30.
  * Un PATCH thresholds ne touche JAMAIS les horaires ni le thème.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT3)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. La couture DB est
+ * COMPLÉTÉE (0014 policy `tenant_update` + GRANT UPDATE colonne-scopé ; 0015 ajoute
+ * `updated_at` au GRANT) : le `UPDATE banks SET <3 seuils>, updated_at=NOW()` tourne
+ * désormais sous connexion armée NOBYPASSRLS. La policy SELECT `tenant_isolation` et
+ * la policy `tenant_update` (`WITH CHECK id = current_bank_id`) sont la vraie barrière
+ * tenant, en plus du `WHERE id` applicatif conservé.
+ *
  * @module
  */
 
@@ -25,6 +35,7 @@ import {
   requireBankId,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur seuils. */
 interface ThresholdsEnv {
@@ -93,8 +104,12 @@ function registerGetThresholds(router: Hono<ThresholdsEnv>): void {
     const tenant = c.get("tenant");
     try {
       const id = paramUuid(c, "id");
-      requireBankId(tenant);
-      return c.json(toThresholds(await loadThresholds(db, id)), 200);
+      const bankId = requireBankId(tenant);
+      // SEC-002 : lecture des seuils à travers la connexion ARMÉE (RLS contraignante).
+      const row = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        loadThresholds(conn as unknown as Client, id)
+      );
+      return c.json(toThresholds(row), 200);
     } catch (err) {
       return errorResponse(c, err);
     }
@@ -108,17 +123,23 @@ function registerPatchThresholds(router: Hono<ThresholdsEnv>): void {
     const tenant = c.get("tenant");
     try {
       const id = paramUuid(c, "id");
-      requireBankId(tenant);
+      const bankId = requireBankId(tenant);
       const input = parseStrict(updateThresholdsSchema, await parseJson(c));
-      const before = await loadThresholds(db, id);
-      const after = await updateThresholds(db, id, input);
-      await recordAudit({
-        db, tenant,
-        action: "PATCH /banks/:id/thresholds",
-        entityType: "bank_thresholds",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff(toThresholds(before), toThresholds(after)),
+      // SEC-002 : lecture (avant) + UPDATE seuils + audit atomiques dans la tx ARMÉE.
+      const after = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const before = await loadThresholds(armedDb, id);
+        const updated = await updateThresholds(armedDb, id, input);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "PATCH /banks/:id/thresholds",
+          entityType: "bank_thresholds",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff(toThresholds(before), toThresholds(updated)),
+        });
+        return updated;
       });
       return c.json(toThresholds(after), 200);
     } catch (err) {

@@ -17,11 +17,11 @@
  * connexion `sigfa_app` voit ZÉRO ligne (FORCE RLS) — c'est bien l'armement, pas le
  * `WHERE bank_id` applicatif, qui porte l'isolation en défense-en-profondeur.
  *
- * COUTURE DB INCOMPLÈTE — `thresholds.ts` reste PENDING (pas dans ce lot) : le dernier
- * test ci-dessous DÉMONTRE le blocage (`UPDATE banks … SET updated_at=NOW()` →
- * « permission denied ») : la migration 0014 accorde UPDATE colonne-scopé sur les 3
- * seuils MAIS PAS sur `updated_at`, que la route positionne. Tant que la couture n'ajoute
- * pas `updated_at` au GRANT, thresholds ne peut tourner armée (cf. arch test).
+ * COUTURE DB DÉBLOQUÉE par lot 3 — `thresholds.ts` est désormais ARMÉE : la migration
+ * 0015 (SEC-002-CUTOVER-LOT3) ajoute `updated_at` au GRANT UPDATE colonne-scopé de
+ * `banks`. Le test ci-dessous, qui documentait le BLOCAGE au lot 2, vérifie maintenant
+ * que le `UPDATE banks … SET updated_at=NOW()` RÉUSSIT sous armement sur la propre
+ * ligne du tenant (cf. arch test + config-cutover-lot3-tenant-isolation).
  *
  * Le SQL exécuté ici est CELUI des routes basculées, rejoué à travers
  * `withArmedTenant` — l'exact chemin de production.
@@ -105,31 +105,33 @@ describe("SEC-002-CUTOVER-LOT2: isolation tenant sous armement (sms/devices/kios
     expect(kiosks.rows).toHaveLength(0);
   }, 60_000);
 
-  // ── COUTURE INCOMPLÈTE : thresholds.ts reste PENDING (hors de ce lot) ────────
-  it("SEC-002-CUTOVER-LOT2: thresholds RESTE bloqué — UPDATE banks touchant `updated_at` (non accordé par 0014) → permission denied", async () => {
+  // ── COUTURE THRESHOLDS DÉBLOQUÉE par lot 3 (0015 : `updated_at` ajouté au GRANT) ──
+  it("SEC-002-CUTOVER-LOT2: thresholds DÉBLOQUÉ — UPDATE banks touchant `updated_at` (accordé par 0015) réussit sous armement", async () => {
     // Rejoue EXACTEMENT le SQL de production `updateThresholds` (SET … updated_at=NOW())
-    // sous armement de A (sa propre ligne). La migration 0014 accorde UPDATE colonne-scopé
-    // sur les 3 seuils MAIS PAS sur `updated_at` → l'UPDATE est REFUSÉ. C'est la raison
-    // documentée pour laquelle thresholds.ts N'EST PAS armée dans ce lot (arch test).
-    await expect(
-      withArmedTenant(armable(h), bankA, async (conn) => {
-        return conn.query(
-          `UPDATE banks
-              SET queue_critical_threshold = COALESCE($2, queue_critical_threshold),
-                  agent_inactivity_minutes = COALESCE($3, agent_inactivity_minutes),
-                  no_show_timeout_minutes = COALESCE($4, no_show_timeout_minutes),
-                  updated_at = NOW()
-            WHERE id=$1 AND deleted_at IS NULL
-            RETURNING queue_critical_threshold`,
-          [bankA, 120, null, null]
-        );
-      })
-    ).rejects.toThrow(/permission denied/i);
+    // sous armement de A (sa propre ligne). Au lot 2, ce chemin ÉCHOUAIT (`updated_at`
+    // hors GRANT 0014). La migration 0015 (SEC-002-CUTOVER-LOT3) ajoute `updated_at`
+    // au GRANT UPDATE colonne-scopé : l'UPDATE réussit désormais sur la propre ligne
+    // du tenant (thresholds.ts est ARMÉE en lot 3 — cf. arch test + isolation lot3).
+    const rows = await withArmedTenant(armable(h), bankA, async (conn) => {
+      const res = await conn.query(
+        `UPDATE banks
+            SET queue_critical_threshold = COALESCE($2, queue_critical_threshold),
+                agent_inactivity_minutes = COALESCE($3, agent_inactivity_minutes),
+                no_show_timeout_minutes = COALESCE($4, no_show_timeout_minutes),
+                updated_at = NOW()
+          WHERE id=$1 AND deleted_at IS NULL
+          RETURNING queue_critical_threshold`,
+        [bankA, 120, null, null]
+      );
+      return res.rows;
+    });
+    expect(rows).toHaveLength(1);
+    expect((rows[0] as { queue_critical_threshold: number }).queue_critical_threshold).toBe(120);
   }, 60_000);
 
   it("SEC-002-CUTOVER-LOT2: banks SELECT reste isolé sous armement — B ne voit PAS la ligne de A", async () => {
-    // La lecture (loadThresholds) EST déjà isolée par la policy SELECT `tenant_isolation`
-    // de banks : la couture SELECT est OK ; seul le chemin UPDATE reste bloqué (ci-dessus).
+    // La lecture (loadThresholds) EST isolée par la policy SELECT `tenant_isolation`
+    // de banks ; le chemin UPDATE est désormais armé et isolé (policy `tenant_update`).
     const rows = await withArmedTenant(armable(h), bankB, async (conn) => {
       const res = await conn.query(
         `SELECT queue_critical_threshold FROM banks WHERE id=$1 AND deleted_at IS NULL`,

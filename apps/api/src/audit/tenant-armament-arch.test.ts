@@ -67,7 +67,6 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
  * DOIT être armée (sinon le test échoue).
  */
 const ARMED_CUTOVER_PENDING: readonly string[] = [
-  "agencies.ts",
   "agents-import.ts",
   "agents.ts",
   // Routeurs IA (IA-002/003/004) — lectures tenant-scoped (`WHERE bank_id`), montés
@@ -80,23 +79,22 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "data-privacy.ts",
   "kiosk-session.ts",
   "onboarding.ts",
-  "operations.ts",
   "public-tickets.ts",
   "queues.ts",
+  // reports.ts — DIFFÉRÉE (couture d'ARCHITECTURE de route, PAS une couture DB
+  // manquante) : GET /reports/kpis?scope=network (buildNetworkResponse) est un
+  // agrégat CROSS-TENANT réseau (SUPER_ADMIN, `bankId=null`) qui lit
+  // `daily_agency_stats` SANS filtre `bank_id`, par conception (AnonymizedNetworkAggregate).
+  // Sous `withArmedTenant`, la policy `tenant_isolation` de `daily_agency_stats`
+  // (USING bank_id = current_bank_id) restreindrait silencieusement l'agrégat à UNE
+  // seule banque — cassant la lecture réseau. Le chemin réseau appartient à
+  // `withPlatform` (comme network-overview.ts), pas à un armement tenant.
+  // Les tables sont bien couvertes (policy `tenant_isolation` + GRANT CRUD `sigfa_app`
+  // sur daily_agency_stats / export_jobs / agencies, 0005/0001) : la couture DB est
+  // COMPLÈTE. Ce qui manque est une DÉCISION d'architecture de route (scinder le
+  // handler : paths tenant → withArmedTenant ; path network → withPlatform), donc
+  // hors périmètre d'un simple recâblage de connexion — reste PENDING jusqu'à ce split.
   "reports.ts",
-  // thresholds.ts — TOUJOURS BLOQUÉ (couture packages/database INCOMPLÈTE) :
-  // PATCH /banks/:id/thresholds fait un `UPDATE banks SET queue_critical_threshold=…,
-  // agent_inactivity_minutes=…, no_show_timeout_minutes=…, updated_at=NOW()`. La
-  // migration 0014_thresholds_tenant_grant.sql accorde UPDATE colonne-scopé sur les
-  // 3 SEULES colonnes de seuils, mais PAS sur `updated_at`. Sous connexion armée
-  // NOBYPASSRLS, un UPDATE qui touche `updated_at` (colonne non accordée) →
-  // « permission denied for table banks » (prouvé Testcontainers, SEC-002-CUTOVER-LOT2).
-  // Reste PENDING tant que la couture n'est pas COMPLÉTÉE côté packages/database :
-  // ajouter `updated_at` au GRANT UPDATE colonne-scopé sur `banks` pour `sigfa_app`
-  //   → `GRANT UPDATE (queue_critical_threshold, agent_inactivity_minutes,
-  //       no_show_timeout_minutes, updated_at) ON banks TO sigfa_app;`
-  // (le trigger `updated_at` n'existe pas sur banks — la colonne est posée par la route).
-  "thresholds.ts",
   "tickets-sync.ts",
   "tickets.ts",
   "tv-session.ts",
@@ -131,10 +129,21 @@ const ARMED: readonly string[] = [
   // - sms-templates.ts : `notification_templates` (policy `tenant_isolation` + CRUD, 0004).
   // - devices.ts : `notification_devices` (policy `tenant_isolation` + CRUD, 0004).
   // - kiosks-status.ts : `kiosks` (policy `tenant_isolation` + SELECT, 0001).
-  // (thresholds.ts reste PENDING : couture 0014 incomplète, cf. note ci-dessus.)
   "sms-templates.ts",
   "devices.ts",
   "kiosks-status.ts",
+  // SEC-002-CUTOVER-LOT3 — bascule seuils/modèle métier tenant-scoped. Tout accès DB
+  // tenant routé via `withArmedTenant` (armement `app.current_bank_id`).
+  // - thresholds.ts : `banks` — SELECT (policy `tenant_isolation`) + UPDATE colonne-scopé
+  //   des 3 seuils + `updated_at` (policy `tenant_update`, GRANT 0014+0015 COMPLÉTÉ).
+  // - operations.ts : `operations` (policy `tenant_isolation` + CRUD, 0009) + `services`
+  //   (lu pour le scope parent, policy `tenant_isolation` + SELECT, 0001).
+  // - agencies.ts : `agencies` (policy `tenant_isolation` + CRUD, 0001) + `tickets`
+  //   (lu pour la garde tickets ouverts, policy `tenant_isolation` + SELECT, 0001).
+  // (reports.ts reste PENDING : chemin réseau cross-tenant → withPlatform, cf. note ci-dessus.)
+  "thresholds.ts",
+  "operations.ts",
+  "agencies.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
