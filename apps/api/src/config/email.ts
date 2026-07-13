@@ -9,11 +9,19 @@
  *  - `EMAIL_ATTACHMENT_SIGNING_SECRET` : secret HMAC des liens signés de pièce jointe.
  *  - `EMAIL_ATTACHMENT_BASE_URL` : base d'URL publique de téléchargement.
  *  - `EMAIL_ATTACHMENT_LIMIT_BYTES` : plafond au-delà duquel repli lien signé (D3).
+ *  - `EMAIL_PROVIDER` / `RESEND_API_KEY` / `RESEND_FROM` : sélection du fournisseur
+ *    d'envoi (RESEND-EMAIL). `mock` par défaut ; `resend` réel seulement si la clé
+ *    et l'adresse d'expédition sont présentes (sinon repli mock, jamais de crash).
  *
  * @module
  */
 
 import { DEFAULT_ATTACHMENT_LIMIT_BYTES } from "src/services/email/attachment-storage.js";
+import {
+  createEmailAdapter,
+  type CreateEmailAdapterDeps,
+} from "src/services/email/resend-email-adapter.js";
+import type { EmailAdapter } from "src/services/email/email-adapter.js";
 
 /** Domaines internes par défaut (à surcharger par banque en déploiement). */
 export const DEFAULT_INTERNAL_DOMAINS = ["sigfa.local"] as const;
@@ -107,4 +115,16 @@ export function getEmailConfig(): EmailConfig {
       DEFAULT_ATTACHMENT_LIMIT_BYTES
     ),
   };
+}
+
+/**
+ * Résout l'adaptateur email du worker NOTIF-004 depuis l'environnement : Resend réel
+ * si `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` + `RESEND_FROM`, sinon mock (défaut).
+ * Point de câblage unique : le worker email obtient son adaptateur ici.
+ *
+ * @param deps - Dépendances injectables (client Resend simulé en test).
+ * @returns L'`EmailAdapter` sélectionné par config
+ */
+export function getEmailAdapter(deps: CreateEmailAdapterDeps = {}): EmailAdapter {
+  return createEmailAdapter(process.env, deps);
 }
