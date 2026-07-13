@@ -42,7 +42,9 @@
     "errorTitle": "Opérations indisponibles",
     "errorMessage": "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
     "retryButton": "Réessayer",
-    "offlineBanner": "Mode hors connexion"
+    "offlineBanner": "Mode hors connexion",
+    "advisorCard": "Voir mon conseiller",
+    "advisorHint": "Rencontrer un chargé de clientèle"
   },
   "choiceModelB": {
     "title": "Que souhaitez-vous ?",

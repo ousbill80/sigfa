@@ -4,6 +4,63 @@
  */
 import { http, HttpResponse } from "msw";
 
+/** Opération de démo (vue publique PublicOperation — SLA résolu). */
+interface DemoOperation {
+  id: string;
+  code: string;
+  name: string;
+  slaMinutes: number;
+  iconKey?: string;
+}
+
+/**
+ * KIOSK-BORNE — Catalogue de démo calqué sur la borne BNI modèle :
+ * 3 familles (Caisse · Moyen de paiement · Accueil / Conseiller client),
+ * opérations DISTINCTES par famille. Codes conformes au contrat
+ * (`^[A-Z0-9]{2,6}$`), `iconKey` aligné sur le jeu `ServiceIcon`.
+ */
+export const DEMO_OPERATIONS_BY_SERVICE: Readonly<Record<string, readonly DemoOperation[]>> = {
+  // ── Caisse (SLA ~8 min) ──────────────────────────────────────────────────
+  "svc-caisse": [
+    { id: "op-retrait-especes", code: "RETESP", name: "Retrait espèces", slaMinutes: 8, iconKey: "withdrawal" },
+    { id: "op-retrait-plus-5m", code: "RETP5M", name: "Retrait plus de 5 millions", slaMinutes: 8, iconKey: "withdrawal" },
+    { id: "op-retrait-versement", code: "RETVER", name: "Retrait/Versement", slaMinutes: 8, iconKey: "withdrawal" },
+    { id: "op-versement-moins-5m", code: "VERM5M", name: "Versement moins de 5 millions", slaMinutes: 8, iconKey: "deposit" },
+    { id: "op-versement-plus-5m", code: "VERP5M", name: "Versement plus de 5 millions", slaMinutes: 8, iconKey: "deposit" },
+    { id: "op-rechargement-carte-prepayee", code: "RECHCP", name: "Rechargement de carte prépayée", slaMinutes: 8, iconKey: "card" },
+    { id: "op-paiement-divers", code: "PAIDIV", name: "Paiement divers", slaMinutes: 8, iconKey: "payment" },
+    { id: "op-change", code: "CHANGE", name: "Change", slaMinutes: 8, iconKey: "exchange" },
+    { id: "op-transfert-orange-money", code: "TRFOM", name: "Transfert Orange Money", slaMinutes: 8, iconKey: "transfer" },
+    { id: "op-transfert-ria", code: "TRFRIA", name: "Transfert RIA", slaMinutes: 8, iconKey: "transfer" },
+    { id: "op-transfert-moneygram", code: "TRFMG", name: "Transfert MoneyGram", slaMinutes: 8, iconKey: "transfer" },
+  ],
+  // ── Moyen de paiement (SLA ~10 min) ─────────────────────────────────────
+  "svc-moyens-paiement": [
+    { id: "op-demande-releve", code: "DEMREL", name: "Demande de relevé", slaMinutes: 10, iconKey: "statement" },
+    { id: "op-retrait-cheque-effet", code: "RETCHQ", name: "Retrait chèque/effet", slaMinutes: 10, iconKey: "cheque" },
+    { id: "op-remise-cheque-effet", code: "REMCHQ", name: "Remise chèque/effet", slaMinutes: 10, iconKey: "cheque" },
+    { id: "op-opposition-carte-cheque", code: "OPPCC", name: "Demande d'opposition carte/chèque", slaMinutes: 10, iconKey: "opposition" },
+    { id: "op-carte-prepayee", code: "CARTPP", name: "Carte prépayée", slaMinutes: 10, iconKey: "card" },
+    { id: "op-retrait-carte-code", code: "RETCAR", name: "Retrait de carte/code", slaMinutes: 10, iconKey: "card" },
+    { id: "op-demande-carte", code: "DEMCAR", name: "Demande de carte", slaMinutes: 10, iconKey: "card" },
+    { id: "op-demande-chequier", code: "DEMCHQ", name: "Demande de chéquier", slaMinutes: 10, iconKey: "cheque" },
+    { id: "op-virement", code: "VIR", name: "Virement", slaMinutes: 10, iconKey: "transfer" },
+  ],
+  // ── Accueil / Conseiller client (SLA ~15 min) ────────────────────────────
+  "svc-conseiller": [
+    { id: "op-ouverture-compte", code: "OUVCPT", name: "Ouverture de compte", slaMinutes: 15, iconKey: "account" },
+    { id: "op-cloture-compte", code: "CLOCPT", name: "Clôture de compte", slaMinutes: 15, iconKey: "account" },
+    { id: "op-demande-credit", code: "DEMCRE", name: "Demande de crédit", slaMinutes: 15, iconKey: "credit" },
+    { id: "op-plan-epargne-pee", code: "PEE", name: "Plan Épargne / PEE", slaMinutes: 15, iconKey: "savings" },
+    { id: "op-resiliation-plan-epargne", code: "RESPEE", name: "Demande de résiliation Plan Épargne PEL/PEE", slaMinutes: 15, iconKey: "savings" },
+    { id: "op-souscription-autre-produit", code: "SOUSPR", name: "Souscription autre produit", slaMinutes: 15, iconKey: "contract" },
+    { id: "op-depot-courriers", code: "DEPCOU", name: "Dépôt de courriers", slaMinutes: 15, iconKey: "mail" },
+    { id: "op-demande-releve-solde", code: "DEMSOL", name: "Demande de relevé/solde", slaMinutes: 15, iconKey: "statement" },
+    { id: "op-demande-informations", code: "DEMINF", name: "Demande d'informations", slaMinutes: 15, iconKey: "info" },
+    { id: "op-reclamations", code: "RECLA", name: "Réclamations", slaMinutes: 15, iconKey: "complaint" },
+  ],
+};
+
 export const handlers = [
   http.post("*/kiosk/session", () => {
     return HttpResponse.json(
@@ -17,20 +74,15 @@ export const handlers = [
     );
   }),
   // MODEL-KIOSK-A: GET /public/agencies/{agencyId}/operations?serviceId=
-  // Liste des opérations actives d'un service (SLA résolu) pour la grille borne.
-  // Démo : ≥3 opérations réalistes (data only) pour peupler la grille sans
-  // déclencher le saut « opération unique ». Le wildcard `:agencyId` matche
-  // n'importe quel identifiant d'agence transmis par l'écran services.
-  http.get("*/public/agencies/:agencyId/operations", () => {
+  // Liste des opérations actives d'UN service (SLA résolu) pour la grille borne.
+  // Le handler FILTRE par `serviceId` : chaque famille reçoit SES opérations
+  // (catalogue borne BNI ci-dessus), jamais celles d'une autre. `serviceId`
+  // inconnu → liste vide (l'écran retombe sur la tuile-service). Le wildcard
+  // `:agencyId` matche n'importe quel identifiant d'agence transmis par l'écran.
+  http.get("*/public/agencies/:agencyId/operations", ({ request }) => {
+    const serviceId = new URL(request.url).searchParams.get("serviceId") ?? "";
     return HttpResponse.json(
-      {
-        data: [
-          { id: "op-dep", code: "DEP", name: "Dépôt espèces", slaMinutes: 8, iconKey: "deposit" },
-          { id: "op-ret", code: "RET", name: "Retrait espèces", slaMinutes: 10, iconKey: "withdrawal" },
-          { id: "op-vir", code: "VIR", name: "Virement", slaMinutes: 12, iconKey: "transfer" },
-          { id: "op-chq", code: "CHQ", name: "Remise de chèque", slaMinutes: 6, iconKey: "deposit" },
-        ],
-      },
+      { data: DEMO_OPERATIONS_BY_SERVICE[serviceId] ?? [] },
       { status: 200 }
     );
   }),

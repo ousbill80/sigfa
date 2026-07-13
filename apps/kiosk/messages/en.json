@@ -42,7 +42,9 @@
     "errorTitle": "Operations unavailable",
     "errorMessage": "Unable to load operations. Retry or go to reception.",
     "retryButton": "Retry",
-    "offlineBanner": "Offline mode"
+    "offlineBanner": "Offline mode",
+    "advisorCard": "See my advisor",
+    "advisorHint": "Meet a relationship manager"
   },
   "choiceModelB": {
     "title": "What would you like to do?",

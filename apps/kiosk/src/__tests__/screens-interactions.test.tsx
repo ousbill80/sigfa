@@ -93,6 +93,8 @@ const servicesMessages = {
     errorMessage: "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
     retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
+    advisorCard: "Voir mon conseiller",
+    advisorHint: "Rencontrer un chargé de clientèle",
   },
   voice008: { playLabel: "Écouter" },
   degraded007: {
@@ -146,12 +148,12 @@ import { ConfirmationScreen } from "@/components/ConfirmationScreen";
 import { TicketScreen } from "@/components/TicketScreen";
 import { readTicketMomentPii } from "@/lib/ticket-moment-store";
 
+// Ids alignés sur le catalogue de démo BNI des handlers MSW (filtrage serviceId).
 const MOCK_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", icon: "💰", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", icon: "💵", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", icon: "🔄", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", icon: "📋", estimatedMinutes: 15, isOpen: true },
-  { id: "svc-5", name: "Crédit", icon: "🏦", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
+  { id: "svc-caisse", name: "Caisse", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-moyens-paiement", name: "Moyen de paiement", estimatedMinutes: 10, isOpen: true },
+  { id: "svc-conseiller", name: "Accueil / Conseiller client", estimatedMinutes: 15, isOpen: true },
+  { id: "svc-ferme", name: "Crédit", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -269,12 +271,12 @@ describe("KIOSK-BORNE: ServicesScreen interactions (prise de ticket par familles
     );
 
     const tiles = await screen.findAllByTestId("operation-tile");
-    fireEvent.click(tiles[0]); // op-dep de la famille svc-1.
+    fireEvent.click(tiles[0]); // op-retrait-especes de la famille svc-caisse.
 
     const target = mockPush.mock.calls[0][0] as string;
     expect(target).toContain("/fr/confirmation?");
-    expect(target).toContain("serviceId=svc-1");
-    expect(target).toContain("operationId=op-dep");
+    expect(target).toContain("serviceId=svc-caisse");
+    expect(target).toContain("operationId=op-retrait-especes");
     expect(target).toContain("agencyId=agt-001");
   });
 

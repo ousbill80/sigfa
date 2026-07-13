@@ -157,6 +157,73 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
         </button>
       </div>
     </section>
+    <button
+      data-testid="advisor-access-card"
+      style="min-height: 88px; background-color: transparent; border: 1px solid var(--gold-soft); border-radius: var(--r-lg); cursor: pointer; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); text-align: left; color: var(--ink-inverse);"
+    >
+      <span
+        data-testid="advisor-access-icon"
+        style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); border: 1px solid var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center;"
+      >
+        <svg
+          aria-hidden="true"
+          fill="none"
+          focusable="false"
+          height="30"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="30"
+        >
+          <circle
+            cx="12"
+            cy="8"
+            r="4"
+          />
+          <path
+            d="M4 21a8 8 0 0 1 16 0"
+          />
+        </svg>
+      </span>
+      <span
+        style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
+      >
+        <span
+          data-testid="advisor-access-label"
+          style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--ink-inverse);"
+        >
+          See my advisor
+        </span>
+        <span
+          style="font-size: 18px; color: var(--ink-muted-inv);"
+        >
+          Meet a relationship manager
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        style="margin-left: auto; color: var(--gold); display: flex;"
+      >
+        <svg
+          aria-hidden="true"
+          fill="none"
+          focusable="false"
+          height="28"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="28"
+        >
+          <path
+            d="M9 6l6 6-6 6"
+          />
+        </svg>
+      </span>
+    </button>
   </div>
   <button
     data-testid="accessibility-btn"
@@ -348,6 +415,73 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
         </button>
       </div>
     </section>
+    <button
+      data-testid="advisor-access-card"
+      style="min-height: 88px; background-color: transparent; border: 1px solid var(--gold-soft); border-radius: var(--r-lg); cursor: pointer; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); text-align: left; color: var(--ink-inverse);"
+    >
+      <span
+        data-testid="advisor-access-icon"
+        style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); border: 1px solid var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center;"
+      >
+        <svg
+          aria-hidden="true"
+          fill="none"
+          focusable="false"
+          height="30"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="30"
+        >
+          <circle
+            cx="12"
+            cy="8"
+            r="4"
+          />
+          <path
+            d="M4 21a8 8 0 0 1 16 0"
+          />
+        </svg>
+      </span>
+      <span
+        style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
+      >
+        <span
+          data-testid="advisor-access-label"
+          style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--ink-inverse);"
+        >
+          Voir mon conseiller
+        </span>
+        <span
+          style="font-size: 18px; color: var(--ink-muted-inv);"
+        >
+          Rencontrer un chargé de clientèle
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        style="margin-left: auto; color: var(--gold); display: flex;"
+      >
+        <svg
+          aria-hidden="true"
+          fill="none"
+          focusable="false"
+          height="28"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="28"
+        >
+          <path
+            d="M9 6l6 6-6 6"
+          />
+        </svg>
+      </span>
+    </button>
   </div>
   <button
     data-testid="accessibility-btn"

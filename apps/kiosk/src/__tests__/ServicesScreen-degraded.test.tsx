@@ -49,6 +49,8 @@ const frMessages = makeMessages(
     errorMessage: "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
     retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
+    advisorCard: "Voir mon conseiller",
+    advisorHint: "Rencontrer un chargé de clientèle",
   },
   {
     longQueueTitle: "Forte affluence — environ {estimate} min",
@@ -72,6 +74,8 @@ const enMessages = makeMessages(
     errorMessage: "Unable to load operations. Retry or go to reception.",
     retryButton: "Retry",
     offlineBanner: "Offline mode",
+    advisorCard: "See my advisor",
+    advisorHint: "Meet a relationship manager",
   },
   {
     longQueueTitle: "High volume — about {estimate} min",

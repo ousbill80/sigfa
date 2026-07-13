@@ -36,9 +36,11 @@ vi.mock("@/hooks/useAccessibilityMode", () => ({
 import { ServicesScreen, type ServiceItem } from "@/components/ServicesScreen";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
+// Ids alignés sur le catalogue de démo BNI des handlers MSW : chaque famille
+// reçoit SES opérations (filtrage par serviceId), jamais celles d'une autre.
 const MOCK_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Caisse", code: "deposit", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Moyens de paiement", code: "card", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-caisse", name: "Caisse", code: "cash", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-moyens-paiement", name: "Moyen de paiement", code: "card", estimatedMinutes: 10, isOpen: true },
 ];
 
 const CLOSED_SERVICE: ServiceItem = {
@@ -65,6 +67,8 @@ const frMessages = {
     errorMessage: "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
     retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
+    advisorCard: "Voir mon conseiller",
+    advisorHint: "Rencontrer un chargé de clientèle",
   },
   degraded007: {
     longQueueTitle: "Forte affluence — environ {estimate} min",
@@ -88,6 +92,8 @@ const enMessages = {
     errorMessage: "Unable to load operations. Retry or go to reception.",
     retryButton: "Retry",
     offlineBanner: "Offline mode",
+    advisorCard: "See my advisor",
+    advisorHint: "Meet a relationship manager",
   },
   degraded007: {
     longQueueTitle: "High volume — about {estimate} min",
@@ -132,11 +138,11 @@ describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
       const sections = await screen.findAllByTestId("family-section");
       expect(sections.length, `Sections for ${locale}`).toBe(2);
       const titles = screen.getAllByTestId("family-title");
-      expect(titles.map((el) => el.textContent)).toEqual(["Caisse", "Moyens de paiement"]);
+      expect(titles.map((el) => el.textContent)).toEqual(["Caisse", "Moyen de paiement"]);
 
-      // Tuiles d'opérations (4 par famille — handler MSW).
+      // Tuiles d'opérations : catalogue BNI — 11 (Caisse) + 9 (Moyen de paiement).
       const tiles = screen.getAllByTestId("operation-tile");
-      expect(tiles.length, `Tiles for ${locale}`).toBe(8);
+      expect(tiles.length, `Tiles for ${locale}`).toBe(20);
       tiles.forEach((tile) => {
         expect((tile as HTMLElement).style.minHeight).toBe("96px");
       });
@@ -155,11 +161,34 @@ describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
       labels.forEach((label) => {
         expect(parseInt((label as HTMLElement).style.fontSize, 10)).toBeGreaterThanOrEqual(20);
       });
-      expect(screen.getAllByText("Dépôt espèces").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Retrait espèces").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Rechargement de carte prépayée").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Demande de chéquier").length).toBeGreaterThan(0);
 
       unmount();
     }
+  });
+
+  it("KIOSK-BORNE: chaque famille reçoit SES opérations (filtrage serviceId) — aucune duplication entre familles", async () => {
+    renderScreen();
+    const sections = await screen.findAllByTestId("family-section");
+    expect(sections.length).toBe(2);
+
+    const labelsOf = (section: HTMLElement) =>
+      Array.from(section.querySelectorAll("[data-testid='operation-tile-label']")).map(
+        (el) => el.textContent ?? ""
+      );
+    const caisse = labelsOf(sections[0] as HTMLElement);
+    const paiement = labelsOf(sections[1] as HTMLElement);
+
+    // Volumes du catalogue BNI, opérations distinctes par famille.
+    expect(caisse.length).toBe(11);
+    expect(paiement.length).toBe(9);
+    expect(caisse).toContain("Transfert Orange Money");
+    expect(paiement).toContain("Demande d'opposition carte/chèque");
+    // Régression « mêmes 4 ops partout » : intersection VIDE entre familles.
+    const overlap = caisse.filter((label) => paiement.includes(label));
+    expect(overlap).toEqual([]);
   });
 
   it("KIOSK-BORNE: bandeau d'en-tête persistant — banque (pastille brand), agence, date + heure vivante", async () => {
@@ -182,16 +211,16 @@ describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
   it("KIOSK-BORNE: clic tuile opération → navigation DIRECTE vers la confirmation (serviceId + operationId + libellé)", async () => {
     renderScreen();
     const tiles = await screen.findAllByTestId("operation-tile");
-    fireEvent.click(tiles[0]); // « Dépôt espèces » (op-dep) de la famille Caisse.
+    fireEvent.click(tiles[0]); // « Retrait espèces » (op-retrait-especes) de la famille Caisse.
 
     expect(mockPush).toHaveBeenCalledTimes(1);
     const target = mockPush.mock.calls[0][0] as string;
     expect(target).toContain("/fr/confirmation?");
-    expect(target).toContain("serviceId=svc-1");
-    expect(target).toContain("operationId=op-dep");
+    expect(target).toContain("serviceId=svc-caisse");
+    expect(target).toContain("operationId=op-retrait-especes");
     expect(target).toContain("agencyId=agt-001");
     expect(target).toContain(
-      new URLSearchParams({ operationLabel: "Dépôt espèces" }).toString()
+      new URLSearchParams({ operationLabel: "Retrait espèces" }).toString()
     );
   });
 
@@ -209,9 +238,43 @@ describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
 
     fireEvent.click(tile);
     const target = mockPush.mock.calls[0][0] as string;
-    expect(target).toContain("serviceId=svc-1");
+    expect(target).toContain("serviceId=svc-caisse");
     expect(target).not.toContain("operationId=");
     expect(target).toContain(`operationLabel=${encodeURIComponent("Caisse")}`);
+  });
+
+  it("KIOSK-BORNE: carte « Voir mon conseiller » en fin de page — style distinct + navigation /managers (FR/EN)", async () => {
+    for (const { locale, messages, label } of [
+      { locale: "fr", messages: frMessages, label: "Voir mon conseiller" },
+      { locale: "en", messages: enMessages, label: "See my advisor" },
+    ]) {
+      const { unmount } = renderScreen(MOCK_SERVICES, { locale, messages });
+      await screen.findAllByTestId("family-section");
+
+      const card = screen.getByTestId("advisor-access-card");
+      expect(card).toBeInTheDocument();
+      expect(screen.getByTestId("advisor-access-label").textContent).toBe(label);
+      // Style DISTINCT des tuiles d'opération : contour or, fond transparent.
+      expect((card as HTMLElement).style.backgroundColor).toBe("transparent");
+      expect((card as HTMLElement).style.border).toContain("var(--gold-soft)");
+      // Icône personne (SVG, zéro emoji) dans la pastille.
+      expect(
+        screen.getByTestId("advisor-access-icon").querySelector("svg")
+      ).toBeInTheDocument();
+      // La carte vient APRÈS les sections de familles dans le DOM.
+      const sections = screen.getAllByTestId("family-section");
+      const lastSection = sections[sections.length - 1];
+      expect(
+        lastSection.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+
+      // useParams est mocké sur « fr » : la navigation cible /fr/managers.
+      fireEvent.click(card);
+      expect(mockPush).toHaveBeenCalledWith("/fr/managers");
+
+      mockPush.mockClear();
+      unmount();
+    }
   });
 
   it("KIOSK-003: service FERMÉ → tuile grisée avec horaire, non cliquable", async () => {

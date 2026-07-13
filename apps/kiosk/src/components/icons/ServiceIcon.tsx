@@ -20,6 +20,14 @@ export type ServiceIconName =
   | "savings"
   | "exchange"
   | "advisor"
+  | "card"
+  | "cheque"
+  | "statement"
+  | "opposition"
+  | "payment"
+  | "contract"
+  | "mail"
+  | "info"
   | "generic";
 
 export interface ServiceIconProps {
@@ -38,13 +46,24 @@ export interface ServiceIconProps {
  * Couvre FR + EN pour les services bancaires courants.
  */
 const KEYWORD_MAP: ReadonlyArray<readonly [readonly string[], ServiceIconName]> = [
+  // Les entrées SPÉCIFIQUES précèdent les génériques : « opposition carte »
+  // doit gagner sur « carte », « retrait chèque » sur « retrait », « dépôt de
+  // courriers » sur « dépôt », etc. (première correspondance retenue).
+  [["opposition", "blocage"], "opposition"],
+  [["cheque", "chequier", "check"], "cheque"],
+  [["releve", "statement", "solde"], "statement"],
+  [["courrier", "mail"], "mail"],
+  [["information", "renseignement"], "info"],
+  [["souscription", "subscription", "contrat", "contract"], "contract"],
+  [["paiement", "payment", "facture"], "payment"],
+  [["carte", "card", "prepay"], "card"],
   [["depot", "deposit", "versement"], "deposit"],
   [["retrait", "withdrawal", "cash", "especes"], "withdrawal"],
   [["virement", "transfer", "transfert"], "transfer"],
   [["reclamation", "complaint", "plainte", "litige"], "complaint"],
   [["compte", "account", "guichet"], "account"],
   [["credit", "loan", "pret", "financement"], "credit"],
-  [["epargne", "savings", "livret"], "savings"],
+  [["epargne", "savings", "livret", "pee", "pel"], "savings"],
   [["change", "exchange", "devise", "currency"], "exchange"],
   [["conseil", "advisor", "conseiller", "rendez", "rdv", "appointment"], "advisor"],
 ];
@@ -68,6 +87,14 @@ const ICON_NAMES: ReadonlySet<string> = new Set<ServiceIconName>([
   "savings",
   "exchange",
   "advisor",
+  "card",
+  "cheque",
+  "statement",
+  "opposition",
+  "payment",
+  "contract",
+  "mail",
+  "info",
   "generic",
 ]);
 
@@ -175,6 +202,80 @@ function renderPaths(name: ServiceIconName) {
         <>
           <circle cx="12" cy="8" r="3.5" />
           <path d="M5 20a7 7 0 0 1 14 0" />
+        </>
+      );
+    case "card":
+      // Carte bancaire avec puce (carte / carte prépayée / retrait de carte).
+      return (
+        <>
+          <path d="M3 6h18v13H3z" />
+          <path d="M6 10h4v3H6z" />
+          <path d="M13 15h5" />
+        </>
+      );
+    case "cheque":
+      // Chèque : lignes d'écriture + paraphe de signature.
+      return (
+        <>
+          <path d="M3 6h18v12H3z" />
+          <path d="M6 10h7" />
+          <path d="M6 13h4" />
+          <path d="M14 14.5c1-1.5 2.5-1.5 3.5 0" />
+        </>
+      );
+    case "statement":
+      // Relevé : document à coin plié avec lignes.
+      return (
+        <>
+          <path d="M6 3h9l3 3v15H6z" />
+          <path d="M15 3v3h3" />
+          <path d="M9 11h6" />
+          <path d="M9 15h6" />
+        </>
+      );
+    case "opposition":
+      // Sens interdit (opposition / blocage carte ou chèque).
+      return (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M6.5 6.5l11 11" />
+        </>
+      );
+    case "payment":
+      // Billet de banque (paiement divers).
+      return (
+        <>
+          <path d="M3 7h18v10H3z" />
+          <circle cx="12" cy="12" r="2.5" />
+          <path d="M6.5 12h.01" />
+          <path d="M17.5 12h.01" />
+        </>
+      );
+    case "contract":
+      // Document + signe plus (souscription d'un nouveau produit).
+      return (
+        <>
+          <path d="M6 3h9l3 3v15H6z" />
+          <path d="M15 3v3h3" />
+          <path d="M12 10v6" />
+          <path d="M9 13h6" />
+        </>
+      );
+    case "mail":
+      // Enveloppe (dépôt de courriers).
+      return (
+        <>
+          <path d="M3 6h18v12H3z" />
+          <path d="M3 7l9 6 9-6" />
+        </>
+      );
+    case "info":
+      // Cercle « i » (demande d'informations).
+      return (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 11v5" />
+          <path d="M12 8v.01" />
         </>
       );
     case "generic":

@@ -28,7 +28,12 @@ import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { DEFAULT_LONG_QUEUE_THRESHOLD_MIN } from "@/hooks/useDegradedState";
 import { kioskAgencyName, kioskBankName } from "@/lib/kiosk-branding";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
-import { AccessibilityIcon, PhoneIcon } from "@/components/icons/UiIcons";
+import {
+  AccessibilityIcon,
+  ChevronIcon,
+  PersonIcon,
+  PhoneIcon,
+} from "@/components/icons/UiIcons";
 import { KioskHeaderBanner } from "@/components/KioskHeaderBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import type { OperationItem } from "@/components/OperationsScreen";
@@ -577,6 +582,74 @@ export function ServicesScreen({
             </div>
           </section>
         ))}
+
+        {/* Accès « Voir mon conseiller » — carte discrète mais visible en fin
+            de page, style DISTINCT des tuiles d'opération (contour or sur le
+            fond kiosque, pas de carte pleine), navigation vers /managers sans
+            repasser par l'écran choice. */}
+        <button
+          data-testid="advisor-access-card"
+          onClick={() => router.push(`/${currentLocale}/managers`)}
+          style={{
+            minHeight: "88px",
+            backgroundColor: "transparent",
+            border: "1px solid var(--gold-soft)",
+            borderRadius: "var(--r-lg)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-4)",
+            padding: "var(--space-3) var(--space-5)",
+            textAlign: "left",
+            color: "var(--ink-inverse)",
+          }}
+        >
+          <span
+            data-testid="advisor-access-icon"
+            style={{
+              flexShrink: 0,
+              width: "56px",
+              height: "56px",
+              borderRadius: "var(--r-full)",
+              border: "1px solid var(--gold-soft)",
+              color: "var(--gold)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <PersonIcon size={30} />
+          </span>
+          <span
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-1)",
+              minWidth: 0,
+            }}
+          >
+            <span
+              data-testid="advisor-access-label"
+              style={{
+                fontSize: `${labelPx}px`,
+                fontWeight: 600,
+                lineHeight: "var(--leading-tight)",
+                color: "var(--ink-inverse)",
+              }}
+            >
+              {t("advisorCard")}
+            </span>
+            <span style={{ fontSize: "18px", color: "var(--ink-muted-inv)" }}>
+              {t("advisorHint")}
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            style={{ marginLeft: "auto", color: "var(--gold)", display: "flex" }}
+          >
+            <ChevronIcon size={28} />
+          </span>
+        </button>
       </div>
 
       {/* Accessibility button — texte ×1.2 en mode actif. */}
