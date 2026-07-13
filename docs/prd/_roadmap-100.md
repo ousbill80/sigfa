@@ -24,21 +24,25 @@
 - ⏳ **ADM-002a** clone+onboarding (api) · 🔒 **ADM-002b** Stepper (DESIGN-gate).
 - ⏳ **ADM-003a** heartbeat+supervision (api) · 🔒 **ADM-003b** écran supervision (DESIGN-gate).
 
-## F9 — Sécurité & Charge
-- ⏳ **SEC-001a** audit exhaustif (api) · **SEC-001b** écran Auditor (web).
-- ⏳ **SEC-002** tenant-isolation exhaustif (ferme dette RLS `withTenant` ; intègre le commit Schemathesis `harden/f3-debt`).
-- ⏳ **SEC-003** PRA (mock S3) · 🔒 RTO/RPO réel gated infra.
+## F9 — Sécurité & Charge (partiel)
+- ⏳ **SEC-001a** audit exhaustif (api) · **SEC-001b** écran Auditor (web) — 🔒 bloqué sur périmètre `31ee3ac`.
+- ⏳ **SEC-002** tenant-isolation exhaustif (ferme dette RLS `withTenant` ; intègre `harden/f3-debt`) — 🔒 bloqué sur `31ee3ac`.
+- ✅ **SEC-003** PRA backup/restore chiffré (mock S3, game day CI) — 🔒 RTO/RPO réel gated infra.
 - 🔒 **SEC-004** k6 charge — env de charge réel (PgBouncer×prepared-statements à tester tôt).
-- ⏳ **SEC-005** Stryker — scope réduit « moteur de file » maintenant, extension sla-engine après REP-001.
+- ✅ **SEC-005** Stryker mutation **100 %** sur queue-engine + sla-engine.
 
 ## F10 — IA & Prédiction (code+synthétique mergeable ; critères pilote 🔒)
 - ⏳ **IA-001** features · **IA-002** prévision · **IA-003** anomalies · **IA-004** NLP FR/EN · **IA-005** surfaces (mock).
 - 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j).
 
-## F11 — Supervision réseau
+## F11 — Supervision réseau (ops fait)
 - ⏳ **NET-001-API** super admin lecture seule (après SEC-002) · 🔒 **NET-001-WEB** console (DESIGN-gate).
-- ⏳ **NET-002** MAJ bornes canary · 🔒 signature artefact réelle.
-- 🔒 **NET-003** monitoring Grafana/Sentry — infra réelle (dépend SEC-004).
+- ✅ **NET-002** MAJ bornes canary/halt/rollback (mécanique) · 🔒 signature artefact réelle.
+- ✅ **NET-003** monitoring règles+scrubbing PII (mock/simulé) · 🔒 infra réelle Grafana/Sentry.
+
+## Infra / dette
+- ✅ **Registre de routes** (`route-registry.ts`) — fin des conflits `app.ts` ; les nouvelles routes = 1 ligne.
+- ⏳ Skew **zod v4/v3** (`@sigfa/schemas`) · ⏳ correctif teardown Redis REP-002 (mineur, CI verte) · ⏳ `harden/f3-debt` (Schemathesis) à merger avec SEC-002.
 
 ## Bouts transverses
 - ⏳ Fix unité REP-001 + réconcilie `app.ts`.
