@@ -418,7 +418,7 @@ describe("SEC-005: selectNextForManager — file conseiller PRIORITÉ ABSOLUE (D
       issuedAt: new Date("2026-07-12T08:00:00Z"),
     };
     const fn: TicketSelector & { called: number } = Object.assign(
-      async (_queueId: string, _counterId: string, _tx: Tx) => {
+      async () => {
         fn.called += 1;
         return marker;
       },
