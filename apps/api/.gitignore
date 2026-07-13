@@ -1,0 +1,5 @@
+# Artefacts de mutation testing StrykerJS (SEC-005) — non versionnés.
+# Le rapport HTML/JSON est régénéré à chaque run `pnpm run test:mutation`.
+.stryker-tmp/
+reports/
+stryker.log
