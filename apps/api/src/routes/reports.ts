@@ -14,6 +14,7 @@
  */
 
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
@@ -37,9 +38,38 @@ import {
   sumAggregates,
   toAbidjanDay,
   isDayPartial,
+  type DailyStatsAggregate,
   type KpiSet,
   type KpiValue,
 } from "src/reporting/sla-engine.js";
+import {
+  rankAgencies,
+  DEFAULT_SORT_KPI,
+  KPI_HIGHER_IS_BETTER,
+  DEFAULT_THRESHOLDS,
+  type SortKpi,
+  type AgencyBenchmarkInput,
+  type BenchmarkEntry,
+} from "src/reporting/benchmark.js";
+import {
+  createExportJob,
+  loadOwnedJob,
+  type ExportJobScope,
+  type ExportJobRow,
+} from "src/reporting/export-job-service.js";
+import type { ExportFormat } from "src/reporting/export-storage.js";
+
+/** Enfile le build d'un job d'export (branché sur l'infra BullMQ REP-003). */
+export type EnqueueExportFn = (jobId: string, bankId: string) => Promise<void>;
+
+/** Dépendances optionnelles du routeur reports (volet export asynchrone REP-003). */
+export interface ReportRouterDeps {
+  /**
+   * Enfile le build d'un export (BullMQ). Absent en dev/test unitaire : le job
+   * reste `PENDING` jusqu'à ce qu'un worker le prenne (aucun échec côté route).
+   */
+  enqueueExport?: EnqueueExportFn;
+}
 
 /** Variables de contexte Hono du routeur reports. */
 interface ReportEnv {
@@ -101,12 +131,15 @@ function projectKpiSet(kpis: KpiSet): KpiSet {
 /**
  * Crée le routeur reports (monté sous /api/v1).
  *
- * @returns Routeur Hono des routes reporting (REP-001)
+ * @param deps - Dépendances optionnelles (enfileur d'export BullMQ REP-003)
+ * @returns Routeur Hono des routes reporting (REP-001 + REP-003)
  */
-export function createReportRouter(): Hono<ReportEnv> {
+export function createReportRouter(deps: ReportRouterDeps = {}): Hono<ReportEnv> {
   const router = new Hono<ReportEnv>();
   registerKpis(router);
   registerDailyReport(router);
+  registerBenchmark(router);
+  registerExport(router, deps);
   return router;
 }
 
@@ -298,4 +331,230 @@ function buildPeriodMeta(bounds: NonNullable<ReturnType<typeof parsePeriod>>): R
     end: endExclusive.toISOString().replace(".000Z", "+00:00"),
     timezone: "Africa/Abidjan",
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /reports/benchmark (REP-003 — classement inter-agences)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Ensemble des KPI de tri valides (validation du paramètre `sortKpi`). */
+const VALID_SORT_KPIS = new Set<string>(Object.keys(KPI_HIGHER_IS_BETTER));
+
+/** Valide le paramètre `sortKpi` (défaut `tauxSLA`), sinon lève 400. */
+function parseSortKpi(raw: string | undefined): SortKpi {
+  if (raw === undefined) return DEFAULT_SORT_KPI;
+  if (!VALID_SORT_KPIS.has(raw)) {
+    throw new SigfaError("VALIDATION_ERROR", "Paramètre `sortKpi` invalide.", 400);
+  }
+  return raw as SortKpi;
+}
+
+/** Enregistre GET /reports/benchmark (classement + statut vert/orange/rouge/n-a). */
+function registerBenchmark(router: Hono<ReportEnv>): void {
+  router.get("/reports/benchmark", async (c) => {
+    const db = c.get("db");
+    const tenant = c.get("tenant");
+    try {
+      const bankId = requireBankId(tenant);
+      const bounds = parsePeriodOr400(c.req.query("period"));
+      const sortKpi = parseSortKpi(c.req.query("sortKpi"));
+      const entries = await buildBenchmark(asQueryFn(db), bankId, bounds, sortKpi);
+      return c.json(
+        {
+          period: bounds.periodKey,
+          thresholds: {
+            sla: { vert: DEFAULT_THRESHOLDS.sla.vert, orange: DEFAULT_THRESHOLDS.sla.orange },
+            tma: { vert: DEFAULT_THRESHOLDS.tma.vert, orange: DEFAULT_THRESHOLDS.tma.orange },
+          },
+          data: entries,
+          meta: { page: 1, limit: entries.length, total: entries.length },
+        },
+        200
+      );
+    } catch (err) {
+      return errorResponse(c, err);
+    }
+  });
+}
+
+/**
+ * Charge les agences du tenant + leur agrégat de période et calcule le classement.
+ * Une agence sans ligne d'agrégat sur la période → `aggregate: null` → statut `n/a`.
+ */
+async function buildBenchmark(
+  query: QueryFn,
+  bankId: string,
+  bounds: NonNullable<ReturnType<typeof parsePeriod>>,
+  sortKpi: SortKpi
+): Promise<BenchmarkEntry[]> {
+  const agencies = await query(
+    `SELECT id, name FROM agencies WHERE bank_id = $1 AND deleted_at IS NULL ORDER BY id`,
+    [bankId]
+  );
+  const statsRows = await query(
+    `SELECT agency_id, tickets_issued, tickets_served, tickets_abandoned, tickets_no_show,
+            total_wait_seconds, total_service_seconds, sla_met_count, sla_total_count,
+            feedback_count, nps_promoters, nps_passives, nps_detractors,
+            agent_active_seconds, agent_available_seconds
+       FROM daily_agency_stats
+      WHERE bank_id = $1 AND service_id IS NULL
+        AND day >= $2::date AND day <= $3::date`,
+    [bankId, bounds.dayStart, bounds.dayEnd]
+  );
+  // Somme des agrégats par agence (multi-jours → une somme par agence).
+  const byAgency = new Map<string, DailyStatsAggregate[]>();
+  for (const raw of statsRows.rows) {
+    const agencyId = String(raw["agency_id"]);
+    const list = byAgency.get(agencyId) ?? [];
+    list.push(mapRowToAggregate(raw as unknown as DailyStatsRow));
+    byAgency.set(agencyId, list);
+  }
+  const inputs: AgencyBenchmarkInput[] = agencies.rows.map((row) => {
+    const agencyId = String(row["id"]);
+    const list = byAgency.get(agencyId);
+    return {
+      agencyId,
+      agencyName: String(row["name"]),
+      aggregate: list && list.length > 0 ? sumAggregates(list) : null,
+    };
+  });
+  return rankAgencies(inputs, sortKpi, DEFAULT_THRESHOLDS);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /reports/export (202 + jobId) & GET /reports/export/:jobId (REP-003)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Enregistre les routes d'export (REP-003 / CONTRACT-006) :
+ *  - déclenchement asynchrone → **202 + jobId** sur `/reports/export`. Le contrat
+ *    déclare la méthode `GET` (202) ; la story REP-003 exige `POST`. On expose LES
+ *    DEUX (même handler) : `GET` (compatible AUDITOR lecture seule + mock contrat)
+ *    et `POST` (intention story). RBAC : AGENT interdit, DIRECTOR+/AUDITOR OK.
+ *  - suivi (polling) → `GET /reports/export/:jobId` (URL signée si READY).
+ */
+function registerExport(router: Hono<ReportEnv>, deps: ReportRouterDeps): void {
+  router.post("/reports/export", async (c) => handleExportCreate(c, deps));
+  router.get("/reports/export", async (c) => handleExportCreate(c, deps));
+  router.get("/reports/export/:jobId", async (c) => handleExportStatus(c));
+}
+
+/** Formats d'export valides. */
+const VALID_FORMATS = new Set<string>(["pdf", "xlsx", "json"]);
+
+/**
+ * POST /reports/export : crée un job `export_jobs` PENDING, enfile le build BullMQ
+ * (si branché) et retourne **202 + jobId** (`ExportJobAccepted`, CONTRACT-006).
+ */
+async function handleExportCreate(
+  c: Context<ReportEnv>,
+  deps: ReportRouterDeps
+): Promise<Response> {
+  const db = c.get("db");
+  const tenant = c.get("tenant");
+  try {
+    const bankId = requireBankId(tenant);
+    const format = c.req.query("format");
+    if (!format || !VALID_FORMATS.has(format)) {
+      throw new SigfaError("VALIDATION_ERROR", "Paramètre `format` requis (pdf|xlsx|json).", 400);
+    }
+    const scopeParam = c.req.query("scope");
+    if (scopeParam !== "agency" && scopeParam !== "network") {
+      throw new SigfaError("VALIDATION_ERROR", "Paramètre `scope` requis (agency|network).", 400);
+    }
+    const bounds = parsePeriodOr400(c.req.query("period"));
+    const scope: ExportJobScope = scopeParam;
+    let agencyId: string | null = null;
+    if (scope === "agency") {
+      agencyId = resolveAgencyId(tenant, c.req.query("agencyId"));
+      assertAgencyScope(tenant, agencyId);
+    }
+    const job = await createExportJob(asQueryFn(db), {
+      bankId,
+      requestedBy: tenant.userId,
+      scope,
+      agencyId,
+      periodKey: bounds.periodKey,
+      format: format as ExportFormat,
+    });
+    if (deps.enqueueExport) {
+      await deps.enqueueExport(job.id, bankId);
+    }
+    return c.json(
+      {
+        jobId: job.id,
+        status: "PENDING",
+        format: job.format,
+        scope,
+        period: bounds.periodKey,
+        createdAt: job.createdAt.toISOString(),
+        pollingUrl: `/api/v1/reports/export/${job.id}`,
+      },
+      202
+    );
+  } catch (err) {
+    return errorResponse(c, err);
+  }
+}
+
+/**
+ * GET /reports/export/:jobId : statut du job + URL signée si READY (et non expirée).
+ * Ownership OPAQUE : un job d'un autre tenant/demandeur → 404 `EXPORT_JOB_NOT_FOUND`.
+ */
+async function handleExportStatus(c: Context<ReportEnv>): Promise<Response> {
+  const db = c.get("db");
+  const tenant = c.get("tenant");
+  try {
+    const bankId = requireBankId(tenant);
+    const jobId = c.req.param("jobId");
+    if (!jobId) {
+      throw new SigfaError("EXPORT_JOB_NOT_FOUND", "Aucun job d'export trouvé avec cet identifiant.", 404);
+    }
+    const job = await loadOwnedJob(asQueryFn(db), jobId, bankId, tenant.userId, tenant.role);
+    if (!job) {
+      // 404 opaque : jamais d'oracle d'existence cross-tenant / cross-demandeur.
+      throw new SigfaError("EXPORT_JOB_NOT_FOUND", "Aucun job d'export trouvé avec cet identifiant.", 404);
+    }
+    return c.json(buildExportStatusResponse(job, new Date()), 200);
+  } catch (err) {
+    return errorResponse(c, err);
+  }
+}
+
+/**
+ * Projette une ligne `export_jobs` en `ExportJobPollingResponse` (CONTRACT-006).
+ * READY expiré → `downloadUrl:null` + erreur `EXPORT_URL_EXPIRED` (aucune URL servie).
+ *
+ * @param job - Ligne du job d'export
+ * @param now - Horloge injectée (base de l'évaluation d'expiration)
+ * @returns Corps `ExportJobPollingResponse`
+ */
+export function buildExportStatusResponse(
+  job: ExportJobRow,
+  now: Date
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    jobId: job.id,
+    status: job.status,
+    format: job.format,
+    createdAt: job.createdAt.toISOString(),
+  };
+  if (job.status === "READY" && job.fileUrl && job.expiresAt) {
+    const expired = now.getTime() > job.expiresAt.getTime();
+    if (expired) {
+      // URL signée expirée : téléchargement refusé, aucune URL servie (regénération
+      // = nouvel export). Le statut reflète l'expiration.
+      base["downloadUrl"] = null;
+      base["expiresAt"] = job.expiresAt.toISOString();
+      base["error"] = { code: "EXPORT_URL_EXPIRED", message: "Lien de téléchargement expiré." };
+      return base;
+    }
+    base["downloadUrl"] = job.fileUrl;
+    base["expiresAt"] = job.expiresAt.toISOString();
+    base["completedAt"] = job.updatedAt.toISOString();
+  }
+  if (job.status === "FAILED") {
+    base["error"] = { code: "EXPORT_GENERATION_FAILED", message: "La génération de l'export a échoué." };
+  }
+  return base;
 }

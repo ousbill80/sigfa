@@ -234,6 +234,10 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "GET", path: "/reports/daily/{agencyId}", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/reports/benchmark",       requiredRole: "AUDITOR",         tenantScope: "bank" },
   { method: "GET", path: "/reports/export",          requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
+  // REP-003 : la story exige POST (202 + jobId) en plus du GET contractuel (mock).
+  // AGENT (< AGENCY_DIRECTOR) interdit ; DIRECTOR+ OK. AUDITOR (lecture seule
+  // orthogonale) déclenche l'export via la variante GET.
+  { method: "POST", path: "/reports/export",         requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/reports/export/{jobId}",  requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/kiosks/status",           requiredRole: "MANAGER",         tenantScope: "agency" },
   { method: "GET", path: "/admin/network-overview",  requiredRole: "SUPER_ADMIN",     tenantScope: "platform" },
