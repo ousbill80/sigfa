@@ -61,6 +61,7 @@ const EXPECTED_BASE_PATHS: readonly string[] = [
   "/api/v1", // webhooks-whatsapp-inbound
   "/api/v1", // ai-forecast (IA-002)
   "/api/v1", // ai-anomalies (IA-003, CONTRACT-008)
+  "/api/v1", // ai/feedback-insights (IA-004)
 ];
 
 describe("route-registry", () => {
@@ -69,7 +70,7 @@ describe("route-registry", () => {
     expect(registry.map((r) => r.basePath)).toEqual(EXPECTED_BASE_PATHS);
   });
 
-  it("REFACTOR-REG-002: monte 29 routeurs (aucune route perdue ni ajoutée)", () => {
+  it("REFACTOR-REG-002: monte 30 routeurs (aucune route perdue ni ajoutée)", () => {
     const registry = buildRouteRegistry(baseOptions());
     expect(registry).toHaveLength(EXPECTED_BASE_PATHS.length);
   });
