@@ -47,6 +47,7 @@ vi.mock("@/hooks/useAccessibilityMode", () => ({
 const frMessages = {
   home002: {
     title: "Akwaba — Bienvenue",
+    welcomeAgency: "à l'agence {agencyName}",
     chooseLanguage: "Choisissez votre langue",
     languageFr: "Français",
     languageEn: "English",
@@ -60,6 +61,7 @@ const frMessages = {
 const enMessages = {
   home002: {
     title: "Akwaba — Welcome",
+    welcomeAgency: "to {agencyName} branch",
     chooseLanguage: "Choose your language",
     languageFr: "Français",
     languageEn: "English",
@@ -121,6 +123,86 @@ describe("KIOSK-002: HomeScreen", () => {
       expect(cardIcons.length, `Expected 2 card icons for locale ${locale}`).toBeGreaterThanOrEqual(2);
 
       unmount();
+    }
+  });
+
+  it("KIOSK-002: monogrammes FR/EN dans une pastille --brand-soft — zéro emoji drapeau", () => {
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const icons = Array.from(container.querySelectorAll("[data-testid='card-icon']"));
+    expect(icons.map((el) => el.textContent)).toEqual(["FR", "EN"]);
+    icons.forEach((icon) => {
+      const el = icon as HTMLElement;
+      expect(el.style.backgroundColor).toBe("var(--brand-soft)");
+      expect(el.style.color).toBe("var(--brand-strong)");
+      // Règle design : zéro emoji (les drapeaux 🇫🇷/🇬🇧 sont bannis).
+      expect(el.textContent).toMatch(/^(FR|EN)$/);
+      expect(el.textContent).not.toMatch(/\p{Extended_Pictographic}|\p{Regional_Indicator}/u);
+    });
+    // Le libellé complet reste appairé au monogramme.
+    const labels = Array.from(container.querySelectorAll("[data-testid='card-label']"));
+    expect(labels.map((el) => el.textContent)).toEqual(["Français", "English"]);
+  });
+
+  it("KIOSK-002: ligne agence sous le titre — nom d'agence (repli) en --ink-muted-inv", () => {
+    for (const { locale, messages, expected } of [
+      { locale: "fr", messages: frMessages, expected: "à l'agence Agence Centrale" },
+      { locale: "en", messages: enMessages, expected: "to Agence Centrale branch" },
+    ]) {
+      const { unmount, container } = render(
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+      const line = container.querySelector("[data-testid='home-agency-line']") as HTMLElement;
+      expect(line, `agency line for locale ${locale}`).toBeInTheDocument();
+      expect(line.textContent).toBe(expected);
+      // Hiérarchie : discrète sous le titre display.
+      expect(line.style.color).toBe("var(--ink-muted-inv)");
+      unmount();
+    }
+  });
+
+  it("KIOSK-002: sans logo provisionné → repli pastille --brand + nom de banque (aucune image)", () => {
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const badge = container.querySelector("[data-testid='home-brand-badge']") as HTMLElement;
+    expect(badge).toBeInTheDocument();
+    expect(badge.textContent).toBe("S"); // repli SIGFA
+    expect(badge.style.backgroundColor).toBe("var(--brand)");
+    expect(badge.style.color).toBe("var(--brand-contrast)");
+    expect(
+      container.querySelector("[data-testid='home-brand-name']")?.textContent
+    ).toBe("SIGFA");
+    expect(container.querySelector("[data-testid='home-brand-logo']")).toBeNull();
+  });
+
+  it("KIOSK-002: NEXT_PUBLIC_BANK_LOGO_URL provisionnée → logo image centré (pastille masquée)", () => {
+    vi.stubEnv("NEXT_PUBLIC_BANK_LOGO_URL", "https://cdn.exemple.ci/banques/logo.svg");
+    try {
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      const logo = container.querySelector("[data-testid='home-brand-logo']") as HTMLImageElement;
+      expect(logo).toBeInTheDocument();
+      expect(logo.getAttribute("src")).toBe("https://cdn.exemple.ci/banques/logo.svg");
+      // Hauteur généreuse ~96-120 px, image non déformée (fond transparent respecté).
+      expect(logo.style.height).toBe("112px");
+      expect(logo.style.objectFit).toBe("contain");
+      expect(container.querySelector("[data-testid='home-brand-badge']")).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 

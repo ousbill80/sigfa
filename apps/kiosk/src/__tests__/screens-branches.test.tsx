@@ -61,6 +61,7 @@ vi.mock("@/hooks/useQueueStatus", () => ({
 const homeMessages = {
   home002: {
     title: "Akwaba — Welcome",
+    welcomeAgency: "to {agencyName} branch",
     chooseLanguage: "Choose your language",
     languageFr: "Français",
     languageEn: "English",

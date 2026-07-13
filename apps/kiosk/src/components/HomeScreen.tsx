@@ -3,6 +3,9 @@
  * Écran d'accueil / sélection de langue — refonte v2 « Sérénité Premium ».
  * Fond --night qui vibre l'or, respiration généreuse, cartes chaudes.
  * FR/EN uniquement (décision PO). Tokens @sigfa/ui, aucune valeur hex en dur.
+ * Marque banque en tête : logo image si provisionné (NEXT_PUBLIC_BANK_LOGO_URL),
+ * sinon repli pastille --brand + nom (cohérent KioskHeaderBanner). Zéro emoji :
+ * les cartes de langue portent un monogramme « FR »/« EN » (badge graphique).
  */
 "use client";
 
@@ -12,6 +15,12 @@ import { useQueueStatus } from "@/hooks/useQueueStatus";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { localeToBcp47, voiceRate } from "@/lib/kiosk-voice";
+import {
+  bankInitial,
+  kioskAgencyName,
+  kioskBankLogoUrl,
+  kioskBankName,
+} from "@/lib/kiosk-branding";
 // Catalogues i18n importés en direct : l'annonce vocale doit être dite dans la
 // langue CHOISIE (pas la locale courante de rendu) — source unique = clé
 // `home002.languageName`, même racine `messages/` qu'i18n/request.ts.
@@ -28,12 +37,13 @@ interface HomeScreenProps {
 interface LanguageCard {
   locale: string;
   labelKey: "languageFr" | "languageEn";
-  icon: string;
+  /** Monogramme graphique du badge (règle design : zéro emoji, jamais de drapeau). */
+  monogram: string;
 }
 
 const LANGUAGE_CARDS: LanguageCard[] = [
-  { locale: "fr", labelKey: "languageFr", icon: "🇫🇷" },
-  { locale: "en", labelKey: "languageEn", icon: "🇬🇧" },
+  { locale: "fr", labelKey: "languageFr", monogram: "FR" },
+  { locale: "en", labelKey: "languageEn", monogram: "EN" },
 ];
 
 /** Nom parlé de la langue par locale (ajustement PO : la voix dit UNIQUEMENT
@@ -52,6 +62,11 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
   const { isAccessibilityMode } = useAccessibilityMode();
 
   const isOffline = isOfflineProp !== undefined ? isOfflineProp : isOfflineHook;
+
+  // Identité d'enseigne (non-PII) — provisionnement borne, replis sûrs.
+  const bankName = kioskBankName();
+  const agencyName = kioskAgencyName();
+  const bankLogoUrl = kioskBankLogoUrl();
 
   const timeoutMs = isAccessibilityMode ? 60000 : 30000;
 
@@ -134,6 +149,70 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
         </div>
       )}
 
+      {/* Marque banque — logo image si provisionné (fond transparent respecté),
+          sinon repli pastille --brand + nom (cohérent KioskHeaderBanner). */}
+      <div
+        data-testid="home-brand"
+        style={{
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "var(--space-4)",
+        }}
+      >
+        {bankLogoUrl ? (
+          /* <img> natif assumé : logo tenant (URL arbitraire), app en output:"export" sans optimiseur next/image. */
+          <img
+            data-testid="home-brand-logo"
+            src={bankLogoUrl}
+            alt={bankName}
+            style={{
+              height: "112px",
+              width: "auto",
+              maxWidth: "420px",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+        ) : (
+          <>
+            <span
+              data-testid="home-brand-badge"
+              aria-hidden="true"
+              style={{
+                width: "88px",
+                height: "88px",
+                borderRadius: "var(--r-lg)",
+                backgroundColor: "var(--brand)",
+                color: "var(--brand-contrast)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "var(--font-display)",
+                fontSize: "44px",
+                fontWeight: 700,
+              }}
+            >
+              {bankInitial(bankName)}
+            </span>
+            <span
+              data-testid="home-brand-name"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--text-lg)",
+                fontWeight: 600,
+                letterSpacing: "var(--tracking-tight)",
+                textTransform: "uppercase",
+                color: "var(--ink-inverse)",
+              }}
+            >
+              {bankName}
+            </span>
+          </>
+        )}
+      </div>
+
       {/* Title */}
       <div
         style={{
@@ -157,6 +236,17 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
         >
           {t("title")}
         </h1>
+        <p
+          data-testid="home-agency-line"
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--text-2xl)",
+            color: "var(--ink-muted-inv)",
+            margin: 0,
+          }}
+        >
+          {t("welcomeAgency", { agencyName })}
+        </p>
         <p
           style={{
             fontSize: "var(--text-xl)",
@@ -199,12 +289,27 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
               padding: "var(--space-8)",
             }}
           >
+            {/* Monogramme graphique (badge visuel, pas le message) — zéro emoji. */}
             <span
               data-testid="card-icon"
               aria-hidden="true"
-              style={{ fontSize: "48px", lineHeight: 1 }}
+              style={{
+                minWidth: "72px",
+                height: "48px",
+                padding: "0 var(--space-4)",
+                borderRadius: "var(--r-full)",
+                backgroundColor: "var(--brand-soft)",
+                color: "var(--brand-strong)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "var(--font-display)",
+                fontSize: "24px",
+                fontWeight: 700,
+                lineHeight: 1,
+              }}
             >
-              {card.icon}
+              {card.monogram}
             </span>
             <span
               data-testid="card-label"

@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   kioskBankName,
   kioskAgencyName,
+  kioskBankLogoUrl,
   bankInitial,
   DEFAULT_BANK_NAME,
   DEFAULT_AGENCY_NAME,
@@ -32,6 +33,30 @@ describe("KIOSK-BORNE: kiosk-branding", () => {
     expect(
       kioskAgencyName({ NODE_ENV: "test", NEXT_PUBLIC_AGENCY_NAME: "" } as NodeJS.ProcessEnv)
     ).toBe(DEFAULT_AGENCY_NAME);
+  });
+
+  it("KIOSK-BORNE: logo provisionné → URL lue depuis NEXT_PUBLIC_BANK_LOGO_URL (espaces rognés)", () => {
+    const env = {
+      NODE_ENV: "test",
+      NEXT_PUBLIC_BANK_LOGO_URL: "https://cdn.exemple.ci/banques/logo.svg",
+    } as NodeJS.ProcessEnv;
+    expect(kioskBankLogoUrl(env)).toBe("https://cdn.exemple.ci/banques/logo.svg");
+    expect(
+      kioskBankLogoUrl({
+        NODE_ENV: "test",
+        NEXT_PUBLIC_BANK_LOGO_URL: "  /branding/logo.png  ",
+      } as NodeJS.ProcessEnv)
+    ).toBe("/branding/logo.png");
+  });
+
+  it("KIOSK-BORNE: logo absent, vide ou blanc → null (repli pastille --brand, jamais de crash)", () => {
+    expect(kioskBankLogoUrl({ NODE_ENV: "test" } as NodeJS.ProcessEnv)).toBeNull();
+    expect(
+      kioskBankLogoUrl({ NODE_ENV: "test", NEXT_PUBLIC_BANK_LOGO_URL: "" } as NodeJS.ProcessEnv)
+    ).toBeNull();
+    expect(
+      kioskBankLogoUrl({ NODE_ENV: "test", NEXT_PUBLIC_BANK_LOGO_URL: "   " } as NodeJS.ProcessEnv)
+    ).toBeNull();
   });
 
   it("KIOSK-BORNE: bankInitial → une seule capitale, repli « S »", () => {

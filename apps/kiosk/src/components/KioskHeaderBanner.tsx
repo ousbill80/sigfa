@@ -2,8 +2,9 @@
  * KIOSK-BORNE — KioskHeaderBanner.tsx
  * Bandeau d'en-tête persistant de l'écran « Prise de ticket » (modèle borne
  * bancaire réelle, bandeau déplacé du bas vers le HAUT et raffiné) :
- *   - identité banque côté brand : pastille `--brand` (initiale, SVG/texte,
- *     jamais d'image réseau) + nom de banque ;
+ *   - identité banque côté brand : logo image si `NEXT_PUBLIC_BANK_LOGO_URL`
+ *     est provisionnée, sinon repli pastille `--brand` (initiale texte) ;
+ *     le nom de banque reste affiché dans les deux cas ;
  *   - nom de l'agence, mis en avant ;
  *   - date longue + heure VIVANTE (tick chaque seconde, affichage HH:MM).
  *
@@ -14,13 +15,19 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { bankInitial } from "@/lib/kiosk-branding";
+import { bankInitial, kioskBankLogoUrl } from "@/lib/kiosk-branding";
 
 interface KioskHeaderBannerProps {
   /** Nom public de l'agence (donnée d'enseigne, non-PII). */
   agencyName: string;
   /** Nom public de la banque (theming libellé). */
   bankName: string;
+  /**
+   * URL du logo de la banque (fond transparent respecté). `null`/absent →
+   * repli pastille `--brand` + initiale. Défaut : provisionnement borne
+   * (`NEXT_PUBLIC_BANK_LOGO_URL`).
+   */
+  bankLogoUrl?: string | null;
 }
 
 /** Format date longue localisée (ex. « dimanche 13 juillet 2026 »). */
@@ -41,7 +48,11 @@ export function formatBannerTime(date: Date, locale: string): string {
   }).format(date);
 }
 
-export function KioskHeaderBanner({ agencyName, bankName }: KioskHeaderBannerProps) {
+export function KioskHeaderBanner({
+  agencyName,
+  bankName,
+  bankLogoUrl = kioskBankLogoUrl(),
+}: KioskHeaderBannerProps) {
   const params = useParams();
   const currentLocale = (params?.locale as string) ?? "fr";
 
@@ -67,28 +78,46 @@ export function KioskHeaderBanner({ agencyName, bankName }: KioskHeaderBannerPro
         boxShadow: "var(--shadow-1)",
       }}
     >
-      {/* Identité banque — pastille brand (initiale texte, jamais d'image). */}
+      {/* Identité banque — logo si provisionné, sinon pastille brand (initiale texte). */}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", minWidth: 0 }}>
-        <span
-          data-testid="kiosk-header-bank-badge"
-          aria-hidden="true"
-          style={{
-            flexShrink: 0,
-            width: "56px",
-            height: "56px",
-            borderRadius: "var(--r-md)",
-            backgroundColor: "var(--brand)",
-            color: "var(--brand-contrast)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "var(--font-display)",
-            fontSize: "28px",
-            fontWeight: 700,
-          }}
-        >
-          {bankInitial(bankName)}
-        </span>
+        {bankLogoUrl ? (
+          /* <img> natif assumé : logo tenant (URL arbitraire), app en output:"export" sans optimiseur next/image. */
+          <img
+            data-testid="kiosk-header-bank-logo"
+            src={bankLogoUrl}
+            alt=""
+            aria-hidden="true"
+            style={{
+              flexShrink: 0,
+              height: "56px",
+              width: "auto",
+              maxWidth: "180px",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+        ) : (
+          <span
+            data-testid="kiosk-header-bank-badge"
+            aria-hidden="true"
+            style={{
+              flexShrink: 0,
+              width: "56px",
+              height: "56px",
+              borderRadius: "var(--r-md)",
+              backgroundColor: "var(--brand)",
+              color: "var(--brand-contrast)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: "var(--font-display)",
+              fontSize: "28px",
+              fontWeight: 700,
+            }}
+          >
+            {bankInitial(bankName)}
+          </span>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
           <span
             data-testid="kiosk-header-bank"

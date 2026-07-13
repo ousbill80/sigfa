@@ -36,8 +36,36 @@ describe("KIOSK-BORNE: KioskHeaderBanner", () => {
     expect(badge.textContent).toBe("B");
     expect((badge as HTMLElement).style.backgroundColor).toBe("var(--brand)");
     expect((badge as HTMLElement).style.color).toBe("var(--brand-contrast)");
-    // Aucune image (le logo est typographique — theming banque sans asset).
+    // Sans logo provisionné : repli typographique, aucune image.
+    expect(screen.queryByTestId("kiosk-header-bank-logo")).toBeNull();
     expect(badge.querySelector("img")).toBeNull();
+  });
+
+  it("KIOSK-BORNE: logo provisionné → image à la place de la pastille-initiale, nom conservé", () => {
+    render(
+      <KioskHeaderBanner
+        agencyName="Cocody Angré"
+        bankName="Banque Ivoire"
+        bankLogoUrl="https://cdn.exemple.ci/banques/logo.svg"
+      />
+    );
+
+    const logo = screen.getByTestId("kiosk-header-bank-logo") as HTMLImageElement;
+    expect(logo.tagName).toBe("IMG");
+    expect(logo.getAttribute("src")).toBe("https://cdn.exemple.ci/banques/logo.svg");
+    // Fond transparent respecté : contenu de l'image non déformé.
+    expect(logo.style.objectFit).toBe("contain");
+    // La pastille-initiale disparaît, le nom de banque reste affiché à côté.
+    expect(screen.queryByTestId("kiosk-header-bank-badge")).toBeNull();
+    expect(screen.getByTestId("kiosk-header-bank").textContent).toBe("Banque Ivoire");
+  });
+
+  it("KIOSK-BORNE: bankLogoUrl null explicite → repli pastille (jamais d'img cassée)", () => {
+    render(
+      <KioskHeaderBanner agencyName="Cocody Angré" bankName="Banque Ivoire" bankLogoUrl={null} />
+    );
+    expect(screen.getByTestId("kiosk-header-bank-badge").textContent).toBe("B");
+    expect(screen.queryByTestId("kiosk-header-bank-logo")).toBeNull();
   });
 
   it("KIOSK-BORNE: date longue + heure affichées, localisées FR", () => {

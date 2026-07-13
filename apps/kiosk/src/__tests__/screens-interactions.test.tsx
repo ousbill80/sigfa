@@ -68,6 +68,7 @@ beforeAll(() => {
 const homeMessages = {
   home002: {
     title: "Akwaba — Bienvenue",
+    welcomeAgency: "à l'agence {agencyName}",
     chooseLanguage: "Choisissez votre langue",
     languageFr: "Français",
     languageEn: "English",
