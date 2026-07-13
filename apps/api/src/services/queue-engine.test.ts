@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   selectNextPriority,
+  selectNextForManager,
   shouldAlertOverflow,
   findOverflowQueues,
   computePositionPriority,
@@ -18,7 +19,7 @@ import {
   PRIORITY_ORDER,
   LANGUAGE_SOFT_TIMEOUT_MINUTES,
 } from "src/services/queue-engine.js";
-import type { Tx } from "src/services/queue-strategy.js";
+import type { Tx, TicketSelector, SelectedTicket } from "src/services/queue-strategy.js";
 import type { OverflowRedis } from "src/services/queue-engine.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,6 +43,31 @@ function multiTx(responses: unknown[][]): Tx {
       return Promise.resolve({ rows });
     },
   } as unknown as Tx;
+}
+
+/** Un appel `query` capturé : le SQL brut + les paramètres liés. */
+interface RecordedCall {
+  sql: string;
+  params: unknown[];
+}
+
+/**
+ * Faux Tx ENREGISTREUR : renvoie les `responses` en séquence ET capture chaque
+ * `(sql, params)`. Permet de tuer les mutants sur les tableaux de paramètres
+ * (`ArrayDeclaration`) et l'arithmétique de deadline sans DB réelle.
+ */
+function recordingTx(responses: unknown[][]): Tx & { calls: RecordedCall[] } {
+  const calls: RecordedCall[] = [];
+  let i = 0;
+  const tx = {
+    query: (sql: string, params: unknown[] = []) => {
+      calls.push({ sql, params });
+      const rows = responses[i++] ?? [];
+      return Promise.resolve({ rows });
+    },
+    calls,
+  };
+  return tx as unknown as Tx & { calls: RecordedCall[] };
 }
 
 /** Faux Redis en mémoire. */
@@ -270,6 +296,208 @@ describe("API-004: position/estimation reflètent les priorités (un VIP émis a
     expect(PRIORITY_ORDER["VIP"]).toBeLessThan(PRIORITY_ORDER["STANDARD"] as number);
     expect(PRIORITY_ORDER["PMR"]).toBeLessThan(PRIORITY_ORDER["PRIORITY"] as number);
     expect(PRIORITY_ORDER["SENIOR"]).toBeLessThan(PRIORITY_ORDER["STANDARD"] as number);
+  });
+});
+
+// ── SEC-005 : durcissement mutation — paramètres liés & branches SQL ─────────
+
+describe("SEC-005: paramètres liés et branches de selectNextPriority (kill ArrayDeclaration/branch)", () => {
+  it("SEC-005: agent AVEC langues → params = [queueId, langs, softDeadline] (3 liaisons)", async () => {
+    const tx = recordingTx([[{ languages: ["FR", "EN"] }], []]);
+    await selectNextPriority("q1", "c1", tx);
+    // 1er appel = getAgentLanguages ; 2e = sélection ticket
+    expect(tx.calls).toHaveLength(2);
+    // getAgentLanguages : SQL non vide, lit les langues du guichet (kill StringLiteral ligne 64)
+    const langQ = tx.calls[0] as RecordedCall;
+    expect(langQ.sql).toContain("u.languages");
+    expect(langQ.sql).toContain("FROM counters");
+    const sel = tx.calls[1] as RecordedCall;
+    expect(sel.params).toHaveLength(3);
+    expect(sel.params[0]).toBe("q1");
+    expect(sel.params[1]).toEqual(["FR", "EN"]);
+    expect(sel.params[2]).toBeInstanceOf(Date);
+    // La branche "avec langues" filtre par ANY($2) — la SQL le prouve
+    expect(sel.sql).toContain("ANY($2");
+    // Ordre de priorité inclus dans la SQL (kill StringLiteral ligne 28 PRIORITY_CASE_T)
+    expect(sel.sql).toContain("CASE t.priority");
+    expect(sel.sql).toContain("WHEN 'VIP' THEN 0");
+    expect(sel.sql).toContain("FOR UPDATE SKIP LOCKED");
+  });
+
+  it("SEC-005: agent SANS langue → params = [queueId, softDeadline] (2 liaisons, branche distincte)", async () => {
+    const tx = recordingTx([[{ languages: [] }], []]);
+    await selectNextPriority("q1", "c1", tx);
+    const sel = tx.calls[1] as RecordedCall;
+    expect(sel.params).toHaveLength(2);
+    expect(sel.params[0]).toBe("q1");
+    expect(sel.params[1]).toBeInstanceOf(Date);
+    // Branche sans langue : PAS de ANY($2) (SQL différent de la branche avec langues)
+    expect(sel.sql).not.toContain("ANY($2");
+    // SQL non vide sur cette branche (kill StringLiteral ligne 113)
+    expect(sel.sql).toContain("t.required_language IS NULL");
+    expect(sel.sql).toContain("t.status = 'WAITING'");
+    expect(sel.sql).toContain("CASE t.priority");
+  });
+
+  it("SEC-005: softDeadline = now − LANGUAGE_SOFT_TIMEOUT_MINUTES min (kill arithmétique ligne 90)", async () => {
+    const before = Date.now();
+    const tx = recordingTx([[{ languages: ["FR"] }], []]);
+    await selectNextPriority("q1", "c1", tx);
+    const after = Date.now();
+    const deadline = (tx.calls[1] as RecordedCall).params[2] as Date;
+    const expectedMs = LANGUAGE_SOFT_TIMEOUT_MINUTES * 60 * 1000;
+    // La deadline est dans le passé d'exactement ~expectedMs (± drift d'exécution)
+    expect(deadline.getTime()).toBeLessThanOrEqual(before - expectedMs);
+    expect(deadline.getTime()).toBeGreaterThanOrEqual(after - expectedMs - 50);
+    // Non trivial : la deadline est bien décalée (mutants *→/, -→+ la déplacent hors borne)
+    expect(before - deadline.getTime()).toBeGreaterThanOrEqual(expectedMs);
+  });
+
+  it("SEC-005: getAgentLanguages lie counterId en paramètre (kill ArrayDeclaration ligne 68)", async () => {
+    const tx = recordingTx([[{ languages: ["FR"] }]]);
+    await getAgentLanguages("counter-42", tx);
+    expect((tx.calls[0] as RecordedCall).params).toEqual(["counter-42"]);
+  });
+
+  it("SEC-005: getAgentLanguages — row absent → [] (kill OptionalChaining ligne 71)", async () => {
+    const tx = recordingTx([[]]); // aucune ligne
+    expect(await getAgentLanguages("c1", tx)).toEqual([]);
+  });
+});
+
+describe("SEC-005: shouldAlertOverflow & findOverflowQueues — params liés & optional chaining", () => {
+  it("SEC-005: shouldAlertOverflow lie bankId puis queueId dans le flag (kill Array ligne 291)", async () => {
+    const tx = recordingTx([[{ queue_critical_threshold: 10 }]]);
+    const redis = fakeRedis();
+    await shouldAlertOverflow("qX", 20, "bankZ", tx, redis);
+    expect((tx.calls[0] as RecordedCall).params).toEqual(["bankZ"]);
+    expect(redis.store.get("overflow_alerted:qX")).toBe("1");
+    // SQL de lecture du seuil non vide (kill StringLiteral ligne 290)
+    expect((tx.calls[0] as RecordedCall).sql).toContain("queue_critical_threshold");
+    expect((tx.calls[0] as RecordedCall).sql).toContain("FROM banks");
+  });
+
+  it("SEC-005: shouldAlertOverflow — threshRow absent → false (kill OptionalChaining ligne 296)", async () => {
+    const tx = recordingTx([[]]); // banque introuvable
+    const redis = fakeRedis();
+    expect(await shouldAlertOverflow("q1", 999, "b1", tx, redis)).toBe(false);
+  });
+
+  it("SEC-005: findOverflowQueues lie [serviceId, bankId] (kill ArrayDeclaration ligne 338)", async () => {
+    const tx = recordingTx([[]]);
+    await findOverflowQueues("svc-1", "bank-1", tx);
+    expect((tx.calls[0] as RecordedCall).params).toEqual(["svc-1", "bank-1"]);
+    // SQL de jointure des services compatibles non vide (kill StringLiteral ligne 328)
+    const sql = (tx.calls[0] as RecordedCall).sql;
+    expect(sql).toContain("counter_services");
+    expect(sql).toContain("q.status = 'OPEN'");
+  });
+
+  it("SEC-005: computePositionPriority lie [ticketId] et rank() prioritaire (kill Str lignes 241/37)", async () => {
+    const tx = recordingTx([[{ position: "3" }]]);
+    await computePositionPriority("tick-9", tx);
+    expect((tx.calls[0] as RecordedCall).params).toEqual(["tick-9"]);
+    const sql = (tx.calls[0] as RecordedCall).sql;
+    // SQL non vide, utilise rank() et l'ordre de priorité PRIORITY_CASE (ligne 37)
+    expect(sql).toContain("rank() OVER");
+    expect(sql).toContain("CASE priority");
+    expect(sql).toContain("WHEN 'VIP' THEN 0");
+    expect(sql).toContain("status = 'WAITING'");
+  });
+});
+
+describe("SEC-005: selectNextForManager — file conseiller PRIORITÉ ABSOLUE (D6, couvre 155-225)", () => {
+  /** Sélecteur fallback espion : retourne un ticket marqueur et compte ses appels. */
+  function spyFallback(): TicketSelector & { called: number } {
+    const marker: SelectedTicket = {
+      id: "fallback-ticket",
+      queueId: "q1",
+      serviceId: "s1",
+      status: "WAITING",
+      priority: "STANDARD",
+      issuedAt: new Date("2026-07-12T08:00:00Z"),
+    };
+    const fn = (async () => {
+      fn.called += 1;
+      return marker;
+    }) as TicketSelector & { called: number };
+    fn.called = 0;
+    return fn;
+  }
+
+  const personalRow = {
+    id: "perso-ticket",
+    queue_id: "q1",
+    service_id: "s1",
+    status: "WAITING",
+    priority: "VIP",
+    issued_at: new Date("2026-07-12T07:00:00Z"),
+  };
+
+  it("SEC-005: agent AVEC ticket perso → sert la file perso, N'appelle PAS le fallback", async () => {
+    // Appel 1 = getCounterAgentId → agent ; Appel 2 = selectNextPersonal → ticket perso
+    const tx = recordingTx([[{ agent_id: "agent-1" }], [personalRow]]);
+    const fallback = spyFallback();
+    const result = await selectNextForManager(fallback)("q1", "c1", tx);
+    expect(result?.id).toBe("perso-ticket");
+    expect(result?.priority).toBe("VIP");
+    expect(fallback.called).toBe(0);
+    // selectNextPersonal lie [queueId, managerId]
+    expect((tx.calls[1] as RecordedCall).params).toEqual(["q1", "agent-1"]);
+    // SQL de la file perso non vide, filtre target_manager_id (kill StringLiteral ligne 179)
+    const persoSql = (tx.calls[1] as RecordedCall).sql;
+    expect(persoSql).toContain("t.target_manager_id = $2");
+    expect(persoSql).toContain("CASE t.priority");
+    expect(persoSql).toContain("FOR UPDATE SKIP LOCKED");
+  });
+
+  it("SEC-005: agent SANS ticket perso → délègue au fallback (file de service)", async () => {
+    const tx = recordingTx([[{ agent_id: "agent-1" }], []]); // perso vide
+    const fallback = spyFallback();
+    const result = await selectNextForManager(fallback)("q1", "c1", tx);
+    expect(result?.id).toBe("fallback-ticket");
+    expect(fallback.called).toBe(1);
+  });
+
+  it("SEC-005: guichet SANS agent → délègue directement au fallback (agentId null)", async () => {
+    const tx = recordingTx([[{ agent_id: null }]]); // pas d'agent
+    const fallback = spyFallback();
+    const result = await selectNextForManager(fallback)("q1", "c1", tx);
+    expect(result?.id).toBe("fallback-ticket");
+    expect(fallback.called).toBe(1);
+    // selectNextPersonal NON appelé (une seule query = getCounterAgentId)
+    expect(tx.calls).toHaveLength(1);
+  });
+
+  it("SEC-005: guichet inconnu (aucune ligne) → agentId null → fallback", async () => {
+    const tx = recordingTx([[]]); // counter introuvable
+    const fallback = spyFallback();
+    const result = await selectNextForManager(fallback)("q1", "c1", tx);
+    expect(result?.id).toBe("fallback-ticket");
+    expect(fallback.called).toBe(1);
+  });
+
+  it("SEC-005: getCounterAgentId lie [counterId] et lit agent_id (kill Array/Str ligne 156)", async () => {
+    const tx = recordingTx([[{ agent_id: null }]]);
+    const fallback = spyFallback();
+    await selectNextForManager(fallback)("q1", "counter-77", tx);
+    expect((tx.calls[0] as RecordedCall).params).toEqual(["counter-77"]);
+    // SQL non vide, lit agent_id du guichet (kill StringLiteral ligne 156)
+    expect((tx.calls[0] as RecordedCall).sql).toContain("agent_id");
+    expect((tx.calls[0] as RecordedCall).sql).toContain("FROM counters");
+  });
+
+  it("SEC-005: ticket perso mappé champ-à-champ (kill ObjectLiteral ligne 193)", async () => {
+    const tx = recordingTx([[{ agent_id: "agent-1" }], [personalRow]]);
+    const result = await selectNextForManager(spyFallback())("q1", "c1", tx);
+    expect(result).toEqual({
+      id: "perso-ticket",
+      queueId: "q1",
+      serviceId: "s1",
+      status: "WAITING",
+      priority: "VIP",
+      issuedAt: personalRow.issued_at,
+    });
   });
 });
 
