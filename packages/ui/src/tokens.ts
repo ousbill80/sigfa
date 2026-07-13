@@ -144,6 +144,7 @@ export const font = {
   display:
     '"Clash Display", "General Sans", ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   text: '"General Sans", "Inter Tight", ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  mono: 'ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
 } as const;
 
 /** The complete token bundle (useful for a mobile RN theme). */
