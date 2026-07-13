@@ -10,6 +10,20 @@
  *
  * Le clonage recopie la config au sein d'une même banque (garde tenant stricte).
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT9) — route ARMÉE (tenant-scopée)
+ * Les DEUX routes opèrent sur une agence EXISTANTE d'une banque EXISTANTE
+ * (`requireBankId(tenant)` + `assertAgencyExists` sur le bankId du JWT) : ce n'est PAS
+ * un bootstrap de NOUVEAU tenant (aucune création de banque ici), mais l'enrôlement
+ * d'agence/borne DANS un tenant déjà établi. TOUT accès DB est donc routé via
+ * `withArmedTenant` (contexte RLS `app.current_bank_id` armé sur `sigfa_app`
+ * NOBYPASSRLS) → cette route est classée **ARMED**.
+ *  - clone-from : lecture/écriture `agencies` / `services` / `counters` /
+ *    `counter_services` (policy `tenant_isolation` + GRANT CRUD, 0001) + audit composé
+ *    SEC-001 dans UNE transaction armée. Le clonage est structurellement borné à la
+ *    banque armée (les UPDATE…FROM et INSERT cross-agence restent DANS le tenant).
+ *  - kiosk-access : INSERT `kiosks` (policy `tenant_isolation` + GRANT CRUD, 0001) via
+ *    le service `createKioskAccess` (connexion armée INJECTÉE) + audit composé.
+ *
  * @module
  */
 
@@ -28,6 +42,7 @@ import {
   assertAgencyScope,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 import { createKioskAccess } from "src/services/kiosk-session.service.js";
 
 /** Variables de contexte Hono du routeur onboarding. */
@@ -84,17 +99,22 @@ function registerClone(router: Hono<OnboardingEnv>): void {
       const targetId = paramUuid(c, "id");
       const templateId = paramUuid(c, "templateId");
       const bankId = requireBankId(tenant);
-      await assertAgencyExists(db, bankId, targetId);
-      await assertAgencyExists(db, bankId, templateId);
-      await cloneConfig(db, bankId, templateId, targetId);
-      await recordAudit({
-        db,
-        tenant,
-        action: "POST /agencies/:id/clone-from/:templateId",
-        entityType: "agency",
-        entityId: targetId,
-        ip: extractIp(c),
-        diff: buildDiff({}, { clonedFrom: templateId }),
+      // SEC-002 : gardes + clonage + audit atomiques dans la transaction ARMÉE (RLS
+      // `app.current_bank_id`). Les tables clonées sont bornées à la banque armée.
+      await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        await assertAgencyExists(armedDb, bankId, targetId);
+        await assertAgencyExists(armedDb, bankId, templateId);
+        await cloneConfig(armedDb, bankId, templateId, targetId);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "POST /agencies/:id/clone-from/:templateId",
+          entityType: "agency",
+          entityId: targetId,
+          ip: extractIp(c),
+          diff: buildDiff({}, { clonedFrom: templateId }),
+        });
       });
       return c.json(
         {
@@ -256,22 +276,28 @@ function registerKioskAccess(router: Hono<OnboardingEnv>): void {
       const agencyId = paramUuid(c, "id");
       assertAgencyScope(tenant, agencyId);
       const bankId = requireBankId(tenant);
-      await assertAgencyExists(db, bankId, agencyId);
       const input = parseStrict(kioskAccessSchema, (await parseJson(c)) ?? {});
-      const creds = await createKioskAccess({
-        db,
-        bankId,
-        agencyId,
-        label: input.label ?? null,
-      });
-      await recordAudit({
-        db,
-        tenant,
-        action: "POST /agencies/:id/kiosk-access",
-        entityType: "kiosk",
-        entityId: creds.kioskId,
-        ip: extractIp(c),
-        diff: buildDiff({}, { kioskId: creds.kioskId }),
+      // SEC-002 : garde + provisioning borne + audit atomiques dans la tx ARMÉE (RLS
+      // `app.current_bank_id`). Le service reçoit la connexion armée injectée.
+      const creds = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        await assertAgencyExists(armedDb, bankId, agencyId);
+        const provisioned = await createKioskAccess({
+          db: armedDb,
+          bankId,
+          agencyId,
+          label: input.label ?? null,
+        });
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "POST /agencies/:id/kiosk-access",
+          entityType: "kiosk",
+          entityId: provisioned.kioskId,
+          ip: extractIp(c),
+          diff: buildDiff({}, { kioskId: provisioned.kioskId }),
+        });
+        return provisioned;
       });
       return c.json(creds, 201);
     } catch (err) {
