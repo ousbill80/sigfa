@@ -188,7 +188,53 @@ export type TranslationKey =
   | "reports.kpi.tts"
   | "reports.kpi.tauxAbandon"
   | "reports.kpi.nps"
-  | "reports.kpi.occupation";
+  | "reports.kpi.occupation"
+  // IA-005 — AI insights surfaces (own namespace)
+  | "ai.title"
+  | "ai.subtitle"
+  | "ai.forecast.title"
+  | "ai.forecast.peak"
+  | "ai.forecast.drivers"
+  | "ai.forecast.factors"
+  | "ai.forecast.confidence"
+  | "ai.lowconf.flag"
+  | "ai.staffing.title"
+  | "ai.advisory.notice"
+  | "ai.anomalies.title"
+  | "ai.anomalies.subtitle"
+  | "ai.anomaly.evidence"
+  | "ai.anomaly.metric"
+  | "ai.anomaly.threshold"
+  | "ai.anomaly.window"
+  | "ai.anomaly.sample"
+  | "ai.anomaly.type.QUEUE_STUCK"
+  | "ai.anomaly.type.AGENT_INACTIVE_PATTERN"
+  | "ai.anomaly.type.SLA_SYSTEMIC"
+  | "ai.anomaly.status.open"
+  | "ai.anomaly.status.acked"
+  | "ai.anomaly.status.resolved"
+  | "ai.feedback.title"
+  | "ai.feedback.score"
+  | "ai.feedback.components"
+  | "ai.feedback.sentiment"
+  | "ai.feedback.positive"
+  | "ai.feedback.neutral"
+  | "ai.feedback.negative"
+  | "ai.feedback.insufficient_sample"
+  | "ai.comex.title"
+  | "ai.comex.expected_load"
+  | "ai.comex.atrisk"
+  | "ai.comex.open_anomalies"
+  | "ai.comex.level.ok"
+  | "ai.comex.level.watch"
+  | "ai.comex.level.risk"
+  | "ai.state.loading"
+  | "ai.state.empty"
+  | "ai.state.error"
+  | "ai.state.offline"
+  | "ai.insufficient.title"
+  | "ai.insufficient.progress"
+  | "ai.insufficient.hint";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -375,6 +421,53 @@ export const FR: TranslationDict = {
   "reports.kpi.tauxAbandon": "Taux d'abandon",
   "reports.kpi.nps": "NPS",
   "reports.kpi.occupation": "Occupation",
+  "ai.title": "INSIGHTS IA — DIRECTION",
+  "ai.subtitle": "Prédictions et explications. L'humain reste décideur.",
+  "ai.forecast.title": "PRÉVISION D'AFFLUENCE",
+  "ai.forecast.peak": "Pic attendu",
+  "ai.forecast.drivers": "Facteurs explicatifs",
+  "ai.forecast.factors": "Contexte du jour",
+  "ai.forecast.confidence": "Confiance",
+  "ai.lowconf.flag": "Confiance faible — à interpréter avec précaution",
+  "ai.staffing.title": "RECOMMANDATIONS DE STAFFING",
+  "ai.advisory.notice":
+    "Recommandations consultatives : elles éclairent la décision, jamais exécutées automatiquement.",
+  "ai.anomalies.title": "ANOMALIES DÉTECTÉES",
+  "ai.anomalies.subtitle": "Motifs agrégés sur fenêtre glissante — distincts des alertes instantanées.",
+  "ai.anomaly.evidence": "Preuves",
+  "ai.anomaly.metric": "Métrique",
+  "ai.anomaly.threshold": "Seuil",
+  "ai.anomaly.window": "Fenêtre",
+  "ai.anomaly.sample": "Échantillon",
+  "ai.anomaly.type.QUEUE_STUCK": "File bloquée",
+  "ai.anomaly.type.AGENT_INACTIVE_PATTERN": "Motif d'inactivité",
+  "ai.anomaly.type.SLA_SYSTEMIC": "SLA systémique",
+  "ai.anomaly.status.open": "Ouverte",
+  "ai.anomaly.status.acked": "Acquittée",
+  "ai.anomaly.status.resolved": "Résolue",
+  "ai.feedback.title": "QUALITÉ DES FEEDBACKS",
+  "ai.feedback.score": "Score qualité",
+  "ai.feedback.components": "Décomposition",
+  "ai.feedback.sentiment": "Sentiments",
+  "ai.feedback.positive": "Positif",
+  "ai.feedback.neutral": "Neutre",
+  "ai.feedback.negative": "Négatif",
+  "ai.feedback.insufficient_sample": "Échantillon insuffisant — score non publié",
+  "ai.comex.title": "COMEX — SYNTHÈSE PRÉDICTIVE",
+  "ai.comex.expected_load": "Charge attendue réseau",
+  "ai.comex.atrisk": "Agences à risque",
+  "ai.comex.open_anomalies": "Anomalies ouvertes",
+  "ai.comex.level.ok": "Réseau serein",
+  "ai.comex.level.watch": "Vigilance",
+  "ai.comex.level.risk": "Risque",
+  "ai.state.loading": "Calcul des prédictions…",
+  "ai.state.empty": "Aucune donnée IA disponible pour le moment.",
+  "ai.state.error": "Impossible de charger les insights IA. Veuillez réessayer.",
+  "ai.state.offline": "Hors ligne — insights depuis le cache",
+  "ai.insufficient.title": "Prédictions bientôt disponibles",
+  "ai.insufficient.progress": "jours d'historique collectés",
+  "ai.insufficient.hint":
+    "Les prédictions s'activent après 90 jours de données. Le compteur progresse chaque jour.",
 };
 
 /** English translations */
@@ -558,6 +651,53 @@ export const EN: TranslationDict = {
   "reports.kpi.tauxAbandon": "Abandonment rate",
   "reports.kpi.nps": "NPS",
   "reports.kpi.occupation": "Occupancy",
+  "ai.title": "AI INSIGHTS — DIRECTION",
+  "ai.subtitle": "Predictions and explanations. The human stays in charge.",
+  "ai.forecast.title": "FOOTFALL FORECAST",
+  "ai.forecast.peak": "Expected peak",
+  "ai.forecast.drivers": "Explaining drivers",
+  "ai.forecast.factors": "Today's context",
+  "ai.forecast.confidence": "Confidence",
+  "ai.lowconf.flag": "Low confidence — interpret with caution",
+  "ai.staffing.title": "STAFFING RECOMMENDATIONS",
+  "ai.advisory.notice":
+    "Advisory recommendations: they inform the decision, never executed automatically.",
+  "ai.anomalies.title": "DETECTED ANOMALIES",
+  "ai.anomalies.subtitle": "Aggregated patterns over a sliding window — distinct from instant alerts.",
+  "ai.anomaly.evidence": "Evidence",
+  "ai.anomaly.metric": "Metric",
+  "ai.anomaly.threshold": "Threshold",
+  "ai.anomaly.window": "Window",
+  "ai.anomaly.sample": "Sample",
+  "ai.anomaly.type.QUEUE_STUCK": "Queue stuck",
+  "ai.anomaly.type.AGENT_INACTIVE_PATTERN": "Inactivity pattern",
+  "ai.anomaly.type.SLA_SYSTEMIC": "Systemic SLA",
+  "ai.anomaly.status.open": "Open",
+  "ai.anomaly.status.acked": "Acknowledged",
+  "ai.anomaly.status.resolved": "Resolved",
+  "ai.feedback.title": "FEEDBACK QUALITY",
+  "ai.feedback.score": "Quality score",
+  "ai.feedback.components": "Decomposition",
+  "ai.feedback.sentiment": "Sentiment",
+  "ai.feedback.positive": "Positive",
+  "ai.feedback.neutral": "Neutral",
+  "ai.feedback.negative": "Negative",
+  "ai.feedback.insufficient_sample": "Insufficient sample — score not published",
+  "ai.comex.title": "COMEX — PREDICTIVE SYNTHESIS",
+  "ai.comex.expected_load": "Expected network load",
+  "ai.comex.atrisk": "Agencies at risk",
+  "ai.comex.open_anomalies": "Open anomalies",
+  "ai.comex.level.ok": "Network calm",
+  "ai.comex.level.watch": "Watch",
+  "ai.comex.level.risk": "Risk",
+  "ai.state.loading": "Computing predictions…",
+  "ai.state.empty": "No AI data available yet.",
+  "ai.state.error": "Unable to load AI insights. Please try again.",
+  "ai.state.offline": "Offline — insights from cache",
+  "ai.insufficient.title": "Predictions coming soon",
+  "ai.insufficient.progress": "days of history collected",
+  "ai.insufficient.hint":
+    "Predictions activate after 90 days of data. The counter progresses each day.",
 };
 
 /** All locales map */
