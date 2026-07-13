@@ -11,6 +11,27 @@
  * - Anti-spam : sliding-window Redis (feedback 5/min par IP ET par trackingId ;
  *   suivi 30/min par IP) → 429 LA LOI + `Retry-After`.
  *
+ * ## Armement RLS (SEC-002-CUTOVER-LOT7)
+ * Route PUBLIQUE : le tenant (bankId) n'est JAMAIS porté par une auth staff. Chaque
+ * accès DB tenant est routé — APRÈS résolution du tenant — via `withArmedTenant`
+ * (`app.current_bank_id` armé, connexion `sigfa_app` NOBYPASSRLS, RLS contraignante) :
+ *
+ * - `POST /public/tickets` : le tenant est RÉSOLU depuis l'`agencyId` du CORPS
+ *   (résolution pré-tenant), puis l'émission (`issueTicketFor`, transaction-aware)
+ *   est ARMÉE (SAVEPOINT sous armement). Le `bankId` d'émission reste dérivé de la
+ *   file (jamais du client) — l'armement l'exige identique.
+ * - `POST /public/tickets/:trackingId/feedback` : le `trackingId` résout le ticket
+ *   (lookup pré-tenant INTRINSÈQUE : un `tracking_id` public global, sans oracle
+ *   d'énumération), puis la persistance du feedback (UPDATE tickets + audit) ET
+ *   l'agrégat NPS (`daily_agency_stats`) sont ARMÉS sur le bankId dérivé.
+ * - `GET /public/tickets/:trackingId` (suivi) : lookup par `tracking_id`
+ *   INTRINSÈQUEMENT PRÉ-TENANT (résolution du token public) — reste hors armement,
+ *   projection DTO en lecture seule sans PII.
+ * - `GET /public/agencies/:agencyId/operations|relationship-managers` : lectures
+ *   publiques scopées agence, ARMÉES après résolution du bankId de l'agence.
+ *
+ * Cette route est classée `ARMED` dans le test d'architecture.
+ *
  * @module
  */
 
@@ -31,6 +52,7 @@ import {
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
 import { issueTicketFor, type IssueTicketInput } from "src/routes/tickets.js";
 import { recordAudit, extractIp } from "src/lib/audit-context.js";
+import { asArmable, withArmedTenant } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono (injectées par app.ts). */
 interface PublicEnv {
@@ -159,18 +181,24 @@ function registerPublicRelationshipManagers(router: Hono<PublicEnv>): void {
       return c.json(buildError("VALIDATION_ERROR", "agencyId requis (UUID)."), 400);
     }
     const db = c.get("db");
-    const res = await db.query(
-      `SELECT u.id, u.display_name, u.photo_url
-         FROM users u
-         JOIN agency_users au ON au.user_id = u.id AND au.agency_id = $1
-        WHERE u.is_relationship_manager = true
-          AND u.is_active = true
-          AND u.deleted_at IS NULL
-          AND u.display_name IS NOT NULL
-        ORDER BY u.display_name ASC, u.id ASC`,
-      [agencyId]
-    );
-    const data = (res.rows as PublicRelationshipManagerRow[]).map(publicRelationshipManagerDto);
+    // SEC-002 : résolution pré-tenant du bankId de l'agence, puis lecture ARMÉE.
+    const bankId = await resolveAgencyBankId(db, agencyId);
+    if (bankId === null) return c.json({ data: [] }, 200);
+    const rows = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+      const res = await conn.query(
+        `SELECT u.id, u.display_name, u.photo_url
+           FROM users u
+           JOIN agency_users au ON au.user_id = u.id AND au.agency_id = $1
+          WHERE u.is_relationship_manager = true
+            AND u.is_active = true
+            AND u.deleted_at IS NULL
+            AND u.display_name IS NOT NULL
+          ORDER BY u.display_name ASC, u.id ASC`,
+        [agencyId]
+      );
+      return res.rows as PublicRelationshipManagerRow[];
+    });
+    const data = rows.map(publicRelationshipManagerDto);
     return c.json({ data }, 200);
   });
 }
@@ -196,6 +224,30 @@ const PUBLIC_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * Résout le `bank_id` d'une agence par son `id` — PRÉ-TENANT (résolution du tenant
+ * d'une surface publique scopée agence : on ignore encore la banque). Retourne
+ * `null` si l'agence est inconnue : la surface publique répond alors par une liste
+ * VIDE / un 404 opaque (jamais un oracle d'existence), sans armer.
+ *
+ * NB : ne filtre PAS sur `is_active`/`deleted_at` — l'existence de l'agence sert
+ * uniquement à dériver le tenant pour l'armement ; les gardes métier (file
+ * OPEN/CLOSED, service/opération actifs) restent portées par les requêtes ARMÉES
+ * en aval, inchangées.
+ *
+ * @param db       - Connexion PG
+ * @param agencyId - Agence revendiquée (déjà validée UUID)
+ * @returns bankId de l'agence, ou null si absente
+ */
+async function resolveAgencyBankId(db: Client, agencyId: string): Promise<string | null> {
+  const res = await db.query(
+    `SELECT bank_id FROM agencies WHERE id = $1`,
+    [agencyId]
+  );
+  const row = res.rows[0] as { bank_id: string } | undefined;
+  return row?.bank_id ?? null;
+}
+
+/**
  * GET /public/agencies/:agencyId/operations?serviceId= (role NONE) — affichage borne.
  *
  * Retourne les opérations ACTIVES d'un service, avec `slaMinutes` **RÉSOLU**
@@ -214,15 +266,21 @@ function registerPublicOperations(router: Hono<PublicEnv>): void {
       return c.json(buildError("VALIDATION_ERROR", "agencyId/serviceId requis (UUID)."), 400);
     }
     const db = c.get("db");
-    const res = await db.query(
-      `SELECT o.id, o.code, o.name,
-              COALESCE(o.sla_minutes, s.sla_minutes) AS sla_minutes, o.icon_key
-         FROM operations o JOIN services s ON s.id = o.service_id
-        WHERE o.agency_id = $1 AND o.service_id = $2 AND o.is_active = true
-        ORDER BY o.display_order ASC, o.created_at ASC`,
-      [agencyId, serviceId]
-    );
-    const data = (res.rows as PublicOperationRow[]).map(publicOperationDto);
+    // SEC-002 : résolution pré-tenant du bankId de l'agence, puis lecture ARMÉE.
+    const bankId = await resolveAgencyBankId(db, agencyId);
+    if (bankId === null) return c.json({ data: [] }, 200);
+    const rows = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+      const res = await conn.query(
+        `SELECT o.id, o.code, o.name,
+                COALESCE(o.sla_minutes, s.sla_minutes) AS sla_minutes, o.icon_key
+           FROM operations o JOIN services s ON s.id = o.service_id
+          WHERE o.agency_id = $1 AND o.service_id = $2 AND o.is_active = true
+          ORDER BY o.display_order ASC, o.created_at ASC`,
+        [agencyId, serviceId]
+      );
+      return res.rows as PublicOperationRow[];
+    });
+    const data = rows.map(publicOperationDto);
     return c.json({ data }, 200);
   });
 }
@@ -312,15 +370,31 @@ async function issuePublicTicket(c: PublicCtx, input: PublicCreateInput): Promis
     phoneNumber: input.phoneNumber ?? undefined,
     smsConsent: input.smsConsent,
   };
-  // SEC-001a : émission publique auditée (acteur anonyme : actorId/role null).
-  // Le diff n'expose JAMAIS le téléphone (assaini + non fourni ici).
-  const result = await issueTicketFor(
-    c.get("db"),
-    c.get("redis"),
-    { bankId: null, agencyId: input.agencyId },
-    issueInput,
-    getBus(c),
-    { actorId: null, actorRole: null, ip: extractIp(c), action: "POST /public/tickets" }
+  const db = c.get("db");
+  // SEC-002 — résolution PRÉ-TENANT : dériver la banque de l'agence du CORPS avant
+  // d'armer. Agence inconnue/inactive → 404 opaque (aucun oracle d'existence),
+  // aligné sur le comportement historique (file introuvable → QUEUE_NOT_FOUND 404).
+  const bankId = await resolveAgencyBankId(db, input.agencyId);
+  if (bankId === null) {
+    // Agence inconnue/inactive : 404 opaque identique à « file introuvable »
+    // (`NOT_FOUND`, cf. resolveServiceQueue) — aucun oracle d'existence d'agence.
+    throw new SigfaError("NOT_FOUND", "File introuvable pour ce service.", 404);
+  }
+  // SEC-001a + SEC-002 : émission publique auditée DANS une transaction ARMÉE
+  // (`app.current_bank_id = bankId`). `issueTicketFor` compose par SAVEPOINT
+  // (`inTransaction:true`). Le `bankId` d'émission reste dérivé de la file résolue
+  // (`at.bankId` borne aussi la résolution) — jamais du client. Acteur anonyme
+  // (actorId/role null) ; le diff n'expose JAMAIS le téléphone.
+  const result = await withArmedTenant(asArmable(db), bankId, (conn) =>
+    issueTicketFor(
+      conn as unknown as Client,
+      c.get("redis"),
+      { bankId, agencyId: input.agencyId },
+      issueInput,
+      getBus(c),
+      { actorId: null, actorRole: null, ip: extractIp(c), action: "POST /public/tickets" },
+      true
+    )
   );
   return publicCreatedDto(result);
 }
@@ -507,22 +581,32 @@ async function parseFeedbackBody(c: PublicCtx): Promise<ParseResult> {
  */
 async function submitFeedback(c: PublicCtx, trackingId: string, note: number, comment: string | null): Promise<Response> {
   const db = c.get("db");
+  // Résolution PRÉ-TENANT du ticket public (lookup par tracking_id global) et de sa
+  // banque. Intrinsèquement hors armement : c'est la résolution du token public.
   const row = await loadByTracking(db, trackingId);
   if (!row) return opaqueNotFound(c);
   assertFeedbackAllowed(row);
   const bankId = await bankIdOf(db, row.id);
-  const applied = await persistFeedback(db, row.id, note, comment, {
-    bankId,
-    ip: extractIp(c),
+  const ip = extractIp(c);
+  // SEC-002 : persistance feedback (UPDATE tickets + audit) ET agrégat NPS
+  // (daily_agency_stats) DANS une transaction ARMÉE (`app.current_bank_id = bankId`,
+  // RLS contraignante). L'UPDATE + l'audit composent par SAVEPOINT ; le NPS suit
+  // dans la même transaction armée, tout committe atomiquement une seule fois.
+  const applied = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+    const armedDb = conn as unknown as Client;
+    const ok = await persistFeedback(armedDb, row.id, note, comment, { bankId, ip });
+    if (ok) {
+      await incrementDailyNps(armedDb, {
+        bankId,
+        agencyId: row.agency_id,
+        serviceId: row.service_id,
+        note,
+        closedAt: row.closed_at ?? new Date(),
+      });
+    }
+    return ok;
   });
   if (!applied) throw new SigfaError("FEEDBACK_ALREADY_SUBMITTED", "Un feedback a déjà été soumis pour ce ticket.", 409);
-  await incrementDailyNps(db, {
-    bankId,
-    agencyId: row.agency_id,
-    serviceId: row.service_id,
-    note,
-    closedAt: row.closed_at ?? new Date(),
-  });
   return c.json({ success: true, message: "Merci pour votre avis !" }, 201);
 }
 
@@ -556,7 +640,12 @@ function assertFeedbackAllowed(row: TicketRow): void {
  * l'UPDATE ne s'applique qu'à un ticket DONE dont `feedback_score IS NULL`
  * et dont la fenêtre 24 h n'est pas expirée (garde SQL en UTC strict).
  *
- * @param db      - Connexion PG
+ * SEC-002 : appelée DANS la transaction ARMÉE ouverte par `submitFeedback`
+ * (`app.current_bank_id` déjà posé). On délimite par SAVEPOINT (au lieu de
+ * BEGIN/COMMIT) — l'UPDATE + l'insert d'audit héritent du contexte RLS armé et la
+ * transaction englobante commit une seule fois avec l'agrégat NPS.
+ *
+ * @param db      - Connexion PG ARMÉE (transaction ouverte)
  * @param id      - UUID interne du ticket
  * @param note    - Note 1–5
  * @param comment - Commentaire nettoyé
@@ -569,10 +658,10 @@ async function persistFeedback(
   comment: string | null,
   audit: { bankId: string; ip: string | null }
 ): Promise<boolean> {
-  // SEC-001a : persistance + audit atomiques (transaction unique). L'acteur est
-  // anonyme (client public) ; le diff ne contient QUE la note (jamais le
-  // commentaire libre ni de PII).
-  await db.query("BEGIN");
+  // SEC-001a + SEC-002 : persistance + audit atomiques par SAVEPOINT dans la
+  // transaction armée. L'acteur est anonyme (client public) ; le diff ne contient
+  // QUE la note (jamais le commentaire libre ni de PII).
+  await db.query("SAVEPOINT sec002_feedback");
   try {
     const res = await db.query(
       `UPDATE tickets
@@ -596,10 +685,12 @@ async function persistFeedback(
         diff: { after: { feedbackScore: note } },
       });
     }
-    await db.query("COMMIT");
+    await db.query("RELEASE SAVEPOINT sec002_feedback");
     return applied;
   } catch (err) {
-    await db.query("ROLLBACK");
+    await db.query("ROLLBACK TO SAVEPOINT sec002_feedback").catch(() => {
+      // Transaction englobante déjà avortée : ROLLBACK global géré en amont.
+    });
     throw err;
   }
 }

@@ -79,9 +79,7 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   // Reste PENDING jusqu'à ce câblage (le fichier existe → non-fantôme).
   "ai-forecast.ts",
   "banks.ts",
-  "kiosk-session.ts",
   "onboarding.ts",
-  "public-tickets.ts",
   // reports.ts — DIFFÉRÉE (couture d'ARCHITECTURE de route, PAS une couture DB
   // manquante) : GET /reports/kpis?scope=network (buildNetworkResponse) est un
   // agrégat CROSS-TENANT réseau (SUPER_ADMIN, `bankId=null`) qui lit
@@ -96,7 +94,6 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   // handler : paths tenant → withArmedTenant ; path network → withPlatform), donc
   // hors périmètre d'un simple recâblage de connexion — reste PENDING jusqu'à ce split.
   "reports.ts",
-  "tv-session.ts",
   "webhooks-notifications.ts",
   "webhooks-whatsapp-inbound.ts",
 ];
@@ -184,6 +181,33 @@ const ARMED: readonly string[] = [
   //   `WHERE bank_id` sur cette connexion. Lecture seule (zéro mutation).
   "anomaly-route.ts",
   "feedback-insights-route.ts",
+  // SEC-002-CUTOVER-LOT7 — surfaces PUBLIQUES/SEMI-PUBLIQUES à token/session (le
+  // tenant est RÉSOLU depuis un token/agencyId, jamais d'une auth staff). Tout accès
+  // DB tenant est routé via `withArmedTenant` APRÈS résolution du tenant ; les seuls
+  // accès hors armement sont les résolutions d'identité PRÉ-TENANT documentées.
+  // - public-tickets.ts : POST /public/tickets ARME l'émission (`issueTicketFor`
+  //   transaction-aware, SAVEPOINT sous armement) sur le bankId dérivé de l'agence ;
+  //   POST …/feedback ARME UPDATE `tickets` + audit + agrégat NPS `daily_agency_stats`
+  //   (policy `tenant_isolation` + GRANT CRUD, 0001/0005) ; GET …/operations et
+  //   …/relationship-managers ARMENT leurs lectures (`operations`/`services`/`users`/
+  //   `agency_users`) après résolution du bankId de l'agence. PRÉ-TENANT (hors
+  //   armement, documenté) : le lookup `tracking_id` global (GET suivi + résolution
+  //   feedback) et la résolution du bankId d'agence — résolution du token public,
+  //   sans oracle d'énumération.
+  // - tv-session.ts : POST /tv/session résout le bankId de l'agence (pré-tenant) puis
+  //   CONFIRME l'agence DANS le tenant via `withArmedTenant` (RLS `agencies`) avant de
+  //   signer le JWT DISPLAY. La confirmation armée est portée par la route (fabrique
+  //   `armedRead` injectée au service).
+  // - kiosk-session.ts : POST /kiosk/session résout le bankId de la borne (pré-tenant,
+  //   lookup par id) puis ARME l'ouverture de session (`createKioskSession`) + l'audit ;
+  //   DELETE …/:kioskId ARME la révocation `kiosks` + audit (tenant du JWT staff) ;
+  //   POST /kiosks/:kioskId/heartbeat ARME l'UPDATE `kiosks` (tenant du JWT borne).
+  //   Tables `kiosks`/`audit_log` : policy `tenant_isolation` + GRANT CRUD (0001/0003).
+  //   NB : `kiosk-session.service.ts` (chantier borne parallèle) est INCHANGÉ ;
+  //   l'armement est porté ENTIÈREMENT par le fichier de route.
+  "public-tickets.ts",
+  "tv-session.ts",
+  "kiosk-session.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
