@@ -10,6 +10,15 @@
  *
  * Les agences soft-supprimées (`deleted_at IS NOT NULL`) sont filtrées partout.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT3)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Tables `agencies` (policy
+ * `tenant_isolation` + GRANT CRUD, 0001) et `tickets` (policy `tenant_isolation` +
+ * GRANT SELECT, 0001, lue pour la garde des tickets ouverts) : lectures de scope +
+ * mutations + audit composé SEC-001 dans UNE transaction armée ; `WHERE bank_id`
+ * applicatif conservé.
+ *
  * @module
  */
 
@@ -30,6 +39,7 @@ import {
   assertAgencyScope,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 import { signAgencyToken } from "src/lib/agency-qr-token.js";
 import { resolveAgencyQrConfig, type AgencyQrConfig } from "src/config/agency-qr.js";
 
@@ -122,21 +132,29 @@ function registerListAgencies(router: Hono<AgencyEnv>): void {
     try {
       const bankId = requireBankId(tenant);
       const { page, limit, offset } = readPagination(c);
-      const res = await db.query(
-        `SELECT ${AGENCY_COLS} FROM agencies
-          WHERE bank_id = $1 AND deleted_at IS NULL
-          ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
-        [bankId, limit, offset]
-      );
-      const count = await db.query(
-        `SELECT COUNT(*)::int AS total FROM agencies
-          WHERE bank_id = $1 AND deleted_at IS NULL`,
-        [bankId]
-      );
+      // SEC-002 : liste + comptage à travers la connexion ARMÉE (RLS contraignante).
+      const { rows, total } = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const res = await armedDb.query(
+          `SELECT ${AGENCY_COLS} FROM agencies
+            WHERE bank_id = $1 AND deleted_at IS NULL
+            ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
+          [bankId, limit, offset]
+        );
+        const count = await armedDb.query(
+          `SELECT COUNT(*)::int AS total FROM agencies
+            WHERE bank_id = $1 AND deleted_at IS NULL`,
+          [bankId]
+        );
+        return {
+          rows: res.rows as AgencyRow[],
+          total: (count.rows[0] as { total: number }).total,
+        };
+      });
       return c.json(
         {
-          data: (res.rows as AgencyRow[]).map(toAgency),
-          meta: { page, limit, total: (count.rows[0] as { total: number }).total },
+          data: rows.map(toAgency),
+          meta: { page, limit, total },
         },
         200
       );
@@ -154,15 +172,20 @@ function registerCreateAgency(router: Hono<AgencyEnv>): void {
     try {
       const bankId = requireBankId(tenant);
       const input = parseStrict(createAgencySchema, await parseJson(c));
-      const created = await insertAgency(db, bankId, input);
-      await recordAudit({
-        db,
-        tenant,
-        action: "POST /agencies",
-        entityType: "agency",
-        entityId: created.id,
-        ip: extractIp(c),
-        diff: buildDiff({}, { name: created.name }),
+      // SEC-002 : insertion + audit atomiques dans la transaction ARMÉE.
+      const created = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await insertAgency(armedDb, bankId, input);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "POST /agencies",
+          entityType: "agency",
+          entityId: row.id,
+          ip: extractIp(c),
+          diff: buildDiff({}, { name: row.name }),
+        });
+        return row;
       });
       return c.json(toAgency(created), 201);
     } catch (err) {
@@ -210,7 +233,11 @@ function registerGetAgency(router: Hono<AgencyEnv>): void {
     try {
       const id = paramUuid(c, "id");
       assertAgencyScope(tenant, id);
-      const agency = await loadAgency(db, requireBankId(tenant), id);
+      const bankId = requireBankId(tenant);
+      // SEC-002 : lecture à travers la connexion ARMÉE (RLS contraignante).
+      const agency = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        loadAgency(conn as unknown as Client, bankId, id)
+      );
       return c.json(toAgency(agency), 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -244,7 +271,10 @@ function registerAgencyQr(router: Hono<AgencyEnv>, qrConfig: AgencyQrConfig): vo
       const id = paramUuid(c, "id");
       assertAgencyScope(tenant, id);
       const bankId = requireBankId(tenant);
-      const agency = await loadActiveAgency(db, bankId, id);
+      // SEC-002 : lecture (agence active) à travers la connexion ARMÉE.
+      const agency = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        loadActiveAgency(conn as unknown as Client, bankId, id)
+      );
       return c.json(buildQrPayload(agency.id, qrConfig), 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -302,19 +332,24 @@ function registerPatchAgency(router: Hono<AgencyEnv>): void {
       assertAgencyScope(tenant, id);
       const bankId = requireBankId(tenant);
       const input = parseStrict(updateAgencySchema, await parseJson(c));
-      const before = await loadAgency(db, bankId, id);
-      const after = await updateAgency(db, bankId, id, input);
-      await recordAudit({
-        db,
-        tenant,
-        action: "PATCH /agencies/:id",
-        entityType: "agency",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff(
-          { name: before.name, active: before.is_active, address: before.address, phone: before.phone },
-          { name: after.name, active: after.is_active, address: after.address, phone: after.phone }
-        ),
+      // SEC-002 : lecture (avant) + update + audit atomiques dans la tx ARMÉE.
+      const after = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const before = await loadAgency(armedDb, bankId, id);
+        const updated = await updateAgency(armedDb, bankId, id, input);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "PATCH /agencies/:id",
+          entityType: "agency",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff(
+            { name: before.name, active: before.is_active, address: before.address, phone: before.phone },
+            { name: updated.name, active: updated.is_active, address: updated.address, phone: updated.phone }
+          ),
+        });
+        return updated;
       });
       return c.json(toAgency(after), 200);
     } catch (err) {
@@ -354,21 +389,26 @@ function registerDeleteAgency(router: Hono<AgencyEnv>): void {
     try {
       const id = paramUuid(c, "id");
       const bankId = requireBankId(tenant);
-      await loadAgency(db, bankId, id);
-      await assertNoOpenTickets(db, bankId, id);
-      await db.query(
-        `UPDATE agencies SET deleted_at = NOW(), is_active = false, updated_at = NOW()
-          WHERE id = $1 AND bank_id = $2`,
-        [id, bankId]
-      );
-      await recordAudit({
-        db,
-        tenant,
-        action: "DELETE /agencies/:id",
-        entityType: "agency",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff({ deleted: false }, { deleted: true }),
+      // SEC-002 : lecture (scope) + garde tickets ouverts + soft-delete + audit
+      // atomiques dans la transaction ARMÉE (agencies + tickets sous RLS armée).
+      await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        await loadAgency(armedDb, bankId, id);
+        await assertNoOpenTickets(armedDb, bankId, id);
+        await armedDb.query(
+          `UPDATE agencies SET deleted_at = NOW(), is_active = false, updated_at = NOW()
+            WHERE id = $1 AND bank_id = $2`,
+          [id, bankId]
+        );
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "DELETE /agencies/:id",
+          entityType: "agency",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff({ deleted: false }, { deleted: true }),
+        });
       });
       return c.json({ success: true }, 200);
     } catch (err) {
