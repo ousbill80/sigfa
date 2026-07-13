@@ -28,7 +28,18 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const ROUTES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "routes");
+const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+const ROUTES_DIR = join(SRC_DIR, "routes");
+/**
+ * Répertoire des routeurs IA (IA-002/003/004). `GET /ai/forecast|anomalies|
+ * feedback-insights` sont montés depuis `src/ai/*-route.ts` — ils accèdent à la DB
+ * tenant au même titre que `src/routes/*`, donc l'inventaire d'armement DOIT les
+ * couvrir (sinon une route DB tenant échapperait silencieusement au verrou).
+ */
+const AI_DIR = join(SRC_DIR, "ai");
+
+/** Répertoires contenant des fichiers de routeurs montés (scannés pour l'inventaire). */
+const ROUTE_DIRS: readonly string[] = [ROUTES_DIR, AI_DIR];
 
 /**
  * Routes n'accédant PAS à une table tenant `bank_id` : connexion plateforme
@@ -55,6 +66,12 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "agencies.ts",
   "agents-import.ts",
   "agents.ts",
+  // Routeurs IA (IA-002/003/004) — lectures tenant-scoped (`WHERE bank_id`), montés
+  // sous `/ai/*`. Non encore basculés vers `withArmedTenant`, comme les autres routes
+  // de lecture tenant. Vivent dans `src/ai/` (voir AI_DIR).
+  "ai-forecast.ts",
+  "anomaly-route.ts",
+  "feedback-insights-route.ts",
   "banks.ts",
   "counters.ts",
   "data-privacy.ts",
@@ -85,20 +102,46 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
  */
 const ARMED: readonly string[] = [];
 
-/** Liste les fichiers de routes source (hors tests et harnais). */
-function listRouteSourceFiles(): string[] {
-  return readdirSync(ROUTES_DIR).filter(
-    (name) =>
-      name.endsWith(".ts") &&
-      !name.endsWith(".test.ts") &&
-      !name.includes(".harness.") &&
-      name !== "admin-test-harness.ts"
+/** Un fichier de routeur candidat + le répertoire qui le contient. */
+interface RouteFile {
+  readonly name: string;
+  readonly dir: string;
+}
+
+/**
+ * Un fichier `src/ai/*.ts` n'est un ROUTEUR (donc à inventorier) que s'il monte des
+ * handlers Hono. Les modules purs (`forecast-model.ts`, `anomaly-detectors.ts`,
+ * `feature-*.ts`…) accèdent parfois à la DB via une `QueryFn` injectée sans être des
+ * routes montées : on ne retient que les fichiers `*-route.ts` (routeurs) + le
+ * routeur `ai-forecast.ts` (vit sous `routes/`).
+ */
+function isRouterFile(name: string, dir: string): boolean {
+  if (dir === AI_DIR) return name.endsWith("-route.ts");
+  return true;
+}
+
+/**
+ * Liste les fichiers de routeurs source (hors tests et harnais) sur tous les
+ * répertoires de routes, avec leur répertoire d'origine.
+ */
+function listRouteSourceFiles(): RouteFile[] {
+  return ROUTE_DIRS.flatMap((dir) =>
+    readdirSync(dir)
+      .filter(
+        (name) =>
+          name.endsWith(".ts") &&
+          !name.endsWith(".test.ts") &&
+          !name.includes(".harness.") &&
+          name !== "admin-test-harness.ts" &&
+          isRouterFile(name, dir)
+      )
+      .map((name) => ({ name, dir }))
   );
 }
 
 /** Vrai si le fichier accède à la connexion DB de requête (`c.get("db")`). */
-function touchesDb(file: string): boolean {
-  const src = readFileSync(join(ROUTES_DIR, file), "utf8");
+function touchesDb(file: RouteFile): boolean {
+  const src = readFileSync(join(file.dir, file.name), "utf8");
   return src.includes('c.get("db")');
 }
 
@@ -118,7 +161,9 @@ describe("SEC-002: architecture — armement tenant obligatoire (SEC-F3-02)", ()
     ]);
     const dbTouchingFiles = listRouteSourceFiles().filter(touchesDb);
 
-    const unclassified = dbTouchingFiles.filter((f) => !classified.has(f));
+    const unclassified = dbTouchingFiles
+      .filter((f) => !classified.has(f.name))
+      .map((f) => f.name);
     expect(
       unclassified,
       `Fichiers de route accédant à la DB sans classification d'armement : ` +
@@ -128,7 +173,7 @@ describe("SEC-002: architecture — armement tenant obligatoire (SEC-F3-02)", ()
   });
 
   it("SEC-002: l'inventaire ne référence AUCUN fichier fantôme (les 3 listes pointent des fichiers existants)", () => {
-    const existing = new Set(listRouteSourceFiles());
+    const existing = new Set(listRouteSourceFiles().map((f) => f.name));
     const referenced = [...ARMED, ...ARMED_CUTOVER_PENDING, ...PLATFORM_OR_PUBLIC];
     const phantom = referenced.filter((f) => !existing.has(f));
     expect(
@@ -146,8 +191,13 @@ describe("SEC-002: architecture — armement tenant obligatoire (SEC-F3-02)", ()
   });
 
   it("SEC-002: un fichier ARMÉ route bien son accès DB via withArmedTenant (grep) — verrou anti-régression de la bascule", () => {
+    const dirByName = new Map(
+      listRouteSourceFiles().map((f) => [f.name, f.dir] as const)
+    );
     for (const file of ARMED) {
-      const src = readFileSync(join(ROUTES_DIR, file), "utf8");
+      const dir = dirByName.get(file);
+      expect(dir, `${file} est classé ARMED mais introuvable dans les répertoires de routes`).toBeDefined();
+      const src = readFileSync(join(dir!, file), "utf8");
       expect(
         /withArmedTenant/.test(src),
         `${file} est classé ARMED mais n'appelle pas withArmedTenant`
