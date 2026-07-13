@@ -25,15 +25,20 @@ import {
 
 /** Store en mémoire single-use (GETDEL simulé) pour les tests. */
 class MemoryStore implements EnrollmentTokenStore {
-  private map = new Map<string, EnrollmentBinding>();
-  async put(k: string, b: EnrollmentBinding): Promise<void> {
-    this.map.set(k, b);
+  private map = new Map<string, { binding: EnrollmentBinding; expiresAt: number }>();
+  async put(
+    k: string,
+    b: EnrollmentBinding,
+    ttlSeconds: number
+  ): Promise<void> {
+    this.map.set(k, { binding: b, expiresAt: Date.now() + ttlSeconds * 1000 });
   }
   async consume(k: string): Promise<EnrollmentBinding | null> {
     const v = this.map.get(k);
     if (v === undefined) return null;
     this.map.delete(k); // atomicité simulée : lecture + suppression.
-    return v;
+    if (v.expiresAt <= Date.now()) return null; // expiration native simulée.
+    return v.binding;
   }
 }
 
