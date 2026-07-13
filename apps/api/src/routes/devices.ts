@@ -9,6 +9,15 @@
  *
  * Le reste du module notifications (envois, opt-in/out, log) est hors périmètre (F6).
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT2)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. La table
+ * `notification_devices` a la policy `tenant_isolation` (WITH CHECK bank_id =
+ * current_bank_id) + GRANT CRUD `sigfa_app` (migration 0004). L'upsert idempotent
+ * `ON CONFLICT (device_token)` réattribue la ligne au tenant armé (bank_id = EXCLUDED,
+ * accepté par WITH CHECK) ; le DELETE ownership ne peut toucher qu'une ligne du tenant.
+ *
  * @module
  */
 
@@ -19,6 +28,7 @@ import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import { errorResponse, paramUuid, parseJson, parseStrict, requireBankId } from "src/lib/admin-helpers.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur devices. */
 interface DeviceEnv {
@@ -70,7 +80,10 @@ function registerDevice(router: Hono<DeviceEnv>): void {
     try {
       const bankId = requireBankId(tenant);
       const input = parseStrict(registerSchema, await parseJson(c));
-      const row = await upsertDevice(db, bankId, input.deviceToken, input.platform);
+      // SEC-002 : upsert idempotent dans la tx ARMÉE (RLS contraignante).
+      const row = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        upsertDevice(conn as unknown as Client, bankId, input.deviceToken, input.platform)
+      );
       return c.json(toDeviceRegistration(row), row.inserted ? 201 : 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -118,11 +131,15 @@ function deleteDevice(router: Hono<DeviceEnv>): void {
     try {
       const deviceId = paramUuid(c, "deviceId");
       const bankId = requireBankId(tenant);
-      const res = await db.query(
-        `DELETE FROM notification_devices WHERE id = $1 AND bank_id = $2 RETURNING id`,
-        [deviceId, bankId]
-      );
-      if (res.rows.length === 0) {
+      // SEC-002 : suppression ownership dans la tx ARMÉE (RLS contraignante).
+      const rows = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const res = await conn.query(
+          `DELETE FROM notification_devices WHERE id = $1 AND bank_id = $2 RETURNING id`,
+          [deviceId, bankId]
+        );
+        return res.rows;
+      });
+      if (rows.length === 0) {
         throw new SigfaError("DEVICE_NOT_FOUND", "Device introuvable.", 404);
       }
       return c.json({ success: true }, 200);

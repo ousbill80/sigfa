@@ -10,6 +10,14 @@
  * Le seuil est dérivé en SQL de `NOW()` : il suit l'horloge base, ce qui permet
  * aux tests d'antidater `last_seen` pour franchir le seuil de façon déterministe.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT2)
+ * La lecture tenant est routée via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. La table `kiosks` a la
+ * policy `tenant_isolation` (SELECT bank_id = current_bank_id) + GRANT SELECT
+ * `sigfa_app` (migration 0001). Le filtrage applicatif `WHERE bank_id`/scope agence est
+ * conservé en défense-en-profondeur.
+ *
  * @module
  */
 
@@ -17,8 +25,9 @@ import { Hono } from "hono";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import type { TenantContext } from "src/middleware/tenant.js";
-import { errorResponse, assertAgencyScope } from "src/lib/admin-helpers.js";
+import { errorResponse, assertAgencyScope, requireBankId } from "src/lib/admin-helpers.js";
 import { KIOSK_SILENT_THRESHOLD_S } from "src/config/kiosk.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur supervision. */
 interface KioskStatusEnv {
@@ -50,17 +59,22 @@ export function createKioskStatusRouter(): Hono<KioskStatusEnv> {
     const db = c.get("db");
     const tenant = c.get("tenant");
     try {
+      const bankId = requireBankId(tenant);
       const agencyId = c.req.query("agencyId");
       const { where, params } = buildScope(tenant, agencyId);
-      const res = await db.query(
-        `SELECT id AS kiosk_id, agency_id, last_seen, printer_status,
-                (last_seen IS NULL OR last_seen < NOW() - ($${params.length + 1} || ' seconds')::interval)
-                  AS is_silent
-           FROM kiosks ${where}
-          ORDER BY created_at ASC`,
-        [...params, String(KIOSK_SILENT_THRESHOLD_S)]
-      );
-      return c.json({ kiosks: (res.rows as KioskStatusRow[]).map(toKioskStatus) }, 200);
+      // SEC-002 : lecture tenant à travers la connexion ARMÉE (RLS contraignante).
+      const rows = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const res = await conn.query(
+          `SELECT id AS kiosk_id, agency_id, last_seen, printer_status,
+                  (last_seen IS NULL OR last_seen < NOW() - ($${params.length + 1} || ' seconds')::interval)
+                    AS is_silent
+             FROM kiosks ${where}
+            ORDER BY created_at ASC`,
+          [...params, String(KIOSK_SILENT_THRESHOLD_S)]
+        );
+        return res.rows as KioskStatusRow[];
+      });
+      return c.json({ kiosks: rows.map(toKioskStatus) }, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
