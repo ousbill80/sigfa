@@ -77,10 +77,8 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "anomaly-route.ts",
   "feedback-insights-route.ts",
   "banks.ts",
-  "counters.ts",
   "data-privacy.ts",
   "devices.ts",
-  "hours.ts",
   "kiosk-session.ts",
   "kiosks-status.ts",
   "onboarding.ts",
@@ -88,8 +86,13 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "public-tickets.ts",
   "queues.ts",
   "reports.ts",
-  "services.ts",
   "sms-templates.ts",
+  // thresholds.ts — BLOQUÉ (couture packages/database) : PATCH /banks/:id/thresholds
+  // fait `UPDATE banks`, mais `sigfa_app` a INSERT/UPDATE/DELETE RÉVOQUÉS sur `banks`
+  // (migration 0001_rls.sql:235 ; policy `banks` = FOR SELECT seule). Sous connexion
+  // armée NOBYPASSRLS → « permission denied for table banks ». Reste PENDING tant que
+  // la couture DB n'est pas posée (GRANT UPDATE ciblé sur `banks` à `sigfa_app`, ou
+  // déport des seuils vers une table tenant-scoped mutable). Cf. SEC-002-CUTOVER-LOT1.
   "thresholds.ts",
   "tickets-sync.ts",
   "tickets.ts",
@@ -113,6 +116,13 @@ const ARMED: readonly string[] = [
   // ADM-002a — onboarding agence < 2h (clone structurel + provisioning borne).
   // Tout accès DB tenant est routé via `withArmedTenant` (services clone/provision).
   "agency-onboarding.ts",
+  // SEC-002-CUTOVER-LOT1 — routes de config tenant-scoped (faible risque). Tout
+  // accès DB tenant routé via `withArmedTenant` (armement `app.current_bank_id`).
+  // Tables `services` / `agencies` / `agency_exceptional_closures` / `counters` /
+  // `counter_services` : policy `tenant_isolation` + GRANT CRUD `sigfa_app` vérifiés.
+  "services.ts",
+  "hours.ts",
+  "counters.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */

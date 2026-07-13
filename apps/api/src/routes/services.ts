@@ -9,6 +9,13 @@
  * L'agence cible est fournie via `?agencyId=` (validée par le middleware contre le
  * scope JWT — un DIRECTOR ciblant une agence hors scope reçoit 403).
  *
+ * ## Sécurité (SEC-002)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Les policies
+ * `tenant_isolation` de `services` (et l'audit composé SEC-001) deviennent alors la
+ * vraie barrière tenant, en plus du filtrage applicatif `WHERE bank_id` conservé.
+ *
  * @module
  */
 
@@ -30,6 +37,7 @@ import {
   UUID_RE,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur services. */
 interface ServiceEnv {
@@ -128,21 +136,28 @@ function registerListServices(router: Hono<ServiceEnv>): void {
       const bankId = requireBankId(tenant);
       const agencyId = requireAgencyId(c, tenant);
       const { page, limit, offset } = readPagination(c);
-      const res = await db.query(
-        `SELECT ${SVC_COLS} FROM services
-          WHERE bank_id=$1 AND agency_id=$2 AND deleted_at IS NULL
-          ORDER BY display_order ASC, created_at ASC LIMIT $3 OFFSET $4`,
-        [bankId, agencyId, limit, offset]
-      );
-      const count = await db.query(
-        `SELECT COUNT(*)::int AS total FROM services
-          WHERE bank_id=$1 AND agency_id=$2 AND deleted_at IS NULL`,
-        [bankId, agencyId]
-      );
+      // SEC-002 : lectures tenant à travers la connexion ARMÉE (RLS contraignante).
+      const { rows, total } = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const res = await conn.query(
+          `SELECT ${SVC_COLS} FROM services
+            WHERE bank_id=$1 AND agency_id=$2 AND deleted_at IS NULL
+            ORDER BY display_order ASC, created_at ASC LIMIT $3 OFFSET $4`,
+          [bankId, agencyId, limit, offset]
+        );
+        const count = await conn.query(
+          `SELECT COUNT(*)::int AS total FROM services
+            WHERE bank_id=$1 AND agency_id=$2 AND deleted_at IS NULL`,
+          [bankId, agencyId]
+        );
+        return {
+          rows: res.rows as ServiceRow[],
+          total: (count.rows[0] as { total: number }).total,
+        };
+      });
       return c.json(
         {
-          data: (res.rows as ServiceRow[]).map(toService),
-          meta: { page, limit, total: (count.rows[0] as { total: number }).total },
+          data: rows.map(toService),
+          meta: { page, limit, total },
         },
         200
       );
@@ -161,15 +176,20 @@ function registerCreateService(router: Hono<ServiceEnv>): void {
       const bankId = requireBankId(tenant);
       const agencyId = requireAgencyId(c, tenant);
       const input = parseStrict(createServiceSchema, await parseJson(c));
-      const created = await insertService(db, bankId, agencyId, input);
-      await recordAudit({
-        db,
-        tenant,
-        action: "POST /services",
-        entityType: "service",
-        entityId: created.id,
-        ip: extractIp(c),
-        diff: buildDiff({}, { code: created.code, name: created.name }),
+      // SEC-002 : insertion + audit atomiques dans la transaction ARMÉE.
+      const created = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await insertService(armedDb, bankId, agencyId, input);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "POST /services",
+          entityType: "service",
+          entityId: row.id,
+          ip: extractIp(c),
+          diff: buildDiff({}, { code: row.code, name: row.name }),
+        });
+        return row;
       });
       return c.json(toService(created), 201);
     } catch (err) {
@@ -220,21 +240,26 @@ function registerPatchService(router: Hono<ServiceEnv>): void {
     try {
       const id = paramUuid(c, "id");
       const bankId = requireBankId(tenant);
-      const before = await loadService(db, bankId, id);
-      assertAgencyScope(tenant, before.agency_id);
       const input = parseStrict(updateServiceSchema, await parseJson(c));
-      const after = await updateService(db, bankId, id, input);
-      await recordAudit({
-        db,
-        tenant,
-        action: "PATCH /services/:id",
-        entityType: "service",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff(
-          { name: before.name, slaMinutes: before.sla_minutes, active: before.is_active, order: before.display_order },
-          { name: after.name, slaMinutes: after.sla_minutes, active: after.is_active, order: after.display_order }
-        ),
+      // SEC-002 : lecture (scope) + mutation + audit atomiques dans la tx ARMÉE.
+      const after = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const before = await loadService(armedDb, bankId, id);
+        assertAgencyScope(tenant, before.agency_id);
+        const updated = await updateService(armedDb, bankId, id, input);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "PATCH /services/:id",
+          entityType: "service",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff(
+            { name: before.name, slaMinutes: before.sla_minutes, active: before.is_active, order: before.display_order },
+            { name: updated.name, slaMinutes: updated.sla_minutes, active: updated.is_active, order: updated.display_order }
+          ),
+        });
+        return updated;
       });
       return c.json(toService(after), 200);
     } catch (err) {
