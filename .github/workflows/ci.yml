@@ -133,9 +133,18 @@ jobs:
         # NB : on passe par la VARIABLE D'ENV, pas `pnpm test -- --concurrency=1` — ce
         # dernier, via le `--` préservé par pnpm, forwarde le flag AUX TÂCHES
         # (`vitest run --concurrency=1`, `tsc --concurrency=1`) et casse builds+scripts.
+        #
+        # CI-RATCHET-ZONES : `--coverage` DOIT être forwardé aux tâches test, sinon seuls
+        # les scripts qui portent déjà le flag (packages/contracts) produisent un
+        # coverage-final.json et le ratchet ne mesure rien d'autre (régression introduite
+        # par 6cca055 en retirant `-- --coverage`). Deux invocations car le script test de
+        # @sigfa/contracts contient déjà `--coverage` : le forwarder en double fait crasher
+        # vitest (« Expected a single value for option "--coverage", received [true, true] »).
         env:
           TURBO_CONCURRENCY: "1"
-        run: pnpm test
+        run: |
+          pnpm exec turbo run test --filter='!@sigfa/contracts' -- --coverage
+          pnpm exec turbo run test --filter=@sigfa/contracts
 
       - name: Build tools/ci
         run: pnpm --filter @sigfa/ci run build

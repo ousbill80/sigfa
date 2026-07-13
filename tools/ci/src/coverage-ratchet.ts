@@ -1,9 +1,13 @@
 /**
- * Ratchet de couverture SIGFA — INFRA-003
+ * Ratchet de couverture SIGFA — INFRA-003 + CI-RATCHET-ZONES
  *
- * Lit les rapports istanbul coverage-final.json, les fusionne,
- * compare avec la baseline, et échoue si une métrique baisse de plus de 0,1 point.
- * En contexte PR, vérifie également que les nouveaux fichiers atteignent ≥85%.
+ * Lit les rapports istanbul coverage-final.json, les fusionne, découpe la
+ * couverture en deux zones et compare chaque zone avec sa baseline :
+ * - zone backend (apps/api + packages/* + tools/*) : tolérance 0,1pt,
+ *   nouveaux fichiers ≥85% (exigence stricte inchangée) ;
+ * - zone ui (apps/web + apps/kiosk) : tolérance 1,0pt, nouveaux fichiers ≥70%
+ *   (exigence assouplie — décision PO, la couverture de lignes garantit peu sur l'UI).
+ * La baseline n'est jamais abaissée par une baisse tolérée (pas d'érosion).
  */
 
 import * as fs from "node:fs";
@@ -17,6 +21,37 @@ export interface GlobalMetrics {
   statements: number;
   branches: number;
   functions: number;
+}
+
+/** Zones de couverture du monorepo. */
+export type Zone = "backend" | "ui";
+
+/** Politique de ratchet d'une zone. */
+export interface ZonePolicy {
+  /** Baisse maximale tolérée par métrique (en points de %). */
+  tolerance: number;
+  /** Seuil de statements exigé pour un nouveau fichier en PR (en %). */
+  newFileThreshold: number;
+}
+
+/** Politiques par zone — source de vérité des seuils (documentées dans CLAUDE.md §4). */
+export const ZONE_POLICIES: Record<Zone, ZonePolicy> = {
+  backend: { tolerance: 0.1, newFileThreshold: 85 },
+  ui: { tolerance: 1.0, newFileThreshold: 70 },
+};
+
+const ZONES: Zone[] = ["backend", "ui"];
+
+/** Chemins de la zone ui : apps/web et apps/kiosk. Tout le reste est backend. */
+const UI_ZONE_PATTERN = /[/\\]apps[/\\](?:web|kiosk)[/\\]/;
+
+/**
+ * Détermine la zone d'un fichier couvert à partir de son chemin.
+ * @param filePath - Chemin (absolu ou relatif) du fichier
+ * @returns "ui" pour apps/web et apps/kiosk, "backend" sinon
+ */
+export function zoneOf(filePath: string): Zone {
+  return UI_ZONE_PATTERN.test(filePath) ? "ui" : "backend";
 }
 
 /** Entrée d'un seul fichier dans un rapport istanbul coverage-final.json. */
@@ -57,9 +92,9 @@ export interface RatchetResult {
   metrics?: GlobalMetrics;
 }
 
-/** Format du fichier coverage-baseline.json. */
+/** Format du fichier coverage-baseline.json (une baseline par zone). */
 interface BaselineFile {
-  global: GlobalMetrics;
+  zones: Record<Zone, GlobalMetrics>;
 }
 
 // ─── Fonctions utilitaires ────────────────────────────────────────────────────
@@ -186,6 +221,24 @@ export function mergeIstanbulReports(reports: IstanbulCoverageMap[]): IstanbulCo
 }
 
 /**
+ * Calcule les métriques par zone depuis une map istanbul fusionnée.
+ * @param map - Map istanbul fusionnée
+ * @returns Métriques par zone, ou null pour une zone sans fichier couvert
+ */
+export function computeZoneMetrics(
+  map: IstanbulCoverageMap
+): Record<Zone, GlobalMetrics | null> {
+  const byZone: Record<Zone, IstanbulCoverageMap> = { backend: {}, ui: {} };
+  for (const [filePath, fileCoverage] of Object.entries(map)) {
+    byZone[zoneOf(filePath)][filePath] = fileCoverage;
+  }
+  return {
+    backend: Object.keys(byZone.backend).length > 0 ? computeGlobalMetrics(byZone.backend) : null,
+    ui: Object.keys(byZone.ui).length > 0 ? computeGlobalMetrics(byZone.ui) : null,
+  };
+}
+
+/**
  * Calcule les métriques par fichier individuel depuis la map fusionnée.
  * @param map - Map istanbul fusionnée
  * @param filePath - Chemin absolu du fichier
@@ -201,10 +254,11 @@ function computeFileMetrics(
 }
 
 /**
- * Vérifie que les nouveaux fichiers d'une PR atteignent le seuil de 85%.
+ * Vérifie que les nouveaux fichiers d'une PR atteignent le seuil de leur zone
+ * (backend ≥85%, ui ≥70%).
  * @param merged - Map de couverture fusionnée
  * @param newFiles - Liste des chemins de nouveaux fichiers
- * @returns Message d'erreur ou null si tous les fichiers passent le seuil
+ * @returns Message d'erreur ou null si tous les fichiers passent leur seuil
  */
 function checkNewFilesThreshold(
   merged: IstanbulCoverageMap,
@@ -214,58 +268,84 @@ function checkNewFilesThreshold(
   for (const filePath of newFiles) {
     const fileMetrics = computeFileMetrics(merged, filePath);
     if (!fileMetrics) continue;
-    if (fileMetrics.statements < 85) {
-      failingFiles.push(`${filePath} (${fileMetrics.statements}% statements < 85%)`);
+    const zone = zoneOf(filePath);
+    const threshold = ZONE_POLICIES[zone].newFileThreshold;
+    if (fileMetrics.statements < threshold) {
+      failingFiles.push(
+        `${filePath} (${fileMetrics.statements}% statements < ${threshold}% — zone ${zone})`
+      );
     }
   }
   if (failingFiles.length === 0) return null;
   return (
-    `Nouveaux fichiers sous le seuil de 85% de couverture :\n` +
+    `Nouveaux fichiers sous le seuil de couverture de leur zone :\n` +
     failingFiles.map((f) => `  - ${f}`).join("\n")
   );
 }
 
 /**
- * Vérifie le ratchet global : aucune métrique ne doit baisser de plus de TOLERANCE.
- * @param current - Métriques courantes
- * @param base - Métriques de la baseline
+ * Vérifie le ratchet d'une zone : aucune métrique ne doit baisser de plus
+ * que la tolérance de la zone.
+ * @param zone - Zone vérifiée
+ * @param current - Métriques courantes de la zone
+ * @param base - Métriques de la baseline de la zone
  * @returns Message d'erreur ou null si le ratchet est respecté
  */
-function checkGlobalRatchet(current: GlobalMetrics, base: GlobalMetrics): string | null {
+function checkZoneRatchet(
+  zone: Zone,
+  current: GlobalMetrics,
+  base: GlobalMetrics
+): string | null {
   const metrics: Array<keyof GlobalMetrics> = ["lines", "statements", "branches", "functions"];
-  const TOLERANCE = 0.1;
+  const tolerance = ZONE_POLICIES[zone].tolerance;
   const deltas: string[] = [];
   for (const metric of metrics) {
     const diff = current[metric] - base[metric];
-    if (diff < -TOLERANCE) {
+    if (diff < -tolerance) {
       deltas.push(
         `  ${metric}: ${base[metric].toFixed(2)}% → ${current[metric].toFixed(2)}% (delta: ${diff.toFixed(2)}%)`
       );
     }
   }
   if (deltas.length === 0) return null;
-  return `Ratchet de couverture ÉCHOUÉ — baisse détectée (delta par métrique) :\n` + deltas.join("\n");
+  return (
+    `Ratchet de couverture ÉCHOUÉ — zone ${zone} en baisse ` +
+    `(tolérance ${tolerance}pt, delta par métrique) :\n` +
+    deltas.join("\n")
+  );
 }
 
 /**
- * Régénère la baseline si au moins une métrique s'est améliorée de plus de TOLERANCE.
- * @param current - Métriques courantes
- * @param base - Métriques de la baseline
+ * Régénère la baseline si au moins une zone s'est améliorée au-delà de sa tolérance.
+ * Seules les zones améliorées sont relevées : une baisse tolérée n'érode JAMAIS
+ * la baseline d'une zone (sinon la tolérance ui deviendrait un canal d'érosion).
+ * @param currentZones - Métriques courantes par zone (null si zone sans fichier)
+ * @param baseZones - Baselines par zone
  * @param artifactDir - Répertoire de sortie de la nouvelle baseline
  * @param log - Fonction de log
  * @returns true si la baseline a été régénérée, false sinon
  */
 function maybeUpdateBaseline(
-  current: GlobalMetrics,
-  base: GlobalMetrics,
+  currentZones: Record<Zone, GlobalMetrics | null>,
+  baseZones: Record<Zone, GlobalMetrics>,
   artifactDir: string,
   log: (msg: string) => void
 ): boolean {
   const metrics: Array<keyof GlobalMetrics> = ["lines", "statements", "branches", "functions"];
-  const TOLERANCE = 0.1;
-  const improved = metrics.some((m) => current[m] > base[m] + TOLERANCE);
+  const newZones: Record<Zone, GlobalMetrics> = { ...baseZones };
+  let improved = false;
+  for (const zone of ZONES) {
+    const current = currentZones[zone];
+    const base = baseZones[zone];
+    if (!current || !base) continue;
+    const tolerance = ZONE_POLICIES[zone].tolerance;
+    if (metrics.some((m) => current[m] > base[m] + tolerance)) {
+      newZones[zone] = current;
+      improved = true;
+    }
+  }
   if (!improved) return false;
-  const newBaseline: BaselineFile = { global: current };
+  const newBaseline: BaselineFile = { zones: newZones };
   fs.writeFileSync(path.join(artifactDir, "coverage-baseline.json"), JSON.stringify(newBaseline, null, 2));
   log("baseline améliorée — commitez coverage-baseline.json");
   return true;
@@ -287,17 +367,34 @@ export async function runRatchet(options: RatchetOptions): Promise<RatchetResult
 
   const merged = mergeIstanbulReports(coverageReports);
   const current = computeGlobalMetrics(merged);
-  const base = (JSON.parse(fs.readFileSync(baselinePath, "utf-8")) as BaselineFile).global;
+  const currentZones = computeZoneMetrics(merged);
+  const baseZones = (JSON.parse(fs.readFileSync(baselinePath, "utf-8")) as BaselineFile).zones;
 
   if (context === "pull_request" && newFiles.length > 0) {
     const err = checkNewFilesThreshold(merged, newFiles);
     if (err) return { exitCode: 1, message: err, metrics: current };
   }
 
-  const ratchetErr = checkGlobalRatchet(current, base);
-  if (ratchetErr) return { exitCode: 1, message: ratchetErr, metrics: current };
+  for (const zone of ZONES) {
+    const zoneMetrics = currentZones[zone];
+    if (!zoneMetrics) {
+      log(`zone ${zone}: aucun fichier couvert dans le diff — skip.`);
+      continue;
+    }
+    const zoneBase = baseZones[zone];
+    if (!zoneBase) {
+      log(`zone ${zone}: absente de la baseline — skip (elle sera ajoutée à la prochaine régénération).`);
+      continue;
+    }
+    const ratchetErr = checkZoneRatchet(zone, zoneMetrics, zoneBase);
+    if (ratchetErr) return { exitCode: 1, message: ratchetErr, metrics: current };
+    log(
+      `zone ${zone}: OK (lines ${zoneMetrics.lines}%, statements ${zoneMetrics.statements}%, ` +
+        `branches ${zoneMetrics.branches}%, functions ${zoneMetrics.functions}%)`
+    );
+  }
 
-  if (maybeUpdateBaseline(current, base, artifactDir, log)) {
+  if (maybeUpdateBaseline(currentZones, baseZones, artifactDir, log)) {
     return { exitCode: 0, message: "Couverture améliorée. Baseline régénérée en artefact.", metrics: current };
   }
 

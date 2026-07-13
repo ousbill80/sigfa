@@ -6,12 +6,20 @@ Outils CI du monorepo SIGFA : ratchet de couverture, validation du commit hook, 
 
 ### `coverage-ratchet.ts`
 
-Lit les rapports `coverage-final.json` au format istanbul, les fusionne, et compare les métriques globales avec la baseline `coverage-baseline.json` à la racine du monorepo.
+Lit les rapports `coverage-final.json` au format istanbul, les fusionne, découpe la couverture en **deux zones** et compare chaque zone avec sa baseline dans `coverage-baseline.json` à la racine du monorepo (format `{ "zones": { "backend": {...}, "ui": {...} } }`).
+
+Zones (décision PO 2026-07, dégraissage du ratchet global unique) :
+
+| Zone | Périmètre (par chemin de fichier) | Tolérance de baisse | Nouveaux fichiers (PR) |
+|---|---|---|---|
+| `backend` | tout sauf apps/web et apps/kiosk (apps/api, packages/*, tools/*) | 0,1 pt | ≥85% statements |
+| `ui` | `apps/web/**` + `apps/kiosk/**` | 1,0 pt | ≥70% statements |
 
 Règles :
-- Aucune des 4 métriques (lines, statements, branches, functions) ne doit baisser de plus de 0,1 point.
-- En contexte `pull_request` avec `newFiles` : chaque nouveau fichier doit atteindre ≥85% statements.
-- Si toutes les métriques s'améliorent de plus de 0,1 point, la baseline est automatiquement régénérée dans `artifactDir`.
+- Par zone : aucune des 4 métriques (lines, statements, branches, functions) ne doit baisser de plus que la tolérance de la zone.
+- En contexte `pull_request` avec `newFiles` : chaque nouveau fichier doit atteindre le seuil statements de sa zone.
+- Si une zone s'améliore au-delà de sa tolérance, la baseline est régénérée dans `artifactDir` — **seules les zones améliorées sont relevées** : une baisse tolérée n'abaisse jamais la baseline (pas d'érosion via la tolérance ui).
+- Une zone sans fichier couvert dans les rapports est sautée (pas de faux 100%).
 
 ### `require-test-in-commit.sh` (via `scripts/`)
 
@@ -44,23 +52,29 @@ Conséquence pour les développeurs : les runs locaux avec Docker complet dépas
 Pour recalculer la baseline (par exemple après une amélioration de couverture) :
 
 ```bash
-# 1. Lancer les tests en conditions CI
-SKIP_DOCKER_TESTS=1 pnpm turbo run test --force -- --coverage
+# 0. Purger les rapports stale (piège connu : un coverage-final.json résiduel fausse la mesure)
+find apps packages tools -maxdepth 2 -name coverage -type d -not -path "*/node_modules/*" -exec rm -rf {} +
 
-# 2. Calculer les métriques fusionnées
+# 1. Lancer les tests en conditions CI (deux invocations : le script test de
+#    @sigfa/contracts porte déjà --coverage, le forwarder en double crashe vitest)
+SKIP_DOCKER_TESTS=1 TURBO_CONCURRENCY=1 pnpm exec turbo run test --filter='!@sigfa/contracts' --force -- --coverage
+SKIP_DOCKER_TESTS=1 TURBO_CONCURRENCY=1 pnpm exec turbo run test --filter=@sigfa/contracts --force
+
+# 2. Calculer les métriques fusionnées par zone
 node --input-type=module << 'EOF'
 import { readFileSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
-import { computeGlobalMetrics, mergeIstanbulReports } from './tools/ci/dist/coverage-ratchet.js';
+import { computeZoneMetrics, mergeIstanbulReports } from './tools/ci/dist/coverage-ratchet.js';
 const reports = [];
-for await (const f of glob('**/coverage/coverage-final.json', { ignore: ['**/node_modules/**'] })) {
+// NB : exclure .claude/** — les worktrees d'agents contiennent des coverage-final.json stale.
+for await (const f of glob('**/coverage/coverage-final.json', { ignore: ['**/node_modules/**', '.claude/**'] })) {
   reports.push(JSON.parse(readFileSync(f, 'utf-8')));
 }
-const metrics = computeGlobalMetrics(mergeIstanbulReports(reports));
-console.log(JSON.stringify({ global: metrics }, null, 2));
+const zones = computeZoneMetrics(mergeIstanbulReports(reports));
+console.log(JSON.stringify({ zones }, null, 2));
 EOF
 
-# 3. Mettre à jour coverage-baseline.json à la racine du monorepo
+# 3. Mettre à jour coverage-baseline.json à la racine du monorepo (format { "zones": ... })
 # 4. Committer avec le message : fix(infra): recalcul baseline CI (SKIP_DOCKER_TESTS)
 ```
 

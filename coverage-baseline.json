@@ -1,8 +1,16 @@
 {
-  "global": {
-    "lines": 90.7,
-    "statements": 90.7,
-    "branches": 81.2,
-    "functions": 91.5
+  "zones": {
+    "backend": {
+      "lines": 98.3,
+      "statements": 98.3,
+      "branches": 91.1,
+      "functions": 99.0
+    },
+    "ui": {
+      "lines": 99.2,
+      "statements": 99.2,
+      "branches": 89.8,
+      "functions": 97.7
+    }
   }
 }

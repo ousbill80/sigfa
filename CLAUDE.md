@@ -43,7 +43,7 @@ Tâche triviale (typo, renommage local) → agent unique en direct, pas d'orches
 6. Suite `tenant-isolation` si table/route touchée
 7. Suite `offline` si kiosk touché
 8. Mapping critères EARS ↔ tests nommés (`STORY-xxx: ...`)
-9. Ratchet de couverture : ≥85% nouveaux fichiers, jamais de baisse
+9. Ratchet de couverture par zone (décision PO 2026-07) : **backend** (`apps/api`, `packages/*`, `tools/*`) — nouveaux fichiers ≥85%, baisse tolérée ≤0,1 pt ; **UI** (`apps/web`, `apps/kiosk`) — nouveaux fichiers ≥70%, baisse tolérée ≤1,0 pt. Baseline par zone dans `coverage-baseline.json`, jamais érodée par une baisse tolérée.
 
 - DESIGN-gate écrans majeurs : l'orchestrateur ne dispatche l'implémentation qu'après GO wireframe humain (KIOSK-002..005, TV-001, WEB-002/003).
 
