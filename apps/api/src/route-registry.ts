@@ -48,6 +48,9 @@ import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
 import { createReportRouter } from "src/routes/reports.js";
 import { createNotificationWebhookRouter } from "src/routes/webhooks-notifications.js";
 import { createWhatsAppInboundRouter } from "src/routes/webhooks-whatsapp-inbound.js";
+import { createAiForecastRouter } from "src/routes/ai-forecast.js";
+import { createAnomalyRouter } from "src/ai/anomaly-route.js";
+import { createFeedbackInsightsRouter } from "src/ai/feedback-insights-route.js";
 import type { AppOptions } from "src/app.js";
 
 /**
@@ -158,5 +161,12 @@ export function buildRouteRegistry(opts: AppOptions): readonly RouteDescriptor[]
     // Webhook WhatsApp ENTRANT signé par banque (NOTIF-003, CONTRACT-003) — public
     // (pas de JWT) mais signature HMAC propre à la banque obligatoire. Routeur isolé.
     mount("/api/v1", createWhatsAppInboundRouter()),
+    // Prévision d'affluence IA (IA-002, CONTRACT-008) : GET /ai/forecast. Runtime
+    // GATED sur données réelles — provider par défaut → 422 INSUFFICIENT_HISTORY.
+    mount("/api/v1", createAiForecastRouter()),
+    // Anomalies IA agrégées (IA-003, CONTRACT-008) : GET /ai/anomalies (lecture seule).
+    mount("/api/v1", createAnomalyRouter()),
+    // Insights NLP feedbacks + scoring qualité (IA-004, CONTRACT-008) : GET /ai/feedback-insights.
+    mount("/api/v1", createFeedbackInsightsRouter()),
   ];
 }
