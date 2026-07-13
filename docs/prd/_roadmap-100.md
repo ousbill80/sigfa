@@ -9,18 +9,15 @@
 ## Racine Boucle 2
 - ✅ **CONTRACT-013** additifs F6-F11 (non-breaking) — poussé `52cf00e`.
 
-## F6 — Notifications & Jobs
-- ✅ **NOTIF-001** infra BullMQ — intégré `cbcba4e`.
-- 🔄 **NOTIF-002** SMS (mock adapter, opt-in, position, webhook).
-- 🔄 **NOTIF-004** email (mock Resend, React Email, alertes/rapports).
-- ⏳ **NOTIF-003** WhatsApp (après 002) — 🔒 limite templates HSM Meta au branchement réel.
-- ⏳ **NOTIF-005-A** QR API (token signé HMAC).
+## F6 — Notifications & Jobs ✅ (API complet, poussé)
+- ✅ **NOTIF-001** infra BullMQ · ✅ **NOTIF-002** SMS · ✅ **NOTIF-003** WhatsApp · ✅ **NOTIF-004** email · ✅ **NOTIF-005-A** QR API.
 - ⏳ **NOTIF-005-B** PWA ticket web → **story WEB** (rattachée F4/F5).
+- ⚠️ **Dépendance DB** : migration réelle requise pour `whatsapp_config`/`whatsapp_menu_mapping`, source `INBOUND_WHATSAPP`, types `POSITION_NEAR/NEXT`, colonnes consentement par canal (tests via DDL harnais ; PO travaille peut-être dessus dans `packages/database`).
 
-## F7 — Reporting
-- 🔄 **REP-001** sla-engine (KPI D2) — intégration en cours (fix unité sec→min + réconcilie app.ts).
-- ⏳ **REP-002** rapports planifiés · **REP-002b** gabarits PDF (@react-pdf A4).
-- ⏳ **REP-003** exports+benchmark · **REP-003b** surface web.
+## F7 — Reporting ✅ (API complet, poussé)
+- ✅ **REP-001** sla-engine (KPI D2, unité minutes) · ✅ **REP-002** rapports planifiés (cron Abidjan) · ✅ **REP-003** exports async + benchmarking.
+- ⏳ **REP-002b** gabarits PDF (@react-pdf A4) · **REP-003b** surface web export — **stories WEB**.
+- ⚠️ Contrat : `/reports/export` exposé POST+GET (LOI ne déclare que GET) → ajout CONTRACT ultérieur.
 
 ## F8 — Admin & Theming
 - ⏳ **ADM-001a** theme+contraste (api) · 🔒 **ADM-001b** console theming (DESIGN-gate).
