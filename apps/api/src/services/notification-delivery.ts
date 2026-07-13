@@ -10,11 +10,22 @@
  * La mise à jour est faite sous garde tenant D5 : le `bank_id` du log corrélé est
  * la source de vérité (le webhook est public, sans JWT ⇒ pas de tenant de session).
  *
+ * ## Armement RLS (SEC-002-CUTOVER-LOT8)
+ * Le webhook est PUBLIC : le tenant n'est JAMAIS porté par une auth. La résolution
+ * du `bank_id` se fait par CORRÉLATION `provider_message_id` — étape INTRINSÈQUEMENT
+ * PRÉ-TENANT (on ignore encore la banque tant que le log corrélé n'est pas lu), donc
+ * hors armement (`resolveDeliveryLog`). UNE FOIS le `bank_id` dérivé, la mutation du
+ * journal (`applyDeliveryAckArmed`) est REJOUÉE sous `withArmedTenant`
+ * (`app.current_bank_id` posé, connexion `sigfa_app` NOBYPASSRLS, RLS
+ * `tenant_isolation` de `notification_log` contraignante) : un accusé corrélé à A ne
+ * peut mettre à jour QUE le journal de A. Le filtre `bank_id` applicatif subsiste en
+ * défense-en-profondeur ; l'armement le double par la RLS.
+ *
  * @module
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { withTenant, type QueryFn } from "@sigfa/database";
+import type { QueryFn } from "@sigfa/database";
 import type { NotificationFailureReason } from "src/services/notification-jobs.js";
 
 /** Fournisseurs de webhook de livraison (LA LOI). */
@@ -71,6 +82,27 @@ export type ApplyDeliveryResult =
   | { updated: true; status: "DELIVERED" | "FAILED" }
   | { updated: false; reason: "NOT_FOUND" };
 
+/** Journal corrélé résolu (PRÉ-TENANT) — porte le `bank_id` à armer en aval. */
+export interface ResolvedDeliveryLog {
+  /** UUID interne du journal `notification_log`. */
+  logId: string;
+  /** Tenant propriétaire (source de vérité D5) à armer pour la mutation. */
+  bankId: string;
+  /** Statut courant du journal (pour la garde de transition). */
+  status: string;
+}
+
+/**
+ * Exécute une mutation sous armement RLS (`app.current_bank_id = bankId`). Le
+ * webhook étant public, cette fabrique est fournie par la route (elle referme
+ * `withArmedTenant` sur la connexion `sigfa_app`), ce qui sépare la résolution
+ * pré-tenant de la mutation tenant-scopée sans coupler ce service à `pg`.
+ */
+export type ArmedRunner = <T>(
+  bankId: string,
+  fn: (query: QueryFn) => Promise<T>
+) => Promise<T>;
+
 /** Escape minimal d'une valeur SQL littérale. */
 function sqlLit(value: string): string {
   return value.replace(/'/g, "''");
@@ -95,36 +127,60 @@ export function normalizeFailureReason(
 }
 
 /**
- * Applique un accusé de livraison au journal par corrélation `provider_message_id`,
- * sous garde tenant D5 (le `bank_id` du log corrélé est la source de vérité).
+ * Résout le journal corrélé par `provider_message_id` — étape PRÉ-TENANT.
  *
- * @param ack     - Accusé normalisé
- * @param queryFn - Requête SQL applicative
- * @returns `{ updated: true, status }` ou `{ updated: false, reason: 'NOT_FOUND' }`
+ * Le webhook est public : tant que le log corrélé n'est pas lu, on ignore la banque
+ * à armer. Cette lecture par corrélation SERT justement à dériver le `bank_id`
+ * (source de vérité D5) — elle précède donc légitimement l'armement RLS. Renvoie
+ * `null` si aucun journal ne correspond (le caller émet alors 404 NOTIFICATION_NOT_FOUND).
+ *
+ * @param messageId - Id fournisseur corrélé (`provider_message_id`)
+ * @param queryFn   - Requête SQL applicative (résolution pré-tenant)
+ * @returns Journal résolu (logId + bankId + statut), ou `null`
  */
-export async function applyDeliveryAck(
-  ack: DeliveryAck,
+export async function resolveDeliveryLog(
+  messageId: string,
   queryFn: QueryFn
-): Promise<ApplyDeliveryResult> {
-  // Corrélation par provider_message_id. La lecture hors tenant sert UNIQUEMENT à
-  // résoudre le bank_id du log (le webhook est public) ; la mutation est ensuite
-  // faite SOUS withTenant(bank_id) + filtre bank_id explicite (D5).
+): Promise<ResolvedDeliveryLog | null> {
   const found = await queryFn(
     `SELECT id, bank_id, status FROM notification_log
-      WHERE provider_message_id = '${sqlLit(ack.messageId)}'
+      WHERE provider_message_id = '${sqlLit(messageId)}'
       LIMIT 1`
   );
   const row = found.rows[0] as
     | { id: string; bank_id: string; status: string }
     | undefined;
-  if (!row) {
+  if (!row) return null;
+  return { logId: row.id, bankId: row.bank_id, status: row.status };
+}
+
+/**
+ * Applique un accusé de livraison au journal par corrélation `provider_message_id`.
+ *
+ * SEC-002-CUTOVER-LOT8 : résout d'abord le `bank_id` (PRÉ-TENANT, `resolveDeliveryLog`),
+ * puis exécute la mutation SOUS ARMEMENT via `armedRun` (fabrique
+ * `withArmedTenant(bankId, …)` fournie par la route) : `app.current_bank_id` est posé,
+ * la RLS `tenant_isolation` de `notification_log` devient contraignante et le filtre
+ * `bank_id` applicatif subsiste en défense-en-profondeur. Un accusé corrélé à A ne
+ * peut donc mettre à jour QUE le journal de A.
+ *
+ * @param ack      - Accusé normalisé
+ * @param queryFn  - Requête SQL applicative (résolution pré-tenant)
+ * @param armedRun - Exécuteur armé (`withArmedTenant`) fourni par la route
+ * @returns `{ updated: true, status }` ou `{ updated: false, reason: 'NOT_FOUND' }`
+ */
+export async function applyDeliveryAck(
+  ack: DeliveryAck,
+  queryFn: QueryFn,
+  armedRun: ArmedRunner
+): Promise<ApplyDeliveryResult> {
+  const resolved = await resolveDeliveryLog(ack.messageId, queryFn);
+  if (!resolved) {
     return { updated: false, reason: "NOT_FOUND" };
   }
+  const { bankId, logId } = resolved;
 
-  const bankId = row.bank_id;
-  const logId = row.id;
-
-  return withTenant(queryFn, bankId, async (query) => {
+  return armedRun(bankId, async (query) => {
     if (ack.status === "DELIVERED") {
       const when = ack.deliveredAt ?? new Date().toISOString();
       await query(
