@@ -19,10 +19,10 @@
 - ⏳ **REP-002b** gabarits PDF (@react-pdf A4) · **REP-003b** surface web export — **stories WEB**.
 - ⚠️ Contrat : `/reports/export` exposé POST+GET (LOI ne déclare que GET) → ajout CONTRACT ultérieur.
 
-## F8 — Admin & Theming
-- ⏳ **ADM-001a** theme+contraste (api) · 🔒 **ADM-001b** console theming (DESIGN-gate).
-- ⏳ **ADM-002a** clone+onboarding (api) · 🔒 **ADM-002b** Stepper (DESIGN-gate).
-- ⏳ **ADM-003a** heartbeat+supervision (api) · 🔒 **ADM-003b** écran supervision (DESIGN-gate).
+## F8 — Admin & Theming (API complet)
+- ✅ **ADM-001a** theme+contraste WCAG serveur (theme.ts ARMED) · 🔄 **ADM-001b** console theming (web, en cours).
+- ✅ **ADM-002a** clone structurel + enrôlement borne · ⏳ **ADM-002b** Stepper onboarding (web).
+- ✅ **ADM-003a** heartbeat+supervision (alerte muette staff room) · ⏳ **ADM-003b** écran supervision (web).
 
 ## F9 — Sécurité & Charge (quasi complet)
 - ✅ **SEC-001** audit trail exhaustif (mutation-registry + wrapper transactionnel) + écran Auditor.
@@ -35,8 +35,8 @@
 - ✅ **IA-001** features · ✅ **IA-002** prévision+staffing · ✅ **IA-003** anomalies · ✅ **IA-004** NLP FR/EN · ✅ **IA-005** surfaces insights/COMEX.
 - 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j) ; ⏳ couture : câbler feature-store→table `ai_features` (DB-AI-FEATURES ✅ poussée).
 
-## F11 — Supervision réseau (ops fait)
-- ⏳ **NET-001-API** super admin lecture seule (après SEC-002) · 🔒 **NET-001-WEB** console (DESIGN-gate).
+## F11 — Supervision réseau (quasi complet)
+- ✅ **NET-001-API** super admin network-overview zéro-PII + PLATFORM_READ_ONLY · 🔄 **NET-001-WEB** console (web, en cours).
 - ✅ **NET-002** MAJ bornes canary/halt/rollback (mécanique) · 🔒 signature artefact réelle.
 - ✅ **NET-003** monitoring règles+scrubbing PII (mock/simulé) · 🔒 infra réelle Grafana/Sentry.
 
