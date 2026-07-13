@@ -36,14 +36,14 @@ Passe design-reviewer (audit code vs DS v2, 8 surfaces scorées) → 3 vagues de
 
 ## F9 — Sécurité & Charge (quasi complet)
 - ✅ **SEC-001** audit trail exhaustif (mutation-registry + wrapper transactionnel) + écran Auditor.
-- 🔄 **SEC-002** tenant-isolation exhaustif + RLS `withTenant` armée (ferme dette SEC-F3-02 + Schemathesis response-conformance) — EN COURS.
+- ✅ **SEC-002** tenant-isolation exhaustif + RLS armée (`withArmedTenant`) — **DETTE SEC-F3-02 FERMÉE** (2026-07-13, `230a49d`) : 25 routes basculées en 10 lots séquencés (isolation prouvée Testcontainers PG16 `sigfa_app` NOBYPASSRLS), `ARMED_CUTOVER_PENDING` VIDE. Chemins plateforme/cross-tenant (agrégat réseau `reports?scope=network`, CRUD `banks.ts`, bootstrap `onboarding`) routés `withPlatform`. Coutures DB : GRANT UPDATE colonne-scopé seuils tenant (`0014`+`0015`).
 - ✅ **SEC-003** PRA backup/restore chiffré (mock S3, game day CI) — 🔒 RTO/RPO réel gated infra.
 - 🔒 **SEC-004** k6 charge — env de charge réel (PgBouncer×prepared-statements à tester tôt).
 - ✅ **SEC-005** Stryker mutation **100 %** sur queue-engine + sla-engine.
 
 ## F10 — IA & Prédiction ✅ (code+synthétique complet, poussé ; critères pilote 🔒)
 - ✅ **IA-001** features · ✅ **IA-002** prévision+staffing · ✅ **IA-003** anomalies · ✅ **IA-004** NLP FR/EN · ✅ **IA-005** surfaces insights/COMEX.
-- 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j) ; ⏳ couture : câbler feature-store→table `ai_features` (DB-AI-FEATURES ✅ poussée).
+- 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j) ; ✅ couture **feature-store→`ai_features`** câblée (`DbFeatureStore` armé, gated `FEATURE_STORE_PROVIDER`, défaut sûr `none`) — `230a49d`.
 
 ## F11 — Supervision réseau (quasi complet)
 - ✅ **NET-001-API** super admin network-overview zéro-PII + PLATFORM_READ_ONLY · 🔄 **NET-001-WEB** console (web, en cours).
