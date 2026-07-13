@@ -9,6 +9,24 @@
  * - POST   /kiosks/:kioskId/heartbeat — heartbeat borne (AUTHENTICATED) : met à
  *   jour printerStatus/appVersion/lastSeen. Preuve d'usage du JWT + de révocation.
  *
+ * ## Armement RLS (SEC-002-CUTOVER-LOT7)
+ * Le tenant (bankId) provient d'un TOKEN/SESSION, jamais d'une auth staff pour les
+ * chemins publics. Chaque accès DB tenant est routé — APRÈS résolution du tenant —
+ * à travers `withArmedTenant` (`app.current_bank_id` armé, connexion `sigfa_app`
+ * NOBYPASSRLS, RLS `kiosks`/`audit_log` contraignantes) :
+ *
+ * - `POST /kiosk/session` : l'authentification par credentials (`createKioskSession`,
+ *   lookup borne + bcrypt + persistance de session) est INTRINSÈQUEMENT PRÉ-TENANT
+ *   (on ignore la banque avant d'authentifier la borne) — elle reste hors armement.
+ *   L'audit d'ouverture, POST-résolution du bankId, est écrit à travers la connexion
+ *   ARMÉE (RLS `audit_log` contraignante).
+ * - `DELETE /kiosk/session/:kioskId` : tenant porté par le JWT staff → révocation
+ *   `kiosks` + audit ARMÉS (`app.current_bank_id` posé).
+ * - `POST /kiosks/:kioskId/heartbeat` : tenant porté par le JWT borne → UPDATE
+ *   `kiosks` ARMÉ.
+ *
+ * Cette route est classée `ARMED` dans le test d'architecture.
+ *
  * @module
  */
 
@@ -25,7 +43,8 @@ import {
   revokeKioskSession,
 } from "src/services/kiosk-session.service.js";
 import { recordAudit, extractIp } from "src/lib/audit-context.js";
-import { withAudit, auditContextFrom } from "src/audit/with-audit.js";
+import { withAudit } from "src/audit/with-audit.js";
+import { asArmable, withArmedTenant } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur session borne. */
 interface KioskEnv {
@@ -82,19 +101,22 @@ function registerCreateSession(router: Hono<KioskEnv>): void {
     const ip = extractIp(c);
     try {
       const input = parseStrict(kioskSessionSchema, await parseJson(c));
-      // SEC-001a : ouverture de session borne + audit atomiques. Acteur = la
-      // borne elle-même (public, actorId/role null) ; jamais le secret dans le diff.
-      await db.query("BEGIN");
-      let session;
-      try {
-        session = await createKioskSession({
+      // SEC-002 — résolution PRÉ-TENANT du tenant de la borne : on ignore la banque
+      // avant d'avoir authentifié la borne. Ce lookup par `id` est le SEUL accès
+      // légitimement hors armement (résolution d'identité de session, cf. en-tête).
+      const bankId = await resolvePreTenantBankId(db, input.kioskId);
+      // SEC-001a + SEC-002 : ouverture de session borne + audit ATOMIQUES à travers
+      // la connexion ARMÉE (`app.current_bank_id = bankId`, RLS kiosks/audit_log
+      // contraignantes). Acteur = la borne (public, actorId/role null) ; jamais le
+      // secret dans le diff. Un échec (auth invalide) relâche la transaction armée.
+      const session = await withArmedTenant(asArmable(db), bankId, async () => {
+        const created = await createKioskSession({
           db,
           jwtSecret: c.get("jwtSecret"),
           kioskId: input.kioskId,
           kioskSecret: input.kioskSecret,
           agencyId: input.agencyId,
         });
-        const bankId = await bankIdOfKiosk(db, input.kioskId);
         await recordAudit({
           db,
           tenant: { requestId: "", userId: "", bankId, role: "NONE", agencyIds: [] },
@@ -104,11 +126,8 @@ function registerCreateSession(router: Hono<KioskEnv>): void {
           ip,
           diff: { after: { agencyId: input.agencyId, sessionOpened: true } },
         });
-        await db.query("COMMIT");
-      } catch (txErr) {
-        await db.query("ROLLBACK");
-        throw txErr;
-      }
+        return created;
+      });
       return c.json(session, 201);
     } catch (err) {
       return errorResponse(c, err);
@@ -124,19 +143,26 @@ function registerRevokeSession(router: Hono<KioskEnv>): void {
     try {
       const kioskId = c.req.param("kioskId");
       const bankId = requireBankId(tenant);
-      // SEC-001a : révocation de session borne + audit atomiques (transaction
-      // unique). Traçabilité de la coupure d'accès borne (API-011).
-      await withAudit(auditContextFrom(c), async () => {
-        await revokeKioskSession(db, bankId, kioskId);
-        return {
-          result: undefined,
-          audit: {
-            action: "DELETE /kiosk/session/:kioskId",
-            entityType: "kiosk",
-            entityId: kioskId,
-            diff: { after: { sessionRevoked: true } },
-          },
-        };
+      // SEC-001a + SEC-002 : révocation de session borne + audit ATOMIQUES à travers
+      // la connexion ARMÉE (`app.current_bank_id = bankId` posé AVANT toute requête,
+      // RLS kiosks/audit_log contraignantes). `withAudit` compose par SAVEPOINT dans
+      // la transaction armée (`inTransaction:true`) ; l'englobant commit une fois.
+      await withArmedTenant(asArmable(db), bankId, async () => {
+        await withAudit(
+          { db, tenant, ip: extractIp(c), inTransaction: true },
+          async () => {
+            await revokeKioskSession(db, bankId, kioskId);
+            return {
+              result: undefined,
+              audit: {
+                action: "DELETE /kiosk/session/:kioskId",
+                entityType: "kiosk",
+                entityId: kioskId,
+                diff: { after: { sessionRevoked: true } },
+              },
+            };
+          }
+        );
       });
       return c.json({ success: true }, 200);
     } catch (err) {
@@ -146,16 +172,27 @@ function registerRevokeSession(router: Hono<KioskEnv>): void {
 }
 
 /**
- * Résout le `bank_id` d'une borne (tenant du scope d'audit). La borne a déjà été
- * authentifiée par `createKioskSession`, donc la ligne existe à ce point.
+ * Résout le `bank_id` d'une borne par son `id` — PRÉ-TENANT (résolution d'identité
+ * de session, cf. en-tête). Une borne inconnue / un id non-UUID → **401 opaque**
+ * `KIOSK_AUTH_FAILED` (jamais un oracle d'existence, aligné sur le rejet d'auth du
+ * service). Ce lookup précède l'armement car le tenant est ENCORE inconnu ici.
  *
- * @param db      - Connexion PG (transaction ouverte)
+ * @param db      - Connexion PG
  * @param kioskId - Identifiant de la borne (colonne `id`)
  * @returns Le `bank_id` de la borne
+ * @throws {SigfaError} 401 KIOSK_AUTH_FAILED si la borne est introuvable (opaque)
  */
-async function bankIdOfKiosk(db: Client, kioskId: string): Promise<string> {
+async function resolvePreTenantBankId(db: Client, kioskId: string): Promise<string> {
+  // Un id non-UUID ne désigne aucune borne → 401 opaque (jamais de 500 sur cast).
+  if (!UUID_RE.test(kioskId)) {
+    throw new SigfaError("KIOSK_AUTH_FAILED", "Authentification borne échouée.", 401);
+  }
   const res = await db.query(`SELECT bank_id FROM kiosks WHERE id = $1`, [kioskId]);
-  return (res.rows[0] as { bank_id: string }).bank_id;
+  const row = res.rows[0] as { bank_id: string } | undefined;
+  if (!row) {
+    throw new SigfaError("KIOSK_AUTH_FAILED", "Authentification borne échouée.", 401);
+  }
+  return row.bank_id;
 }
 
 /** Ligne kiosk projetée par l'UPDATE du heartbeat (état avant/après). */
@@ -174,8 +211,13 @@ function registerHeartbeat(router: Hono<KioskEnv>): void {
     try {
       const kioskId = c.req.param("kioskId");
       assertOwnKiosk(tenant, kioskId);
+      const bankId = requireBankId(tenant);
       const input = parseStrict(heartbeatSchema, await parseJson(c));
-      const row = await applyHeartbeat(db, kioskId, input.printerStatus, input.appVersion);
+      // SEC-002 : UPDATE `kiosks` à travers la connexion ARMÉE (RLS `app.current_bank_id`
+      // contraignante) — une borne ne rafraîchit QUE sa propre ligne, dans SA banque.
+      const row = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        applyHeartbeat(conn as unknown as Client, kioskId, input.printerStatus, input.appVersion)
+      );
       maybeEmitPrinterError(c.get("bus"), row);
       return c.json({ serverTime: new Date().toISOString() }, 200);
     } catch (err) {
