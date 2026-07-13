@@ -41,7 +41,13 @@ import {
   type ReportPayload,
 } from "src/reporting/report-schedule.js";
 import { resolveInternalRecipients } from "src/services/email/recipients.js";
-import type { EmailNotificationType } from "src/services/email/email-types.js";
+import type {
+  EmailNotificationType,
+  EmailLang,
+} from "src/services/email/email-types.js";
+import type { CandidateAttachment } from "src/services/email/attachment-storage.js";
+import { buildReportPdfAttachment } from "src/reporting/pdf/report-pdf-attachment.js";
+import type { TenantBrandConfig } from "src/reporting/pdf/theme.js";
 
 /**
  * Un envoi de rapport prêt à enfiler : la ligne `notification_log` (QUEUED) est
@@ -60,11 +66,24 @@ export interface ReportEmailEnqueue {
   agencyId: string | null;
 }
 
-/** Fonction d'enfilement d'un envoi email de rapport (branchée sur NOTIF-004/NOTIF-001). */
+/**
+ * Fonction d'enfilement d'un envoi email de rapport (branchée sur NOTIF-004/NOTIF-001).
+ * Reçoit, en plus du payload, la pièce jointe PDF DÉJÀ RENDUE (REP-002b) quand le
+ * gabarit PDF est branché — `undefined` sinon (rétro-compatibilité : aucun PDF).
+ */
 export type EnqueueReportEmailFn = (
   enqueue: ReportEmailEnqueue,
-  payload: ReportPayload
+  payload: ReportPayload,
+  pdfAttachment?: CandidateAttachment
 ) => Promise<void>;
+
+/**
+ * Résout la config de theming tenant (couleur/logo/nom banque) pour le rendu PDF
+ * d'un rapport. Optionnelle : à défaut, le gabarit applique les défauts SIGFA.
+ */
+export type ResolveReportBrandFn = (
+  bankId: string
+) => Promise<TenantBrandConfig> | TenantBrandConfig;
 
 /** Résout les agences d'un tenant (portée `agency` = une agence par envoi). */
 export type ListAgenciesFn = (
@@ -87,6 +106,16 @@ export interface BuildReportDeps {
   listAgencies: ListAgenciesFn;
   /** Enfile l'envoi email d'un rapport (NOTIF-004/NOTIF-001). */
   enqueueReportEmail: EnqueueReportEmailFn;
+  /**
+   * Branche le gabarit PDF riche REP-002b : quand présent (`true`), chaque payload
+   * est rendu en PDF (A4, gabarit du type, theming tenant, FR/EN) et la pièce jointe
+   * est passée à `enqueueReportEmail`. Absent ⇒ aucun PDF (rétro-compatibilité).
+   */
+  attachReportPdf?: boolean;
+  /** Langue de rendu du PDF (FR/EN) — défaut FR. */
+  pdfLang?: EmailLang;
+  /** Résout le theming tenant du PDF (couleur/logo) — défauts SIGFA sinon. */
+  resolveReportBrand?: ResolveReportBrandFn;
   /** Journalise un événement d'orchestration (skip, alerte). */
   log?: (event: ReportJobLog) => void;
 }
@@ -245,6 +274,9 @@ async function enqueueForRecipients(
     return 0;
   }
   const emailType = REPORT_EMAIL_TYPE[reportType];
+  // Rendu du PDF riche REP-002b UNE SEULE FOIS par payload (pas par destinataire) :
+  // même document pour tous les destinataires d'une même agence/réseau/période.
+  const pdfAttachment = await renderPdfAttachment(deps, payload);
   let enqueued = 0;
   for (const recipient of recipients) {
     const dedupeKey = reportIdempotencyKey({
@@ -261,11 +293,36 @@ async function enqueueForRecipients(
         dedupeKey,
         agencyId: payload.agencyId,
       },
-      payload
+      payload,
+      pdfAttachment
     );
     enqueued += 1;
   }
   return enqueued;
+}
+
+/**
+ * Rend la pièce jointe PDF d'un payload (REP-002b) SI le gabarit PDF est branché
+ * (`attachReportPdf`). Résout d'abord le theming tenant (couleur/logo) si un
+ * résolveur est fourni. Retourne `undefined` quand le PDF n'est pas branché
+ * (rétro-compatibilité) — l'email part alors sans pièce jointe riche.
+ *
+ * @param deps    - Dépendances (flag PDF, langue, theming)
+ * @param payload - Payload de rapport à rendre
+ * @returns Pièce jointe candidate, ou `undefined` si le PDF n'est pas branché
+ */
+async function renderPdfAttachment(
+  deps: BuildReportDeps,
+  payload: ReportPayload
+): Promise<CandidateAttachment | undefined> {
+  if (!deps.attachReportPdf) return undefined;
+  const brand = deps.resolveReportBrand
+    ? await deps.resolveReportBrand(payload.bankId)
+    : {};
+  return buildReportPdfAttachment(payload, {
+    lang: deps.pdfLang ?? "FR",
+    brand,
+  });
 }
 
 /**

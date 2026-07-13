@@ -63,17 +63,27 @@ function stubRecipientsQuery(emails: string[]): DbQueryFn {
   }) as DbQueryFn;
 }
 
+/** Une entrée d'enfilement capturée (avec la pièce jointe PDF éventuelle). */
+interface CapturedEnqueue {
+  /** Métadonnées d'enfilement. */
+  enqueue: ReportEmailEnqueue;
+  /** Payload de rapport. */
+  payload: ReportPayload;
+  /** Pièce jointe PDF passée par le job (REP-002b) — `undefined` si non branchée. */
+  pdf?: { filename: string; contentType: string; sizeBytes: number; contentBase64: string };
+}
+
 /** Collecteur d'enfilements (au lieu d'un vrai enqueue BullMQ). */
 function makeEnqueueCollector(): {
   deps: Pick<BuildReportDeps, "enqueueReportEmail">;
-  enqueued: Array<{ enqueue: ReportEmailEnqueue; payload: ReportPayload }>;
+  enqueued: CapturedEnqueue[];
 } {
-  const enqueued: Array<{ enqueue: ReportEmailEnqueue; payload: ReportPayload }> = [];
+  const enqueued: CapturedEnqueue[] = [];
   return {
     enqueued,
     deps: {
-      enqueueReportEmail: async (enqueue, payload) => {
-        enqueued.push({ enqueue, payload });
+      enqueueReportEmail: async (enqueue, payload, pdfAttachment) => {
+        enqueued.push({ enqueue, payload, pdf: pdfAttachment });
       },
     },
   };
@@ -257,5 +267,95 @@ describe("REP-002 assemblage réseau (hebdo/mensuel, anonymisé 0 PII)", () => {
     expect(col.enqueued[0]!.enqueue.dedupeKey).toBe(
       "report:bank-1:MONTHLY:2026-07:comex@banque.example"
     );
+  });
+});
+
+describe("REP-002b: branchement du gabarit PDF riche dans l'assemblage", () => {
+  it("REP-002b: sans attachReportPdf, aucune pièce jointe PDF passée (rétro-compatibilité)", async () => {
+    const col = makeEnqueueCollector();
+    const deps: BuildReportDeps = {
+      reportQuery: stubReportQuery([statsRow()]),
+      recipientsQuery: stubRecipientsQuery(["dir@banque.example"]),
+      listAgencies: async () => ["agency-1"],
+      ...col.deps,
+    };
+    await buildAndEnqueueReport(
+      "DAILY",
+      "bank-1",
+      new Date("2026-07-13T18:00:00Z"),
+      deps
+    );
+    expect(col.enqueued[0]!.pdf).toBeUndefined();
+  });
+
+  it("REP-002b: attachReportPdf → pièce jointe PDF A4 attachée (filename déterministe)", async () => {
+    const col = makeEnqueueCollector();
+    const deps: BuildReportDeps = {
+      reportQuery: stubReportQuery([statsRow()]),
+      recipientsQuery: stubRecipientsQuery(["dir@banque.example"]),
+      listAgencies: async () => ["agency-1"],
+      attachReportPdf: true,
+      ...col.deps,
+    };
+    await buildAndEnqueueReport(
+      "DAILY",
+      "bank-1",
+      new Date("2026-07-13T18:00:00Z"),
+      deps
+    );
+    const pdf = col.enqueued[0]!.pdf;
+    expect(pdf).toBeDefined();
+    expect(pdf!.filename).toBe("report-daily-2026-07-13.pdf");
+    expect(pdf!.contentType).toBe("application/pdf");
+    expect(pdf!.sizeBytes).toBeGreaterThan(0);
+    // Le contenu base64 décode bien vers un PDF valide.
+    expect(Buffer.from(pdf!.contentBase64, "base64").subarray(0, 5).toString()).toBe(
+      "%PDF-"
+    );
+  });
+
+  it("REP-002b: même PDF pour tous les destinataires d'un même payload (rendu 1 fois)", async () => {
+    const col = makeEnqueueCollector();
+    const deps: BuildReportDeps = {
+      reportQuery: stubReportQuery([statsRow()]),
+      recipientsQuery: stubRecipientsQuery(["a@banque.example", "b@banque.example"]),
+      listAgencies: async () => ["agency-1"],
+      attachReportPdf: true,
+      ...col.deps,
+    };
+    await buildAndEnqueueReport(
+      "DAILY",
+      "bank-1",
+      new Date("2026-07-13T18:00:00Z"),
+      deps
+    );
+    expect(col.enqueued).toHaveLength(2);
+    expect(col.enqueued[0]!.pdf!.contentBase64).toBe(
+      col.enqueued[1]!.pdf!.contentBase64
+    );
+  });
+
+  it("REP-002b: resolveReportBrand appliqué au theming du PDF (couleur/logo tenant)", async () => {
+    const col = makeEnqueueCollector();
+    const brandCalls: string[] = [];
+    const deps: BuildReportDeps = {
+      reportQuery: stubReportQuery([statsRow()]),
+      recipientsQuery: stubRecipientsQuery(["dir@banque.example"]),
+      listAgencies: async () => ["agency-1"],
+      attachReportPdf: true,
+      resolveReportBrand: (bankId) => {
+        brandCalls.push(bankId);
+        return { brandColor: "#0F766E", bankName: "Banque Atlantique" };
+      },
+      ...col.deps,
+    };
+    await buildAndEnqueueReport(
+      "DAILY",
+      "bank-1",
+      new Date("2026-07-13T18:00:00Z"),
+      deps
+    );
+    expect(brandCalls).toEqual(["bank-1"]);
+    expect(col.enqueued[0]!.pdf).toBeDefined();
   });
 });
