@@ -1272,6 +1272,9 @@ paths:
                 status: CALLED
                 counterId: cccccccc-cccc-4ccc-accc-cccccccccccc
                 serviceId: 77777777-7777-4777-a777-777777777777
+                operationId: 88888888-8888-4888-a888-888888888888
+                operationName: Retrait espèces
+                serviceName: Opérations courantes
                 position: 0
                 estimatedWaitMinutes: 0
                 calledAt: '2026-07-11T09:30:00Z'
@@ -2893,6 +2896,18 @@ components:
           description: |
             Opération résolue du ticket (additif, nullable). `null` si le ticket a été
             émis par service sans opération.
+        operationName:
+          type:
+            - string
+            - 'null'
+          description: |
+            Libellé de l'opération choisie à la borne (additif, nullable — WEB-002-OP).
+            `null` si le ticket a été émis par service sans opération.
+          example: Retrait espèces
+        serviceName:
+          type: string
+          description: Libellé du service du ticket (additif — WEB-002-OP).
+          example: Opérations courantes
         targetManagerId:
           type:
             - string
@@ -3040,6 +3055,26 @@ components:
         serviceId:
           type: string
           format: uuid
+        operationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: |
+            Opération résolue du ticket (additif, nullable — WEB-002-OP). `null` si le
+            ticket a été émis par service sans opération.
+        operationName:
+          type:
+            - string
+            - 'null'
+          description: |
+            Libellé de l'opération choisie à la borne (additif, nullable — WEB-002-OP),
+            affiché à l'agent au moment de l'appel. `null` si émis sans opération.
+          example: Retrait espèces
+        serviceName:
+          type: string
+          description: Libellé du service du ticket (additif — WEB-002-OP).
+          example: Opérations courantes
         position:
           type: integer
           minimum: 0

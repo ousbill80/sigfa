@@ -1657,6 +1657,9 @@ export interface paths {
                          *       "status": "CALLED",
                          *       "counterId": "cccccccc-cccc-4ccc-accc-cccccccccccc",
                          *       "serviceId": "77777777-7777-4777-a777-777777777777",
+                         *       "operationId": "88888888-8888-4888-a888-888888888888",
+                         *       "operationName": "Retrait espèces",
+                         *       "serviceName": "Opérations courantes",
                          *       "position": 0,
                          *       "estimatedWaitMinutes": 0,
                          *       "calledAt": "2026-07-11T09:30:00Z"
@@ -3169,6 +3172,17 @@ export interface components {
              */
             operationId?: string | null;
             /**
+             * @description Libellé de l'opération choisie à la borne (additif, nullable — WEB-002-OP).
+             *     `null` si le ticket a été émis par service sans opération.
+             * @example Retrait espèces
+             */
+            operationName?: string | null;
+            /**
+             * @description Libellé du service du ticket (additif — WEB-002-OP).
+             * @example Opérations courantes
+             */
+            serviceName?: string;
+            /**
              * Format: uuid
              * @description Conseiller ciblé par le ticket (additif, nullable — MODEL-CONTRACT-B/D6).
              *     `null` si le ticket n'est adressé à aucun conseiller (file de service).
@@ -3254,6 +3268,23 @@ export interface components {
             counterId: string;
             /** Format: uuid */
             serviceId: string;
+            /**
+             * Format: uuid
+             * @description Opération résolue du ticket (additif, nullable — WEB-002-OP). `null` si le
+             *     ticket a été émis par service sans opération.
+             */
+            operationId?: string | null;
+            /**
+             * @description Libellé de l'opération choisie à la borne (additif, nullable — WEB-002-OP),
+             *     affiché à l'agent au moment de l'appel. `null` si émis sans opération.
+             * @example Retrait espèces
+             */
+            operationName?: string | null;
+            /**
+             * @description Libellé du service du ticket (additif — WEB-002-OP).
+             * @example Opérations courantes
+             */
+            serviceName?: string;
             position: number;
             estimatedWaitMinutes: number;
             /** Format: date-time */
