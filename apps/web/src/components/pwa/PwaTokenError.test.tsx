@@ -20,4 +20,16 @@ describe("NOTIF-005-B: PwaTokenError (humane, no crash)", () => {
     expect(screen.getByText(pt("pwa.token.expired_title", "en"))).toBeInTheDocument();
     expect(screen.getByText(pt("pwa.token.expired_body", "en"))).toBeInTheDocument();
   });
+
+  it("uses DISTINCT humane copy for expired vs invalid (never a raw code)", () => {
+    // Titles + bodies must differ so the two situations read differently.
+    expect(pt("pwa.token.expired_title", "fr")).not.toEqual(pt("pwa.token.invalid_title", "fr"));
+    expect(pt("pwa.token.expired_body", "fr")).not.toEqual(pt("pwa.token.invalid_body", "fr"));
+    // Human sentences, not opaque codes.
+    for (const key of ["pwa.token.expired_body", "pwa.token.invalid_body"] as const) {
+      const copy = pt(key, "fr");
+      expect(copy).not.toMatch(/^[A-Z_]+$/);
+      expect(copy.length).toBeGreaterThan(20);
+    }
+  });
 });

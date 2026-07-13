@@ -51,6 +51,15 @@ describe("NET-001: NetAdminConsole — 5 états", () => {
     expect(screen.getByTestId("net-synth-incidents")).toHaveTextContent("1");
   });
 
+  it("NET-001: les grands chiffres de synthèse utilisent la primitive KpiTile", () => {
+    render(<NetAdminConsole view={view()} load="ready" />);
+    const banks = screen.getByTestId("net-synth-banks");
+    // KpiTile = classe .sig-kpi (jamais une div stylée maison).
+    expect(banks.className).toContain("sig-kpi");
+    expect(banks.querySelector(".sig-kpi__value")).not.toBeNull();
+    expect(banks.querySelector(".sig-kpi__value")).toHaveTextContent("2");
+  });
+
   it("NET-001: état loading — skeleton", () => {
     render(<NetAdminConsole view={null} load="loading" />);
     expect(screen.getByTestId("net-admin-skeleton")).toBeInTheDocument();

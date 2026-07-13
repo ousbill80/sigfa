@@ -141,11 +141,13 @@ export function PwaShell({
             consent={flow.consent}
             canSubmit={flow.canSubmit}
             emitStatus={flow.emitStatus}
+            emitError={flow.emitError}
             locale={locale}
             onPhoneChange={flow.setPhone}
             onConsentChange={flow.setConsent}
             onBack={flow.back}
             onSubmit={() => void flow.submit()}
+            onRetry={() => void flow.retry()}
           />
         )}
 
