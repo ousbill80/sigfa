@@ -18,6 +18,11 @@ export type Role = (typeof ROLES)[number];
 
 /** Route permission matrix — which roles can access which route prefixes */
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
+  // Cross-tenant network supervision console (NET-001-WEB): SUPER_ADMIN ONLY.
+  // Every tenant role (BANK_ADMIN / AGENCY_DIRECTOR / MANAGER / AGENT / AUDITOR)
+  // → 403. The platform surface is never lowered to a tenant role. Must precede
+  // any broader prefix so its match wins.
+  "/platform": ["SUPER_ADMIN"],
   "/admin": ["SUPER_ADMIN", "BANK_ADMIN"],
   // AUDITOR reaches the manager dashboard in read-only mode (WEB-003).
   "/dashboard/manager": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AUDITOR"],

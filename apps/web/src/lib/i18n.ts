@@ -259,7 +259,39 @@ export type TranslationKey =
   | "ai.state.offline"
   | "ai.insufficient.title"
   | "ai.insufficient.progress"
-  | "ai.insufficient.hint";
+  | "ai.insufficient.hint"
+  // NET-001 — Super Admin network console (own namespace)
+  | "netAdmin.title"
+  | "netAdmin.subtitle"
+  | "netAdmin.guarantee"
+  | "netAdmin.read_only"
+  | "netAdmin.synthesis.title"
+  | "netAdmin.synthesis.banks"
+  | "netAdmin.synthesis.agencies"
+  | "netAdmin.synthesis.kiosks_online"
+  | "netAdmin.synthesis.kiosks_offline"
+  | "netAdmin.synthesis.muted_rate"
+  | "netAdmin.synthesis.open_incidents"
+  | "netAdmin.synthesis.tickets"
+  | "netAdmin.banks.title"
+  | "netAdmin.col.bank"
+  | "netAdmin.col.agencies"
+  | "netAdmin.col.kiosks"
+  | "netAdmin.col.tickets"
+  | "netAdmin.col.uptime"
+  | "netAdmin.col.health"
+  | "netAdmin.kiosks_split"
+  | "netAdmin.health.vert"
+  | "netAdmin.health.orange"
+  | "netAdmin.health.rouge"
+  | "netAdmin.health.na"
+  | "netAdmin.forbidden"
+  | "netAdmin.refresh"
+  | "netAdmin.loading"
+  | "netAdmin.empty"
+  | "netAdmin.error"
+  | "netAdmin.offline"
+  | "netAdmin.reconnect";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -518,6 +550,37 @@ export const FR: TranslationDict = {
   "ai.insufficient.progress": "jours d'historique collectés",
   "ai.insufficient.hint":
     "Les prédictions s'activent après 90 jours de données. Le compteur progresse chaque jour.",
+  "netAdmin.title": "SUPERVISION RÉSEAU — SUPER ADMIN",
+  "netAdmin.subtitle": "Pilotage cross-tenant du parc — lecture seule.",
+  "netAdmin.guarantee": "Agrégat réseau — aucune donnée client",
+  "netAdmin.read_only": "Console en lecture seule — aucune action sur les données d'une banque.",
+  "netAdmin.synthesis.title": "SYNTHÈSE RÉSEAU",
+  "netAdmin.synthesis.banks": "Banques",
+  "netAdmin.synthesis.agencies": "Agences",
+  "netAdmin.synthesis.kiosks_online": "Bornes en ligne",
+  "netAdmin.synthesis.kiosks_offline": "Bornes hors ligne",
+  "netAdmin.synthesis.muted_rate": "Taux de bornes muettes",
+  "netAdmin.synthesis.open_incidents": "Incidents ouverts",
+  "netAdmin.synthesis.tickets": "Tickets agrégés",
+  "netAdmin.banks.title": "VUE PAR BANQUE",
+  "netAdmin.col.bank": "Banque",
+  "netAdmin.col.agencies": "Agences",
+  "netAdmin.col.kiosks": "Bornes (en ligne / hors ligne)",
+  "netAdmin.col.tickets": "Tickets",
+  "netAdmin.col.uptime": "Disponibilité",
+  "netAdmin.col.health": "Santé",
+  "netAdmin.kiosks_split": "en ligne / hors ligne",
+  "netAdmin.health.vert": "Vert",
+  "netAdmin.health.orange": "Orange",
+  "netAdmin.health.rouge": "Rouge",
+  "netAdmin.health.na": "N/A",
+  "netAdmin.forbidden": "Console réservée au Super Admin plateforme.",
+  "netAdmin.refresh": "Rafraîchir",
+  "netAdmin.loading": "Chargement de la supervision réseau…",
+  "netAdmin.empty": "Aucune banque dans le réseau pour le moment.",
+  "netAdmin.error": "Impossible de charger la supervision réseau. Veuillez réessayer.",
+  "netAdmin.offline": "Hors ligne — agrégats figés, resynchronisation à la reconnexion.",
+  "netAdmin.reconnect": "Se reconnecter",
 };
 
 /** English translations */
@@ -773,6 +836,37 @@ export const EN: TranslationDict = {
   "ai.insufficient.progress": "days of history collected",
   "ai.insufficient.hint":
     "Predictions activate after 90 days of data. The counter progresses each day.",
+  "netAdmin.title": "NETWORK SUPERVISION — SUPER ADMIN",
+  "netAdmin.subtitle": "Cross-tenant fleet steering — read-only.",
+  "netAdmin.guarantee": "Network aggregate — no customer data",
+  "netAdmin.read_only": "Read-only console — no action on any bank's data.",
+  "netAdmin.synthesis.title": "NETWORK SYNTHESIS",
+  "netAdmin.synthesis.banks": "Banks",
+  "netAdmin.synthesis.agencies": "Agencies",
+  "netAdmin.synthesis.kiosks_online": "Kiosks online",
+  "netAdmin.synthesis.kiosks_offline": "Kiosks offline",
+  "netAdmin.synthesis.muted_rate": "Muted kiosk rate",
+  "netAdmin.synthesis.open_incidents": "Open incidents",
+  "netAdmin.synthesis.tickets": "Aggregated tickets",
+  "netAdmin.banks.title": "PER-BANK VIEW",
+  "netAdmin.col.bank": "Bank",
+  "netAdmin.col.agencies": "Agencies",
+  "netAdmin.col.kiosks": "Kiosks (online / offline)",
+  "netAdmin.col.tickets": "Tickets",
+  "netAdmin.col.uptime": "Uptime",
+  "netAdmin.col.health": "Health",
+  "netAdmin.kiosks_split": "online / offline",
+  "netAdmin.health.vert": "Green",
+  "netAdmin.health.orange": "Orange",
+  "netAdmin.health.rouge": "Red",
+  "netAdmin.health.na": "N/A",
+  "netAdmin.forbidden": "Console restricted to the platform Super Admin.",
+  "netAdmin.refresh": "Refresh",
+  "netAdmin.loading": "Loading network supervision…",
+  "netAdmin.empty": "No bank in the network yet.",
+  "netAdmin.error": "Unable to load network supervision. Please try again.",
+  "netAdmin.offline": "Offline — aggregates frozen, resync on reconnection.",
+  "netAdmin.reconnect": "Reconnect",
 };
 
 /** All locales map */
