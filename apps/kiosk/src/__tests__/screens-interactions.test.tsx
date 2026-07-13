@@ -83,7 +83,6 @@ const servicesMessages = {
     title: "Prise de ticket",
     subtitle: "Touchez l'opération de votre choix",
     backButton: "Retour",
-    waitEstimate: "~{minutes} min",
     closedService: "Fermé — {schedule}",
     accessibilityButton: "♿ Accès prioritaire",
     emptyTitle: "Aucun service disponible",

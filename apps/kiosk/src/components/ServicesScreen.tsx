@@ -402,7 +402,8 @@ export function ServicesScreen({
             aria-label={service.name}
             style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
           >
-            {/* En-tête de famille : trait or + nom + pill d'attente. */}
+            {/* En-tête de famille : trait or + nom (pas d'estimation d'attente
+                affichée — décision PO ; le SLA reste porté jusqu'au ticket). */}
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
               <span
                 aria-hidden="true"
@@ -427,23 +428,6 @@ export function ServicesScreen({
               >
                 {service.name}
               </h2>
-              {service.isOpen && (
-                <span
-                  data-testid="family-estimate"
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: "18px",
-                    fontWeight: 600,
-                    color: "var(--gold)",
-                    border: "1px solid var(--gold-soft)",
-                    borderRadius: "var(--r-full)",
-                    padding: "var(--space-1) var(--space-3)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {t("waitEstimate", { minutes: service.estimatedMinutes })}
-                </span>
-              )}
             </div>
 
             {/* Grille de tuiles — 3 colonnes à 1024×768, tuiles ≥ 96px. */}

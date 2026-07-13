@@ -33,7 +33,6 @@
     "title": "Take a ticket",
     "subtitle": "Tap the operation of your choice",
     "backButton": "Back",
-    "waitEstimate": "~{minutes} min",
     "closedService": "Closed — {schedule}",
     "accessibilityButton": "Priority access",
     "emptyTitle": "No services available",
