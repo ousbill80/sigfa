@@ -6,6 +6,14 @@
  *   - Tickets existants restent servables (call-next fonctionne)
  *   - Réouverture → OPEN, émission reprise
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT4)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Table `queues` (policy
+ * `tenant_isolation` + GRANT CRUD, 0001) : la lecture de scope, l'UPDATE de statut et
+ * l'audit composé SEC-001 (savepoint) s'exécutent dans UNE transaction armée. Le
+ * recalcul longueur/estimation (lecture) partage la même connexion armée.
+ *
  * @module
  */
 
@@ -21,8 +29,9 @@ import {
   estimateWaitMinutes,
   invalidateEstimate,
 } from "src/services/queue-estimation.js";
-import { buildDiff } from "src/lib/audit-context.js";
-import { withAudit, auditContextFrom } from "src/audit/with-audit.js";
+import { buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withAudit, type AuditRequestContext } from "src/audit/with-audit.js";
+import { withArmedTenant, asArmable, isCanonicalUuid } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono injectées par app.ts. */
 interface QueueEnv {
@@ -133,12 +142,35 @@ function registerPatchQueue(router: Hono<QueueEnv>): void {
           400
         );
       }
-      const result = await patchQueue(db, redis, tenant, queueId, parsed.data, getBus(c), auditContextFrom(c));
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : lecture de scope + UPDATE + audit (savepoint) dans UNE
+      // transaction ARMÉE (RLS `app.current_bank_id` contraignante). Le recalcul
+      // longueur/estimation partage la connexion armée avant COMMIT.
+      const result = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        patchQueue(conn as unknown as Client, redis, tenant, queueId, parsed.data, getBus(c), ip)
+      );
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
   });
+}
+
+/**
+ * Exige un `bankId` tenant en UUID canonique pour l'armement RLS.
+ * Absent (contexte plateforme) ou malformé → 403 : une route tenant ne s'arme
+ * jamais sans banque résolue.
+ *
+ * @param tenant - Contexte tenant résolu
+ * @throws {SigfaError} 403 FORBIDDEN si `bankId` absent/non-UUID
+ */
+function requireArmableBankId(tenant: TenantContext): string {
+  const bankId = tenant.bankId;
+  if (!bankId || !isCanonicalUuid(bankId)) {
+    throw new SigfaError("FORBIDDEN", "Contexte de banque requis.", 403);
+  }
+  return bankId;
 }
 
 /** Données validées de mise à jour. */
@@ -155,14 +187,18 @@ async function patchQueue(
   queueId: string,
   input: PatchQueueInput,
   bus: RealtimeBus,
-  auditCtx: ReturnType<typeof auditContextFrom>
+  ip: string | null
 ): Promise<Record<string, unknown>> {
   const queue = await loadQueue(db, tenant, queueId);
 
   const newStatus = input.status ?? queue.status;
   const isOpen = newStatus === "OPEN";
 
-  // SEC-001a : mutation + audit dans UNE transaction (rollback si audit échoue).
+  // SEC-002 : la connexion est DÉJÀ armée + en transaction (withArmedTenant).
+  // `withAudit` compose alors par SAVEPOINT (inTransaction:true) : la mutation +
+  // l'insert d'audit héritent du contexte RLS `app.current_bank_id` et committent
+  // avec la transaction englobante (atomicité audit↔métier préservée, RLS armée).
+  const auditCtx: AuditRequestContext = { db, tenant, ip, inTransaction: true };
   const view = await withAudit(auditCtx, async (tx) => {
     await tx.query(
       `UPDATE queues
