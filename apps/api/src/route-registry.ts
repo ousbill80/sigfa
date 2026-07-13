@@ -52,6 +52,7 @@ import { createWhatsAppInboundRouter } from "src/routes/webhooks-whatsapp-inboun
 import { createAiForecastRouter } from "src/routes/ai-forecast.js";
 import { createAnomalyRouter } from "src/ai/anomaly-route.js";
 import { createFeedbackInsightsRouter } from "src/ai/feedback-insights-route.js";
+import { createNetworkOverviewRouter } from "src/routes/network-overview.js";
 import type { AppOptions } from "src/app.js";
 
 /**
@@ -150,6 +151,10 @@ export function buildRouteRegistry(opts: AppOptions): readonly RouteDescriptor[]
     // lecture (ONLINE/DEGRADED/SILENT/NEVER_SEEN) + alerte « muette » débouncée.
     mount("/api/v1", createKioskSupervisionRouter()),
     mount("/api/v1", createAuditLogRouter()),
+    // Supervision réseau cross-tenant NET-001 (reporting.yaml, CONTRACT-006/013) :
+    // GET /admin/network-overview — SUPER_ADMIN, LECTURE SEULE (agrégats/compteurs,
+    // zéro PII), audit PLATFORM_READ, mutations → 403 PLATFORM_READ_ONLY.
+    mount("/api/v1", createNetworkOverviewRouter()),
     mount("/api/v1", createDeviceRouter()),
     // Routes reporting KPI (REP-001) : GET /reports/kpis + /reports/daily/:agencyId.
     // `enqueueExport` injecté seulement si `exportEnqueue` fourni (sinon export PENDING).
