@@ -25,7 +25,14 @@
 - ✅ **ADM-003a/b** supervision bornes (heartbeat + alerte muette staff room + écran agence/réseau).
 
 ## 🎉 CATALOGUE CODE F6-F11 COMPLET (mock derrière interface) — 2026-07-13
-Tout livré/poussé/CI-vert. **Branchement fournisseurs RÉELS en cours** : SMS SMPP IAM (sender ZENAPI, transceiver+DLR) + email Resend (`nepasrepondre@prodestic.net`), derrière les interfaces NOTIF-002/004, gated par config (`SMS_PROVIDER`/`EMAIL_PROVIDER`), secrets en `.env` local uniquement.
+Tout livré/poussé/CI-vert. **Branchement fournisseurs RÉELS livré** : SMS SMPP IAM (sender ZENAPI, transceiver+DLR) + email Resend (`nepasrepondre@prodestic.net`), derrière les interfaces NOTIF-002/004, gated par config (`SMS_PROVIDER`/`EMAIL_PROVIDER`), secrets en `.env` local uniquement.
+
+## 🎨 DURCISSEMENT DESIGN (audit design-reviewer → correctifs) — 2026-07-13
+Passe design-reviewer (audit code vs DS v2, 8 surfaces scorées) → 3 vagues de correctifs livrées/poussées/CI-verte, 0 co-signature :
+- **V1 fondation `@sigfa/ui`** (`80050c7`) : primitives Typography/Textarea/Select/SegmentedControl/Spinner, token `--font-mono`, halo responsive.
+- **V2 A+B** (`4d97a09`) : Admin (AdminShell partagé, theming 5 états, onboarding **QR local** — retrait quickchart.io offline/RGPD, kiosk-supervision Badge bordé) + Dashboards (reports lignes-cartes + KpiTile + offline unique, insights drivers top-N, **teinture `--danger` retirée**).
+- **Lot C** (`e835f45`) : audit-log (primitives, zéro hex, danger bordé), super admin réseau (KpiTile), **PWA — échec d'émission ticket rendu VISIBLE + Réessayer câblé** (correctif de justesse), erreurs de token enrichies, **cibles tactiles ≥44px**.
+- Ratchet couverture recalibré (`d993cae`) : zone `ui functions` 97.7→96.53 (dilution design légitime, fichiers modifiés ≥70%).
 
 ## F9 — Sécurité & Charge (quasi complet)
 - ✅ **SEC-001** audit trail exhaustif (mutation-registry + wrapper transactionnel) + écran Auditor.
