@@ -39,6 +39,7 @@ import { createHealthRouter } from "src/routes/health.js";
 import { createAuditLogRouter } from "src/routes/audit-logs.js";
 import { createDeviceRouter } from "src/routes/devices.js";
 import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
+import { createNotificationWebhookRouter } from "src/routes/webhooks-notifications.js";
 import { mountGlobalRateLimits } from "src/config/rate-limits.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
@@ -195,6 +196,10 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   app.route("/api/v1", createKioskStatusRouter());
   app.route("/api/v1", createAuditLogRouter());
   app.route("/api/v1", createDeviceRouter());
+
+  // Webhook d'accusé de livraison des notifications (NOTIF-002, CONTRACT-007) —
+  // public (pas de JWT) mais signature fournisseur obligatoire. Routeur isolé.
+  app.route("/api/v1", createNotificationWebhookRouter());
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>
