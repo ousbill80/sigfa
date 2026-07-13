@@ -39,6 +39,7 @@ import { createHealthRouter } from "src/routes/health.js";
 import { createAuditLogRouter } from "src/routes/audit-logs.js";
 import { createDeviceRouter } from "src/routes/devices.js";
 import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
+import { createReportRouter } from "src/routes/reports.js";
 import { mountGlobalRateLimits } from "src/config/rate-limits.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
@@ -195,6 +196,11 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   app.route("/api/v1", createKioskStatusRouter());
   app.route("/api/v1", createAuditLogRouter());
   app.route("/api/v1", createDeviceRouter());
+
+  // Routes reporting KPI (REP-001, reporting.yaml) : GET /reports/kpis (agency|network)
+  // + GET /reports/daily/:agencyId. Moteur de calcul PUR (sla-engine), lecture des
+  // agrégats matérialisés daily_agency_stats. Champ `partial` (jour figé J+2 07 h Abidjan).
+  app.route("/api/v1", createReportRouter());
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>
