@@ -19,8 +19,60 @@ import {
   deriveComexPredictive,
   deriveRiskLevel,
   riskColor,
+  aggregateDrivers,
   REQUIRED_HISTORY_DAYS,
+  type ForecastPointView,
 } from "./ai-insights-state";
+
+describe("IA-005: aggregateDrivers — dé-surcharge des drivers", () => {
+  const points: ForecastPointView[] = [
+    {
+      hour: "09:00",
+      expectedTickets: 10,
+      confidence: 0.9,
+      lowConfidence: false,
+      drivers: [
+        { factor: "END_OF_MONTH", direction: "up", weight: 0.4 },
+        { factor: "HOLIDAY", direction: "down", weight: 0.2 },
+      ],
+    },
+    {
+      hour: "10:00",
+      expectedTickets: 20,
+      confidence: 0.9,
+      lowConfidence: false,
+      drivers: [{ factor: "END_OF_MONTH", direction: "up", weight: 0.3 }],
+    },
+  ];
+
+  it("IA-005: agrège par facteur (poids sommés) et trie par poids décroissant", () => {
+    const agg = aggregateDrivers(points);
+    expect(agg[0]!.factor).toBe("END_OF_MONTH");
+    expect(agg[0]!.weight).toBeCloseTo(0.7);
+    expect(agg[1]!.factor).toBe("HOLIDAY");
+  });
+
+  it("IA-005: direction dominante = côté le plus lourd, poids borné à 1", () => {
+    const agg = aggregateDrivers([
+      {
+        hour: "11:00",
+        expectedTickets: 5,
+        confidence: 0.9,
+        lowConfidence: false,
+        drivers: [
+          { factor: "X", direction: "down", weight: 0.9 },
+          { factor: "X", direction: "up", weight: 0.3 },
+        ],
+      },
+    ]);
+    expect(agg[0]!.direction).toBe("down");
+    expect(agg[0]!.weight).toBe(1);
+  });
+
+  it("IA-005: aucun driver → liste vide", () => {
+    expect(aggregateDrivers([])).toEqual([]);
+  });
+});
 
 const UUID = "55555555-5555-4555-a555-555555555505";
 

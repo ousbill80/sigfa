@@ -9,28 +9,40 @@
  * CONTRACT-008 endpoints.
  *
  * Non-negotiable guarantees rendered here:
- *   - `INSUFFICIENT_HISTORY` (422) is a FIRST-CLASS pedagogic view ("X / 90
- *     jours"), never a raw error nor a misleading empty chart.
- *   - `lowConfidence` is flagged visually (warning tone, explicit uncertainty).
+ *   - `INSUFFICIENT_HISTORY` (422) is a FIRST-CLASS pedagogic view (`Heading` +
+ *     "X / 90 jours", reassuring tone), never a raw error nor a misleading empty
+ *     chart.
+ *   - `lowConfidence` is flagged as a `--warning-soft` banner with a paired icon.
  *   - staffing is ADVISORY: an explicit notice, and NO auto-execution control.
- *   - anomalies show their evidence and are visually distinguished from an
- *     instantaneous alert (aggregated-pattern wording); `--danger` is reserved
- *     for genuine risk.
+ *   - anomalies show STRUCTURED evidence (label/value pairs) and a NEUTRAL type
+ *     badge; only the STATUS carries tone. `--danger` is never used as a fill.
+ *   - the COMEX "agencies at risk" figure is `--ink` (no danger tint on the big
+ *     number, DS §1); the risk is carried by a bordered `Badge` next to it.
  *   - ZERO PII: only already-expurged, scrubbed views reach the screen.
  *
- * Design System v2 « Sérénité Premium »: chrome from @sigfa/ui, tokens only,
- * FR/EN, zero emoji. The five states (nominal/loading/empty/error/insufficient)
- * plus the discreet offline banner are all covered.
+ * Design System v2 « Sérénité Premium »: chrome from @sigfa/ui (KpiTile /
+ * SectionTitle / Badge / Spinner), tokens only, FR/EN, zero emoji. The five
+ * states (nominal/loading/empty/error/insufficient) plus the discreet offline
+ * banner are all covered.
  * @module components/insights/ai-insights-dashboard
  */
 "use client";
 
 import type { CSSProperties, ReactElement } from "react";
-import { Badge, Card, EmptyState, OfflineBanner, Skeleton } from "@sigfa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Heading,
+  KpiTile,
+  OfflineBanner,
+  SectionTitle,
+  Spinner,
+} from "@sigfa/ui";
 import { t, type Locale, type TranslationKey } from "@/lib/i18n";
 import {
-  formatConfidence,
-  riskColor,
+  aggregateDrivers,
   type AnomalyView,
   type ForecastView,
   type FeedbackInsightsView,
@@ -52,7 +64,12 @@ export interface AiInsightsDashboardProps {
   offline?: boolean;
   /** Active locale. */
   locale?: Locale;
+  /** Optional retry handler for the dedicated error state. */
+  onRetry?: () => void;
 }
+
+/** Max number of drivers shown before collapsing into "+N autres". */
+const MAX_DRIVERS = 5;
 
 const rootStyle: CSSProperties = {
   padding: "var(--space-6)",
@@ -64,15 +81,6 @@ const rootStyle: CSSProperties = {
   gap: "var(--space-6)",
 };
 
-const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-xl)",
-  fontWeight: 600,
-  color: "var(--ink)",
-  letterSpacing: "var(--tracking-tight)",
-  margin: 0,
-};
-
 const subtitleStyle: CSSProperties = {
   fontFamily: "var(--font-text)",
   fontSize: "var(--text-sm)",
@@ -80,34 +88,11 @@ const subtitleStyle: CSSProperties = {
   margin: 0,
 };
 
-const sectionTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-text)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 600,
-  color: "var(--ink-soft)",
-  letterSpacing: "0.02em",
-  margin: 0,
-};
-
 const cardStyle: CSSProperties = {
   padding: "var(--space-6)",
-  background: "var(--surface-1)",
-  border: "1px solid var(--hairline)",
-  borderRadius: "var(--r-lg)",
-  boxShadow: "var(--shadow-1)",
   display: "flex",
   flexDirection: "column",
-  gap: "var(--space-3)",
-};
-
-const bigValueStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-3xl)",
-  fontWeight: 600,
-  lineHeight: 1,
-  fontVariantNumeric: "tabular-nums",
-  letterSpacing: "var(--tracking-numeric)",
-  color: "var(--ink)",
+  gap: "var(--space-4)",
 };
 
 const labelStyle: CSSProperties = {
@@ -127,13 +112,6 @@ const advisoryStyle: CSSProperties = {
   padding: "var(--space-3)",
 };
 
-const lowConfStyle: CSSProperties = {
-  fontFamily: "var(--font-text)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 600,
-  color: "var(--warning)",
-};
-
 /** i18n key for an anomaly type label. */
 function anomalyTypeKey(type: AnomalyView["type"]): TranslationKey {
   return `ai.anomaly.type.${type}` as TranslationKey;
@@ -149,7 +127,76 @@ function comexLevelKey(level: ComexPredictiveView["level"]): TranslationKey {
   return `ai.comex.level.${level}` as TranslationKey;
 }
 
-/** Forecast surface — peak, contextual factors and explainability drivers. */
+/** Small warning glyph paired with the low-confidence banner (never colour alone). */
+function WarnIcon(): ReactElement {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 1.5 17 15.5H1L9 1.5Z" />
+      <path d="M9 7v3.5" />
+      <path d="M9 13h.01" />
+    </svg>
+  );
+}
+
+/** A single aggregated driver row — factor + tone badge + weight mini-bar. */
+function DriverRow({
+  factor,
+  direction,
+  weight,
+}: {
+  factor: string;
+  direction: "up" | "down";
+  weight: number;
+}): ReactElement {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+      <span style={{ minWidth: "9rem", ...labelStyle, color: "var(--ink)", fontWeight: 500 }}>
+        {factor}
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          flex: "1 1 auto",
+          height: "6px",
+          borderRadius: "var(--r-full)",
+          background: "var(--surface-2)",
+          overflow: "hidden",
+        }}
+      >
+        <span
+          style={{
+            display: "block",
+            height: "100%",
+            width: `${Math.round(weight * 100)}%`,
+            background: direction === "up" ? "var(--warning)" : "var(--info)",
+          }}
+        />
+      </span>
+      <span
+        style={{
+          minWidth: "3rem",
+          textAlign: "right",
+          fontVariantNumeric: "tabular-nums",
+          ...labelStyle,
+        }}
+      >
+        {(weight * 100).toFixed(0)}%
+      </span>
+    </div>
+  );
+}
+
+/** Forecast surface — peak (KpiTile), context, and de-cluttered top drivers. */
 function ForecastSection({
   forecast,
   locale,
@@ -157,18 +204,36 @@ function ForecastSection({
   forecast: ForecastView;
   locale: Locale;
 }): ReactElement {
+  const drivers = aggregateDrivers(forecast.points);
+  const shown = drivers.slice(0, MAX_DRIVERS);
+  const rest = drivers.length - shown.length;
   return (
     <Card data-testid="ai-forecast" style={cardStyle}>
-      <h2 style={sectionTitleStyle}>{t("ai.forecast.title", locale)}</h2>
-      <div>
-        <span style={labelStyle}>{t("ai.forecast.peak", locale)} — </span>
-        <span data-testid="ai-forecast-peak" style={bigValueStyle}>
-          {forecast.peakExpected}
-        </span>
-      </div>
+      <SectionTitle>{t("ai.forecast.title", locale)}</SectionTitle>
+      <KpiTile
+        data-testid="ai-forecast-peak"
+        label={t("ai.forecast.peak", locale)}
+        value={String(forecast.peakExpected)}
+      />
 
       {forecast.hasLowConfidence && (
-        <div data-testid="ai-lowconf-flag" style={lowConfStyle}>
+        <div
+          data-testid="ai-lowconf-flag"
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-3)",
+            borderRadius: "var(--r-md)",
+            background: "var(--warning-soft)",
+            border: "1px solid var(--warning)",
+            color: "var(--warning)",
+            fontSize: "var(--text-sm)",
+            fontWeight: 600,
+          }}
+        >
+          <WarnIcon />
           {t("ai.lowconf.flag", locale)}
         </div>
       )}
@@ -179,20 +244,26 @@ function ForecastSection({
         </div>
       )}
 
-      <div data-testid="ai-forecast-drivers" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-        {forecast.points.flatMap((p) =>
-          p.drivers.map((d) => (
-            <Badge key={`${p.hour}-${d.factor}`} tone={d.direction === "up" ? "warning" : "info"}>
-              {d.factor} · {(d.weight * 100).toFixed(0)}%
-            </Badge>
-          )),
-        )}
-      </div>
+      {shown.length > 0 && (
+        <div data-testid="ai-forecast-drivers" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <span style={{ ...labelStyle, fontWeight: 600, color: "var(--ink)" }}>
+            {t("ai.forecast.drivers", locale)}
+          </span>
+          {shown.map((d) => (
+            <DriverRow key={d.factor} factor={d.factor} direction={d.direction} weight={d.weight} />
+          ))}
+          {rest > 0 && (
+            <span data-testid="ai-drivers-more" style={labelStyle}>
+              + {rest} {t("ai.drivers.others", locale)}
+            </span>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
 
-/** Anomalies surface — evidence + status; distinguished from an instant alert. */
+/** Anomalies surface — structured evidence + status; distinct from an instant alert. */
 function AnomaliesSection({
   anomalies,
   locale,
@@ -202,7 +273,7 @@ function AnomaliesSection({
 }): ReactElement {
   return (
     <Card data-testid="ai-anomalies" style={cardStyle}>
-      <h2 style={sectionTitleStyle}>{t("ai.anomalies.title", locale)}</h2>
+      <SectionTitle>{t("ai.anomalies.title", locale)}</SectionTitle>
       <p style={subtitleStyle}>{t("ai.anomalies.subtitle", locale)}</p>
       {anomalies.map((a) => (
         <div
@@ -217,28 +288,52 @@ function AnomaliesSection({
           }}
         >
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-            <Badge tone={a.status === "open" ? "warning" : "info"}>
-              {t(anomalyTypeKey(a.type), locale)}
+            {/* Type is NEUTRAL (info); only the STATUS carries tone. */}
+            <Badge tone="info">{t(anomalyTypeKey(a.type), locale)}</Badge>
+            <Badge tone={a.status === "open" ? "warning" : "success"} dot>
+              {t(anomalyStatusKey(a.status), locale)}
             </Badge>
-            <Badge tone="info">{t(anomalyStatusKey(a.status), locale)}</Badge>
           </div>
           <div style={labelStyle}>{a.description}</div>
           {a.evidence.length > 0 && (
-            <div
+            <dl
               data-testid="ai-anomaly-evidence"
-              style={{ ...labelStyle, fontVariantNumeric: "tabular-nums" }}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "auto 1fr",
+                columnGap: "var(--space-4)",
+                rowGap: "var(--space-1)",
+                margin: 0,
+                fontVariantNumeric: "tabular-nums",
+              }}
             >
-              {t("ai.anomaly.evidence", locale)} :{" "}
-              {a.evidence
-                .map(
-                  (e) =>
-                    `${e.metric} (${t("ai.anomaly.threshold", locale)} ${e.threshold}, ${t(
-                      "ai.anomaly.window",
-                      locale,
-                    )} ${e.window}, ${t("ai.anomaly.sample", locale)} ${e.sample})`,
-                )
-                .join(" · ")}
-            </div>
+              {a.evidence.flatMap((e, idx) => [
+                <dt key={`m-${idx}`} style={{ ...labelStyle }}>
+                  {t("ai.anomaly.metric", locale)}
+                </dt>,
+                <dd key={`mv-${idx}`} style={{ margin: 0, color: "var(--ink)", fontWeight: 500 }}>
+                  {e.metric}
+                </dd>,
+                <dt key={`t-${idx}`} style={{ ...labelStyle }}>
+                  {t("ai.anomaly.threshold", locale)}
+                </dt>,
+                <dd key={`tv-${idx}`} style={{ margin: 0, color: "var(--ink)" }}>
+                  {e.threshold}
+                </dd>,
+                <dt key={`w-${idx}`} style={{ ...labelStyle }}>
+                  {t("ai.anomaly.window", locale)}
+                </dt>,
+                <dd key={`wv-${idx}`} style={{ margin: 0, color: "var(--ink)" }}>
+                  {e.window}
+                </dd>,
+                <dt key={`s-${idx}`} style={{ ...labelStyle }}>
+                  {t("ai.anomaly.sample", locale)}
+                </dt>,
+                <dd key={`sv-${idx}`} style={{ margin: 0, color: "var(--ink)" }}>
+                  {e.sample}
+                </dd>,
+              ])}
+            </dl>
           )}
         </div>
       ))}
@@ -246,7 +341,7 @@ function AnomaliesSection({
   );
 }
 
-/** Feedback quality surface — score (withheld if insufficient) + decomposition. */
+/** Feedback quality surface — score (KpiTile, withheld if insufficient) + decomposition. */
 function FeedbackSection({
   feedback,
   locale,
@@ -256,19 +351,28 @@ function FeedbackSection({
 }): ReactElement {
   return (
     <Card data-testid="ai-feedback" style={cardStyle}>
-      <h2 style={sectionTitleStyle}>{t("ai.feedback.title", locale)}</h2>
+      <SectionTitle>{t("ai.feedback.title", locale)}</SectionTitle>
       {feedback.insufficientSample || feedback.score === null ? (
-        <div data-testid="ai-feedback-insufficient" style={lowConfStyle}>
+        <div
+          data-testid="ai-feedback-insufficient"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            color: "var(--warning)",
+            fontSize: "var(--text-sm)",
+            fontWeight: 600,
+          }}
+        >
+          <WarnIcon />
           {t("ai.feedback.insufficient_sample", locale)}
         </div>
       ) : (
-        <div>
-          <span style={labelStyle}>{t("ai.feedback.score", locale)} — </span>
-          <span data-testid="ai-feedback-score" style={bigValueStyle}>
-            {feedback.score.toFixed(1)}
-            {feedback.scale !== null && <span style={labelStyle}> / {feedback.scale}</span>}
-          </span>
-        </div>
+        <KpiTile
+          data-testid="ai-feedback-score"
+          label={t("ai.feedback.score", locale)}
+          value={`${feedback.score.toFixed(1)}${feedback.scale !== null ? ` / ${feedback.scale}` : ""}`}
+        />
       )}
 
       <div style={labelStyle}>
@@ -298,38 +402,43 @@ function ComexPredictiveSection({
   comex: ComexPredictiveView;
   locale: Locale;
 }): ReactElement {
+  const atRisk = comex.level === "risk";
   return (
     <Card data-testid="ai-comex-predictive" style={cardStyle}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={sectionTitleStyle}>{t("ai.comex.title", locale)}</h2>
-        <Badge
-          tone={comex.level === "risk" ? "danger" : comex.level === "watch" ? "warning" : "success"}
-        >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)" }}>
+        <SectionTitle size="xl">{t("ai.comex.title", locale)}</SectionTitle>
+        <Badge tone={atRisk ? "danger" : comex.level === "watch" ? "warning" : "success"} dot>
           {t(comexLevelKey(comex.level), locale)}
         </Badge>
       </div>
-      <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap" }}>
-        <div>
-          <div style={labelStyle}>{t("ai.comex.expected_load", locale)}</div>
-          <div data-testid="ai-comex-load" style={bigValueStyle}>
-            {comex.expectedNetworkLoad}
-          </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--space-4)",
+        }}
+      >
+        <KpiTile
+          data-testid="ai-comex-load"
+          label={t("ai.comex.expected_load", locale)}
+          value={String(comex.expectedNetworkLoad)}
+        />
+        {/* Big number stays --ink (KpiTile); the risk is carried by a bordered Badge. */}
+        <div data-testid="ai-comex-atrisk" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <KpiTile label={t("ai.comex.atrisk", locale)} value={String(comex.atRiskCount)} />
+          {atRisk && (
+            <span>
+              <Badge tone="danger" dot>
+                {t("ai.forecast.risk", locale)}
+              </Badge>
+            </span>
+          )}
         </div>
-        <div>
-          <div style={labelStyle}>{t("ai.comex.atrisk", locale)}</div>
-          <div
-            data-testid="ai-comex-atrisk"
-            style={{ ...bigValueStyle, color: riskColor(comex.level) }}
-          >
-            {comex.atRiskCount}
-          </div>
-        </div>
-        <div>
-          <div style={labelStyle}>{t("ai.comex.open_anomalies", locale)}</div>
-          <div data-testid="ai-comex-open" style={bigValueStyle}>
-            {comex.openAnomalies}
-          </div>
-        </div>
+        <KpiTile
+          data-testid="ai-comex-open"
+          label={t("ai.comex.open_anomalies", locale)}
+          value={String(comex.openAnomalies)}
+        />
       </div>
     </Card>
   );
@@ -346,14 +455,13 @@ export function AiInsightsDashboard({
   history,
   offline = false,
   locale = "fr",
+  onRetry,
 }: AiInsightsDashboardProps): ReactElement {
   if (load === "loading") {
     return (
       <div data-testid="ai-skeleton" aria-busy="true" style={{ padding: "var(--space-6)", background: "var(--paper)" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} data-testid="ai-skeleton-card" height="120px" radius="var(--r-lg)" />
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", alignItems: "center", padding: "var(--space-8)" }}>
+          <Spinner size="lg" label={t("ai.state.loading", locale)} showLabel />
         </div>
       </div>
     );
@@ -366,13 +474,24 @@ export function AiInsightsDashboard({
         role="status"
         style={{ ...rootStyle, alignItems: "flex-start" }}
       >
-        <h1 data-testid="ai-title" style={titleStyle}>
-          {t("ai.title", locale)}
-        </h1>
+        <Heading size="2xl">{t("ai.insufficient.title", locale)}</Heading>
         <Card style={{ ...cardStyle, width: "100%" }}>
-          <h2 style={sectionTitleStyle}>{t("ai.insufficient.title", locale)}</h2>
-          <div style={bigValueStyle}>
-            {history.availableDays} / {history.requiredDays}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: "var(--space-2)",
+              fontFamily: "var(--font-display)",
+              fontWeight: 600,
+              color: "var(--ink)",
+            }}
+          >
+            <span style={{ fontSize: "var(--text-4xl)", fontVariantNumeric: "tabular-nums" }}>
+              {history.availableDays}
+            </span>
+            <span style={{ fontSize: "var(--text-xl)", color: "var(--ink-soft)" }}>
+              / {history.requiredDays} {t("ai.insufficient.days", locale)}
+            </span>
           </div>
           <div style={labelStyle}>{t("ai.insufficient.progress", locale)}</div>
           {/* Pure token-driven progress bar (no misleading empty chart). */}
@@ -406,7 +525,18 @@ export function AiInsightsDashboard({
   if (load === "error" || (load !== "empty" && insights === null)) {
     return (
       <div data-testid="ai-error" role="alert" style={{ padding: "var(--space-6)" }}>
-        <EmptyState title={t("ai.title", locale)} description={t("ai.state.error", locale)} />
+        <EmptyState
+          icon={<WarnIcon />}
+          title={t("ai.state.error.title", locale)}
+          description={t("ai.state.error", locale)}
+          action={
+            onRetry ? (
+              <Button variant="secondary" size="dense" data-testid="ai-retry" onClick={onRetry}>
+                {t("ai.state.retry", locale)}
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
     );
   }
@@ -422,9 +552,9 @@ export function AiInsightsDashboard({
   return (
     <div data-testid="ai-insights-dashboard" style={rootStyle}>
       <header style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-        <h1 data-testid="ai-title" style={titleStyle}>
+        <Heading data-testid="ai-title" size="3xl">
           {t("ai.title", locale)}
-        </h1>
+        </Heading>
         <p style={subtitleStyle}>{t("ai.subtitle", locale)}</p>
       </header>
 
@@ -441,7 +571,7 @@ export function AiInsightsDashboard({
 
       {/* Advisory staffing notice — read-only, NO auto-execution control. */}
       <Card data-testid="ai-staffing" style={cardStyle}>
-        <h2 style={sectionTitleStyle}>{t("ai.staffing.title", locale)}</h2>
+        <SectionTitle>{t("ai.staffing.title", locale)}</SectionTitle>
         <div data-testid="ai-advisory-notice" style={advisoryStyle}>
           {t("ai.advisory.notice", locale)}
         </div>

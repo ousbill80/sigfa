@@ -2,22 +2,25 @@
  * ExportPanel — report export trigger + async job tracking (REP-003b).
  *
  * Design system v2 « Sérénité Premium »: calm --surface-1 card, --brand primary
- * action, tokens only, zero hard-coded value, zero emoji. Renders the 5 surface
- * states of the export flow:
+ * action, tokens only, zero hard-coded value, zero emoji. Fields use the
+ * tokenised `Select` / `Field` primitives (focus ring preserved). Renders the 5
+ * surface states of the export flow:
  *   - nominal  : format/scope/period selectors + "start export" button;
- *   - loading  : PENDING/PROCESSING spinner + status label (poll in progress);
+ *   - loading  : a tokenised `Spinner` + status label (poll in progress);
  *   - ready    : signed-URL download button (or "restart" when the URL expired);
- *   - error/failed : human message + restart action (never a silent dead link);
- *   - offline  : connection-required notice, action disabled.
+ *   - error/failed/expired : tonal Badge + paired icon + restart action (never a
+ *     bare grey <p>, never a silent dead link);
+ *   - offline  : the single page-level banner lives in the dashboard; here the
+ *     trigger is simply disabled.
  * The status verdict and download URL come from the hook (REP-003 contract) —
  * this component only renders. FR/EN via the `locale` prop.
  * @module components/reports/export-panel
  */
 "use client";
 
-import { type CSSProperties, type ReactElement } from "react";
-import { Badge, Button, Card, Skeleton } from "@sigfa/ui";
-import { t, type Locale } from "@/lib/i18n";
+import { type ReactElement } from "react";
+import { Badge, Button, Card, Field, SectionTitle, Select, Spinner } from "@sigfa/ui";
+import { t, type Locale, type TranslationKey } from "@/lib/i18n";
 import {
   EXPORT_FORMATS,
   EXPORT_SCOPES,
@@ -58,28 +61,65 @@ export interface ExportPanelProps {
   onLaunch: () => void;
 }
 
-const sectionLabel: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 600,
-  letterSpacing: "var(--tracking-tight)",
-  textTransform: "uppercase",
-  color: "var(--ink-soft)",
-  marginBottom: "var(--space-2)",
-};
+const fieldWrap = { flex: "1 1 160px", minWidth: 0 } as const;
 
-const selectStyle: CSSProperties = {
-  width: "100%",
-  padding: "var(--space-2) var(--space-3)",
-  borderRadius: "var(--r-md)",
-  border: "1px solid var(--hairline)",
-  backgroundColor: "var(--surface-2)",
-  color: "var(--ink)",
-  fontSize: "var(--text-md)",
-  fontFamily: "inherit",
-};
+/** A small warning glyph paired with a tonal state badge (never colour alone). */
+function AlertIcon(): ReactElement {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 1.5 15 14H1L8 1.5Z" />
+      <path d="M8 6.5v3.5" />
+      <path d="M8 12h.01" />
+    </svg>
+  );
+}
 
-const fieldWrap: CSSProperties = { flex: "1 1 160px", minWidth: 0 };
+/** A tonal state row: warning Badge + paired icon + a human sentence. */
+function StateNotice({
+  testId,
+  badgeKey,
+  message,
+  locale,
+}: {
+  testId: string;
+  badgeKey: TranslationKey;
+  message: string;
+  locale: Locale;
+}): ReactElement {
+  return (
+    <div
+      data-testid={testId}
+      role="alert"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-3)",
+        flexWrap: "wrap",
+        marginBottom: "var(--space-3)",
+      }}
+    >
+      <Badge tone="warning" dot>
+        <span
+          style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}
+        >
+          <AlertIcon />
+          {t(badgeKey, locale)}
+        </span>
+      </Badge>
+      <span style={{ color: "var(--ink)", fontSize: "var(--text-sm)" }}>{message}</span>
+    </div>
+  );
+}
 
 /**
  * Report export panel.
@@ -105,19 +145,8 @@ export function ExportPanel({
 
   return (
     <Card data-testid="export-panel" style={{ padding: "var(--space-6)" }}>
-      <header style={{ marginBottom: "var(--space-4)" }}>
-        <h2
-          style={{
-            margin: 0,
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--text-xl)",
-            fontWeight: 600,
-            letterSpacing: "var(--tracking-tight)",
-            color: "var(--ink)",
-          }}
-        >
-          {t("reports.export.title", locale)}
-        </h2>
+      <header style={{ marginBottom: "var(--space-5)" }}>
+        <SectionTitle size="xl">{t("reports.export.title", locale)}</SectionTitle>
         <p style={{ margin: "var(--space-1) 0 0", color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}>
           {t("reports.export.subtitle", locale)}
         </p>
@@ -125,48 +154,32 @@ export function ExportPanel({
 
       <div style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={fieldWrap}>
-          <div style={sectionLabel}>{t("reports.export.format", locale)}</div>
-          <select
+          <Select
             data-testid="export-format"
-            aria-label={t("reports.export.format", locale)}
+            label={t("reports.export.format", locale)}
             value={format}
             onChange={(e) => onFormatChange(e.target.value as ExportFormat)}
-            style={selectStyle}
-          >
-            {EXPORT_FORMATS.map((f) => (
-              <option key={f} value={f}>
-                {t(exportFormatLabelKey(f), locale)}
-              </option>
-            ))}
-          </select>
+            options={EXPORT_FORMATS.map((f) => ({ value: f, label: t(exportFormatLabelKey(f), locale) }))}
+          />
         </div>
 
         <div style={fieldWrap}>
-          <div style={sectionLabel}>{t("reports.export.scope", locale)}</div>
-          <select
+          <Select
             data-testid="export-scope"
-            aria-label={t("reports.export.scope", locale)}
+            label={t("reports.export.scope", locale)}
             value={scope}
             onChange={(e) => onScopeChange(e.target.value as ExportScope)}
-            style={selectStyle}
-          >
-            {EXPORT_SCOPES.map((s) => (
-              <option key={s} value={s}>
-                {t(exportScopeLabelKey(s), locale)}
-              </option>
-            ))}
-          </select>
+            options={EXPORT_SCOPES.map((s) => ({ value: s, label: t(exportScopeLabelKey(s), locale) }))}
+          />
         </div>
 
         <div style={fieldWrap}>
-          <div style={sectionLabel}>{t("reports.export.period", locale)}</div>
-          <input
+          <Field
             data-testid="export-period"
             type="month"
-            aria-label={t("reports.export.period", locale)}
+            label={t("reports.export.period", locale)}
             value={period}
             onChange={(e) => onPeriodChange(e.target.value)}
-            style={selectStyle}
           />
         </div>
 
@@ -183,13 +196,7 @@ export function ExportPanel({
         </div>
       </div>
 
-      {offline && (
-        <p data-testid="export-offline" role="status" style={{ marginTop: "var(--space-4)", color: "var(--info)", fontSize: "var(--text-sm)" }}>
-          {t("reports.export.offline", locale)}
-        </p>
-      )}
-
-      {/* Job tracking area (5 states of the flow). */}
+      {/* Job tracking area (states of the flow). */}
       <div style={{ marginTop: "var(--space-5)" }}>
         {phase === "idle" && !offline && (
           <p data-testid="export-empty" style={{ margin: 0, color: "var(--ink-faint)", fontSize: "var(--text-sm)" }}>
@@ -199,10 +206,7 @@ export function ExportPanel({
 
         {inFlight && (
           <div data-testid="export-loading" aria-busy="true" style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-            <Skeleton style={{ height: "20px", width: "20px", borderRadius: "var(--r-full)" }} />
-            <span style={{ color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}>
-              {t(exportStatusLabelKey(job?.status ?? "PENDING"), locale)}
-            </span>
+            <Spinner size="sm" label={t(exportStatusLabelKey(job?.status ?? "PENDING"), locale)} showLabel />
           </div>
         )}
 
@@ -224,21 +228,30 @@ export function ExportPanel({
         )}
 
         {phase === "ready" && !downloadable && (
-          <p data-testid="export-expired" role="alert" style={{ margin: "0 0 var(--space-3)", color: "var(--ink)", fontSize: "var(--text-sm)" }}>
-            {t("reports.export.expired", locale)}
-          </p>
+          <StateNotice
+            testId="export-expired"
+            badgeKey="reports.export.state.expired"
+            message={t("reports.export.expired", locale)}
+            locale={locale}
+          />
         )}
 
         {phase === "failed" && (
-          <p data-testid="export-failed" role="alert" style={{ margin: "0 0 var(--space-3)", color: "var(--ink)", fontSize: "var(--text-sm)" }}>
-            {t("reports.export.status.failed", locale)}
-          </p>
+          <StateNotice
+            testId="export-failed"
+            badgeKey="reports.export.state.failed"
+            message={t("reports.export.status.failed", locale)}
+            locale={locale}
+          />
         )}
 
         {phase === "error" && (
-          <p data-testid="export-error" role="alert" style={{ margin: "0 0 var(--space-3)", color: "var(--ink)", fontSize: "var(--text-sm)" }}>
-            {t("reports.export.error", locale)}
-          </p>
+          <StateNotice
+            testId="export-error"
+            badgeKey="reports.export.state.error"
+            message={t("reports.export.error", locale)}
+            locale={locale}
+          />
         )}
 
         {canRestart && (

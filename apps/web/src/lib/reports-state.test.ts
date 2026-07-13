@@ -18,10 +18,57 @@ import {
   sortKpiLabelKey,
   exportFormatLabelKey,
   exportScopeLabelKey,
+  benchmarkValue,
+  benchmarkOverview,
   type BenchmarkRow,
 } from "./reports-state";
 
 const NOW = Date.parse("2026-07-13T10:00:00Z");
+
+describe("REP-003b: benchmarkValue — valeur chiffrée du KPI trié", () => {
+  const row: BenchmarkRow = { rank: 1, agencyId: "a", agencyName: "A", status: "VERT", tauxSLA: 92, tma: 9 };
+
+  it("REP-003b: tauxSLA en pourcentage", () => {
+    expect(benchmarkValue(row, "tauxSLA")).toBe("92 %");
+  });
+  it("REP-003b: tma en minutes", () => {
+    expect(benchmarkValue(row, "tma")).toBe("9 min");
+  });
+  it("REP-003b: KPI sans valeur par ligne → null (jamais un chiffre fabriqué)", () => {
+    for (const kpi of ["tmt", "tts", "tauxAbandon", "nps", "occupation"] as const) {
+      expect(benchmarkValue(row, kpi)).toBeNull();
+    }
+  });
+});
+
+describe("REP-003b: benchmarkOverview — rangée de KpiTile", () => {
+  const rows: BenchmarkRow[] = [
+    { rank: 1, agencyId: "a", agencyName: "Plateau", status: "VERT", tauxSLA: 92, tma: 9 },
+    { rank: 2, agencyId: "b", agencyName: "Cocody", status: "ORANGE", tauxSLA: 71, tma: 18 },
+    { rank: 3, agencyId: "c", agencyName: "Yopougon", status: "ROUGE", tauxSLA: 52, tma: 28 },
+    { rank: 99, agencyId: "d", agencyName: "Sans Donnée", status: "n/a", tauxSLA: 0, tma: 0 },
+  ];
+
+  it("REP-003b: compte les classées, meilleure/pire, part n/a", () => {
+    const o = benchmarkOverview(rows);
+    expect(o.ranked).toBe(3);
+    expect(o.best).toBe("Plateau");
+    expect(o.worst).toBe("Yopougon");
+    expect(o.naSharePct).toBe(25);
+  });
+
+  it("REP-003b: aucune ligne → agrégat neutre (0, nulls, 0%)", () => {
+    const o = benchmarkOverview([]);
+    expect(o).toEqual({ ranked: 0, best: null, worst: null, naSharePct: 0 });
+  });
+
+  it("REP-003b: toutes n/a → best/worst null, 100% n/a", () => {
+    const o = benchmarkOverview([{ rank: 1, agencyId: "x", agencyName: "X", status: "n/a", tauxSLA: 0, tma: 0 }]);
+    expect(o.best).toBeNull();
+    expect(o.worst).toBeNull();
+    expect(o.naSharePct).toBe(100);
+  });
+});
 
 describe("REP-003b: constantes contrat", () => {
   it("REP-003b: 3 formats d'export (pdf/xlsx/json)", () => {

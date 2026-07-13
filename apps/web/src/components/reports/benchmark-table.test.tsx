@@ -58,6 +58,33 @@ describe("REP-003b: BenchmarkTable — pastilles = statut serveur", () => {
   });
 });
 
+describe("REP-003b: BenchmarkTable — valeur chiffrée du KPI trié (lignes-cartes)", () => {
+  it("REP-003b: affiche la valeur tauxSLA par ligne (font-display tabular-nums, alignée à droite)", () => {
+    render(<BenchmarkTable {...props({ sortKpi: "tauxSLA" })} />);
+    const rows = screen.getAllByTestId("benchmark-row");
+    expect(within(rows[0]!).getByTestId("benchmark-value")).toHaveTextContent("92 %");
+    expect(within(rows[1]!).getByTestId("benchmark-value")).toHaveTextContent("71 %");
+  });
+
+  it("REP-003b: valeur tma en minutes quand tri=tma", () => {
+    render(<BenchmarkTable {...props({ sortKpi: "tma" })} />);
+    const rows = screen.getAllByTestId("benchmark-row");
+    expect(within(rows[0]!).getByTestId("benchmark-value")).toHaveTextContent("9 min");
+  });
+
+  it("REP-003b: KPI sans valeur par ligne → tiret neutre (jamais un chiffre fabriqué)", () => {
+    render(<BenchmarkTable {...props({ sortKpi: "nps" })} />);
+    const rows = screen.getAllByTestId("benchmark-row");
+    expect(within(rows[0]!).getByTestId("benchmark-value")).toHaveTextContent("—");
+  });
+
+  it("REP-003b: rendu en lignes-cartes (liste), pas de <table> ligné (anti-pattern DS §5)", () => {
+    const { container } = render(<BenchmarkTable {...props()} />);
+    expect(container.querySelector("table")).toBeNull();
+    expect(container.querySelector("ul")).not.toBeNull();
+  });
+});
+
 describe("REP-003b: BenchmarkTable — tri serveur", () => {
   it("REP-003b: changement de sortKpi → onSort (le serveur re-classe)", () => {
     const onSort = vi.fn();
@@ -68,9 +95,10 @@ describe("REP-003b: BenchmarkTable — tri serveur", () => {
 });
 
 describe("REP-003b: BenchmarkTable — 4 états + offline", () => {
-  it("REP-003b: loading — skeleton", () => {
-    render(<BenchmarkTable {...props({ load: "loading" })} />);
+  it("REP-003b: loading — Spinner tokenisé (role status, aria-busy)", () => {
+    const { container } = render(<BenchmarkTable {...props({ load: "loading" })} />);
     expect(screen.getByTestId("benchmark-loading")).toHaveAttribute("aria-busy", "true");
+    expect(container.querySelector(".sig-spinner")).not.toBeNull();
   });
 
   it("REP-003b: empty — message humain", () => {
@@ -83,9 +111,11 @@ describe("REP-003b: BenchmarkTable — 4 états + offline", () => {
     expect(screen.getByTestId("benchmark-error")).toHaveAttribute("role", "alert");
   });
 
-  it("REP-003b: offline — bandeau classement figé", () => {
+  it("REP-003b: offline — classement figé (aria-disabled ; bannière offline au niveau page, jamais dupliquée ici)", () => {
     render(<BenchmarkTable {...props({ offline: true })} />);
-    expect(screen.getByTestId("benchmark-offline")).toBeInTheDocument();
+    // Single offline treatment lives at the page level; the table only freezes (aria-disabled).
+    expect(screen.queryByTestId("benchmark-offline")).toBeNull();
+    expect(screen.getByTestId("benchmark-table")).toHaveAttribute("aria-disabled", "true");
   });
 });
 
