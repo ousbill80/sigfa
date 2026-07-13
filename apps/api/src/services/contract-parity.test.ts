@@ -22,6 +22,9 @@ import {
   counterStatusEvent,
   alertManagerEvent,
   kioskPrinterErrorEvent,
+  kioskSilentEvent,
+  kioskRecoveredEvent,
+  kioskStatusEvent,
 } from "@sigfa/contracts/events/realtime.js";
 import { EVENT_SCHEMAS, type EventName } from "src/services/realtime.js";
 
@@ -36,6 +39,9 @@ const CONTRACT_SCHEMAS = {
   "counter:status": counterStatusEvent.payloadSchema,
   "alert:manager": alertManagerEvent.payloadSchema,
   "kiosk:printer-error": kioskPrinterErrorEvent.payloadSchema,
+  "kiosk:silent": kioskSilentEvent.payloadSchema,
+  "kiosk:recovered": kioskRecoveredEvent.payloadSchema,
+  "kiosk:status": kioskStatusEvent.payloadSchema,
 } as const;
 
 /** Échantillons { valid, invalid } par événement. */
@@ -114,6 +120,49 @@ const SAMPLES: Record<EventName, { valid: unknown; invalid: unknown }> = {
       since: "hier matin",
     },
   },
+  // ── CONTRACT-013 / ADM-003 : supervision borne (3 événements STAFF) ─────────
+  "kiosk:silent": {
+    valid: {
+      kioskId: "00000000-0000-4000-a000-000000000006",
+      agencyId: AGENCY_ID,
+      status: "SILENT",
+      since: "2026-07-12T10:00:00.000Z",
+    },
+    invalid: {
+      kioskId: "00000000-0000-4000-a000-000000000006",
+      agencyId: AGENCY_ID,
+      status: "OFFLINE", // hors enum KioskStatus
+      since: "2026-07-12T10:00:00.000Z",
+    },
+  },
+  "kiosk:recovered": {
+    valid: {
+      kioskId: "00000000-0000-4000-a000-000000000006",
+      agencyId: AGENCY_ID,
+      status: "ONLINE",
+      since: "2026-07-12T10:00:00.000Z",
+    },
+    invalid: {
+      kioskId: "not-a-uuid",
+      agencyId: AGENCY_ID,
+      status: "ONLINE",
+      since: "2026-07-12T10:00:00.000Z",
+    },
+  },
+  "kiosk:status": {
+    valid: {
+      kioskId: "00000000-0000-4000-a000-000000000006",
+      agencyId: AGENCY_ID,
+      status: "DEGRADED",
+      since: "2026-07-12T10:00:00.000Z",
+    },
+    invalid: {
+      kioskId: "00000000-0000-4000-a000-000000000006",
+      agencyId: AGENCY_ID,
+      status: "DEGRADED",
+      since: "hier matin",
+    },
+  },
 };
 
 const ALL: EventName[] = [
@@ -124,9 +173,12 @@ const ALL: EventName[] = [
   "counter:status",
   "alert:manager",
   "kiosk:printer-error",
+  "kiosk:silent",
+  "kiosk:recovered",
+  "kiosk:status",
 ];
 
-describe("RT-001a: parité bus↔contrat (7 événements, LA LOI)", () => {
+describe("RT-001a: parité bus↔contrat (10 événements, LA LOI)", () => {
   it.each(ALL)(
     "RT-001a: %s — payload valide accepté par contrat ET bus (parité positive)",
     (event) => {

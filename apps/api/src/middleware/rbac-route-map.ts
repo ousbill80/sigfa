@@ -241,6 +241,8 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "POST", path: "/reports/export",         requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/reports/export/{jobId}",  requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/kiosks/status",           requiredRole: "MANAGER",         tenantScope: "agency" },
+  // Supervision borne ADM-003a (admin.yaml, CONTRACT-013) : état dérivé à la lecture.
+  { method: "GET", path: "/agencies/{id}/kiosks/status", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/admin/network-overview",  requiredRole: "SUPER_ADMIN",     tenantScope: "platform" },
 
   // ── AI (ai.yaml) ──────────────────────────────────────────────────────────

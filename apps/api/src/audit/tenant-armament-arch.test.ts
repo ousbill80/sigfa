@@ -103,6 +103,9 @@ const ARMED: readonly string[] = [
   // ADM-001a : theming tenant — tout accès DB routé via withArmedTenant
   // (armement `app.current_bank_id` sur le bankId du chemin).
   "theme.ts",
+  // ADM-003a — supervision borne (GET /agencies/{id}/kiosks/status). Lecture
+  // tenant routée via `withArmedTenant` (RLS armée) : première route basculée.
+  "kiosk-supervision.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
