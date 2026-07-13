@@ -23,6 +23,9 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // → 403. The platform surface is never lowered to a tenant role. Must precede
   // any broader prefix so its match wins.
   "/platform": ["SUPER_ADMIN"],
+  // Theming console (ADM-001b): theming = BANK_ADMIN+ incl. AGENCY_DIRECTOR.
+  // Must precede "/admin" so the more specific prefix match wins.
+  "/admin/theming": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR"],
   "/admin": ["SUPER_ADMIN", "BANK_ADMIN"],
   // AUDITOR reaches the manager dashboard in read-only mode (WEB-003).
   "/dashboard/manager": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AUDITOR"],
