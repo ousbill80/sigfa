@@ -55,6 +55,8 @@ export interface PurgeAiHistoryResult {
   deletedQualityScores: number;
   /** Nombre d'anomalies `ai_anomalies` supprimées (toutes statuts). */
   deletedAnomalies: number;
+  /** Nombre de features `ai_features` supprimées. */
+  deletedFeatures: number;
 }
 
 /**
@@ -64,6 +66,7 @@ export interface PurgeAiHistoryResult {
  * - `ai_forecasts`      : `computed_at` < now - 24 mois
  * - `ai_quality_scores` : `created_at`  < now - 24 mois
  * - `ai_anomalies`      : `detected_at` < now - 24 mois (toutes statuts)
+ * - `ai_features`       : `computed_at` < now - 24 mois (DB-AI-FEATURES)
  *
  * Idempotente : un second appel ne supprime rien de plus.
  *
@@ -120,5 +123,16 @@ export async function purgeAiHistory(
   `);
   const deletedAnomalies = Number(anomaliesRes.rows[0]?.n ?? 0);
 
-  return { deletedForecasts, deletedQualityScores, deletedAnomalies };
+  // ── 4. ai_features : computed_at < cutoff (DB-AI-FEATURES) ───────────────────
+  const featuresRes = await query(`
+    WITH deleted AS (
+      DELETE FROM ai_features
+      WHERE computed_at < ${cutoff}
+      RETURNING id
+    )
+    SELECT count(*)::int AS n FROM deleted
+  `);
+  const deletedFeatures = Number(featuresRes.rows[0]?.n ?? 0);
+
+  return { deletedForecasts, deletedQualityScores, deletedAnomalies, deletedFeatures };
 }

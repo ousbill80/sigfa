@@ -6,6 +6,8 @@ import {
   date,
   integer,
   numeric,
+  doublePrecision,
+  boolean,
   timestamp,
   index,
   uniqueIndex,
@@ -480,5 +482,175 @@ export const aiQualityScores = pgTable(
      * Index (bank_id, period) — requêtes réseau par banque.
      */
     index("ai_quality_scores_bank_period_idx").on(table.bankId, table.period),
+  ]
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Table 5 : ai_features (DB-AI-FEATURES — couture IA-001)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `ai_features` — matérialisation du feature-set d'affluence (DB-AI-FEATURES).
+ *
+ * ## Couture IA-001 (CONTRACT-008)
+ * Table de persistance RÉELLE du pipeline features IA-001. Elle remplace le
+ * substitut `InMemoryFeatureStore` (`apps/api/src/ai/feature-store.ts`). Chaque
+ * colonne reflète un champ du `FeatureRecord` produit par `computeFeatureSet`
+ * (`apps/api/src/ai/feature-engine.ts`) :
+ *  - mesures de bucket d'affluence (arrivals/served/no_show/abandoned, TMA/TMT,
+ *    p90, guichets/agents) — issues REP-001 / extraction, jamais recalculées ;
+ *  - features calendaires (day_of_week + flags + factors JSONB) ;
+ *  - features LAG (J-1, J-7, moyenne glissante 4 semaines) ;
+ *  - métadonnées (is_partial, available_days, feature_set_version).
+ *
+ * ## Clé d'idempotence (upsert IA-001)
+ * UNIQUE `(bank_id, agency_id, service_id, date, hour_bucket, feature_set_version)`
+ * avec `NULLS NOT DISTINCT` (PG16) — `service_id` NULL = « tous services confondus »
+ * reste une clé canonique unique. Rejouer la même fenêtre produit exactement les
+ * mêmes lignes (aucun doublon) via `ON CONFLICT DO UPDATE`, exactement comme
+ * `canonicalKey` du store en mémoire (qui mappe `serviceId ?? "∅"`).
+ *
+ * ## Dénormalisation bank_id + agency_id
+ * `bank_id` (FK RESTRICT) porte l'isolation tenant RLS ; `agency_id` (FK RESTRICT)
+ * est dénormalisé pour les requêtes par agence (convention F2 : bank_id en tête).
+ *
+ * ## service_id
+ * `text` nullable (SANS FK) : le pipeline traite `serviceId` comme un identifiant
+ * opaque pouvant être `null` (agrégat tous services). Pas de FK — cohérent avec le
+ * contrat IA-001 et l'absence d'imputation.
+ *
+ * ## Rétention (DB-007 / DB-008)
+ * Cache de calcul (pas une source de vérité) : purgé si `computed_at` < now - 24
+ * mois par `purgeAiHistory()` — cohérent avec les autres tables `ai_*`.
+ *
+ * ## Décision d'audit
+ * EXCLUE de AUDITED_TABLES : table d'agrégats IA à volume élevé, mutations
+ * idempotentes (upsert). La source de vérité reste `tickets`.
+ *
+ * ## Zéro donnée personnelle
+ * Uniquement des agrégats numériques et calendaires — aucun phone/email/nom, aucun
+ * identifiant client, aucun verbatim. Conformité UEMOA.
+ *
+ * ## RLS
+ * ENABLE + FORCE + policy `tenant_isolation` (bank_id = app.current_bank_id).
+ */
+export const aiFeatures = pgTable(
+  "ai_features",
+  {
+    /** Identifiant unique de la feature. */
+    id: uuid("id").primaryKey().defaultRandom(),
+    // ── Clé canonique ──────────────────────────────────────────────────────────
+    /** Tenant — banque propriétaire (FK RESTRICT, isolation RLS). */
+    bankId: uuid("bank_id")
+      .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
+      .references(() => banks.id, { onDelete: "restrict" }),
+    /** Agence (FK RESTRICT, dénormalisée). */
+    agencyId: uuid("agency_id")
+      .notNull()
+      /* v8 ignore next — callback de résolution lazy FK Drizzle (pure DSL, non instrumentable) */
+      .references(() => agencies.id, { onDelete: "restrict" }),
+    /** Service (opaque, nullable — NULL = tous services confondus). Pas de FK. */
+    serviceId: text("service_id"),
+    /** Jour civil Abidjan (YYYY-MM-DD). */
+    date: date("date").notNull(),
+    /** Index du bucket dans la journée (0-based). Horaire : 0–23. 30 min : 0–47. */
+    hourBucket: integer("hour_bucket").notNull(),
+    /** Largeur du bucket en minutes (30 ou 60). */
+    bucketMinutes: integer("bucket_minutes").notNull(),
+    // ── Mesures de bucket (REP-001 / extraction, non recalculées) ───────────────
+    /** Tickets émis (arrivées) dans le bucket. */
+    arrivals: integer("arrivals").notNull(),
+    /** Tickets servis (DONE). */
+    served: integer("served").notNull(),
+    /** Tickets non-présentés (NO_SHOW). */
+    noShow: integer("no_show").notNull(),
+    /** Tickets abandonnés (ABANDONED). */
+    abandoned: integer("abandoned").notNull(),
+    /** TMA du bucket (moyenne attente s). NULL si served = 0 (aucune imputation). */
+    avgWaitSeconds: doublePrecision("avg_wait_seconds"),
+    /** 90e centile du temps d'attente (secondes). */
+    p90WaitSeconds: doublePrecision("p90_wait_seconds").notNull(),
+    /** TMT du bucket (moyenne service s). NULL si served = 0. */
+    avgServiceSeconds: doublePrecision("avg_service_seconds"),
+    /** Nb de guichets ouverts observés. */
+    countersOpen: integer("counters_open").notNull(),
+    /** Nb d'agents actifs observés. */
+    agentsActive: integer("agents_active").notNull(),
+    // ── Features calendaires (CONTRACT-008) ─────────────────────────────────────
+    /** Jour de la semaine (0=dimanche … 6=samedi, aligné calendarFlags). */
+    dayOfWeek: integer("day_of_week").notNull(),
+    /** Fin de mois. */
+    isMonthEnd: boolean("is_month_end").notNull(),
+    /** Jour de paie de la fonction publique. */
+    isPublicPayDay: boolean("is_public_pay_day").notNull(),
+    /** Jour férié. */
+    isPublicHoliday: boolean("is_public_holiday").notNull(),
+    /** Veille de jour férié. */
+    isEveOfHoliday: boolean("is_eve_of_holiday").notNull(),
+    /**
+     * Facteurs contextuels (JSONB, enum ContextualFactor).
+     * Ex. `["END_OF_MONTH", "PUBLIC_HOLIDAY"]` ou `["NONE"]`.
+     */
+    factors: jsonb("factors").notNull().default(["NONE"]),
+    // ── Features LAG ────────────────────────────────────────────────────────────
+    /** Arrivées du même bucket la veille (J-1). NULL si absent. */
+    arrivalsLag1d: integer("arrivals_lag_1d"),
+    /** Arrivées du même bucket 7 jours avant (J-7). NULL si absent. */
+    arrivalsLag7d: integer("arrivals_lag_7d"),
+    /**
+     * Moyenne des arrivées du même bucket sur 4 semaines glissantes
+     * (J-7, J-14, J-21, J-28). NULL si aucun des 4 points n'est disponible.
+     */
+    arrivalsRollMean4w: doublePrecision("arrivals_roll_mean_4w"),
+    // ── Métadonnées ─────────────────────────────────────────────────────────────
+    /** Bucket incomplet — aucune imputation. */
+    isPartial: boolean("is_partial").notNull(),
+    /** Nb de jours civils distincts observés pour l'agence (base seuil 90 j). */
+    availableDays: integer("available_days").notNull(),
+    /** Version du schéma de features (CONTRACT-008). */
+    featureSetVersion: text("feature_set_version").notNull(),
+    // ── AiMeta / horodatages ────────────────────────────────────────────────────
+    /**
+     * AiMeta — horodatage UTC du calcul de la feature (base de la rétention 24 mois).
+     */
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Horodatage de création de la ligne. */
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Horodatage de dernière mise à jour (upsert idempotent). */
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    /**
+     * Contrainte unique (idempotence upsert IA-001) :
+     * (bank_id, agency_id, service_id, date, hour_bucket, feature_set_version).
+     *
+     * NOTE : la migration SQL 0013 crée cet index avec `NULLS NOT DISTINCT` (PG16)
+     * pour que `service_id` NULL (« tous services ») reste une clé canonique unique.
+     * Drizzle 0.36 n'exposant pas de builder `NULLS NOT DISTINCT`, la clause est
+     * portée par la migration hand-authored (source de vérité DDL) ; ce descripteur
+     * garantit l'alignement des colonnes de la clé.
+     */
+    uniqueIndex("ai_features_unique_feature").on(
+      table.bankId,
+      table.agencyId,
+      table.serviceId,
+      table.date,
+      table.hourBucket,
+      table.featureSetVersion
+    ),
+    /**
+     * Index (bank_id, agency_id, date) — requêtes par agence et date.
+     * bank_id en tête (convention F2).
+     */
+    index("ai_features_bank_agency_date_idx").on(
+      table.bankId,
+      table.agencyId,
+      table.date
+    ),
+    /**
+     * Index (bank_id, computed_at) — support de la purge rétention 24 mois.
+     */
+    index("ai_features_bank_computed_idx").on(table.bankId, table.computedAt),
   ]
 );

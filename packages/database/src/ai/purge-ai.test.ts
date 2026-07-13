@@ -130,6 +130,35 @@ async function insertQualityScore(
   `);
 }
 
+/** Insère une feature ai_features (DB-AI-FEATURES) — horloge `computedAt` injectée. */
+async function insertFeature(
+  harness: DualConnectionHarness,
+  opts: {
+    id: string;
+    bankId: string;
+    agencyId: string;
+    date: string;
+    hourBucket: number;
+    computedAt: string;
+  }
+): Promise<void> {
+  await harness.query(`
+    INSERT INTO ai_features
+      (id, bank_id, agency_id, service_id, date, hour_bucket, bucket_minutes,
+       arrivals, served, no_show, abandoned, p90_wait_seconds,
+       counters_open, agents_active, day_of_week,
+       is_month_end, is_public_pay_day, is_public_holiday, is_eve_of_holiday,
+       is_partial, available_days, feature_set_version, computed_at)
+    VALUES (
+      '${opts.id}', '${opts.bankId}', '${opts.agencyId}', NULL,
+      '${opts.date}'::date, ${opts.hourBucket}, 60,
+      5, 5, 0, 0, 120.0, 3, 2, 5,
+      false, false, false, false, false, 90, 'fs-v1',
+      '${opts.computedAt}'::timestamptz
+    )
+  `);
+}
+
 // ── Suite principale ─────────────────────────────────────────────────────────
 
 describe("DB-007 — tables IA + rétention (intégration PG16, Testcontainers)", () => {
@@ -164,6 +193,7 @@ describe("DB-007 — tables IA + rétention (intégration PG16, Testcontainers)"
     await harness.query(
       `DELETE FROM ai_staffing_recommendations WHERE bank_id IN ('${BANK_A}', '${BANK_B}')`
     );
+    await harness.query(`DELETE FROM ai_features WHERE bank_id IN ('${BANK_A}', '${BANK_B}')`);
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -461,11 +491,32 @@ describe("DB-007 — tables IA + rétention (intégration PG16, Testcontainers)"
         createdAt: "2026-06-30T12:00:00Z",
       });
 
+      // Feature ancienne (>24 mois — computed_at)
+      await insertFeature(harness, {
+        id: "fe700010-0000-4000-8000-00000000db07",
+        bankId: BANK_A,
+        agencyId: AGENCY_A,
+        date: "2024-05-01",
+        hourBucket: 9,
+        computedAt: "2024-04-30T22:00:00Z",
+      });
+
+      // Feature récente (<24 mois)
+      await insertFeature(harness, {
+        id: "fe700011-0000-4000-8000-00000000db07",
+        bankId: BANK_A,
+        agencyId: AGENCY_A,
+        date: "2026-06-01",
+        hourBucket: 9,
+        computedAt: "2026-05-31T22:00:00Z",
+      });
+
       // Premier appel
       const first = await purgeAiHistory(harness.query.bind(harness), { now: NOW });
       expect(first.deletedForecasts).toBeGreaterThanOrEqual(1);
       expect(first.deletedAnomalies).toBeGreaterThanOrEqual(2);
       expect(first.deletedQualityScores).toBeGreaterThanOrEqual(1);
+      expect(first.deletedFeatures).toBeGreaterThanOrEqual(1);
 
       // Vérifier que le forecast ancien est supprimé et le récent intact
       const oldForecast = await harness.query(`
@@ -500,11 +551,25 @@ describe("DB-007 — tables IA + rétention (intégration PG16, Testcontainers)"
       `);
       expect(recentScore.rows[0]!.n).toBe(1);
 
+      // Feature ancienne supprimée, récente intacte (DB-AI-FEATURES)
+      const oldFeature = await harness.query(`
+        SELECT count(*)::int AS n FROM ai_features
+        WHERE id = 'fe700010-0000-4000-8000-00000000db07'
+      `);
+      expect(oldFeature.rows[0]!.n).toBe(0);
+
+      const recentFeature = await harness.query(`
+        SELECT count(*)::int AS n FROM ai_features
+        WHERE id = 'fe700011-0000-4000-8000-00000000db07'
+      `);
+      expect(recentFeature.rows[0]!.n).toBe(1);
+
       // Deuxième appel → idempotent (rien à supprimer)
       const second = await purgeAiHistory(harness.query.bind(harness), { now: NOW });
       expect(second.deletedForecasts).toBe(0);
       expect(second.deletedAnomalies).toBe(0);
       expect(second.deletedQualityScores).toBe(0);
+      expect(second.deletedFeatures).toBe(0);
     },
     60_000
   );
