@@ -1,0 +1,30 @@
+{
+  "$comment": "SEC-003 — Politique de rétention/rotation PRA (versionnée). Surchargeable par variables d'environnement (BACKUP_HOURLY_RETENTION_HOURS / BACKUP_DAILY_RETENTION_DAYS). Défauts codés dans apps/api/src/pra/backup-config.ts.",
+  "rpoTargetMinutes": 60,
+  "rtoTargetMinutes": 15,
+  "schedulerDriftToleranceMinutes": 5,
+  "hourly": {
+    "cadence": "hourly",
+    "retentionHours": 48,
+    "envOverride": "BACKUP_HOURLY_RETENTION_HOURS"
+  },
+  "daily": {
+    "cadence": "daily",
+    "retentionDays": 30,
+    "envOverride": "BACKUP_DAILY_RETENTION_DAYS"
+  },
+  "encryption": {
+    "algorithm": "aes-256-gcm",
+    "keyEnv": "BACKUP_ENCRYPTION_KEY",
+    "keyBytes": 32,
+    "checksum": "sha256",
+    "custodyRisk": "Clé stockée hors du bucket de backup (KMS/coffre). Perte de clé = perte totale des backups. Rotation via version d'enveloppe. Voir ops/pra/RUNBOOK.md §6."
+  },
+  "storage": {
+    "provider": "cloudflare-r2",
+    "s3Compatible": true,
+    "interface": "BackupStorage",
+    "ciAdapter": "MockBackupStorage",
+    "note": "Adaptateur R2 réel = déploiement GATED infra. Aucune dépendance réseau réelle en CI."
+  }
+}
