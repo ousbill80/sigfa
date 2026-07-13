@@ -18,6 +18,7 @@ import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { SignJWT } from "jose";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 import { createCaptureBus, type CaptureBus } from "src/services/realtime.js";
 
 let pgContainer: StartedTestContainer;
@@ -133,6 +134,7 @@ beforeAll(async () => {
   await db.connect();
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
   await runMigrations(db);
+  await ensureAuditLogSchema(db);
   fx = await insertFixtures(db);
   bus = createCaptureBus();
   app = createApp({ db, redis, jwtSecret: jwtSecretBytes, bus });
@@ -204,7 +206,9 @@ describe("API-007: POST /agents/:id/status — transitions + forçage SERVING + 
 
   it("API-007: MANAGER change le statut d'un agent de son scope → 200", async () => {
     await setStatus(fx.agentId, "AVAILABLE");
-    const tok = await token("MANAGER", "manager-1", fx.bankId, [fx.agencyId]);
+    // sub = UUID réel (le claim `sub` du JWT est TOUJOURS un userId UUID) : requis
+    // depuis SEC-001a car le changement de statut journalise l'acteur (actor_id).
+    const tok = await token("MANAGER", "99999999-9999-4999-a999-999999999999", fx.bankId, [fx.agencyId]);
     const r = await post(`/agents/${fx.agentId}/status`, { status: "OFFLINE" }, tok);
     expect(r.status).toBe(200);
   });

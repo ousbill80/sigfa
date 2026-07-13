@@ -188,7 +188,32 @@ export type TranslationKey =
   | "reports.kpi.tts"
   | "reports.kpi.tauxAbandon"
   | "reports.kpi.nps"
-  | "reports.kpi.occupation";
+  | "reports.kpi.occupation"
+  | "audit.title"
+  | "audit.subtitle"
+  | "audit.filter.entityType"
+  | "audit.filter.entityId"
+  | "audit.filter.actorId"
+  | "audit.filter.from"
+  | "audit.filter.to"
+  | "audit.filter.apply"
+  | "audit.filter.reset"
+  | "audit.col.timestamp"
+  | "audit.col.actor"
+  | "audit.col.action"
+  | "audit.col.entity"
+  | "audit.col.ip"
+  | "audit.col.diff"
+  | "audit.diff.before"
+  | "audit.diff.after"
+  | "audit.diff.none"
+  | "audit.pagination.prev"
+  | "audit.pagination.next"
+  | "audit.pagination.page"
+  | "audit.loading"
+  | "audit.empty"
+  | "audit.error"
+  | "audit.offline";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -375,6 +400,31 @@ export const FR: TranslationDict = {
   "reports.kpi.tauxAbandon": "Taux d'abandon",
   "reports.kpi.nps": "NPS",
   "reports.kpi.occupation": "Occupation",
+  "audit.title": "Journal d'audit",
+  "audit.subtitle": "Consultation en lecture seule des évènements de sécurité et de configuration.",
+  "audit.filter.entityType": "Type d'entité",
+  "audit.filter.entityId": "Identifiant d'entité",
+  "audit.filter.actorId": "Identifiant de l'acteur",
+  "audit.filter.from": "Du",
+  "audit.filter.to": "Au",
+  "audit.filter.apply": "Filtrer",
+  "audit.filter.reset": "Réinitialiser",
+  "audit.col.timestamp": "Horodatage",
+  "audit.col.actor": "Acteur",
+  "audit.col.action": "Action",
+  "audit.col.entity": "Entité",
+  "audit.col.ip": "Adresse IP",
+  "audit.col.diff": "Modifications",
+  "audit.diff.before": "Avant",
+  "audit.diff.after": "Après",
+  "audit.diff.none": "—",
+  "audit.pagination.prev": "Précédent",
+  "audit.pagination.next": "Suivant",
+  "audit.pagination.page": "Page",
+  "audit.loading": "Chargement du journal d'audit…",
+  "audit.empty": "Aucun évènement pour ces critères.",
+  "audit.error": "Impossible de charger le journal d'audit. Réessayez.",
+  "audit.offline": "Hors ligne — le journal affiché peut ne pas être à jour.",
 };
 
 /** English translations */
@@ -558,6 +608,31 @@ export const EN: TranslationDict = {
   "reports.kpi.tauxAbandon": "Abandonment rate",
   "reports.kpi.nps": "NPS",
   "reports.kpi.occupation": "Occupancy",
+  "audit.title": "Audit log",
+  "audit.subtitle": "Read-only view of security and configuration events.",
+  "audit.filter.entityType": "Entity type",
+  "audit.filter.entityId": "Entity ID",
+  "audit.filter.actorId": "Actor ID",
+  "audit.filter.from": "From",
+  "audit.filter.to": "To",
+  "audit.filter.apply": "Filter",
+  "audit.filter.reset": "Reset",
+  "audit.col.timestamp": "Timestamp",
+  "audit.col.actor": "Actor",
+  "audit.col.action": "Action",
+  "audit.col.entity": "Entity",
+  "audit.col.ip": "IP address",
+  "audit.col.diff": "Changes",
+  "audit.diff.before": "Before",
+  "audit.diff.after": "After",
+  "audit.diff.none": "—",
+  "audit.pagination.prev": "Previous",
+  "audit.pagination.next": "Next",
+  "audit.pagination.page": "Page",
+  "audit.loading": "Loading audit log…",
+  "audit.empty": "No events for these filters.",
+  "audit.error": "Unable to load the audit log. Please retry.",
+  "audit.offline": "Offline — the displayed log may be out of date.",
 };
 
 /** All locales map */

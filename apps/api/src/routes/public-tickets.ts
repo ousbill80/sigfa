@@ -30,6 +30,7 @@ import {
 } from "src/services/idempotency.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
 import { issueTicketFor, type IssueTicketInput } from "src/routes/tickets.js";
+import { recordAudit, extractIp } from "src/lib/audit-context.js";
 
 /** Variables de contexte Hono (injectées par app.ts). */
 interface PublicEnv {
@@ -311,12 +312,15 @@ async function issuePublicTicket(c: PublicCtx, input: PublicCreateInput): Promis
     phoneNumber: input.phoneNumber ?? undefined,
     smsConsent: input.smsConsent,
   };
+  // SEC-001a : émission publique auditée (acteur anonyme : actorId/role null).
+  // Le diff n'expose JAMAIS le téléphone (assaini + non fourni ici).
   const result = await issueTicketFor(
     c.get("db"),
     c.get("redis"),
     { bankId: null, agencyId: input.agencyId },
     issueInput,
-    getBus(c)
+    getBus(c),
+    { actorId: null, actorRole: null, ip: extractIp(c), action: "POST /public/tickets" }
   );
   return publicCreatedDto(result);
 }
@@ -506,10 +510,14 @@ async function submitFeedback(c: PublicCtx, trackingId: string, note: number, co
   const row = await loadByTracking(db, trackingId);
   if (!row) return opaqueNotFound(c);
   assertFeedbackAllowed(row);
-  const applied = await persistFeedback(db, row.id, note, comment);
+  const bankId = await bankIdOf(db, row.id);
+  const applied = await persistFeedback(db, row.id, note, comment, {
+    bankId,
+    ip: extractIp(c),
+  });
   if (!applied) throw new SigfaError("FEEDBACK_ALREADY_SUBMITTED", "Un feedback a déjà été soumis pour ce ticket.", 409);
   await incrementDailyNps(db, {
-    bankId: await bankIdOf(db, row.id),
+    bankId,
     agencyId: row.agency_id,
     serviceId: row.service_id,
     note,
@@ -554,18 +562,46 @@ function assertFeedbackAllowed(row: TicketRow): void {
  * @param comment - Commentaire nettoyé
  * @returns `true` si la ligne a été mise à jour (première soumission), `false` sinon
  */
-async function persistFeedback(db: Client, id: string, note: number, comment: string | null): Promise<boolean> {
-  const res = await db.query(
-    `UPDATE tickets
-        SET feedback_score = $2, feedback_comment = $3, feedback_at = now(), updated_at = now()
-      WHERE id = $1
-        AND status = 'DONE'
-        AND feedback_score IS NULL
-        AND NOW() - closed_at <= INTERVAL '24 hours'
-      RETURNING id`,
-    [id, note, comment]
-  );
-  return (res.rowCount ?? 0) > 0;
+async function persistFeedback(
+  db: Client,
+  id: string,
+  note: number,
+  comment: string | null,
+  audit: { bankId: string; ip: string | null }
+): Promise<boolean> {
+  // SEC-001a : persistance + audit atomiques (transaction unique). L'acteur est
+  // anonyme (client public) ; le diff ne contient QUE la note (jamais le
+  // commentaire libre ni de PII).
+  await db.query("BEGIN");
+  try {
+    const res = await db.query(
+      `UPDATE tickets
+          SET feedback_score = $2, feedback_comment = $3, feedback_at = now(), updated_at = now()
+        WHERE id = $1
+          AND status = 'DONE'
+          AND feedback_score IS NULL
+          AND NOW() - closed_at <= INTERVAL '24 hours'
+        RETURNING id`,
+      [id, note, comment]
+    );
+    const applied = (res.rowCount ?? 0) > 0;
+    if (applied) {
+      await recordAudit({
+        db,
+        tenant: { requestId: "", userId: "", bankId: audit.bankId, role: "NONE", agencyIds: [] },
+        action: "POST /public/tickets/:trackingId/feedback",
+        entityType: "ticket",
+        entityId: id,
+        ip: audit.ip,
+        diff: { after: { feedbackScore: note } },
+      });
+    }
+    await db.query("COMMIT");
+    return applied;
+  } catch (err) {
+    await db.query("ROLLBACK");
+    throw err;
+  }
 }
 
 /** Résout le bankId (tenant) du ticket pour l'agrégat NPS. */

@@ -21,6 +21,7 @@ import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { randomUUID } from "node:crypto";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 process.env["PHONE_ENCRYPTION_KEY"] =
   process.env["PHONE_ENCRYPTION_KEY"] ??
@@ -103,6 +104,7 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test` });
   await db.connect();
   await runMigrations(db);
+  await ensureAuditLogSchema(db);
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
 
   // Tenant A

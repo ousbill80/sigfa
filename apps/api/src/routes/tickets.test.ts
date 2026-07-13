@@ -20,6 +20,7 @@ import { createApp } from "src/app.js";
 import { createCaptureBus, type CaptureBus } from "src/services/realtime.js";
 import { computePosition, queueLength } from "src/services/queue-strategy.js";
 import { getCachedEstimate } from "src/services/queue-estimation.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 let pgContainer: StartedTestContainer;
 let redisContainer: StartedTestContainer;
@@ -197,6 +198,7 @@ beforeAll(async () => {
   await db.connect();
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
   await runMigrations(db);
+  await ensureAuditLogSchema(db);
   ids = await insertFixtures(db);
   bus = createCaptureBus();
   app = createApp({ db, redis, jwtSecret: jwtSecretBytes, bus });

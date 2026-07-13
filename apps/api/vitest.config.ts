@@ -75,6 +75,7 @@ export default defineConfig({
         "src/routes/admin-test-harness.ts", // Support de test partagé API-008 (Testcontainers)
         "src/services/rt002-test-harness.ts", // Support de test partagé RT-002 (Testcontainers realtime)
         "src/routes/model-api-b.harness.ts", // Support de test partagé MODEL-API-B (Testcontainers)
+        "src/audit/audit-log-test-schema.ts", // Support de test partagé SEC-001a (schéma audit_log Testcontainers)
       ],
     },
   },

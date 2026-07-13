@@ -24,6 +24,8 @@ import {
   createKioskSession,
   revokeKioskSession,
 } from "src/services/kiosk-session.service.js";
+import { recordAudit, extractIp } from "src/lib/audit-context.js";
+import { withAudit, auditContextFrom } from "src/audit/with-audit.js";
 
 /** Variables de contexte Hono du routeur session borne. */
 interface KioskEnv {
@@ -77,15 +79,36 @@ export function createKioskSessionRouter(): Hono<KioskEnv> {
 function registerCreateSession(router: Hono<KioskEnv>): void {
   router.post("/kiosk/session", async (c) => {
     const db = c.get("db");
+    const ip = extractIp(c);
     try {
       const input = parseStrict(kioskSessionSchema, await parseJson(c));
-      const session = await createKioskSession({
-        db,
-        jwtSecret: c.get("jwtSecret"),
-        kioskId: input.kioskId,
-        kioskSecret: input.kioskSecret,
-        agencyId: input.agencyId,
-      });
+      // SEC-001a : ouverture de session borne + audit atomiques. Acteur = la
+      // borne elle-même (public, actorId/role null) ; jamais le secret dans le diff.
+      await db.query("BEGIN");
+      let session;
+      try {
+        session = await createKioskSession({
+          db,
+          jwtSecret: c.get("jwtSecret"),
+          kioskId: input.kioskId,
+          kioskSecret: input.kioskSecret,
+          agencyId: input.agencyId,
+        });
+        const bankId = await bankIdOfKiosk(db, input.kioskId);
+        await recordAudit({
+          db,
+          tenant: { requestId: "", userId: "", bankId, role: "NONE", agencyIds: [] },
+          action: "POST /kiosk/session",
+          entityType: "kiosk",
+          entityId: input.kioskId,
+          ip,
+          diff: { after: { agencyId: input.agencyId, sessionOpened: true } },
+        });
+        await db.query("COMMIT");
+      } catch (txErr) {
+        await db.query("ROLLBACK");
+        throw txErr;
+      }
       return c.json(session, 201);
     } catch (err) {
       return errorResponse(c, err);
@@ -101,12 +124,38 @@ function registerRevokeSession(router: Hono<KioskEnv>): void {
     try {
       const kioskId = c.req.param("kioskId");
       const bankId = requireBankId(tenant);
-      await revokeKioskSession(db, bankId, kioskId);
+      // SEC-001a : révocation de session borne + audit atomiques (transaction
+      // unique). Traçabilité de la coupure d'accès borne (API-011).
+      await withAudit(auditContextFrom(c), async () => {
+        await revokeKioskSession(db, bankId, kioskId);
+        return {
+          result: undefined,
+          audit: {
+            action: "DELETE /kiosk/session/:kioskId",
+            entityType: "kiosk",
+            entityId: kioskId,
+            diff: { after: { sessionRevoked: true } },
+          },
+        };
+      });
       return c.json({ success: true }, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
   });
+}
+
+/**
+ * Résout le `bank_id` d'une borne (tenant du scope d'audit). La borne a déjà été
+ * authentifiée par `createKioskSession`, donc la ligne existe à ce point.
+ *
+ * @param db      - Connexion PG (transaction ouverte)
+ * @param kioskId - Identifiant de la borne (colonne `id`)
+ * @returns Le `bank_id` de la borne
+ */
+async function bankIdOfKiosk(db: Client, kioskId: string): Promise<string> {
+  const res = await db.query(`SELECT bank_id FROM kiosks WHERE id = $1`, [kioskId]);
+  return (res.rows[0] as { bank_id: string }).bank_id;
 }
 
 /** Ligne kiosk projetée par l'UPDATE du heartbeat (état avant/après). */

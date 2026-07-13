@@ -43,6 +43,17 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("AGENCY_DIRECTOR", "/dashboard/network")).toBe(true);
     });
 
+    it("SEC-001b: RBAC /audit — AUDITOR et SUPER_ADMIN autorisés (lecture seule)", () => {
+      expect(canAccess("AUDITOR", "/audit")).toBe(true);
+      expect(canAccess("SUPER_ADMIN", "/audit")).toBe(true);
+    });
+
+    it("SEC-001b: RBAC /audit — MANAGER / AGENT / AGENCY_DIRECTOR refusés (403)", () => {
+      expect(canAccess("MANAGER", "/audit")).toBe(false);
+      expect(canAccess("AGENT", "/audit")).toBe(false);
+      expect(canAccess("AGENCY_DIRECTOR", "/audit")).toBe(false);
+    });
+
     it("WEB-004: RBAC MANAGER — /dashboard/network retourne 403 (non direction réseau)", () => {
       expect(canAccess("MANAGER", "/dashboard/network")).toBe(false);
     });

@@ -22,6 +22,7 @@ import { GenericContainer, type StartedTestContainer, Wait } from "testcontainer
 import { serve } from "@hono/node-server";
 import type { Server } from "node:http";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 const execAsync = promisify(exec);
 
@@ -57,6 +58,7 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test` });
   await db.connect();
   await runMigrations(db);
+  await ensureAuditLogSchema(db);
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
 
   const app = createApp({ db, redis, jwtSecret: jwtSecretBytes });

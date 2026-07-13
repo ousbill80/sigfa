@@ -25,6 +25,7 @@ import { randomUUID } from "node:crypto";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import type { AddressInfo } from "net";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 import { createSocketServer } from "src/services/socket-server.js";
 import { logger } from "src/lib/logger.js";
 import { serve } from "@hono/node-server";
@@ -266,6 +267,7 @@ beforeAll(async () => {
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
 
   await runMigrations(db);
+  await ensureAuditLogSchema(db);
   ids = await insertFixtures(db);
   agentToken = await forgeToken([ids.agencyId]);
 

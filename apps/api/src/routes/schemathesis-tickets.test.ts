@@ -22,6 +22,7 @@ import { serve } from "@hono/node-server";
 import type { Server } from "node:http";
 import { SignJWT } from "jose";
 import { createApp } from "src/app.js";
+import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 const execAsync = promisify(exec);
 
@@ -99,6 +100,7 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test` });
   await db.connect();
   const fx = await runMigrations(db);
+  await ensureAuditLogSchema(db);
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
 
   token = await new SignJWT({ role: "AGENT", bankId: fx.bankId, agencyIds: [fx.agencyId] })

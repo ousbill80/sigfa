@@ -21,6 +21,8 @@ import {
   estimateWaitMinutes,
   invalidateEstimate,
 } from "src/services/queue-estimation.js";
+import { buildDiff } from "src/lib/audit-context.js";
+import { withAudit, auditContextFrom } from "src/audit/with-audit.js";
 
 /** Variables de contexte Hono injectées par app.ts. */
 interface QueueEnv {
@@ -131,7 +133,7 @@ function registerPatchQueue(router: Hono<QueueEnv>): void {
           400
         );
       }
-      const result = await patchQueue(db, redis, tenant, queueId, parsed.data, getBus(c));
+      const result = await patchQueue(db, redis, tenant, queueId, parsed.data, getBus(c), auditContextFrom(c));
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -152,35 +154,51 @@ async function patchQueue(
   tenant: TenantContext,
   queueId: string,
   input: PatchQueueInput,
-  bus: RealtimeBus
+  bus: RealtimeBus,
+  auditCtx: ReturnType<typeof auditContextFrom>
 ): Promise<Record<string, unknown>> {
   const queue = await loadQueue(db, tenant, queueId);
 
   const newStatus = input.status ?? queue.status;
   const isOpen = newStatus === "OPEN";
 
-  await db.query(
-    `UPDATE queues
-        SET status = $1,
-            is_open = $2,
-            open_at = COALESCE($3, open_at),
-            close_at = COALESCE($4, close_at),
-            updated_at = NOW()
-      WHERE id = $5`,
-    [newStatus, isOpen, input.openAt ?? null, input.closeAt ?? null, queueId]
-  );
+  // SEC-001a : mutation + audit dans UNE transaction (rollback si audit échoue).
+  const view = await withAudit(auditCtx, async (tx) => {
+    await tx.query(
+      `UPDATE queues
+          SET status = $1,
+              is_open = $2,
+              open_at = COALESCE($3, open_at),
+              close_at = COALESCE($4, close_at),
+              updated_at = NOW()
+        WHERE id = $5`,
+      [newStatus, isOpen, input.openAt ?? null, input.closeAt ?? null, queueId]
+    );
+    return {
+      result: {
+        id: queueId,
+        agencyId: queue.agency_id,
+        serviceId: queue.service_id,
+        status: newStatus,
+        ...(input.openAt !== undefined ? { openAt: input.openAt } : {}),
+        ...(input.closeAt !== undefined ? { closeAt: input.closeAt } : {}),
+      },
+      audit: {
+        action: "PATCH /queues/:id",
+        entityType: "queue",
+        entityId: queueId,
+        diff: buildDiff(
+          { status: queue.status, openAt: queue.open_at, closeAt: queue.close_at },
+          { status: newStatus, openAt: input.openAt ?? queue.open_at, closeAt: input.closeAt ?? queue.close_at }
+        ),
+      },
+    };
+  });
 
   await invalidateEstimate(redis, queueId);
   const length = await queueLength(queueId, db);
   const estimate = await estimateWaitMinutes(length, queue.service_id, db);
   bus.emit("queue:updated", queue.agency_id, { queueId, length, estimate });
 
-  return {
-    id: queueId,
-    agencyId: queue.agency_id,
-    serviceId: queue.service_id,
-    status: newStatus,
-    ...(input.openAt !== undefined ? { openAt: input.openAt } : {}),
-    ...(input.closeAt !== undefined ? { closeAt: input.closeAt } : {}),
-  };
+  return view;
 }
