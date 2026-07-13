@@ -28,6 +28,10 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // AGENCY_DIRECTOR are excluded (→ 403). Must precede "/dashboard" so the prefix
   // match wins.
   "/dashboard/comex": ["SUPER_ADMIN", "BANK_ADMIN"],
+  // AI insights + COMEX predictive surfaces (IA-005): DIRECTOR+ / network only.
+  // AGENT and MANAGER are excluded (→ 403). Must precede "/dashboard" so the
+  // prefix match wins.
+  "/dashboard/insights": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR"],
   // Reporting surface — export + benchmarking (REP-003b): AGENCY_DIRECTOR+ and
   // AUDITOR only. AGENT / MANAGER are excluded (→ 403). Must precede
   // "/dashboard" so the prefix match wins.
