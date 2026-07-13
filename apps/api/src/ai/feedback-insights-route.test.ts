@@ -27,6 +27,29 @@ const BANK_A = "11111111-1111-4111-8111-111111111111";
 const AGENCY_A = "aaaaaaaa-1111-4111-8111-111111111111";
 const AGENCY_OTHER = "bbbbbbbb-2222-4222-8222-222222222222";
 
+/**
+ * SEC-002 : la route arme la connexion (`withArmedTenant`) → le flux de requêtes
+ * comprend l'enveloppe d'armement (`BEGIN` / `SET LOCAL app.current_bank_id` /
+ * `COMMIT` / `ROLLBACK`). Les tests portant sur le SQL de DONNÉES filtrent cette
+ * enveloppe de transport pour ne raisonner que sur les requêtes métier.
+ */
+function isArmamentEnvelope(sql: string): boolean {
+  const s = sql.trim().toUpperCase();
+  return (
+    s === "BEGIN" ||
+    s === "COMMIT" ||
+    s === "ROLLBACK" ||
+    s.startsWith("SET LOCAL APP.CURRENT_BANK_ID")
+  );
+}
+
+/** Ne conserve que les requêtes de données (hors enveloppe d'armement). */
+function dataQueries(
+  queries: Array<{ sql: string; params: unknown[] }>
+): Array<{ sql: string; params: unknown[] }> {
+  return queries.filter((q) => !isArmamentEnvelope(q.sql));
+}
+
 /** Fabrique un faux Client pg qui renvoie des lignes fixes et capture les requêtes. */
 function fakeDb(rows: Array<Record<string, unknown>>): {
   db: Client;
@@ -117,9 +140,10 @@ describe("feedback-insights-route", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body["scope"]).toBe("bank");
-    // La requête n'a filtré que sur bank_id (aucun agency_id positionnel $4).
-    expect(queries[0]!.params[0]).toBe(BANK_A);
-    expect(queries[0]!.params).toHaveLength(3);
+    // La requête de DONNÉES n'a filtré que sur bank_id (aucun agency_id positionnel $4).
+    const data = dataQueries(queries);
+    expect(data[0]!.params[0]).toBe(BANK_A);
+    expect(data[0]!.params).toHaveLength(3);
   });
 
   it("IA-004: 400 — scope agence, aucune agence unique liée au JWT, sans agencyId", async () => {
@@ -151,7 +175,10 @@ describe("feedback-insights-route", () => {
   it("IA-004: lecture seule — aucune requête de mutation (SELECT uniquement)", async () => {
     const { app, queries } = appWith(DIRECTOR, rows(MIN_SAMPLE_SIZE));
     await app.request("/api/v1/ai/feedback-insights?period=2026-07");
-    for (const q of queries) {
+    // Hors enveloppe d'armement (BEGIN/SET LOCAL/COMMIT), le SQL métier est du SELECT pur.
+    const data = dataQueries(queries);
+    expect(data.length).toBeGreaterThan(0);
+    for (const q of data) {
       expect(q.sql.trim().toUpperCase()).toContain("SELECT");
       expect(q.sql.toUpperCase()).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/);
     }

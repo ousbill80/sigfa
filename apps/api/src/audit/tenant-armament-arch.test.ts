@@ -67,12 +67,17 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
  * DOIT être armée (sinon le test échoue).
  */
 const ARMED_CUTOVER_PENDING: readonly string[] = [
-  // Routeurs IA (IA-002/003/004) — lectures tenant-scoped (`WHERE bank_id`), montés
-  // sous `/ai/*`. Non encore basculés vers `withArmedTenant`, comme les autres routes
-  // de lecture tenant. Vivent dans `src/ai/` (voir AI_DIR).
+  // ai-forecast.ts — DIFFÉRÉE (couture INTER-PISTE feature-store, PAS une couture DB
+  // manquante). Le routeur `GET /ai/forecast` (vit sous `routes/`) N'ACCÈDE PAS
+  // lui-même à la DB tenant : il lit ses features via un `ForecastDataProvider`
+  // INJECTÉ (defaut `emptyForecastDataProvider` → 0 record → 422 gated). L'accès DB
+  // réel (matérialisation `ai_features`) appartient au provider câblé par la piste
+  // parallèle feature-store — HORS de ce fichier de route. Il n'y a donc rien à armer
+  // ICI (aucun `c.get("db")`), et un armement forcé serait vide de sens. Ce provider
+  // DEVRA router son accès `ai_features` via `withArmedTenant` lors du câblage
+  // feature-store (couture inter-piste) ; à ce moment la route passera ARMED.
+  // Reste PENDING jusqu'à ce câblage (le fichier existe → non-fantôme).
   "ai-forecast.ts",
-  "anomaly-route.ts",
-  "feedback-insights-route.ts",
   "banks.ts",
   "kiosk-session.ts",
   "onboarding.ts",
@@ -167,6 +172,18 @@ const ARMED: readonly string[] = [
   "agents.ts",
   "agents-import.ts",
   "data-privacy.ts",
+  // SEC-002-CUTOVER-LOT6 — bascule des routes de LECTURE IA tenant-scopées. Tout accès
+  // DB tenant routé via `withArmedTenant` (armement `app.current_bank_id`). Vivent sous
+  // `src/ai/` (voir AI_DIR).
+  // - anomaly-route.ts : `ai_anomalies` (policy `tenant_isolation` + GRANT CRUD
+  //   `sigfa_app`, 0007). `loadAnomalies` (count + liste paginée `WHERE bank_id`) rejoué
+  //   à travers la connexion armée. Lecture seule (zéro mutation).
+  // - feedback-insights-route.ts : `tickets` (feedback_score/feedback_comment ; policy
+  //   `tenant_isolation` + GRANT CRUD `sigfa_app`, 0001). La connexion armée est INJECTÉE
+  //   au service partagé `feedback-insights-service` (INCHANGÉ) qui exécute son SELECT
+  //   `WHERE bank_id` sur cette connexion. Lecture seule (zéro mutation).
+  "anomaly-route.ts",
+  "feedback-insights-route.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */

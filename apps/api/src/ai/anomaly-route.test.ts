@@ -193,8 +193,11 @@ describe("loadAnomalies (isolation tenant, filtres, pagination)", () => {
 });
 
 describe("createAnomalyRouter (GET /ai/anomalies)", () => {
+  // SEC-002 : la route arme la connexion (`withArmedTenant`) qui exige un bankId
+  // UUID canonique (jamais interpolé sinon). Le contexte tenant en porte toujours un.
+  const BANK = "11111111-1111-4111-a111-111111111111";
   const tenant: TenantContext = {
-    bankId: "bank-A",
+    bankId: BANK,
     role: "AGENCY_DIRECTOR",
     agencyIds: [AGENCY],
   } as TenantContext;

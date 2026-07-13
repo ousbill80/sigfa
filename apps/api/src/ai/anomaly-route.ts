@@ -12,9 +12,14 @@
  * opérationnelle. L'acquittement (`POST /ai/anomalies/:id/ack`) est HORS scope de
  * cette story (implémenté séparément).
  *
- * ## Isolation tenant
+ * ## Isolation tenant (SEC-002 — ARMÉE)
  * Le filtre `bank_id` provient du contexte tenant (JWT) — jamais du client.
- * Un tenant ne voit JAMAIS les anomalies d'une autre banque.
+ * Un tenant ne voit JAMAIS les anomalies d'une autre banque. La lecture
+ * `ai_anomalies` passe désormais par `withArmedTenant` (`app.current_bank_id`
+ * armé, connexion `sigfa_app` NOBYPASSRLS) : la policy `tenant_isolation`
+ * (DB-007) devient réellement contraignante en défense-en-profondeur — l'isolation
+ * ne repose plus sur le seul `WHERE bank_id` applicatif. Cette route est classée
+ * `ARMED` dans le test d'architecture.
  *
  * ## Note d'intégration (GATED runtime)
  * L'implémentation runtime de la détection est GATED sur données réelles ; ce
@@ -36,6 +41,7 @@ import {
   assertAgencyScope,
   type Pagination,
 } from "src/lib/admin-helpers.js";
+import { asArmable, withArmedTenant } from "src/lib/armed-tenant.js";
 import { ANOMALY_TYPES, type AnomalyType, type AnomalyEvidence } from "src/ai/anomaly-detectors.js";
 
 /** Version de modèle exposée dans `aiMeta` pour les anomalies (CONTRACT-008). */
@@ -207,8 +213,16 @@ export type QueryFn = (
   values?: unknown[]
 ) => Promise<{ rows: Array<Record<string, unknown>> }>;
 
-/** Adapte un `Client` pg en `QueryFn`. */
-export function asQueryFn(db: Client): QueryFn {
+/**
+ * Connexion pg minimale requise par `asQueryFn` : un `query(sql, values?)`.
+ * Un `Client` pg comme une connexion ARMÉE (`withArmedTenant`) la satisfont.
+ */
+interface QueryableConnection {
+  query(sql: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
+}
+
+/** Adapte une connexion pg (Client ou armée) en `QueryFn`. */
+export function asQueryFn(db: QueryableConnection): QueryFn {
   return (sql, values) =>
     db.query(sql, values).then((r) => ({ rows: r.rows as Array<Record<string, unknown>> }));
 }
@@ -317,7 +331,10 @@ export function createAnomalyRouter(): Hono<AnomalyEnv> {
       const now = new Date();
       const dataWindow = computeDataWindow(now);
       const computedAt = now.toISOString();
-      const { rows, total } = await loadAnomalies(asQueryFn(db), bankId, status, agencyIdParam, page);
+      // SEC-002 : lecture tenant à travers la connexion ARMÉE (RLS contraignante).
+      const { rows, total } = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        loadAnomalies(asQueryFn(conn), bankId, status, agencyIdParam, page)
+      );
       return c.json(buildAnomaliesResponse(rows, total, page, dataWindow, computedAt), 200);
     } catch (err) {
       return errorResponse(c, err);

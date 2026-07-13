@@ -7,6 +7,15 @@
  * routeur ne fait que lire, agréger (via `feedback-insights-service`) et projeter
  * la forme contractuelle. **Lecture seule** — aucune mutation.
  *
+ * ## Isolation tenant (SEC-002 — ARMÉE)
+ * La lecture des feedbacks (`tickets`, via `feedback-insights-service`) passe par
+ * `withArmedTenant` (`app.current_bank_id` armé, connexion `sigfa_app` NOBYPASSRLS) :
+ * la policy `tenant_isolation` de `tickets` (DB-001) devient réellement contraignante
+ * en défense-en-profondeur — l'isolation ne repose plus sur le seul `WHERE bank_id`
+ * du service. Cette route est classée `ARMED` dans le test d'architecture. Le
+ * service `feedback-insights-service` reste INCHANGÉ : il exécute son SQL sur la
+ * connexion armée que le routeur lui injecte.
+ *
  * @module
  */
 
@@ -16,6 +25,7 @@ import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import { errorResponse, requireBankId, assertAgencyScope } from "src/lib/admin-helpers.js";
+import { asArmable, withArmedTenant } from "src/lib/armed-tenant.js";
 import { parsePeriod } from "src/reporting/period.js";
 import type { QueryFn } from "src/reporting/aggregate-service.js";
 import {
@@ -33,8 +43,16 @@ interface FeedbackInsightsEnv {
   };
 }
 
-/** Adapte le `Client` pg en `QueryFn` paramétrée. */
-function asQueryFn(db: Client): QueryFn {
+/**
+ * Connexion pg minimale requise par `asQueryFn` : un `query(sql, values?)`.
+ * Un `Client` pg comme une connexion ARMÉE (`withArmedTenant`) la satisfont.
+ */
+interface QueryableConnection {
+  query(sql: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
+}
+
+/** Adapte une connexion pg (Client ou armée) en `QueryFn` paramétrée. */
+function asQueryFn(db: QueryableConnection): QueryFn {
   return (sql: string, values?: unknown[]) =>
     db.query(sql, values).then((r) => ({ rows: r.rows as Array<Record<string, unknown>> }));
 }
@@ -115,7 +133,11 @@ export function createFeedbackInsightsRouter(): Hono<FeedbackInsightsEnv> {
         c.req.query("agencyId"),
         new Date()
       );
-      const body = await computeFeedbackInsights(asQueryFn(db), q);
+      // SEC-002 : lecture tenant (`tickets`) à travers la connexion ARMÉE. Le
+      // service `feedback-insights-service` reçoit la connexion armée, INCHANGÉ.
+      const body = await withArmedTenant(asArmable(db), q.bankId, (conn) =>
+        computeFeedbackInsights(asQueryFn(conn), q)
+      );
       return c.json(body, 200);
     } catch (err) {
       return errorResponse(c, err);
