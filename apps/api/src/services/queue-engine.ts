@@ -46,8 +46,10 @@ END`;
  * `LANGUAGE_SOFT_TIMEOUT_MINUTES` : après ce délai, le guichet prend le ticket
  * même sans correspondance de langue. Configurable via env.
  */
+// Stryker disable StringLiteral: mutant statique (lecture env au chargement du module) ET équivalent — la clé env n'est pas définie sous test, `process.env[""]` comme `process.env["LANGUAGE_SOFT_TIMEOUT_MINUTES"]` valent `undefined` → défaut 10 identique (SEC-005/D3)
 export const LANGUAGE_SOFT_TIMEOUT_MINUTES =
   Number(process.env["LANGUAGE_SOFT_TIMEOUT_MINUTES"] ?? 10);
+// Stryker restore StringLiteral
 
 /**
  * Récupère les langues parlées par l'agent du guichet.

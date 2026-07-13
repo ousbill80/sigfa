@@ -9,10 +9,13 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "DOCKER_CONFIG=/tmp/docker-config-sigfa vitest run",
+    "test:mutation": "stryker run",
     "start": "node dist/index.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@sigfa/config": "workspace:*",
     "@sigfa/database": "workspace:*",
     "@sigfa/schemas": "workspace:*",

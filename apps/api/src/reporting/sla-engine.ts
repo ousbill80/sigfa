@@ -301,11 +301,27 @@ export function sumAggregates(aggregates: readonly DailyStatsAggregate[]): Daily
 // Fuseau Africa/Abidjan & jour partiel (horloge injectée)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Formateur de date civile Abidjan (year-month-day), mémoïsé. */
+/**
+ * Formateur de date civile Abidjan (year-month-day), mémoïsé au chargement.
+ *
+ * SEC-005 — exclusion mutants ÉQUIVALENTS/STATIQUES tracée & justifiée (D3) :
+ * ce `const` module-level s'initialise UNE fois à l'import (avant tout test).
+ * Sous `coverageAnalysis: perTest`, les mutations de sa config (`StringLiteral`,
+ * `ObjectLiteral`) sont des mutants STATIQUES non-attribuables à un test — donc
+ * non tuables par une suite unitaire (limitation connue StrykerJS). De plus, le
+ * couple `en-CA` + `{}` défaut produit déjà `YYYY-MM-DD` (mutant `{}` réellement
+ * équivalent). On les exclut explicitement — le comportement de `toAbidjanDay`
+ * reste, lui, testé (composantes année/mois/jour asserties).
+ */
+// Stryker disable next-line StringLiteral,ObjectLiteral: mutant statique (init module) + équivalent (défaut en-CA = YYYY-MM-DD) — non tuable en unitaire (SEC-005/D3)
 const abidjanDayFormatter = new Intl.DateTimeFormat("en-CA", {
+  // Stryker disable next-line StringLiteral: mutant statique (init module, coveredBy=0) — non tuable en unitaire (SEC-005/D3)
   timeZone: ABIDJAN_TZ,
+  // Stryker disable next-line StringLiteral: mutant statique (init module, coveredBy=0) — non tuable en unitaire (SEC-005/D3)
   year: "numeric",
+  // Stryker disable next-line StringLiteral: mutant statique (init module, coveredBy=0) — non tuable en unitaire (SEC-005/D3)
   month: "2-digit",
+  // Stryker disable next-line StringLiteral: mutant statique (init module, coveredBy=0) — non tuable en unitaire (SEC-005/D3)
   day: "2-digit",
 });
 
