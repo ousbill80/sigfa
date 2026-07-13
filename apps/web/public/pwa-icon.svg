@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="SIGFA">
+  <rect width="192" height="192" rx="40" fill="#16110B"/>
+  <rect x="40" y="52" width="112" height="88" rx="16" fill="#FBF6EE"/>
+  <circle cx="40" cy="96" r="10" fill="#16110B"/>
+  <circle cx="152" cy="96" r="10" fill="#16110B"/>
+  <text x="96" y="108" font-family="system-ui, sans-serif" font-size="46" font-weight="700"
+        text-anchor="middle" fill="#C25A16">A42</text>
+  <rect x="60" y="120" width="72" height="8" rx="4" fill="#C79A3A"/>
+</svg>

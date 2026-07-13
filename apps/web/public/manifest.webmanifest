@@ -1,0 +1,22 @@
+{
+  "name": "SIGFA — Mon ticket",
+  "short_name": "SIGFA",
+  "description": "Prenez et suivez votre ticket en agence, sans installer d'application.",
+  "start_url": "/q/",
+  "scope": "/q/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBF8F3",
+  "theme_color": "#C25A16",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["finance", "utilities"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
