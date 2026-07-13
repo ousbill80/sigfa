@@ -2,7 +2,8 @@
  * Tests unitaires — bus temps réel typé + validation Zod (forme CONTRAT).
  *
  * RT-001a : signature `emit(event, agencyId, payload)` ; les `EVENT_SCHEMAS`
- * sont la transcription du CONTRAT (parité prouvée par `contract-parity.test.ts`).
+ * RÉFÉRENCENT directement le CONTRAT (`*.payloadSchema`, importés tels quels
+ * depuis `@sigfa/contracts` — plus de transcription depuis l'unification zod v4).
  * Couvre `queue:updated` (strict {queueId,length,estimate}), la validation par
  * événement, `createNoopBus`/`createCaptureBus` avec l'agencyId capturé.
  *

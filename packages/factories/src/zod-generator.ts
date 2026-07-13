@@ -59,11 +59,11 @@ export function generateForSchema<T>(schema: z.ZodTypeAny, rng: () => number): T
  * @param schema - Schéma ZodArray source
  * @param rng - Fonction PRNG
  */
-function generateArrayValue(schema: z.ZodArray<z.ZodTypeAny>, rng: () => number): unknown[] {
+function generateArrayValue(schema: z.ZodArray, rng: () => number): unknown[] {
   const len = Math.floor(rng() * 4); // 0-3 éléments
-  return Array.from({ length: len }, () =>
-    generateValue(schema._def.type as z.ZodTypeAny, rng)
-  );
+  // zod v4 : l'élément est exposé via `_def.element` (v3 utilisait `_def.type`).
+  const element = schema._def.element as z.ZodTypeAny;
+  return Array.from({ length: len }, () => generateValue(element, rng));
 }
 
 /**
@@ -75,7 +75,9 @@ function generateObjectValue(
   schema: z.ZodObject<z.ZodRawShape>,
   rng: () => number
 ): Record<string, unknown> {
-  const shape = schema._def.shape() as Record<string, z.ZodTypeAny>;
+  // zod v4 : la forme est un objet simple (`_def.shape`) ; v3 exposait une
+  // fonction `_def.shape()`. On lit ici directement l'objet des propriétés.
+  const shape = schema._def.shape as Record<string, z.ZodTypeAny>;
   const result: Record<string, unknown> = {};
   for (const [key, fieldSchema] of Object.entries(shape)) {
     result[key] = generateValue(fieldSchema, rng);
@@ -89,7 +91,9 @@ function generateValue(schema: z.ZodTypeAny, rng: () => number): unknown {
   if (schema instanceof z.ZodNumber) return generateNumberValue(schema, rng);
   if (schema instanceof z.ZodBoolean) return rng() >= 0.5;
   if (schema instanceof z.ZodEnum) {
-    const values = schema._def.values as string[];
+    // zod v4 : les valeurs sont exposées via `_def.entries` (map libellé→valeur) ;
+    // v3 exposait un tableau `_def.values`.
+    const values = Object.values(schema._def.entries) as string[];
     return values[Math.floor(rng() * values.length)];
   }
   if (schema instanceof z.ZodOptional) {
@@ -104,32 +108,59 @@ function generateValue(schema: z.ZodTypeAny, rng: () => number): unknown {
   return null;
 }
 
+/**
+ * Métadonnée d'un check zod v4. Les checks sont exposés via
+ * `schema._zod.def.checks[]`, chaque check portant sa définition dans
+ * `check._zod.def`. Le champ `check` remplace le `kind` de la v3.
+ */
+interface ZodV4CheckDef {
+  /** Type de check (ex. "string_format", "min_length", "greater_than"). */
+  check?: string;
+  /** Format string (ex. "uuid", "email") quand `check === "string_format"`. */
+  format?: string;
+  /** Longueur minimale (`min_length`). */
+  minimum?: number;
+  /** Longueur maximale (`max_length`). */
+  maximum?: number;
+  /** Borne numérique (`greater_than` / `less_than`). */
+  value?: number;
+}
+
+/**
+ * Extrait les définitions de checks d'un schéma zod v4.
+ * @param schema - Schéma zod (string ou number)
+ */
+function readChecks(schema: z.ZodTypeAny): ZodV4CheckDef[] {
+  const zodInternal = (schema as { _zod?: { def?: { checks?: unknown[] } } })._zod;
+  const rawChecks = zodInternal?.def?.checks ?? [];
+  return rawChecks.map(
+    (c) => ((c as { _zod?: { def?: ZodV4CheckDef } })._zod?.def ?? {}) as ZodV4CheckDef
+  );
+}
+
 /** Génère une valeur string respectant les checks (uuid, min, max) */
 function generateStringValue(schema: z.ZodString, rng: () => number): string {
-  const checks = schema._def.checks as Array<{ kind: string }>;
-  const isUuid = checks.some((c) => c.kind === "uuid");
+  const checks = readChecks(schema);
+  const isUuid = checks.some((c) => c.check === "string_format" && c.format === "uuid");
   if (isUuid) {
     return generateUuid(rng);
   }
-  const minCheck = checks.find((c): c is { kind: "min"; value: number } => c.kind === "min");
-  const maxCheck = checks.find((c): c is { kind: "max"; value: number } => c.kind === "max");
-  const minLen = minCheck ? Math.max(1, minCheck.value) : 4;
-  const maxLen = maxCheck ? Math.min(64, maxCheck.value) : 12;
+  const minCheck = checks.find((c) => c.check === "min_length");
+  const maxCheck = checks.find((c) => c.check === "max_length");
+  const minLen = minCheck?.minimum !== undefined ? Math.max(1, minCheck.minimum) : 4;
+  const maxLen = maxCheck?.maximum !== undefined ? Math.min(64, maxCheck.maximum) : 12;
   return generateString(rng, minLen, maxLen);
 }
 
 /** Génère une valeur number respectant les checks (int, min, max) */
 function generateNumberValue(schema: z.ZodNumber, rng: () => number): number {
-  const checks = schema._def.checks as Array<{ kind: string }>;
-  const isInt = checks.some((c) => c.kind === "int");
-  const minCheck = checks.find((c): c is { kind: "min"; value: number; inclusive: boolean } =>
-    c.kind === "min"
-  );
-  const maxCheck = checks.find((c): c is { kind: "max"; value: number; inclusive: boolean } =>
-    c.kind === "max"
-  );
-  const lo = minCheck ? minCheck.value : 0;
-  const hi = maxCheck ? maxCheck.value : lo + 100;
+  const checks = readChecks(schema);
+  // zod v4 : `int()` devient un check `number_format` (format entier safeint/int32…).
+  const isInt = checks.some((c) => c.check === "number_format");
+  const minCheck = checks.find((c) => c.check === "greater_than");
+  const maxCheck = checks.find((c) => c.check === "less_than");
+  const lo = minCheck?.value !== undefined ? minCheck.value : 0;
+  const hi = maxCheck?.value !== undefined ? maxCheck.value : lo + 100;
   const range = hi - lo;
   const raw = lo + rng() * range;
   return isInt ? Math.floor(raw) : Math.round(raw * 100) / 100;
