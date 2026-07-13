@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="352" height="88" viewBox="0 0 352 88" fill="none" role="img" aria-label="BNCI">
+  <!--
+    KIOSK-HOME : logo de banque de DEMO (tenant fictif « BNCI »), servi
+    localement par le mode mock MSW (handler /public/banks/{id}/theme).
+    Asset de demonstration uniquement - jamais reference hors mode demo.
+  -->
+  <!-- Emblème : arche stylisée sur cartouche -->
+  <rect x="6" y="10" width="68" height="68" rx="16" fill="#003F7F"/>
+  <path d="M22 62 V44 a18 18 0 0 1 36 0 v18" stroke="#F2E4C0" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <line x1="18" y1="64" x2="62" y2="64" stroke="#F2E4C0" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="40" cy="30" r="4.5" fill="#F2E4C0"/>
+  <!-- Wordmark -->
+  <text x="94" y="52" font-family="Georgia, 'Times New Roman', serif" font-size="38" font-weight="700" letter-spacing="7" fill="#0B2E52">BNCI</text>
+  <text x="96" y="74" font-family="Georgia, 'Times New Roman', serif" font-size="13" letter-spacing="3.2" fill="#4A5E78">BANQUE NATIONALE CI</text>
+</svg>
