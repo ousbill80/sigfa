@@ -15,33 +15,7 @@ import type { Redis } from "ioredis";
 import type { Client } from "pg";
 import { buildError } from "src/lib/errors.js";
 import { logger } from "src/lib/logger.js";
-import { createAuthRouter } from "src/routes/auth.js";
-import { createTicketRouter } from "src/routes/tickets.js";
-import { createTicketSyncRouter } from "src/routes/tickets-sync.js";
-import { createQueueRouter } from "src/routes/queues.js";
-import { createAgentRouter } from "src/routes/agents.js";
-import { createBankRouter } from "src/routes/banks.js";
-import { createAgencyRouter } from "src/routes/agencies.js";
-import { createServiceRouter } from "src/routes/services.js";
-import { createOperationRouter } from "src/routes/operations.js";
-import { createCounterRouter } from "src/routes/counters.js";
-import { createHoursRouter } from "src/routes/hours.js";
-import { createThresholdsRouter } from "src/routes/thresholds.js";
-import { createSmsTemplateRouter } from "src/routes/sms-templates.js";
-import { createThemeRouter } from "src/routes/theme.js";
-import { createOnboardingRouter } from "src/routes/onboarding.js";
-import { createKioskSessionRouter } from "src/routes/kiosk-session.js";
-import { createTvSessionRouter } from "src/routes/tv-session.js";
-import { createAgentImportRouter } from "src/routes/agents-import.js";
-import { createDataPrivacyRouter } from "src/routes/data-privacy.js";
-import { createPublicTicketRouter } from "src/routes/public-tickets.js";
-import { createHealthRouter } from "src/routes/health.js";
-import { createAuditLogRouter } from "src/routes/audit-logs.js";
-import { createDeviceRouter } from "src/routes/devices.js";
-import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
-import { createReportRouter } from "src/routes/reports.js";
-import { createNotificationWebhookRouter } from "src/routes/webhooks-notifications.js";
-import { createWhatsAppInboundRouter } from "src/routes/webhooks-whatsapp-inbound.js";
+import { buildRouteRegistry } from "src/route-registry.js";
 import { mountGlobalRateLimits } from "src/config/rate-limits.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
@@ -126,100 +100,13 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
     );
   });
 
-  // Routes auth sous /api/v1/auth
-  const authRouter = createAuthRouter();
-  app.route("/api/v1/auth", authRouter);
-
-  // Routes tickets (API-003/004) sous /api/v1 (chemins /tickets, /counters/…)
-  const ticketRouter = createTicketRouter();
-  app.route("/api/v1", ticketRouter);
-
-  // Route de synchronisation offline (API-005) : POST /tickets/sync.
-  // Montée AVANT le routeur tickets générique ? Non : Hono route par chemin exact,
-  // et /tickets/sync n'entre pas en collision avec /tickets/:id (POST simple).
-  const ticketSyncRouter = createTicketSyncRouter();
-  app.route("/api/v1", ticketSyncRouter);
-
-  // Routes files d'attente (API-004) sous /api/v1 (PATCH /queues/:id)
-  const queueRouter = createQueueRouter();
-  app.route("/api/v1", queueRouter);
-
-  // Routes agents (API-007) sous /api/v1 (/agents/:id, /agents/:id/status, /agents/:id/stats)
-  const agentRouter = createAgentRouter();
-  app.route("/api/v1", agentRouter);
-
-  // Routes CRUD admin (API-008) — banques (platform + bank).
-  const bankRouter = createBankRouter();
-  app.route("/api/v1", bankRouter);
-
-  // Routes CRUD admin (API-008) — agences (CRUD + soft-delete).
-  const agencyRouter = createAgencyRouter();
-  app.route("/api/v1", agencyRouter);
-
-  // Routes CRUD admin (API-008) — services & guichets (scope agence).
-  const serviceRouter = createServiceRouter();
-  app.route("/api/v1", serviceRouter);
-  // Routes CRUD opérations (MODEL-API-A) — enfants d'un service, scope agence.
-  const operationRouter = createOperationRouter();
-  app.route("/api/v1", operationRouter);
-  const counterRouter = createCounterRouter();
-  app.route("/api/v1", counterRouter);
-
-  // Routes admin config (API-008, admin.yaml) — horaires, seuils, templates SMS.
-  const hoursRouter = createHoursRouter();
-  app.route("/api/v1", hoursRouter);
-  const thresholdsRouter = createThresholdsRouter();
-  app.route("/api/v1", thresholdsRouter);
-  const smsTemplateRouter = createSmsTemplateRouter();
-  app.route("/api/v1", smsTemplateRouter);
-
-  // Routes onboarding & plateforme (API-009, admin.yaml + public.yaml + agents.yaml).
-  // Theming (couleurs corrigées ≥4.5:1, presign R2), clonage de config,
-  // session borne (JWT 12 h + révocation), import CSV, droit à l'oubli.
-  const themeRouter = createThemeRouter();
-  app.route("/api/v1", themeRouter);
-  const onboardingRouter = createOnboardingRouter();
-  app.route("/api/v1", onboardingRouter);
-  const kioskSessionRouter = createKioskSessionRouter();
-  app.route("/api/v1", kioskSessionRouter);
-  // Session d'affichage TV publique (CONTRACT-013) : token DISPLAY lecture seule.
-  const tvSessionRouter = createTvSessionRouter();
-  app.route("/api/v1", tvSessionRouter);
-  const agentImportRouter = createAgentImportRouter();
-  app.route("/api/v1", agentImportRouter);
-  const dataPrivacyRouter = createDataPrivacyRouter();
-  app.route("/api/v1", dataPrivacyRouter);
-
-  // Routes PUBLIQUES (API-010, public.yaml) — suivi & feedback client SANS JWT.
-  // Anti-spam Redis, fenêtre 24 h UTC, NPS incrémental, 404 opaque anti-énumération.
-  const publicTicketRouter = createPublicTicketRouter();
-  app.route("/api/v1", publicTicketRouter);
-
-  // Routes API-011 (dernière story F3) : santé, supervision bornes, audit, devices.
-  // - /health : public, sans auth/tenant (checks postgres+redis, 503 si down).
-  // - /kiosks/status : supervision MANAGER+ (ONLINE/OFFLINE dérivé de last_seen).
-  // - /audit-logs : lecture seule stricte (AUDITOR|SUPER_ADMIN).
-  // - /notifications/devices : enregistrement idempotent + DELETE ownership.
-  app.route("/api/v1", createHealthRouter("0.0.0", options.queueHealth));
-  app.route("/api/v1", createKioskStatusRouter());
-  app.route("/api/v1", createAuditLogRouter());
-  app.route("/api/v1", createDeviceRouter());
-
-  // Routes reporting KPI (REP-001, reporting.yaml) : GET /reports/kpis (agency|network)
-  // + GET /reports/daily/:agencyId. Moteur de calcul PUR (sla-engine), lecture des
-  // agrégats matérialisés daily_agency_stats. Champ `partial` (jour figé J+2 07 h Abidjan).
-  app.route(
-    "/api/v1",
-    createReportRouter(options.exportEnqueue ? { enqueueExport: options.exportEnqueue } : {})
-  );
-
-  // Webhook d'accusé de livraison des notifications (NOTIF-002, CONTRACT-007) —
-  // public (pas de JWT) mais signature fournisseur obligatoire. Routeur isolé.
-  app.route("/api/v1", createNotificationWebhookRouter());
-
-  // Webhook WhatsApp ENTRANT signé par banque (NOTIF-003, CONTRACT-003) — public
-  // (pas de JWT) mais signature HMAC propre à la banque obligatoire. Routeur isolé.
-  app.route("/api/v1", createWhatsAppInboundRouter());
+  // Enregistrement des routeurs depuis le REGISTRE DÉCLARATIF (route-registry.ts).
+  // L'ordre, les chemins de base et les injections d'options y sont définis à
+  // l'identique. AJOUTER UNE ROUTE = AJOUTER UNE LIGNE dans route-registry.ts,
+  // PAS ICI (fin des conflits de merge au milieu de app.ts).
+  for (const descriptor of buildRouteRegistry(options)) {
+    descriptor.apply(app);
+  }
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>
