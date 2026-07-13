@@ -1,12 +1,14 @@
 /**
- * AdZone — full-screen advertising/media carousel shown when the TV is at rest
- * (no active call). Premium waiting-room presentation: soft cross-fade between
- * bank promo slides, discreet overlay (bank logo/name + clock + a welcome line).
+ * AdZone — advertising/media carousel of the TV split layout (TV v3). Elle vit
+ * EN PERMANENCE dans la zone gauche (~75 %) sous le bandeau global : soft
+ * cross-fade entre slides banque + ligne d'accueil en pied. Elle ne rend PLUS
+ * de header propre (nom banque/horloge sont portés par le bandeau TvScreen) et
+ * remplit son conteneur (plus de plein écran autonome).
  *
  * Présentation pure : pilotée par une liste de slides configurable
- * ({@link AdSlide}) et l'horloge fournie ; aucun fetch, aucune image réseau
- * externe (les slides de démo sont composées en tokens). La gestion réelle des
- * médias (upload banque) = future story admin, HORS SCOPE ici.
+ * ({@link AdSlide}) ; aucun fetch, aucune image réseau externe (les slides de
+ * démo sont composées en tokens). La gestion réelle des médias (upload banque)
+ * = future story admin, HORS SCOPE ici.
  * @module components/tv/ad-zone
  */
 "use client";
@@ -20,12 +22,8 @@ import { useAdCarousel } from "@/lib/use-ad-carousel";
 export interface AdZoneProps {
   /** Slides to rotate through (defaults to demo slides). */
   slides?: readonly AdSlide[];
-  /** Active locale for the overlay + slide copy. */
+  /** Active locale for the slide copy + footer. */
   locale?: Locale;
-  /** Bank display name shown in the overlay header. */
-  tenantName?: string;
-  /** Current wall-clock time (kept out of the component for testability). */
-  clock?: string;
   /** Whether the AdZone is on screen (drives/pauses the carousel). */
   active?: boolean;
   /** Reduced motion — disables the cross-fade transition. */
@@ -35,12 +33,14 @@ export interface AdZoneProps {
 const rootStyle: CSSProperties = {
   position: "relative",
   flex: 1,
-  minHeight: "100vh",
+  height: "100%",
+  minWidth: 0,
   overflow: "hidden",
-  /* Grille « billboard » : header (haut) / contenu centré / footer (bas).
-     Les trois rangées sont DISTINCTES → jamais de chevauchement, même titre long. */
+  /* Grille « billboard » : contenu centré / footer (bas). Les rangées sont
+     DISTINCTES → jamais de chevauchement, même titre long. Le header global
+     (banque + date + horloge) est porté par TvScreen, pas par l'AdZone. */
   display: "grid",
-  gridTemplateRows: "var(--tv-header-height) 1fr auto",
+  gridTemplateRows: "1fr auto",
   backgroundColor: "var(--night-2, var(--surface-screen))",
   color: "var(--ink-inverse)",
   fontFamily: "var(--font-text)",
@@ -55,15 +55,13 @@ const AD_TITLE_FONT_SIZE = "clamp(2.75rem, 6.2vw, 6rem)" as const;
 const AD_SUBTITLE_FONT_SIZE = "clamp(1.375rem, 2.4vw, 2.4375rem)" as const;
 
 /**
- * Full-screen resting AdZone carousel.
+ * Container-filling AdZone carousel (permanent left pane of the TV split).
  * @param props - {@link AdZoneProps}.
  * @returns The AdZone element.
  */
 export function AdZone({
   slides = DEFAULT_AD_SLIDES,
   locale = "fr",
-  tenantName = "",
-  clock = "",
   active = true,
   reducedMotion = false,
 }: AdZoneProps): ReactElement {
@@ -107,33 +105,8 @@ export function AdZone({
         ))}
       </div>
 
-      {/* Overlay discret : nom banque + horloge en haut, ligne d'accueil en bas */}
-      <header
-        data-testid="tv-adzone-overlay"
-        style={{
-          position: "relative",
-          zIndex: 1,
-          height: "var(--tv-header-height)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 var(--space-12)",
-          color: "var(--ink-inverse-soft)",
-          fontSize: "var(--text-lg)",
-        }}
-      >
-        <span style={{ fontWeight: 600, color: "var(--brand)" }}>{tenantName}</span>
-        <span
-          data-testid="tv-adzone-clock"
-          aria-hidden={clock === ""}
-          style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "var(--tracking-numeric)" }}
-        >
-          {clock}
-        </span>
-      </header>
-
       {/* Rangée centrale : le contenu du slide actif, CENTRÉ verticalement dans
-          l'espace SÛR entre header et footer. Padding généreux → marges autour
+          l'espace SÛR au-dessus du footer. Padding généreux → marges autour
           du titre. Le titre est borné (clamp) donc un titre long reste dans la
           zone sans jamais toucher les overlays. */}
       <div

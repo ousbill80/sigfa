@@ -1,15 +1,20 @@
 /**
- * TvScreen — full-screen call display for waiting rooms (TV-001 + AdZone).
+ * TvScreen — écran TV « split permanent » pour salles d'attente (TV v3).
  *
- * Présentation « salle d'attente premium » sur grand écran mural 16:9 :
- * - État APPEL (`mode="call"`) : en-tête banque (logo/nom thémable + horloge),
- *   scène principale = guichet + numéro géant appelé (halo or, entrée « ding »),
- *   rail latéral persistant = derniers appelés (en retrait) + longueur de file.
- * - État REPOS (`mode="rest"`) : {@link AdZone} plein écran (carrousel média
- *   banque) au lieu d'un écran vide.
+ * Design-gate PO 2026-07-13 (photo de référence BNI, option « flash dans la
+ * colonne ») : plus de modes exclusifs appel/pub — les deux zones vivent
+ * ensemble en permanence :
+ * - **Bandeau haut** (--tv-header-height, fond --brand) : pastille logo + nom
+ *   banque/agence à gauche · date complète FR/EN au centre · horloge en bloc
+ *   contrasté à droite (grande, tabular-nums).
+ * - **Zone gauche ~75 %** : {@link AdZone} (carrousel banque) active EN
+ *   PERMANENCE — la pub n'est JAMAIS interrompue par un appel.
+ * - **Colonne droite ~25 %** (fond --night-2) : carte appel courant (flash
+ *   --brand + halo pendant la fenêtre de célébration TV-002), derniers appelés
+ *   en retrait, longueur de file en bas.
  *
- * Présentationnel : piloté entièrement par {@link TvState} + `mode`. La logique
- * temps réel (consommation d'événements / sync / contrat) est INCHANGÉE : ce
+ * Présentationnel : piloté entièrement par {@link TvState}. La logique temps
+ * réel (consommation d'événements / sync / contrat) est INCHANGÉE : ce
  * composant ne fait qu'afficher. Tokens uniquement — aucune couleur/taille en dur.
  * @module components/tv/tv-screen
  */
@@ -21,7 +26,6 @@ import type { TvState, TvCall } from "@/lib/tv-state";
 import { TV_PREVIOUS_COUNT } from "@/lib/tv-state";
 import { AdZone } from "./ad-zone";
 import type { AdSlide } from "@/lib/ad-slides";
-import type { TvMode } from "@/lib/use-tv-mode";
 
 /** Visible lifecycle state of the TV screen. */
 export type TvViewState = "nominal" | "loading" | "empty";
@@ -36,18 +40,15 @@ export interface TvScreenProps {
   tenantName?: string;
   /** Current wall-clock time rendered in the header (kept out of the component for testability). */
   clock?: string;
-  /** Loading flag — renders a full-screen skeleton without a white flash. */
+  /** Full localized date (FR/EN) shown at the center of the top banner. */
+  dateLabel?: string;
+  /** Loading flag — renders a split-adapted skeleton without a white flash. */
   loading?: boolean;
-  /** TV-002: brand flash active on the hero for the celebration window. */
+  /** TV-002: brand flash active on the current-call card for the celebration window. */
   celebration?: boolean;
-  /** TV-002: reduced motion — disables the slide transition (instant swap). */
+  /** TV-002: reduced motion — disables transitions (instant swap). */
   reducedMotion?: boolean;
-  /**
-   * Top-level mode: `rest` shows the AdZone, `call` shows the call scene.
-   * Defaults to `call` when a hero is present, else `rest` (backward-compatible).
-   */
-  mode?: TvMode;
-  /** Configurable ad slides for the rest-state AdZone (defaults to demo slides). */
+  /** Configurable ad slides for the permanent AdZone (defaults to demo slides). */
   adSlides?: readonly AdSlide[];
 }
 
@@ -59,14 +60,35 @@ export interface TvScreenProps {
 const screenStyle: CSSProperties = {
   backgroundColor: "var(--night-2, var(--surface-screen))",
   color: "var(--ink-inverse)",
-  minHeight: "100vh",
+  height: "100vh",
   display: "flex",
   flexDirection: "column",
+  overflow: "hidden",
   fontFamily: "var(--font-text)",
 };
 
+/** Split permanent : pub ~75 % à gauche, colonne d'appels ~25 % à droite. */
+const splitStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 3fr) minmax(0, 1fr)",
+};
+
+/** Colonne d'appels — fond sombre dédié + séparateur token. */
+const columnStyle: CSSProperties = {
+  backgroundColor: "var(--night-2, var(--surface-screen))",
+  borderLeft: "1px solid var(--tv-separator)",
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 0,
+  padding: "var(--space-6)",
+  gap: "var(--space-6)",
+  overflow: "hidden",
+};
+
 /**
- * Renders a single previous-call card at the mandated --display-tv size.
+ * Renders a single previous-call card (numéro + guichet, en retrait).
  * Recent calls are in retreat: --ink-inverse-soft, tabular --font-display digits.
  * @param call - The previous call to render.
  * @returns The card element.
@@ -104,7 +126,98 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
 }
 
 /**
- * Full-screen TV call display.
+ * Carte « appel courant » en tête de colonne. Au nouvel appel (celebration),
+ * la carte passe sur fond --brand avec halo or (mécanique TV-002 conservée),
+ * puis revient au repos — la pub à gauche n'est jamais interrompue.
+ * @param props - Hero call (or null), locale, celebration and motion flags.
+ * @returns The current-call card element.
+ */
+function CurrentCallCard({
+  hero,
+  locale,
+  celebration,
+  reducedMotion,
+}: {
+  hero: TvCall | null;
+  locale: Locale;
+  celebration: boolean;
+  reducedMotion: boolean;
+}): ReactElement {
+  return (
+    <section
+      data-testid="tv-hero"
+      data-celebration={celebration ? "on" : "off"}
+      aria-live="polite"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        gap: "var(--space-2)",
+        padding: "var(--space-6) var(--space-4)",
+        borderRadius: "var(--r-xl)",
+        border: "1px solid var(--tv-separator)",
+        backgroundColor: celebration ? "var(--brand)" : "var(--surface-screen)",
+        boxShadow: celebration ? "var(--shadow-gold)" : "none",
+        transition: reducedMotion
+          ? "none"
+          : "background-color var(--duration-celebration) linear, box-shadow var(--tv-slide-duration) var(--tv-slide-ease)",
+        flexShrink: 0,
+      }}
+    >
+      {hero === null ? (
+        <div
+          data-testid="tv-empty"
+          style={{
+            fontSize: "var(--text-3xl)",
+            lineHeight: "var(--leading-tight)",
+            color: "var(--ink-inverse-soft)",
+            fontFamily: "var(--font-display)",
+            padding: "var(--space-6) 0",
+          }}
+        >
+          {t("tv.empty", locale)}
+        </div>
+      ) : (
+        <>
+          <div
+            data-testid="tv-hero-counter"
+            style={{
+              fontSize: "var(--text-2xl)",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: celebration ? "var(--ink-inverse)" : "var(--gold)",
+            }}
+          >
+            {hero.counterLabel}
+          </div>
+          <div
+            data-testid="tv-hero-number"
+            style={{
+              fontSize: "var(--display-tv-counter)",
+              fontFamily: "var(--font-display)",
+              fontWeight: 600,
+              lineHeight: "var(--leading-tight)",
+              fontVariantNumeric: "tabular-nums",
+              letterSpacing: "var(--tracking-numeric)",
+              color: celebration ? "var(--ink-inverse)" : "var(--brand)",
+            }}
+          >
+            {hero.displayNumber}
+          </div>
+          <div style={{ fontSize: "var(--text-lg)", color: celebration ? "var(--ink-inverse)" : "var(--ink-inverse-soft)" }}>
+            {t("tv.now_serving", locale)}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Écran TV split permanent (pub + colonne d'appels).
  * @param props - {@link TvScreenProps}.
  * @returns The screen element.
  */
@@ -113,213 +226,125 @@ export function TvScreen({
   locale = "fr",
   tenantName = "",
   clock = "",
+  dateLabel = "",
   loading = false,
   celebration = false,
   reducedMotion = false,
-  mode,
   adSlides,
 }: TvScreenProps): ReactElement {
   const isEmpty = state.hero === null;
-  // Mode par défaut : `call` s'il y a un héros (rétro-compatible avec TV-001),
-  // sinon `rest`. Le loading garde la priorité (skeleton).
-  const resolvedMode: TvMode = mode ?? (isEmpty ? "rest" : "call");
-  const showAdZone = !loading && resolvedMode === "rest";
 
   return (
     <div
       data-testid="tv-screen"
-      data-mode={loading ? "loading" : resolvedMode}
+      data-layout="split"
       data-state={loading ? "loading" : isEmpty ? "empty" : "nominal"}
       style={screenStyle}
     >
+      <TvHeader tenantName={tenantName} dateLabel={dateLabel} clock={clock} />
+
       {loading ? (
-        <>
-          <TvHeader tenantName={tenantName} locale={locale} clock={clock} />
+        /* Skeleton adapté au split : volet pub + colonne d'appels squelettés. */
+        <main data-testid="tv-skeleton" aria-busy="true" style={splitStyle}>
           <div
-            data-testid="tv-skeleton"
-            aria-busy="true"
+            data-testid="tv-skeleton-ad"
             style={{
-              flex: 1,
-              backgroundColor: "var(--night-2, var(--surface-screen))",
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-6)",
-              padding: "var(--space-12)",
+              margin: "var(--space-8)",
+              backgroundColor: "var(--tv-separator)",
+              borderRadius: "var(--r-xl)",
             }}
-          >
+          />
+          <div style={columnStyle}>
             <div
               data-testid="tv-skeleton-hero"
               style={{
-                height: "var(--display-tv-hero)",
+                height: "var(--display-tv-counter)",
                 backgroundColor: "var(--tv-separator)",
                 borderRadius: "var(--r-xl)",
-              }}
-            />
-            <div style={{ display: "flex", gap: "var(--space-6)" }}>
-              {Array.from({ length: TV_PREVIOUS_COUNT }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    height: "var(--display-tv-counter)",
-                    flex: 1,
-                    backgroundColor: "var(--tv-separator)",
-                    borderRadius: "var(--r-lg)",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </>
-      ) : showAdZone ? (
-        <AdZone
-          slides={adSlides}
-          locale={locale}
-          tenantName={tenantName}
-          clock={clock}
-          active
-          reducedMotion={reducedMotion}
-        />
-      ) : (
-        <>
-          <TvHeader tenantName={tenantName} locale={locale} clock={clock} />
-          <main style={{ flex: 1, display: "flex", minHeight: 0 }}>
-            {/* Scène principale — le « Moment Ticket » : guichet + numéro géant */}
-            <section
-              data-testid="tv-hero"
-              data-celebration={celebration ? "on" : "off"}
-              aria-live="polite"
-              style={{
-                flex: 1,
-                minHeight: "var(--display-tv-hero)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "var(--space-4)",
-                padding: "var(--space-12) var(--space-8)",
-                backgroundColor: celebration ? "var(--brand)" : "var(--surface-screen)",
-                transition: reducedMotion
-                  ? "none"
-                  : "background-color var(--duration-celebration) linear, transform var(--tv-slide-duration) var(--tv-slide-ease)",
-              }}
-            >
-              {isEmpty ? (
-                <div
-                  data-testid="tv-empty"
-                  style={{
-                    fontSize: "var(--display-tv)",
-                    color: "var(--ink-inverse-soft)",
-                    textAlign: "center",
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  {t("tv.empty", locale)}
-                </div>
-              ) : (
-                <>
-                  <div
-                    style={{
-                      fontSize: "var(--text-3xl)",
-                      fontWeight: 600,
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      color: celebration ? "var(--ink-inverse)" : "var(--gold)",
-                    }}
-                  >
-                    {state.hero!.counterLabel} — {t("tv.now_serving", locale)}
-                  </div>
-                  <div
-                    data-testid="tv-hero-number"
-                    style={{
-                      fontSize: "var(--display-tv-hero)",
-                      fontFamily: "var(--font-display)",
-                      fontWeight: 600,
-                      lineHeight: "var(--leading-tight)",
-                      fontVariantNumeric: "tabular-nums",
-                      letterSpacing: "var(--tracking-numeric)",
-                      color: celebration ? "var(--ink-inverse)" : "var(--brand)",
-                      padding: "var(--space-6) var(--space-16)",
-                      borderRadius: "var(--r-xl)",
-                      // Halo « Moment Ticket » — cerclage or premium (« ding » visuel).
-                      boxShadow: "var(--shadow-gold)",
-                    }}
-                  >
-                    {state.hero!.displayNumber}
-                  </div>
-                  <div style={{ fontSize: "var(--text-3xl)", color: "var(--ink-inverse-soft)" }}>
-                    {t("tv.please_proceed", locale)} {state.hero!.counterLabel}
-                  </div>
-                </>
-              )}
-            </section>
-
-            {/* Rail latéral persistant — derniers appelés + longueur de file */}
-            <aside
-              data-testid="tv-rail"
-              style={{
-                width: "22vw",
-                minWidth: "var(--space-24)",
-                borderLeft: "1px solid var(--tv-separator)",
-                display: "flex",
-                flexDirection: "column",
-                padding: "var(--space-8) var(--space-8)",
-                gap: "var(--space-6)",
                 flexShrink: 0,
               }}
-            >
-              <section data-testid="tv-previous" aria-label={t("tv.recent_calls", locale)}>
-                <div
-                  style={{
-                    fontSize: "var(--text-md)",
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: "var(--ink-inverse-soft)",
-                    marginBottom: "var(--space-3)",
-                  }}
-                >
-                  {t("tv.recent_calls", locale)}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {state.previous.map((call) => (
-                    <PreviousCard key={`${call.displayNumber}-${call.calledAt}`} call={call} />
-                  ))}
-                </div>
-              </section>
+            />
+            {Array.from({ length: TV_PREVIOUS_COUNT }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  height: "var(--display-tv)",
+                  backgroundColor: "var(--tv-separator)",
+                  borderRadius: "var(--r-lg)",
+                  flexShrink: 0,
+                }}
+              />
+            ))}
+          </div>
+        </main>
+      ) : (
+        <main data-testid="tv-split" style={splitStyle}>
+          {/* Zone gauche ~75 % — carrousel pub actif EN PERMANENCE. */}
+          <section style={{ minWidth: 0, minHeight: 0, display: "flex" }}>
+            <AdZone slides={adSlides} locale={locale} active reducedMotion={reducedMotion} />
+          </section>
 
-              {/* Longueur de file — encre secondaire, valeur mise en avant */}
-              <section
-                data-testid="tv-queue"
-                aria-label={t("tv.waiting", locale)}
-                style={{ marginTop: "auto", borderTop: "1px solid var(--tv-separator)", paddingTop: "var(--space-6)" }}
+          {/* Colonne droite ~25 % — appel courant + derniers appelés + file. */}
+          <aside data-testid="tv-call-column" style={columnStyle}>
+            <CurrentCallCard
+              hero={state.hero}
+              locale={locale}
+              celebration={celebration}
+              reducedMotion={reducedMotion}
+            />
+
+            <section data-testid="tv-previous" aria-label={t("tv.recent_calls", locale)} style={{ minHeight: 0 }}>
+              <div
+                style={{
+                  fontSize: "var(--text-md)",
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-inverse-soft)",
+                  marginBottom: "var(--space-3)",
+                }}
               >
-                <div
-                  style={{
-                    fontSize: "var(--text-md)",
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: "var(--ink-inverse-soft)",
-                  }}
-                >
-                  {t("tv.waiting", locale)}
-                </div>
-                <div
-                  data-testid="tv-queue-count"
-                  style={{
-                    fontSize: "var(--display-tv-counter)",
-                    fontFamily: "var(--font-display)",
-                    fontWeight: 600,
-                    lineHeight: "var(--leading-tight)",
-                    fontVariantNumeric: "tabular-nums",
-                    letterSpacing: "var(--tracking-numeric)",
-                    color: "var(--gold)",
-                  }}
-                >
-                  {state.queue.length}
-                </div>
-              </section>
-            </aside>
-          </main>
-        </>
+                {t("tv.recent_calls", locale)}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {state.previous.map((call) => (
+                  <PreviousCard key={`${call.displayNumber}-${call.calledAt}`} call={call} />
+                ))}
+              </div>
+            </section>
+
+            {/* Longueur de file — en bas de colonne, style actuel conservé. */}
+            <section
+              data-testid="tv-queue"
+              aria-label={t("tv.waiting", locale)}
+              style={{ marginTop: "auto", borderTop: "1px solid var(--tv-separator)", paddingTop: "var(--space-6)" }}
+            >
+              <div
+                style={{
+                  fontSize: "var(--text-md)",
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-inverse-soft)",
+                }}
+              >
+                {t("tv.waiting", locale)}
+              </div>
+              <div
+                data-testid="tv-queue-count"
+                style={{
+                  fontSize: "var(--display-tv-counter)",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 600,
+                  lineHeight: "var(--leading-tight)",
+                  fontVariantNumeric: "tabular-nums",
+                  letterSpacing: "var(--tracking-numeric)",
+                  color: "var(--gold)",
+                }}
+              >
+                {state.queue.length}
+              </div>
+            </section>
+          </aside>
+        </main>
       )}
 
       {/* Offline banner — discret, --info neutre, dernier état conservé */}
@@ -345,14 +370,17 @@ export function TvScreen({
   );
 }
 
-/** Bank header — logo mark (thémable --brand) + name + clock, en retrait. */
+/**
+ * Bandeau haut — fond --brand, texte inverse : pastille logo + nom banque à
+ * gauche, date complète au centre, horloge en bloc contrasté à droite.
+ */
 function TvHeader({
   tenantName,
-  locale,
+  dateLabel,
   clock,
 }: {
   tenantName: string;
-  locale: Locale;
+  dateLabel: string;
   clock: string;
 }): ReactElement {
   return (
@@ -363,15 +391,16 @@ function TvHeader({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 var(--space-12)",
-        borderBottom: "1px solid var(--tv-separator)",
-        color: "var(--ink-inverse-soft)",
+        gap: "var(--space-6)",
+        padding: "0 var(--space-6)",
+        backgroundColor: "var(--brand)",
+        color: "var(--brand-contrast)",
         fontSize: "var(--text-lg)",
         flexShrink: 0,
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-        {/* Pastille logo — accent marque thémable par banque */}
+      <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", minWidth: 0 }}>
+        {/* Pastille logo — lisible sur le bandeau brand (theming banque). */}
         <span
           data-testid="tv-brand-mark"
           aria-hidden="true"
@@ -379,19 +408,56 @@ function TvHeader({
             width: "var(--space-6)",
             height: "var(--space-6)",
             borderRadius: "var(--r-full)",
-            backgroundColor: "var(--brand)",
-            boxShadow: "var(--shadow-gold)",
+            backgroundColor: "var(--brand-contrast)",
+            boxShadow: "var(--shadow-1)",
+            flexShrink: 0,
           }}
         />
-        <span style={{ fontWeight: 600, color: "var(--ink-inverse)" }}>{tenantName}</span>
+        <span
+          style={{
+            fontWeight: 600,
+            color: "var(--brand-contrast)",
+            fontSize: "var(--text-xl)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {tenantName}
+        </span>
       </span>
-      <span style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontSize: "var(--text-md)" }}>
-        {t("tv.title", locale)}
+
+      {/* Date complète (FR/EN) au centre du bandeau. */}
+      <span
+        data-testid="tv-date"
+        aria-hidden={dateLabel === ""}
+        style={{
+          fontSize: "var(--text-xl)",
+          fontWeight: 500,
+          letterSpacing: "0.04em",
+          color: "var(--brand-contrast)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {dateLabel}
       </span>
+
+      {/* Horloge — bloc contrasté, grande, chiffres tabulaires. */}
       <span
         data-testid="tv-clock"
         aria-hidden={clock === ""}
-        style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "var(--tracking-numeric)" }}
+        style={{
+          backgroundColor: "var(--night-2, var(--surface-screen))",
+          color: "var(--ink-inverse)",
+          fontFamily: "var(--font-display)",
+          fontSize: "var(--text-2xl)",
+          fontWeight: 600,
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "var(--tracking-numeric)",
+          padding: "var(--space-1) var(--space-4)",
+          borderRadius: "var(--r-md)",
+          flexShrink: 0,
+        }}
       >
         {clock}
       </span>
