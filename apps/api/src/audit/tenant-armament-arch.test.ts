@@ -79,17 +79,17 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
  * DOIT être armée (sinon le test échoue).
  */
 const ARMED_CUTOVER_PENDING: readonly string[] = [
-  // ai-forecast.ts — DIFFÉRÉE (couture INTER-PISTE feature-store, PAS une couture DB
-  // manquante). Le routeur `GET /ai/forecast` (vit sous `routes/`) N'ACCÈDE PAS
-  // lui-même à la DB tenant : il lit ses features via un `ForecastDataProvider`
-  // INJECTÉ (defaut `emptyForecastDataProvider` → 0 record → 422 gated). L'accès DB
-  // réel (matérialisation `ai_features`) appartient au provider câblé par la piste
-  // parallèle feature-store — HORS de ce fichier de route. Il n'y a donc rien à armer
-  // ICI (aucun `c.get("db")`), et un armement forcé serait vide de sens. Ce provider
-  // DEVRA router son accès `ai_features` via `withArmedTenant` lors du câblage
-  // feature-store (couture inter-piste) ; à ce moment la route passera ARMED.
-  // Reste PENDING jusqu'à ce câblage (le fichier existe → non-fantôme).
-  "ai-forecast.ts",
+  // VIDE — dette SEC-F3-02 FERMÉE (F10-FEATURE-STORE + SEC-002-CUTOVER-LOT10).
+  //
+  // Le dernier fichier différé, `ai-forecast.ts`, est désormais ARMÉ : le câblage
+  // feature-store (couture inter-piste) a livré le provider DB-backed
+  // `dbFeatureStoreProvider`, qui lit `ai_features` (migration 0013) SOUS
+  // `withArmedTenant` — la lecture tenant s'exécute sur la connexion `sigfa_app`
+  // NOBYPASSRLS avec `app.current_bank_id` armé (RLS FORCE contraignante). Le fichier
+  // porte l'armement (`withArmedTenant` + `c.get("db")`) → reclassé ARMED ci-dessous.
+  //
+  // Liste vide = toute route tenant accédant à la DB est ARMÉE ou explicitement
+  // PLATFORM_OR_PUBLIC : plus aucune bascule en attente.
 ];
 
 /**
@@ -239,6 +239,16 @@ const ARMED: readonly string[] = [
   //   GRANT CRUD, 0001).
   "reports.ts",
   "onboarding.ts",
+  // SEC-002-CUTOVER-LOT10 + F10-FEATURE-STORE — DERNIÈRE bascule, FERME SEC-F3-02.
+  // - ai-forecast.ts : `GET /ai/forecast`. Le provider de features DB-backed
+  //   (`dbFeatureStoreProvider`, activé par `FEATURE_STORE_PROVIDER=db`) lit
+  //   `ai_features` (migration 0013 : policy `tenant_isolation` FORCE + GRANT
+  //   SELECT/INSERT/UPDATE/DELETE `sigfa_app`) via `DbFeatureStore` SOUS
+  //   `withArmedTenant(asArmable(c.get("db")), bankId, …)`. La lecture tenant est
+  //   donc bornée à la banque armée par la RLS (défense-en-profondeur), pas seulement
+  //   par le `WHERE bank_id`/`agency_id` applicatif. Le provider par défaut (feature-
+  //   store désactivé) reste `emptyForecastDataProvider` → 422 gated (inchangé).
+  "ai-forecast.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
