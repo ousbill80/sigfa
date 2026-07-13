@@ -43,6 +43,7 @@ import { mountGlobalRateLimits } from "src/config/rate-limits.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import type { QueueHealthProvider } from "src/routes/health.js";
 
 // Valider le mapping route→rôle au démarrage du module
 validateRouteMapping();
@@ -70,6 +71,12 @@ export interface AppOptions {
   jwtSecret: Uint8Array;
   /** Bus temps réel injectable (défaut : no-op validant). API-003. */
   bus?: RealtimeBus;
+  /**
+   * Fournisseur de santé des files BullMQ de notification (NOTIF-001).
+   * Injecté par l'entrypoint serveur quand l'infra est démarrée → expose
+   * `checks.queues` sur `GET /health` (extension non-breaking, CONTRACT-013).
+   */
+  queueHealth?: QueueHealthProvider;
 }
 
 /**
@@ -184,7 +191,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // - /kiosks/status : supervision MANAGER+ (ONLINE/OFFLINE dérivé de last_seen).
   // - /audit-logs : lecture seule stricte (AUDITOR|SUPER_ADMIN).
   // - /notifications/devices : enregistrement idempotent + DELETE ownership.
-  app.route("/api/v1", createHealthRouter());
+  app.route("/api/v1", createHealthRouter("0.0.0", options.queueHealth));
   app.route("/api/v1", createKioskStatusRouter());
   app.route("/api/v1", createAuditLogRouter());
   app.route("/api/v1", createDeviceRouter());

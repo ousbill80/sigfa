@@ -20,6 +20,7 @@ import { Hono } from "hono";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { buildError } from "src/lib/errors.js";
+import type { QueueHealth } from "src/services/notification-jobs.js";
 
 /** Variables de contexte Hono injectées par app.ts. */
 interface HealthEnv {
@@ -36,20 +37,43 @@ const START_TIME = Date.now();
 type DepState = "up" | "down";
 
 /**
+ * Fournisseur optionnel de la santé des files BullMQ de notification (NOTIF-001).
+ * Injecté par `app.ts` quand l'infrastructure de notification est démarrée ;
+ * absent, le check `queues` n'apparaît pas (extension non-breaking, CONTRACT-013).
+ */
+export type QueueHealthProvider = () => Promise<QueueHealth>;
+
+/**
  * Crée le routeur de santé (monté sous /api/v1).
  *
- * @param version - Version applicative exposée (défaut `0.0.0`).
+ * Le corps 200 respecte `HealthResponse` (LA LOI, champs requis `status`,
+ * `version`, `timestamp`) et l'enrichit de `uptime` + `checks`. Quand un
+ * `queueHealth` est injecté, `checks.queues` expose la santé des files BullMQ
+ * (waiting/active/failed/... + DLQ) — extension non-breaking prête pour
+ * CONTRACT-013. Un job bloqué en DLQ passe la réponse en 503 (dépendance dégradée).
+ *
+ * @param version     - Version applicative exposée (défaut `0.0.0`).
+ * @param queueHealth - Fournisseur optionnel de la santé des files (NOTIF-001).
  * @returns Routeur Hono de `/health`
  */
-export function createHealthRouter(version = "0.0.0"): Hono<HealthEnv> {
+export function createHealthRouter(
+  version = "0.0.0",
+  queueHealth?: QueueHealthProvider
+): Hono<HealthEnv> {
   const router = new Hono<HealthEnv>();
   router.get("/health", async (c) => {
-    const [postgres, redis] = await Promise.all([
+    const [postgres, redis, queues] = await Promise.all([
       checkPostgres(c.get("db")),
       checkRedis(c.get("redis")),
+      checkQueues(queueHealth),
     ]);
-    const checks = { postgres, redis };
-    const healthy = postgres === "up" && redis === "up";
+    const checks = {
+      postgres,
+      redis,
+      ...(queues ? { queues } : {}),
+    };
+    const queuesHealthy = queues === undefined || queues.healthy;
+    const healthy = postgres === "up" && redis === "up" && queuesHealthy;
     const timestamp = new Date().toISOString();
     if (!healthy) {
       return c.json(
@@ -72,6 +96,25 @@ export function createHealthRouter(version = "0.0.0"): Hono<HealthEnv> {
     );
   });
   return router;
+}
+
+/**
+ * Interroge la santé des files de notification (si un fournisseur est injecté).
+ * Ne propage jamais l'erreur : une panne de sonde compte comme file dégradée.
+ *
+ * @param provider - Fournisseur optionnel de la santé des files
+ * @returns Santé des files, ou `undefined` si non câblé
+ */
+async function checkQueues(
+  provider?: QueueHealthProvider
+): Promise<QueueHealth | undefined> {
+  if (!provider) return undefined;
+  try {
+    return await provider();
+  } catch {
+    // Sonde en échec → file marquée dégradée (healthy:false) sans crash du /health.
+    return { channels: [], dlq: { name: "notifications-dlq", counts: { waiting: 0, active: 0, failed: 0, completed: 0, delayed: 1 } }, healthy: false };
+  }
 }
 
 /**
