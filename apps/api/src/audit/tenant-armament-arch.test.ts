@@ -86,7 +86,6 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "reports.ts",
   "services.ts",
   "sms-templates.ts",
-  "theme.ts",
   "thresholds.ts",
   "tickets-sync.ts",
   "tickets.ts",
@@ -100,7 +99,14 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
  * de la livraison du primitif ; se remplit à mesure de la bascule. Quand
  * `ARMED_CUTOVER_PENDING` est vide, la dette SEC-F3-02 est fermée.
  */
-const ARMED: readonly string[] = [];
+const ARMED: readonly string[] = [
+  // ADM-001a : theming tenant — tout accès DB routé via withArmedTenant
+  // (armement `app.current_bank_id` sur le bankId du chemin).
+  "theme.ts",
+  // ADM-003a — supervision borne (GET /agencies/{id}/kiosks/status). Lecture
+  // tenant routée via `withArmedTenant` (RLS armée) : première route basculée.
+  "kiosk-supervision.ts",
+];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
 interface RouteFile {

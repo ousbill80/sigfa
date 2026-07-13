@@ -193,6 +193,7 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   // ── ADMIN — THEME (admin.yaml) ────────────────────────────────────────────
   { method: "GET",   path: "/banks/{id}/theme",            requiredRole: "BANK_ADMIN", tenantScope: "bank" },
   { method: "PATCH", path: "/banks/{id}/theme",            requiredRole: "BANK_ADMIN", tenantScope: "bank" },
+  { method: "POST",  path: "/banks/{id}/theme/logo",       requiredRole: "BANK_ADMIN", tenantScope: "bank" },
   { method: "GET",   path: "/banks/{id}/theme/logo-upload-url", requiredRole: "BANK_ADMIN", tenantScope: "bank" },
 
   // ── ADMIN — SMS TEMPLATES (admin.yaml) ────────────────────────────────────
@@ -240,6 +241,8 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "POST", path: "/reports/export",         requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/reports/export/{jobId}",  requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/kiosks/status",           requiredRole: "MANAGER",         tenantScope: "agency" },
+  // Supervision borne ADM-003a (admin.yaml, CONTRACT-013) : état dérivé à la lecture.
+  { method: "GET", path: "/agencies/{id}/kiosks/status", requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "GET", path: "/admin/network-overview",  requiredRole: "SUPER_ADMIN",     tenantScope: "platform" },
 
   // ── AI (ai.yaml) ──────────────────────────────────────────────────────────
@@ -256,6 +259,7 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   { method: "DELETE", path: "/kiosk/session/{kioskId}",            requiredRole: "AGENCY_DIRECTOR", tenantScope: "agency" },
   { method: "POST",   path: "/kiosks/{kioskId}/heartbeat",         requiredRole: "AUTHENTICATED", tenantScope: "agency" },
   { method: "GET",    path: "/agencies/{id}/qr",                   requiredRole: "AGENT",         tenantScope: "agency" },
+  { method: "GET",    path: "/public/banks/{id}/theme",             requiredRole: "NONE",       tenantScope: "public" },
   { method: "GET",    path: "/public/agencies/{agencyId}/operations", requiredRole: "NONE",       tenantScope: "public" },
   { method: "GET",    path: "/public/agencies/{agencyId}/relationship-managers", requiredRole: "NONE", tenantScope: "public" },
   { method: "POST",   path: "/public/tickets",                     requiredRole: "NONE",          tenantScope: "public" },

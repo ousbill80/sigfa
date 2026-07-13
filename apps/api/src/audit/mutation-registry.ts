@@ -124,6 +124,7 @@ export const MUTATION_REGISTRY: readonly MutationEntry[] = [
 
   // ── ADMIN — THEME / SMS TEMPLATES / THRESHOLDS / HOURS (admin.yaml) ────────
   { method: "PATCH", path: "/banks/{id}/theme", entityType: "theme", action: "PATCH /banks/:id/theme", disposition: "app" },
+  { method: "POST", path: "/banks/{id}/theme/logo", entityType: "theme", action: "POST /banks/:id/theme/logo", disposition: "app" },
   { method: "PATCH", path: "/banks/{id}/sms-templates", entityType: "sms_template", action: "PATCH /banks/:id/sms-templates", disposition: "app" },
   { method: "PATCH", path: "/banks/{id}/thresholds", entityType: "threshold", action: "PATCH /banks/:id/thresholds", disposition: "app" },
   { method: "PATCH", path: "/agencies/{id}/hours", entityType: "agency_hours", action: "PATCH /agencies/:id/hours", disposition: "app" },
