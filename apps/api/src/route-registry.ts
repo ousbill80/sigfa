@@ -48,6 +48,7 @@ import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
 import { createReportRouter } from "src/routes/reports.js";
 import { createNotificationWebhookRouter } from "src/routes/webhooks-notifications.js";
 import { createWhatsAppInboundRouter } from "src/routes/webhooks-whatsapp-inbound.js";
+import { createAnomalyRouter } from "src/ai/anomaly-route.js";
 import type { AppOptions } from "src/app.js";
 
 /**
@@ -158,5 +159,7 @@ export function buildRouteRegistry(opts: AppOptions): readonly RouteDescriptor[]
     // Webhook WhatsApp ENTRANT signé par banque (NOTIF-003, CONTRACT-003) — public
     // (pas de JWT) mais signature HMAC propre à la banque obligatoire. Routeur isolé.
     mount("/api/v1", createWhatsAppInboundRouter()),
+    // Anomalies IA agrégées (IA-003, CONTRACT-008) : GET /ai/anomalies (lecture seule).
+    mount("/api/v1", createAnomalyRouter()),
   ];
 }
