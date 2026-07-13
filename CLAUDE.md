@@ -20,7 +20,6 @@ Un hook bloque ses écritures sur `apps/` et `packages/` — ce n'est pas une su
 | `apps/api/` | `agent-api` |
 | `apps/web/` | `agent-web` |
 | `apps/kiosk/` | `agent-kiosk` |
-| `apps/mobile/` | `agent-mobile` |
 | Après tout lot de stories | Fan-out parallèle : `security-reviewer` + `test-coverage-checker` + `style-conformance` + `design-reviewer` |
 | Rédaction/critique de PRD | Fan-out : `critic-completeness` + `critic-ambiguity` + `critic-feasibility` |
 
@@ -42,7 +41,7 @@ Tâche triviale (typo, renommage local) → agent unique en direct, pas d'orches
 4. Tests d'intégration (Testcontainers — vraie PostgreSQL/Redis)
 5. Schemathesis si une route a changé
 6. Suite `tenant-isolation` si table/route touchée
-7. Suite `offline` si kiosk/mobile touché
+7. Suite `offline` si kiosk touché
 8. Mapping critères EARS ↔ tests nommés (`STORY-xxx: ...`)
 9. Ratchet de couverture : ≥85% nouveaux fichiers, jamais de baisse
 
@@ -55,7 +54,7 @@ SIGFA est 100% autonome et standalone.
 
 ## 6. Stack (source : SIGFA_PROMPT_v5.md §7)
 
-Hono 4 + TypeScript strict · Drizzle + PostgreSQL 16 RLS (multi-tenant bridge : `bank_id` + policies) · Redis 7 + BullMQ · Socket.io · Next.js 15 + shadcn/ui + Tailwind 4 · Electron (kiosque) · Expo SDK 51 · Vitest/Supertest/Testcontainers/Schemathesis/Playwright/k6.
+Hono 4 + TypeScript strict · Drizzle + PostgreSQL 16 RLS (multi-tenant bridge : `bank_id` + policies) · Redis 7 + BullMQ · Socket.io · Next.js 15 + shadcn/ui + Tailwind 4 · Electron (kiosque) · Vitest/Supertest/Testcontainers/Schemathesis/Playwright/k6.
 
 ## 7. Conventions
 

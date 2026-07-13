@@ -127,7 +127,7 @@ jobs:
       - name: Run tests with coverage
         # TURBO_CONCURRENCY=1 : sérialise les PACKAGES turbo (une suite à la fois). Sur un
         # runner 2 cœurs, faire tourner en parallèle plusieurs suites Testcontainers
-        # (api, database) + jest (mobile) + vitest sature CPU/Docker → échecs INTERMITTENTS
+        # (api, database) + vitest sature CPU/Docker → échecs INTERMITTENTS
         # et TOURNANTS (chaque package est vert isolément). Classe « CI 2 cœurs ≠ local »,
         # cf. .claude/lessons/etat-local-residuel-masque-la-ci.md. Fiabilité > vitesse.
         # NB : on passe par la VARIABLE D'ENV, pas `pnpm test -- --concurrency=1` — ce

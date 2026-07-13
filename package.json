@@ -21,7 +21,6 @@
       "@stoplight/prism-core": "5.8.0",
       "@stoplight/prism-http": "5.12.0",
       "@stoplight/prism-http-server": "5.12.0",
-      "@sigfa/mobile>@types/react": "~18.2.0",
       "@sigfa/contracts>react": "18.2.0"
     }
   },

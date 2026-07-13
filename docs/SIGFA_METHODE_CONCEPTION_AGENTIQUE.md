@@ -144,7 +144,6 @@ Les cinq agents d'exécution suivent le même gabarit avec leur périmètre :
 | `agent-database` | `packages/database/` | Schéma Drizzle, migrations, policies RLS, seed |
 | `agent-web` | `apps/web/` | Next.js 15, shadcn/ui, Zustand, Socket.io client |
 | `agent-kiosk` | `apps/kiosk/` | UX borne (boutons ≥80px), offline Dexie.js, next-intl (FR/Dioula/Baoulé/EN), Web Speech API |
-| `agent-mobile` | `apps/mobile/` | Expo SDK 51, MMKV offline, push FCM |
 
 Et trois agents de vérification (lecture seule — `tools: Read, Grep, Glob, Bash` sans Write) :
 
@@ -202,7 +201,7 @@ Et trois agents de vérification (lecture seule — `tools: Read, Grep, Glob, Ba
      │           · Squelettes de tests contrat → voir Partie IV
      ▼
 [5] PARALLÈLE    agent-api implémente le vrai backend
-                 PENDANT QUE agent-web / agent-kiosk / agent-mobile
+                 PENDANT QUE agent-web / agent-kiosk
                  codent contre le mock. Zéro blocage inter-équipes.
 ```
 
@@ -498,7 +497,6 @@ Règles de routage :
 - Toute modification dans packages/database/ → dispatcher agent-database
 - Toute modification dans apps/web/       → dispatcher agent-web
 - Toute modification dans apps/kiosk/     → dispatcher agent-kiosk
-- Toute modification dans apps/mobile/    → dispatcher agent-mobile
 - Après tout lot d'implémentation → fan-out du panel de vérification
   (security-reviewer + test-coverage-checker + style-conformance en parallèle)
 
@@ -717,7 +715,6 @@ sigfa/
 │   │   ├── agent-database.md
 │   │   ├── agent-web.md
 │   │   ├── agent-kiosk.md
-│   │   ├── agent-mobile.md
 │   │   ├── security-reviewer.md     # Panel (lecture seule)
 │   │   ├── test-coverage-checker.md
 │   │   ├── style-conformance.md
