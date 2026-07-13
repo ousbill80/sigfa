@@ -233,6 +233,45 @@ export function deriveForecast(body: unknown): ForecastView {
   return { points, factors, peakExpected, hasLowConfidence };
 }
 
+/** An aggregated driver: one factor, its dominant direction and summed weight. */
+export interface AggregatedDriver {
+  /** Driver factor name (PII-free). */
+  factor: string;
+  /** Dominant contribution direction (the heavier side wins). */
+  direction: "up" | "down";
+  /** Total weight across all points, clamped to 0..1 for the mini-bar. */
+  weight: number;
+}
+
+/**
+ * Aggregates the per-point forecast drivers into a compact, de-cluttered list:
+ * one entry per factor (weights summed, dominant direction kept), sorted by
+ * descending weight. Replaces the wall of dozens of per-hour badges with a
+ * ranked top list the direction can actually read.
+ * @param points - Forecast points carrying drivers.
+ * @returns Aggregated drivers, heaviest first.
+ */
+export function aggregateDrivers(points: readonly ForecastPointView[]): AggregatedDriver[] {
+  const byFactor = new Map<string, { up: number; down: number }>();
+  for (const p of points) {
+    for (const d of p.drivers) {
+      const acc = byFactor.get(d.factor) ?? { up: 0, down: 0 };
+      acc[d.direction] += d.weight;
+      byFactor.set(d.factor, acc);
+    }
+  }
+  const out: AggregatedDriver[] = [];
+  for (const [factor, { up, down }] of byFactor) {
+    const total = up + down;
+    out.push({
+      factor,
+      direction: down > up ? "down" : "up",
+      weight: Math.max(0, Math.min(1, total)),
+    });
+  }
+  return out.sort((a, b) => b.weight - a.weight);
+}
+
 // ─── Anomalies (evidence) ──────────────────────────────────────────────────────
 
 /** Anomaly type token (contract `AnomalyType`). */

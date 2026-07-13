@@ -54,6 +54,7 @@ export function InsightsPageClient({
       load={dash.load}
       history={dash.history}
       offline={offline || dash.connection === "offline"}
+      onRetry={() => void dash.refresh()}
     />
   );
 }

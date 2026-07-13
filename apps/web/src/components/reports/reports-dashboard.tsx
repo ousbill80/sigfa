@@ -12,18 +12,18 @@
  */
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
-import { Card } from "@sigfa/ui";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { EmptyState, KpiTile, OfflineBanner, PageTitle } from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 import { canAccess, type Role } from "@/lib/roles";
 import {
+  benchmarkOverview,
   type ExportFormat,
   type ExportScope,
   type SortKpi,
 } from "@/lib/reports-state";
 import { useReportExport, type ReportingClient } from "@/lib/use-report-export";
 import { useBenchmark } from "@/lib/use-benchmark";
-import { OfflineBanner } from "@/components/ui/offline-banner";
 import { ExportPanel } from "./export-panel";
 import { BenchmarkTable } from "./benchmark-table";
 
@@ -79,11 +79,9 @@ export function ReportsDashboard({
   if (!allowed) {
     return (
       <div style={{ padding: "var(--space-6)", maxWidth: "720px", margin: "0 auto" }}>
-        <Card data-testid="reports-forbidden" role="alert" style={{ padding: "var(--space-8)", textAlign: "center" }}>
-          <p style={{ margin: 0, color: "var(--ink)", fontSize: "var(--text-lg)", fontWeight: 600 }}>
-            {t("reports.forbidden", locale)}
-          </p>
-        </Card>
+        <div data-testid="reports-forbidden" role="alert">
+          <EmptyState title={t("reports.forbidden", locale)} />
+        </div>
       </div>
     );
   }
@@ -101,26 +99,44 @@ export function ReportsDashboard({
     void benchmark.refresh(sortKpi);
   };
 
+  const overview = useMemo(() => benchmarkOverview(benchmark.rows), [benchmark.rows]);
+  const showOverview = benchmark.load === "ready" && benchmark.rows.length > 0;
+  const dash = t("reports.overview.value.none", locale);
+
   return (
     <div
       data-testid="reports-dashboard"
       style={{ padding: "var(--space-6)", maxWidth: "1200px", margin: "0 auto", backgroundColor: "var(--paper)" }}
     >
+      {offline && (
+        <div data-testid="reports-offline" style={{ marginBottom: "var(--space-5)" }}>
+          <OfflineBanner message={t("reports.benchmark.offline", locale)} />
+        </div>
+      )}
+
       <header style={{ marginBottom: "var(--space-6)" }}>
-        <h1
+        <PageTitle size="3xl">{t("reports.title", locale)}</PageTitle>
+        <p style={{ margin: "var(--space-1) 0 0", color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}>
+          {t("reports.benchmark.period", locale)} · {period}
+        </p>
+      </header>
+
+      {showOverview && (
+        <div
+          data-testid="reports-overview"
           style={{
-            margin: 0,
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--text-3xl)",
-            fontWeight: 600,
-            letterSpacing: "var(--tracking-tight)",
-            lineHeight: "var(--leading-tight)",
-            color: "var(--ink)",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "var(--space-4)",
+            marginBottom: "var(--space-6)",
           }}
         >
-          {t("reports.title", locale)}
-        </h1>
-      </header>
+          <KpiTile label={t("reports.overview.ranked", locale)} value={String(overview.ranked)} />
+          <KpiTile label={t("reports.overview.best", locale)} value={overview.best ?? dash} />
+          <KpiTile label={t("reports.overview.worst", locale)} value={overview.worst ?? dash} />
+          <KpiTile label={t("reports.overview.naShare", locale)} value={`${overview.naSharePct} %`} />
+        </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
         <ExportPanel
@@ -147,8 +163,6 @@ export function ReportsDashboard({
           onSort={handleSort}
         />
       </div>
-
-      <OfflineBanner />
     </div>
   );
 }

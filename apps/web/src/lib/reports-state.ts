@@ -170,6 +170,58 @@ export interface BenchmarkRow {
   tma: number;
 }
 
+/** Headline figures for the benchmark KpiTile overview row. */
+export interface BenchmarkOverview {
+  /** Number of ranked agencies (status ≠ n/a). */
+  ranked: number;
+  /** Best (rank 1) ranked agency name, or null when none. */
+  best: string | null;
+  /** Worst (last) ranked agency name, or null when none. */
+  worst: string | null;
+  /** Share of agencies without data (n/a), as an integer percent 0..100. */
+  naSharePct: number;
+}
+
+/**
+ * Derives the KpiTile overview from the already-ordered benchmark rows (ranked
+ * first, n/a last — see {@link orderBenchmarkRows}). Pure aggregation, zero KPI
+ * computation. The n/a share is a plain ratio of the total.
+ * @param rows - Ordered benchmark rows.
+ * @returns The {@link BenchmarkOverview}.
+ */
+export function benchmarkOverview(rows: readonly BenchmarkRow[]): BenchmarkOverview {
+  const ranked = rows.filter((r) => r.status !== "n/a");
+  const naCount = rows.length - ranked.length;
+  const naSharePct = rows.length > 0 ? Math.round((naCount / rows.length) * 100) : 0;
+  return {
+    ranked: ranked.length,
+    best: ranked[0]?.agencyName ?? null,
+    worst: ranked.length > 0 ? (ranked[ranked.length - 1]?.agencyName ?? null) : null,
+    naSharePct,
+  };
+}
+
+/**
+ * Formats the numeric value of the currently-sorted KPI for a benchmark row.
+ * The contract's minimal `BenchmarkEntry` only carries `tauxSLA` (percent) and
+ * `tma` (minutes); every other sort KPI is server-ranked without a per-row value
+ * on this surface, so it returns null (rendered as a neutral dash — NEVER a
+ * fabricated number). The client performs zero KPI computation.
+ * @param row - The benchmark row.
+ * @param sortKpi - The active sort KPI.
+ * @returns A locale-agnostic formatted value, or null when unavailable.
+ */
+export function benchmarkValue(row: BenchmarkRow, sortKpi: SortKpi): string | null {
+  switch (sortKpi) {
+    case "tauxSLA":
+      return `${row.tauxSLA} %`;
+    case "tma":
+      return `${row.tma} min`;
+    default:
+      return null;
+  }
+}
+
 /**
  * Orders benchmark rows for display: ranked agencies keep the server order
  * (ascending rank), and every `n/a` agency is relegated to the end regardless of

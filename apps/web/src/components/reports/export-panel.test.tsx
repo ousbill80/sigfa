@@ -92,10 +92,41 @@ describe("REP-003b: ExportPanel — 5 états du flux", () => {
     expect(screen.getByTestId("export-retry")).toBeInTheDocument();
   });
 
-  it("REP-003b: offline — notice + déclencheur désactivé", () => {
+  it("REP-003b: offline — déclencheur désactivé (bannière offline au niveau page, jamais dupliquée ici)", () => {
     render(<ExportPanel {...props({ offline: true })} />);
-    expect(screen.getByTestId("export-offline")).toBeInTheDocument();
+    // Single offline treatment lives at the page level; the panel only disables its trigger.
+    expect(screen.queryByTestId("export-offline")).toBeNull();
     expect(screen.getByTestId("export-launch")).toBeDisabled();
+  });
+});
+
+describe("REP-003b: ExportPanel — états tonals + Spinner tokenisé", () => {
+  it("REP-003b: loading — Spinner tokenisé (pas un Skeleton rond)", () => {
+    const job: ExportJob = { jobId: "j", status: "PROCESSING", downloadUrl: null, expiresAt: null };
+    const { container } = render(<ExportPanel {...props({ phase: "polling", job })} />);
+    expect(container.querySelector(".sig-spinner")).not.toBeNull();
+    expect(container.querySelector(".sig-skeleton")).toBeNull();
+  });
+
+  it("REP-003b: error/expired/failed → Badge tonal + icône (jamais un <p> gris nu)", () => {
+    for (const state of [
+      { phase: "error" as const, testId: "export-error" },
+      { phase: "failed" as const, testId: "export-failed", job: { jobId: "j", status: "FAILED" as const, downloadUrl: null, expiresAt: null } },
+    ]) {
+      const { unmount } = render(<ExportPanel {...props(state)} />);
+      const notice = screen.getByTestId(state.testId);
+      expect(notice.querySelector(".sig-badge")).not.toBeNull();
+      expect(notice.querySelector("svg")).not.toBeNull();
+      unmount();
+    }
+  });
+
+  it("REP-003b: expired → Badge tonal + icône + relance", () => {
+    render(<ExportPanel {...props({ phase: "ready", job: { ...readyJob, expiresAt: "2000-01-01T00:00:00Z" }, downloadable: false })} />);
+    const notice = screen.getByTestId("export-expired");
+    expect(notice.querySelector(".sig-badge")).not.toBeNull();
+    expect(notice.querySelector("svg")).not.toBeNull();
+    expect(screen.getByTestId("export-retry")).toBeInTheDocument();
   });
 });
 

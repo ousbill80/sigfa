@@ -189,6 +189,16 @@ export type TranslationKey =
   | "reports.kpi.tauxAbandon"
   | "reports.kpi.nps"
   | "reports.kpi.occupation"
+  | "reports.benchmark.col.value"
+  | "reports.benchmark.period"
+  | "reports.overview.ranked"
+  | "reports.overview.best"
+  | "reports.overview.worst"
+  | "reports.overview.naShare"
+  | "reports.overview.value.none"
+  | "reports.export.state.error"
+  | "reports.export.state.expired"
+  | "reports.export.state.failed"
   | "audit.title"
   | "audit.subtitle"
   | "audit.filter.entityType"
@@ -260,6 +270,11 @@ export type TranslationKey =
   | "ai.insufficient.title"
   | "ai.insufficient.progress"
   | "ai.insufficient.hint"
+  | "ai.insufficient.days"
+  | "ai.drivers.others"
+  | "ai.state.error.title"
+  | "ai.state.retry"
+  | "ai.forecast.risk"
   // NET-001 — Super Admin network console (own namespace)
   | "netAdmin.title"
   | "netAdmin.subtitle"
@@ -507,6 +522,16 @@ export const FR: TranslationDict = {
   "reports.kpi.tauxAbandon": "Taux d'abandon",
   "reports.kpi.nps": "NPS",
   "reports.kpi.occupation": "Occupation",
+  "reports.benchmark.col.value": "Valeur",
+  "reports.benchmark.period": "Période",
+  "reports.overview.ranked": "Agences classées",
+  "reports.overview.best": "Meilleure agence",
+  "reports.overview.worst": "Agence à surveiller",
+  "reports.overview.naShare": "Part sans donnée",
+  "reports.overview.value.none": "—",
+  "reports.export.state.error": "Export impossible",
+  "reports.export.state.expired": "Lien expiré",
+  "reports.export.state.failed": "Génération échouée",
   "audit.title": "Journal d'audit",
   "audit.subtitle": "Consultation en lecture seule des évènements de sécurité et de configuration.",
   "audit.filter.entityType": "Type d'entité",
@@ -579,6 +604,11 @@ export const FR: TranslationDict = {
   "ai.insufficient.progress": "jours d'historique collectés",
   "ai.insufficient.hint":
     "Les prédictions s'activent après 90 jours de données. Le compteur progresse chaque jour.",
+  "ai.insufficient.days": "jours",
+  "ai.drivers.others": "autres facteurs",
+  "ai.state.error.title": "Insights indisponibles",
+  "ai.state.retry": "Réessayer",
+  "ai.forecast.risk": "À risque",
   "netAdmin.title": "SUPERVISION RÉSEAU — SUPER ADMIN",
   "netAdmin.subtitle": "Pilotage cross-tenant du parc — lecture seule.",
   "netAdmin.guarantee": "Agrégat réseau — aucune donnée client",
@@ -822,6 +852,16 @@ export const EN: TranslationDict = {
   "reports.kpi.tauxAbandon": "Abandonment rate",
   "reports.kpi.nps": "NPS",
   "reports.kpi.occupation": "Occupancy",
+  "reports.benchmark.col.value": "Value",
+  "reports.benchmark.period": "Period",
+  "reports.overview.ranked": "Ranked agencies",
+  "reports.overview.best": "Best agency",
+  "reports.overview.worst": "Agency to watch",
+  "reports.overview.naShare": "No-data share",
+  "reports.overview.value.none": "—",
+  "reports.export.state.error": "Export failed",
+  "reports.export.state.expired": "Link expired",
+  "reports.export.state.failed": "Generation failed",
   "audit.title": "Audit log",
   "audit.subtitle": "Read-only view of security and configuration events.",
   "audit.filter.entityType": "Entity type",
@@ -894,6 +934,11 @@ export const EN: TranslationDict = {
   "ai.insufficient.progress": "days of history collected",
   "ai.insufficient.hint":
     "Predictions activate after 90 days of data. The counter progresses each day.",
+  "ai.insufficient.days": "days",
+  "ai.drivers.others": "other factors",
+  "ai.state.error.title": "Insights unavailable",
+  "ai.state.retry": "Try again",
+  "ai.forecast.risk": "At risk",
   "netAdmin.title": "NETWORK SUPERVISION — SUPER ADMIN",
   "netAdmin.subtitle": "Cross-tenant fleet steering — read-only.",
   "netAdmin.guarantee": "Network aggregate — no customer data",

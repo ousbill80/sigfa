@@ -84,4 +84,29 @@ describe("REP-003b: ReportsDashboard — composition & i18n", () => {
     rerender(<ReportsDashboard {...props("BANK_ADMIN", { locale: "en" })} />);
     await waitFor(() => expect(screen.getByText("REPORTS & BENCHMARKING")).toBeInTheDocument());
   });
+
+  it("REP-003b: rangée de KpiTile en tête (nb classées, meilleure/pire, part n/a) + sous-titre période", async () => {
+    render(<ReportsDashboard {...props("BANK_ADMIN")} />);
+    // Period subtitle is always rendered.
+    expect(screen.getByText(/2026-07/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("reports-overview")).toBeInTheDocument());
+    const overview = screen.getByTestId("reports-overview");
+    // 1 ranked (Plateau) + 1 n/a → 50% n/a share, best = Plateau.
+    expect(overview).toHaveTextContent("Agence Plateau");
+    expect(overview).toHaveTextContent("50 %");
+  });
+
+  it("REP-003b: un SEUL traitement offline — bannière en tête de page", async () => {
+    render(<ReportsDashboard {...props("BANK_ADMIN", { offline: true })} />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-table")).toBeInTheDocument());
+    expect(screen.getByTestId("reports-offline")).toBeInTheDocument();
+    // No duplicate offline treatment inside the panels.
+    expect(screen.queryByTestId("benchmark-offline")).toBeNull();
+    expect(screen.queryByTestId("export-offline")).toBeNull();
+  });
+
+  it("REP-003b: forbidden rendu en EmptyState (pas un <p> gris nu)", () => {
+    const { container } = render(<ReportsDashboard {...props("AGENT")} />);
+    expect(container.querySelector(".sig-empty")).not.toBeNull();
+  });
 });
