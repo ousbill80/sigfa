@@ -13,7 +13,7 @@
  *    ce que le contrat exige (note + comment).
  *  - 409 FEEDBACK_ALREADY_SUBMITTED → remerciement neutre, zéro erreur visible.
  *  - 422 TICKET_NOT_CLOSED | FEEDBACK_WINDOW_EXPIRED → retour accueil silencieux.
- *  - Bouton 🎤 masqué si SpeechRecognition absent (Electron).
+ *  - Bouton micro masqué si SpeechRecognition absent (Electron).
  *  - Retour accueil auto après 30 s d'inactivité (60 s mode accessibilité).
  *  - Tokens @sigfa/ui uniquement, cibles ≥ 72 px, contraste ≥ 7:1.
  */
@@ -23,6 +23,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
+import { IconAudio, IconEtoile } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { A11Y_BASE_FONT_PX, accessibilityFontSizePx } from "@/lib/kiosk-voice";
 import {
@@ -68,7 +69,7 @@ export function FeedbackScreen({
     ? accessibilityFontSizePx()
     : A11Y_BASE_FONT_PX;
 
-  // Détection de la Web Speech API (masque le bouton 🎤 dans Electron).
+  // Détection de la Web Speech API (masque le bouton micro dans Electron).
   useEffect(() => {
     setSpeechSupported(getSpeechRecognitionConstructor() !== null);
   }, []);
@@ -175,8 +176,8 @@ export function FeedbackScreen({
           padding: "var(--space-8)",
         }}
       >
-        <span aria-hidden="true" style={{ fontSize: "56px", color: "var(--gold)" }}>
-          ★
+        <span aria-hidden="true" style={{ color: "var(--gold)", lineHeight: 1 }}>
+          <IconEtoile size={56} />
         </span>
         <p
           data-testid="feedback-thankyou"
@@ -255,7 +256,7 @@ export function FeedbackScreen({
                 cursor: "pointer",
               }}
             >
-              <span aria-hidden="true">{active ? "★" : "☆"}</span>
+              <IconEtoile size={labelFontPx + 8} />
             </button>
           );
         })}
@@ -282,7 +283,7 @@ export function FeedbackScreen({
         }}
       />
 
-      {/* Bouton 🎤 : masqué silencieusement si SpeechRecognition absent */}
+      {/* Bouton micro : masqué silencieusement si SpeechRecognition absent */}
       {speechSupported && (
         <button
           type="button"
@@ -305,7 +306,7 @@ export function FeedbackScreen({
             padding: "var(--space-2) var(--space-4)",
           }}
         >
-          <span aria-hidden="true">🎤</span>
+          <IconAudio size={28} />
           <span>{t("micLabel")}</span>
         </button>
       )}

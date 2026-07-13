@@ -41,11 +41,11 @@ export interface ServiceItem {
 }
 
 const MOCK_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", icon: "💰", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", icon: "💵", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", icon: "🔄", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", icon: "📋", estimatedMinutes: 15, isOpen: true },
-  { id: "svc-5", name: "Crédit", icon: "🏦", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
+  { id: "svc-1", name: "Dépôt", icon: "deposit", estimatedMinutes: 5, isOpen: true },
+  { id: "svc-2", name: "Retrait", icon: "withdrawal", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-3", name: "Virement", icon: "transfer", estimatedMinutes: 12, isOpen: true },
+  { id: "svc-4", name: "Réclamation", icon: "complaint", estimatedMinutes: 15, isOpen: true },
+  { id: "svc-5", name: "Crédit", icon: "credit", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
 ];
 
 const frMessages = {
@@ -55,7 +55,7 @@ const frMessages = {
     waitEstimate: "~{minutes} min",
     seeMore: "Voir plus de services",
     closedService: "Fermé — {schedule}",
-    accessibilityButton: "♿ Accès prioritaire",
+    accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
     offlineBanner: "Mode hors connexion",
@@ -74,7 +74,7 @@ const enMessages = {
     waitEstimate: "~{minutes} min",
     seeMore: "See more services",
     closedService: "Closed — {schedule}",
-    accessibilityButton: "♿ Priority access",
+    accessibilityButton: "Priority access",
     emptyTitle: "No services available",
     emptyMessage: "Please go to reception — a staff member will assist you.",
     offlineBanner: "Offline mode",
@@ -178,7 +178,7 @@ describe("KIOSK-003: ServicesScreen", () => {
     const closedService: ServiceItem = {
       id: "svc-closed",
       name: "Crédit",
-      icon: "🏦",
+      icon: "credit",
       estimatedMinutes: 20,
       isOpen: false,
       schedule: "Lu-Ve 09h-17h",
@@ -203,7 +203,7 @@ describe("KIOSK-003: ServicesScreen", () => {
     expect(container.querySelector("[data-testid='service-schedule']")).toBeInTheDocument();
   });
 
-  it("KIOSK-003: ♿ button → text +20%, doubled inactivity delay (Vitest)", () => {
+  it("KIOSK-003: bouton accessibilité → text +20%, doubled inactivity delay (Vitest)", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />

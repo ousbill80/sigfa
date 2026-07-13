@@ -1,13 +1,15 @@
 /**
  * KIOSK-008 — VoiceButton.tsx
  *
- * Bouton 🔊 permanent (cible ≥ 72×72 px) présent sur tous les écrans : déclenche
- * la lecture vocale de l'écran courant dans la langue de session. Icône appariée
- * à un label texte (règle icône+texte du design system). Tokens CSS uniquement.
+ * Bouton audio permanent (cible ≥ 72×72 px) présent sur tous les écrans : déclenche
+ * la lecture vocale de l'écran courant dans la langue de session. Icône SIGFA
+ * « audio » appariée à un label texte (règle icône+texte du design system).
+ * Tokens CSS uniquement.
  */
 "use client";
 
 import { useTranslations } from "next-intl";
+import { IconAudio } from "@sigfa/ui";
 import { useVoiceAnnouncement } from "@/hooks/useVoiceAnnouncement";
 import {
   accessibilityFontSizePx,
@@ -56,7 +58,7 @@ export function VoiceButton({
         padding: "var(--space-2) var(--space-4)",
       }}
     >
-      <span aria-hidden="true">🔊</span>
+      <IconAudio size={28} />
       <span>{t("playLabel")}</span>
     </button>
   );

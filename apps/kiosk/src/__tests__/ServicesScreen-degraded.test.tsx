@@ -39,7 +39,7 @@ const frMessages = makeMessages(
     waitEstimate: "~{minutes} min",
     seeMore: "Voir plus de services",
     closedService: "Fermé — {schedule}",
-    accessibilityButton: "♿ Accès prioritaire",
+    accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
     offlineBanner: "Mode hors connexion",
@@ -58,7 +58,7 @@ const enMessages = makeMessages(
     waitEstimate: "~{minutes} min",
     seeMore: "See more services",
     closedService: "Closed — {schedule}",
-    accessibilityButton: "♿ Priority access",
+    accessibilityButton: "Priority access",
     emptyTitle: "No services available",
     emptyMessage: "Please go to reception — a staff member will assist you.",
     offlineBanner: "Offline mode",
@@ -78,7 +78,7 @@ const AGENCY_ID = "33333333-3333-4333-a333-333333333333";
 const openService: ServiceItem = {
   id: "svc-1",
   name: "Retrait / Dépôt",
-  icon: "💰",
+  icon: "deposit",
   estimatedMinutes: 45,
   isOpen: true,
 };
@@ -86,7 +86,7 @@ const openService: ServiceItem = {
 const closedService: ServiceItem = {
   id: "svc-2",
   name: "Virement international",
-  icon: "💸",
+  icon: "withdrawal",
   estimatedMinutes: 0,
   isOpen: false,
   schedule: "lundi 08h00",

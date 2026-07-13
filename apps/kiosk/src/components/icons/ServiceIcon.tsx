@@ -1,13 +1,19 @@
 /**
- * ServiceIcon — jeu d'icônes SVG line/stroke cohérentes pour l'écran services.
- * Refonte v2 « Sérénité Premium » : fin des emoji sur un produit bancaire.
+ * ServiceIcon — icônes des services de l'écran services (borne).
  *
- * - Traits ~2px, `stroke="currentColor"` → l'icône prend la couleur du parent
- *   (posée en `--brand` dans un cercle `--brand-soft`).
+ * Migration ICONS-001 : le rendu est délégué au set d'icônes SIGFA duotone
+ * (`SigfaIcon` de @sigfa/ui) — plus aucun tracé SVG ad hoc ici. L'API du
+ * composant est conservée à l'identique (`name`/`keyword`/`size`, `data-icon`
+ * porte toujours la clé métier du jeu).
+ *
+ * - `currentColor` → l'icône prend la couleur du parent (posée en `--brand`
+ *   dans un cercle `--brand-soft`).
  * - Les services sont configurables (`code`/`name`) : on mappe par mot-clé,
  *   sinon on retombe sur une icône générique par défaut. AUCUN emoji.
  */
 import type { CSSProperties } from "react";
+
+import { SigfaIcon, type IconName } from "@sigfa/ui";
 
 /** Clés d'icônes disponibles dans le jeu. */
 export type ServiceIconName =
@@ -92,105 +98,24 @@ export function resolveServiceIcon(keyword: string): ServiceIconName {
   return "generic";
 }
 
-/** Chemins SVG (stroke) par icône. viewBox 24×24, traits arrondis. */
-function renderPaths(name: ServiceIconName) {
-  switch (name) {
-    case "deposit":
-      // Flèche vers un portefeuille (dépôt = entrée d'argent).
-      return (
-        <>
-          <path d="M12 3v9" />
-          <path d="M8 8l4 4 4-4" />
-          <path d="M4 14h16v6H4z" />
-          <path d="M16 16h1.5" />
-        </>
-      );
-    case "withdrawal":
-      // Billets sortant d'un distributeur (retrait).
-      return (
-        <>
-          <path d="M4 5h16v9H4z" />
-          <path d="M4 9h16" />
-          <path d="M9 20l3-3 3 3" />
-          <path d="M12 17v5" />
-        </>
-      );
-    case "transfer":
-      // Deux flèches opposées (virement / transfert).
-      return (
-        <>
-          <path d="M4 9h13l-3-3" />
-          <path d="M20 15H7l3 3" />
-        </>
-      );
-    case "complaint":
-      // Bulle de dialogue avec point d'exclamation (réclamation).
-      return (
-        <>
-          <path d="M4 5h16v11H9l-4 4v-4H4z" />
-          <path d="M12 8v3" />
-          <path d="M12 13.5v.01" />
-        </>
-      );
-    case "account":
-      // Carte + puce (compte).
-      return (
-        <>
-          <path d="M3 6h18v12H3z" />
-          <path d="M3 10h18" />
-          <path d="M7 14h4" />
-        </>
-      );
-    case "credit":
-      // Pièce avec signe (crédit / prêt).
-      return (
-        <>
-          <circle cx="12" cy="12" r="8" />
-          <path d="M9 12h6" />
-          <path d="M12 9v6" />
-        </>
-      );
-    case "savings":
-      // Tirelire (épargne).
-      return (
-        <>
-          <path d="M4 12a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v3a2 2 0 0 1-2 2h-1v2h-3v-2H9v2H6v-2a4 4 0 0 1-2-3z" />
-          <path d="M9 9h3" />
-          <path d="M20 11h1" />
-        </>
-      );
-    case "exchange":
-      // Double flèche circulaire (change de devises).
-      return (
-        <>
-          <path d="M4 11a8 8 0 0 1 14-5l2 2" />
-          <path d="M20 6v4h-4" />
-          <path d="M20 13a8 8 0 0 1-14 5l-2-2" />
-          <path d="M4 18v-4h4" />
-        </>
-      );
-    case "advisor":
-      // Personne (conseiller).
-      return (
-        <>
-          <circle cx="12" cy="8" r="3.5" />
-          <path d="M5 20a7 7 0 0 1 14 0" />
-        </>
-      );
-    case "generic":
-    default:
-      // Étoile/point d'accueil générique (fallback).
-      return (
-        <>
-          <circle cx="12" cy="12" r="8" />
-          <path d="M12 8v4l3 2" />
-        </>
-      );
-  }
-}
+/** Clé métier du jeu → icône du set SIGFA duotone (@sigfa/ui). */
+const SIGFA_ICON_BY_SERVICE: Record<ServiceIconName, IconName> = {
+  deposit: "depot",
+  withdrawal: "retrait",
+  transfer: "virement",
+  complaint: "alerte",
+  account: "compte",
+  credit: "credit",
+  savings: "epargne",
+  exchange: "change-devises",
+  advisor: "conseiller",
+  generic: "guichet",
+};
 
 /**
- * Icône SVG d'un service. `stroke="currentColor"` → hérite `--brand` du parent.
+ * Icône d'un service — rendue par le set SIGFA (`currentColor` → hérite
+ * `--brand` du parent). `data-icon` reste la clé métier du jeu (contrat des
+ * écrans appelants et des tests).
  */
 export function ServiceIcon({
   name,
@@ -202,22 +127,13 @@ export function ServiceIcon({
   const resolved: ServiceIconName = name ?? (keyword ? resolveServiceIcon(keyword) : "generic");
 
   return (
-    <svg
-      data-testid={dataTestid}
-      data-icon={resolved}
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
+    <SigfaIcon
+      name={SIGFA_ICON_BY_SERVICE[resolved]}
+      size={size}
       style={style}
-    >
-      {renderPaths(resolved)}
-    </svg>
+      stroke="currentColor"
+      data-icon={resolved}
+      data-testid={dataTestid}
+    />
   );
 }

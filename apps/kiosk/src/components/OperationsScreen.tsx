@@ -26,7 +26,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
-import { EmptyState } from "@sigfa/ui";
+import { EmptyState, IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
@@ -141,7 +141,11 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
             minHeight: "72px",
           }}
         >
-          ← {t("backButton")}
+          <IconRetour
+            size={24}
+            style={{ verticalAlign: "middle", marginRight: "var(--space-2)" }}
+          />
+          {t("backButton")}
         </button>
         <span
           style={{

@@ -100,6 +100,9 @@ describe("KIOSK-007: ConfirmationScreen erreur système", () => {
 
     const pictogram = screen.getByTestId("system-error-pictogram");
     expect(pictogram.style.color).toBe("var(--danger)");
+    // ICONS-001 : pictogramme = icône SIGFA « alerte » (plus de glyphe texte).
+    expect(pictogram.querySelector("svg[data-icon='alerte']")).toBeInTheDocument();
+    expect(pictogram.textContent).toBe("");
 
     // Le conteneur (fond) ne doit JAMAIS porter --danger en background.
     const container = screen.getByTestId("system-error");
