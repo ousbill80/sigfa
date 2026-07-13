@@ -80,7 +80,6 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "kiosk-session.ts",
   "onboarding.ts",
   "public-tickets.ts",
-  "queues.ts",
   // reports.ts — DIFFÉRÉE (couture d'ARCHITECTURE de route, PAS une couture DB
   // manquante) : GET /reports/kpis?scope=network (buildNetworkResponse) est un
   // agrégat CROSS-TENANT réseau (SUPER_ADMIN, `bankId=null`) qui lit
@@ -95,8 +94,6 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   // handler : paths tenant → withArmedTenant ; path network → withPlatform), donc
   // hors périmètre d'un simple recâblage de connexion — reste PENDING jusqu'à ce split.
   "reports.ts",
-  "tickets-sync.ts",
-  "tickets.ts",
   "tv-session.ts",
   "webhooks-notifications.ts",
   "webhooks-whatsapp-inbound.ts",
@@ -144,6 +141,19 @@ const ARMED: readonly string[] = [
   "thresholds.ts",
   "operations.ts",
   "agencies.ts",
+  // SEC-002-CUTOVER-LOT4 — bascule du cycle ticket / file d'attente tenant-scopé.
+  // Tout accès DB tenant routé via `withArmedTenant` (armement `app.current_bank_id`).
+  // - tickets.ts : `tickets` / `queues` / `ticket_transfers` / `counters` / `operations`
+  //   / `services` / `users` / `agency_users` / `agent_status_history` (policy
+  //   `tenant_isolation` + GRANT CRUD) + `banks` (SELECT armé pour le timeout no-show).
+  //   Le cœur `issueTicketFor` (partagé avec public/whatsapp NON armés) est rendu
+  //   TRANSACTION-AWARE (SAVEPOINT sous armement, BEGIN/COMMIT sinon).
+  // - tickets-sync.ts : batch offline — `tickets` / `queues` / `services` / `operations`
+  //   / `users` / `agency_users` ; unité par item = SAVEPOINT dans la tx armée du batch.
+  // - queues.ts : `queues` (policy `tenant_isolation` + GRANT CRUD) — audit composé SEC-001.
+  "tickets.ts",
+  "tickets-sync.ts",
+  "queues.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */

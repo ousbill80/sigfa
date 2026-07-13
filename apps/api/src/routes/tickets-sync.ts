@@ -16,6 +16,15 @@
  * Un `queue:updated` par file affectée ; un `alert:manager` KIOSK_SYSTEM_ERROR
  * par batch dès qu'au moins une ligne est skipped.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT4)
+ * TOUT accès DB tenant du batch est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé, connexion `sigfa_app` NOBYPASSRLS) → cette route est
+ * **ARMED**. Tables `tickets` / `queues` / `services` / `operations` / `users` /
+ * `agency_users` / `audit_log` : policy `tenant_isolation` + GRANT CRUD `sigfa_app`
+ * vérifiés. L'unité PAR TICKET devient un SAVEPOINT dans la transaction armée du
+ * batch : un item fautif relâche son savepoint (skipped) sans annuler les autres, et
+ * l'idempotence `ON CONFLICT (local_uuid)` reste isolée par savepoint (ALREADY_SYNCED).
+ *
  * @module
  */
 
@@ -36,6 +45,7 @@ import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
 import { queueLength } from "src/services/queue-strategy.js";
 import { estimateWaitMinutes, invalidateEstimate } from "src/services/queue-estimation.js";
 import { recordAudit, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable, isCanonicalUuid } from "src/lib/armed-tenant.js";
 
 /** Nombre maximum de tickets par batch de synchronisation (LA LOI). */
 const MAX_BATCH = 100;
@@ -132,7 +142,14 @@ async function handleSync(c: SyncCtx): Promise<Response> {
     const scope = `tickets-sync:${tenant.bankId ?? "_"}`;
     const replay = await findReplay(redis, scope, key, parsed.data);
     if (replay) return c.newResponse(replay.body, replay.status as 200, { "Content-Type": "application/json" });
-    const result = await processBatch(db, redis, tenant, parsed.data.tickets, getBus(c), extractIp(c));
+    const bankId = requireArmableBankId(tenant);
+    const ip = extractIp(c);
+    // SEC-002 : le batch entier tourne à travers la connexion ARMÉE (RLS
+    // `app.current_bank_id`). Chaque item est isolé par SAVEPOINT (un échec ne
+    // touche pas les autres) ; les émissions de fin partagent la connexion armée.
+    const result = await withArmedTenant(asArmable(db), bankId, (conn) =>
+      processBatch(conn as unknown as Client, redis, tenant, parsed.data.tickets, getBus(c), ip)
+    );
     const bodyStr = JSON.stringify(result);
     await storeReplay(redis, scope, key, parsed.data, 200, bodyStr);
     return c.newResponse(bodyStr, 200, { "Content-Type": "application/json" });
@@ -318,13 +335,17 @@ async function insertSynced(
   targetManagerId: string | null,
   ip: string | null
 ): Promise<Outcome> {
-  await db.query("BEGIN");
+  // SEC-002 : la connexion est DÉJÀ armée + en transaction (withArmedTenant). L'unité
+  // par ticket est un SAVEPOINT : conflit d'idempotence → rollback partiel (skip
+  // ALREADY_SYNCED) ; erreur → rollback partiel + propagation (syncOne → SYNC_ERROR).
+  await db.query("SAVEPOINT sec002_sync_item");
   try {
     const number = await allocateNumber(db, queue.queueId);
     const displayNumber = `${queue.code}-${String(number).padStart(3, "0")}`;
     const inserted = await insertRow(db, tenant, it, queue, number, displayNumber, serviceId, operationId, targetManagerId);
     if (!inserted) {
-      await db.query("ROLLBACK");
+      await db.query("ROLLBACK TO SAVEPOINT sec002_sync_item");
+      await db.query("RELEASE SAVEPOINT sec002_sync_item");
       return skip(it.localUuid, "ALREADY_SYNCED");
     }
     // SEC-001a : audit du ticket synchronisé DANS la transaction de la ligne.
@@ -345,16 +366,34 @@ async function insertSynced(
         },
       },
     });
-    await db.query("COMMIT");
+    await db.query("RELEASE SAVEPOINT sec002_sync_item");
     return {
       kind: "synced",
       queueId: queue.queueId,
       ticket: { localUuid: it.localUuid, serverId: inserted.id, number: `A${String(number).padStart(3, "0")}` },
     };
   } catch (err) {
-    await db.query("ROLLBACK");
+    await db.query("ROLLBACK TO SAVEPOINT sec002_sync_item").catch(() => {
+      // Transaction englobante déjà avortée : ROLLBACK global géré en amont.
+    });
     throw err;
   }
+}
+
+/**
+ * Exige un `bankId` tenant en UUID canonique pour l'armement RLS (SEC-002).
+ * Absent (contexte plateforme) ou malformé → 403 : une route tenant ne s'arme
+ * jamais sans banque résolue.
+ *
+ * @param tenant - Contexte tenant résolu
+ * @throws {SigfaError} 403 FORBIDDEN si `bankId` absent/non-UUID
+ */
+function requireArmableBankId(tenant: TenantContext): string {
+  const bankId = tenant.bankId;
+  if (!bankId || !isCanonicalUuid(bankId)) {
+    throw new SigfaError("FORBIDDEN", "Contexte de banque requis.", 403);
+  }
+  return bankId;
 }
 
 /**
