@@ -36,6 +36,7 @@ import { createThresholdsRouter } from "src/routes/thresholds.js";
 import { createSmsTemplateRouter } from "src/routes/sms-templates.js";
 import { createThemeRouter } from "src/routes/theme.js";
 import { createOnboardingRouter } from "src/routes/onboarding.js";
+import { createAgencyOnboardingRouter } from "src/routes/agency-onboarding.js";
 import { createKioskSessionRouter } from "src/routes/kiosk-session.js";
 import { createTvSessionRouter } from "src/routes/tv-session.js";
 import { createAgentImportRouter } from "src/routes/agents-import.js";
@@ -135,6 +136,9 @@ export function buildRouteRegistry(opts: AppOptions): readonly RouteDescriptor[]
     // borne (JWT 12 h + révocation), import CSV, droit à l'oubli.
     mount("/api/v1", createThemeRouter()),
     mount("/api/v1", createOnboardingRouter()),
+    // Onboarding agence < 2h ADM-002a (admin.yaml, CONTRACT-013) : clone structurel
+    // (:clone), provisioning borne + jeton d'enrôlement (:provision), suivi du parcours.
+    mount("/api/v1", createAgencyOnboardingRouter()),
     mount("/api/v1", createKioskSessionRouter()),
     // Session d'affichage TV publique (CONTRACT-013) : token DISPLAY lecture seule.
     mount("/api/v1", createTvSessionRouter()),

@@ -106,6 +106,9 @@ const ARMED: readonly string[] = [
   // ADM-003a — supervision borne (GET /agencies/{id}/kiosks/status). Lecture
   // tenant routée via `withArmedTenant` (RLS armée) : première route basculée.
   "kiosk-supervision.ts",
+  // ADM-002a — onboarding agence < 2h (clone structurel + provisioning borne).
+  // Tout accès DB tenant est routé via `withArmedTenant` (services clone/provision).
+  "agency-onboarding.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
