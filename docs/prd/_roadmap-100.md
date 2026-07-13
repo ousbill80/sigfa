@@ -19,10 +19,13 @@
 - ⏳ **REP-002b** gabarits PDF (@react-pdf A4) · **REP-003b** surface web export — **stories WEB**.
 - ⚠️ Contrat : `/reports/export` exposé POST+GET (LOI ne déclare que GET) → ajout CONTRACT ultérieur.
 
-## F8 — Admin & Theming (API complet)
-- ✅ **ADM-001a** theme+contraste WCAG serveur (theme.ts ARMED) · 🔄 **ADM-001b** console theming (web, en cours).
-- ✅ **ADM-002a** clone structurel + enrôlement borne · ⏳ **ADM-002b** Stepper onboarding (web).
-- ✅ **ADM-003a** heartbeat+supervision (alerte muette staff room) · ⏳ **ADM-003b** écran supervision (web).
+## F8 — Admin & Theming ✅ COMPLET (API + web)
+- ✅ **ADM-001a/b** theming (contraste WCAG serveur + console preview live).
+- ✅ **ADM-002a/b** onboarding (clone structurel + enrôlement + Stepper 5 étapes chronométré + QR install).
+- ✅ **ADM-003a/b** supervision bornes (heartbeat + alerte muette staff room + écran agence/réseau).
+
+## 🎉 CATALOGUE CODE F6-F11 COMPLET (mock derrière interface) — 2026-07-13
+Tout livré/poussé/CI-vert. **Branchement fournisseurs RÉELS en cours** : SMS SMPP IAM (sender ZENAPI, transceiver+DLR) + email Resend (`nepasrepondre@prodestic.net`), derrière les interfaces NOTIF-002/004, gated par config (`SMS_PROVIDER`/`EMAIL_PROVIDER`), secrets en `.env` local uniquement.
 
 ## F9 — Sécurité & Charge (quasi complet)
 - ✅ **SEC-001** audit trail exhaustif (mutation-registry + wrapper transactionnel) + écran Auditor.
