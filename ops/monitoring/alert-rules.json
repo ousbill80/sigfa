@@ -1,0 +1,58 @@
+{
+  "groups": [
+    {
+      "name": "sigfa-infra",
+      "rules": [
+        {
+          "alert": "CpuHigh",
+          "expr": "avg(rate(process_cpu_seconds_total[5m])) by (service) > 0.80",
+          "for": "5m",
+          "labels": { "severity": "warning", "route": "ops" },
+          "annotations": { "summary": "CPU > 80% sur 5 min ({{ $labels.service }})" }
+        },
+        {
+          "alert": "MemHigh",
+          "expr": "process_resident_memory_bytes / node_memory_MemTotal_bytes > 0.85",
+          "for": "5m",
+          "labels": { "severity": "warning", "route": "ops" },
+          "annotations": { "summary": "Mémoire > 85% sur 5 min ({{ $labels.service }})" }
+        },
+        {
+          "alert": "ErrorRateHigh",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) > 0.01",
+          "for": "5m",
+          "labels": { "severity": "critical", "route": "on-call" },
+          "annotations": { "summary": "Taux d'erreur 5xx > 1% sur 5 min" }
+        },
+        {
+          "alert": "RtLatencyDegraded",
+          "expr": "histogram_quantile(0.95, sum(rate(rt_ticket_called_delivery_seconds_bucket[5m])) by (le)) >= 0.500",
+          "for": "5m",
+          "labels": { "severity": "warning", "route": "ops" },
+          "annotations": { "summary": "Latence RT ticket:called p95 >= 500ms (SEC-004)" }
+        },
+        {
+          "alert": "DependencyDown",
+          "expr": "up{job=~\"postgres|redis\"} == 0 or probe_success{probe=\"health\"} == 0",
+          "for": "0m",
+          "labels": { "severity": "critical", "route": "on-call" },
+          "annotations": { "summary": "Dépendance critique down / /health 503 — CRITICAL immédiat" }
+        }
+      ]
+    }
+  ],
+  "route": {
+    "group_by": ["alertname"],
+    "group_wait": "30s",
+    "group_interval": "10m",
+    "repeat_interval": "10m",
+    "routes": [
+      { "matchers": ["severity=\"warning\""], "receiver": "ops" },
+      { "matchers": ["severity=\"critical\""], "receiver": "on-call" }
+    ]
+  },
+  "receivers": [
+    { "name": "ops", "placeholder": true, "note": "canal ops WARNING — valeur réelle fournie par le PO/ops (OBS_OPS_RECIPIENT)" },
+    { "name": "on-call", "placeholder": true, "note": "astreinte CRITICAL — valeur réelle fournie par le PO/ops (OBS_ONCALL_RECIPIENT)" }
+  ]
+}

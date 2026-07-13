@@ -1,0 +1,23 @@
+{
+  "uid": "sigfa-realtime",
+  "title": "SIGFA — Temps réel",
+  "domain": "realtime",
+  "schemaVersion": 39,
+  "tags": ["sigfa", "net-003", "realtime"],
+  "panels": [
+    {
+      "title": "Latence livraison ticket:called p95 (SLA 500ms — SEC-004)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(rt_ticket_called_delivery_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+      ]
+    },
+    {
+      "title": "Connexions Socket.io actives",
+      "type": "stat",
+      "targets": [
+        { "expr": "sum(socketio_connected_clients)", "legendFormat": "connectés" }
+      ]
+    }
+  ]
+}
