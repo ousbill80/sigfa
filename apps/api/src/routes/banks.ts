@@ -9,6 +9,24 @@
  * Sémantique PATCH : merge partiel — seuls les champs fournis sont modifiés
  * (COALESCE), les autres colonnes (slug, thème, seuils) sont préservées.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT9) — route PLATEFORME (jamais armée)
+ * `banks` est la table RACINE du tenant (elle EST la banque). Par conception DB-009
+ * (`0001_rls.sql`), le rôle `sigfa_app` (NOBYPASSRLS) N'A AUCUN droit de mutation sur
+ * `banks` : `REVOKE INSERT, UPDATE, DELETE ON banks FROM sigfa_app`. Seul le GRANT
+ * colonne-scopé des 3 seuils + `updated_at` (0014/0015) est ouvert — réservé à
+ * `thresholds.ts`. Donc :
+ *  - POST /banks (INSERT) et PATCH /banks/:id (UPDATE name/is_active) sont
+ *    STRUCTURELLEMENT impossibles sous une connexion armée `sigfa_app` (permission
+ *    denied) : ce sont des opérations de GESTION DE BANQUE réservées à la connexion
+ *    PLATEFORME (SUPER_ADMIN, RBAC `tenantScope: platform`). Les armer casserait.
+ *  - GET /banks (liste cross-banques, SUPER_ADMIN platform) : la policy SELECT
+ *    `tenant_isolation` de `banks` (USING id = current_bank_id) limiterait une liste
+ *    armée à UNE seule banque — la liste réseau EXIGE la connexion plateforme.
+ *  - GET/PATCH /banks/:id sont BANK_ADMIN (`tenantScope: bank`) mais opèrent sur la
+ *    table racine dont les mutations sont plateforme-only ; l'accès est routé via
+ *    `withPlatform` (frontière plateforme explicite) et la garde `id`/RBAC middleware
+ *    borne le périmètre. Ce fichier est donc classé PLATFORM_OR_PUBLIC.
+ *
  * @module
  */
 
@@ -16,6 +34,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
+import { withPlatform } from "@sigfa/database";
 import { SigfaError } from "src/lib/errors.js";
 import { safeText } from "src/lib/safe-text.js";
 import type { TenantContext } from "src/middleware/tenant.js";
@@ -96,16 +115,23 @@ function registerListBanks(router: Hono<BankEnv>): void {
     const db = c.get("db");
     try {
       const { page, limit, offset } = readPagination(c);
-      const res = await db.query(
-        `SELECT id, name, slug, is_active, created_at
-           FROM banks WHERE deleted_at IS NULL
-          ORDER BY created_at ASC LIMIT $1 OFFSET $2`,
-        [limit, offset]
+      // PLATEFORME : liste cross-banques (SUPER_ADMIN) — connexion plateforme, jamais
+      // armée (une liste armée serait bornée à une seule banque par la RLS SELECT).
+      const { res, total } = await withPlatform(
+        (sql) => db.query(sql) as unknown as Promise<{ rows: Record<string, unknown>[] }>,
+        async () => {
+          const rows = await db.query(
+            `SELECT id, name, slug, is_active, created_at
+               FROM banks WHERE deleted_at IS NULL
+              ORDER BY created_at ASC LIMIT $1 OFFSET $2`,
+            [limit, offset]
+          );
+          const count = await db.query(
+            `SELECT COUNT(*)::int AS total FROM banks WHERE deleted_at IS NULL`
+          );
+          return { res: rows, total: (count.rows[0] as { total: number }).total };
+        }
       );
-      const count = await db.query(
-        `SELECT COUNT(*)::int AS total FROM banks WHERE deleted_at IS NULL`
-      );
-      const total = (count.rows[0] as { total: number }).total;
       return c.json(
         {
           data: (res.rows as BankRow[]).map(toBank),
@@ -126,7 +152,11 @@ function registerCreateBank(router: Hono<BankEnv>): void {
     const tenant = c.get("tenant");
     try {
       const input = parseStrict(createBankSchema, await parseJson(c));
-      const created = await insertBank(db, input);
+      // PLATEFORME : INSERT sur `banks` (révoqué pour sigfa_app) — connexion plateforme.
+      const created = await withPlatform(
+        (sql) => db.query(sql) as unknown as Promise<{ rows: Record<string, unknown>[] }>,
+        () => insertBank(db, input)
+      );
       await recordAudit({
         db,
         tenant: { ...tenant, bankId: created.id },
@@ -169,7 +199,11 @@ function registerGetBank(router: Hono<BankEnv>): void {
     const db = c.get("db");
     try {
       const id = paramUuid(c, "id");
-      const bank = await loadBank(db, id);
+      // PLATEFORME : lecture de la banque racine (RBAC middleware borne le périmètre).
+      const bank = await withPlatform(
+        (sql) => db.query(sql) as unknown as Promise<{ rows: Record<string, unknown>[] }>,
+        () => loadBank(db, id)
+      );
       return c.json(toBank(bank), 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -197,8 +231,16 @@ function registerPatchBank(router: Hono<BankEnv>): void {
     try {
       const id = paramUuid(c, "id");
       const input = parseStrict(updateBankSchema, await parseJson(c));
-      const before = await loadBank(db, id);
-      const after = await updateBank(db, id, input);
+      // PLATEFORME : UPDATE name/is_active sur `banks` (colonnes révoquées pour
+      // sigfa_app, DB-009) — opération de gestion de banque, connexion plateforme.
+      const { before, after } = await withPlatform(
+        (sql) => db.query(sql) as unknown as Promise<{ rows: Record<string, unknown>[] }>,
+        async () => {
+          const b = await loadBank(db, id);
+          const a = await updateBank(db, id, input);
+          return { before: b, after: a };
+        }
+      );
       await recordAudit({
         db,
         tenant,

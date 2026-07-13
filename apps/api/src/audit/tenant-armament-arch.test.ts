@@ -54,6 +54,18 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
   // (withPlatform, cross-banques). LECTURE SEULE agrégée : n'arme JAMAIS
   // `app.current_bank_id` (pas de contexte tenant), mutations → 403 PLATFORM_READ_ONLY.
   "network-overview.ts",
+  // SEC-002-CUTOVER-LOT9 — banks.ts : `banks` est la table RACINE du tenant. Par
+  // DB-009 (0001_rls.sql), sigfa_app N'A AUCUN droit de mutation sur `banks`
+  // (`REVOKE INSERT, UPDATE, DELETE`), seul le GRANT colonne-scopé des 3 seuils +
+  // updated_at (0014/0015) est ouvert (réservé à thresholds.ts). Donc POST /banks
+  // (INSERT) et PATCH /banks/:id (UPDATE name/is_active) sont STRUCTURELLEMENT
+  // impossibles sous armement `sigfa_app` : ce sont des opérations de GESTION DE
+  // BANQUE réservées à la connexion PLATEFORME (SUPER_ADMIN, RBAC platform). GET
+  // /banks (liste cross-banques) exige aussi la plateforme (une liste armée serait
+  // bornée à 1 banque par la RLS SELECT). Tout l'accès DB est routé via
+  // `withPlatform` (frontière plateforme explicite). L'armer casserait la gestion
+  // de banque — reclassé PLATFORM, jamais ARMED.
+  "banks.ts",
 ];
 
 /**
@@ -78,22 +90,6 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   // feature-store (couture inter-piste) ; à ce moment la route passera ARMED.
   // Reste PENDING jusqu'à ce câblage (le fichier existe → non-fantôme).
   "ai-forecast.ts",
-  "banks.ts",
-  "onboarding.ts",
-  // reports.ts — DIFFÉRÉE (couture d'ARCHITECTURE de route, PAS une couture DB
-  // manquante) : GET /reports/kpis?scope=network (buildNetworkResponse) est un
-  // agrégat CROSS-TENANT réseau (SUPER_ADMIN, `bankId=null`) qui lit
-  // `daily_agency_stats` SANS filtre `bank_id`, par conception (AnonymizedNetworkAggregate).
-  // Sous `withArmedTenant`, la policy `tenant_isolation` de `daily_agency_stats`
-  // (USING bank_id = current_bank_id) restreindrait silencieusement l'agrégat à UNE
-  // seule banque — cassant la lecture réseau. Le chemin réseau appartient à
-  // `withPlatform` (comme network-overview.ts), pas à un armement tenant.
-  // Les tables sont bien couvertes (policy `tenant_isolation` + GRANT CRUD `sigfa_app`
-  // sur daily_agency_stats / export_jobs / agencies, 0005/0001) : la couture DB est
-  // COMPLÈTE. Ce qui manque est une DÉCISION d'architecture de route (scinder le
-  // handler : paths tenant → withArmedTenant ; path network → withPlatform), donc
-  // hors périmètre d'un simple recâblage de connexion — reste PENDING jusqu'à ce split.
-  "reports.ts",
 ];
 
 /**
@@ -225,6 +221,24 @@ const ARMED: readonly string[] = [
   //   + GRANT CRUD `sigfa_app` (0012/0004/0001).
   "webhooks-notifications.ts",
   "webhooks-whatsapp-inbound.ts",
+  // SEC-002-CUTOVER-LOT9 — SPLIT tenant/plateforme (FERMETURE de la dette hors
+  // ai-forecast.ts). Tout accès DB TENANT routé via `withArmedTenant` (armement
+  // `app.current_bank_id`).
+  // - reports.ts : chemins TENANT (scope=agency, daily, benchmark, export) armés —
+  //   `daily_agency_stats` / `agencies` / `export_jobs` (policy `tenant_isolation` +
+  //   GRANT CRUD `sigfa_app`, 0005/0001). Le chemin RÉSEAU (scope=network,
+  //   `buildNetworkResponse`) est SCINDÉ vers `withPlatform` (agrégat cross-tenant
+  //   anonymisé, lit `daily_agency_stats` SANS filtre `bank_id` — l'armer le
+  //   restreindrait à UNE banque). ARMED car son accès tenant passe par
+  //   `withArmedTenant` ; le chemin plateforme cohabite via `withPlatform`.
+  // - onboarding.ts : enrôlement d'agence/borne DANS un tenant EXISTANT (pas un
+  //   bootstrap de nouveau tenant — aucune création de banque). clone-from mute
+  //   `agencies`/`services`/`counters`/`counter_services` ; kiosk-access insère
+  //   `kiosks` via `createKioskAccess` (connexion armée injectée). Gardes + mutations
+  //   + audit composé SEC-001 dans UNE transaction armée (policy `tenant_isolation` +
+  //   GRANT CRUD, 0001).
+  "reports.ts",
+  "onboarding.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
