@@ -178,4 +178,18 @@ describe("WEB-001: RBAC", () => {
       expect(ROLES).toHaveLength(6);
     });
   });
+
+  describe("ADM-002b: /admin/onboarding RBAC", () => {
+    it("ADM-002b: AGENCY_DIRECTOR+ accède à /admin/onboarding", () => {
+      expect(canAccess("SUPER_ADMIN", "/admin/onboarding")).toBe(true);
+      expect(canAccess("BANK_ADMIN", "/admin/onboarding")).toBe(true);
+      expect(canAccess("AGENCY_DIRECTOR", "/admin/onboarding")).toBe(true);
+    });
+
+    it("ADM-002b: MANAGER/AGENT/AUDITOR → 403 sur /admin/onboarding", () => {
+      expect(canAccess("MANAGER", "/admin/onboarding")).toBe(false);
+      expect(canAccess("AGENT", "/admin/onboarding")).toBe(false);
+      expect(canAccess("AUDITOR", "/admin/onboarding")).toBe(false);
+    });
+  });
 });
