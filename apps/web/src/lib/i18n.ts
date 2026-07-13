@@ -291,7 +291,33 @@ export type TranslationKey =
   | "netAdmin.empty"
   | "netAdmin.error"
   | "netAdmin.offline"
-  | "netAdmin.reconnect";
+  | "netAdmin.reconnect"
+  // ADM-003b — supervision bornes (namespace propre admSuper.*)
+  | "admSuper.title"
+  | "admSuper.subtitle"
+  | "admSuper.view.agency"
+  | "admSuper.view.network"
+  | "admSuper.alerts_active"
+  | "admSuper.status.online"
+  | "admSuper.status.degraded"
+  | "admSuper.status.silent"
+  | "admSuper.status.never_seen"
+  | "admSuper.silent_label"
+  | "admSuper.last_seen"
+  | "admSuper.never_seen_hint"
+  | "admSuper.count.online"
+  | "admSuper.count.degraded"
+  | "admSuper.count.silent"
+  | "admSuper.count.never_seen"
+  | "admSuper.count.kiosks"
+  | "admSuper.network.agencies"
+  | "admSuper.network.no_silent"
+  | "admSuper.loading"
+  | "admSuper.empty"
+  | "admSuper.empty_cta"
+  | "admSuper.error"
+  | "admSuper.stale"
+  | "admSuper.offline";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -581,6 +607,32 @@ export const FR: TranslationDict = {
   "netAdmin.error": "Impossible de charger la supervision réseau. Veuillez réessayer.",
   "netAdmin.offline": "Hors ligne — agrégats figés, resynchronisation à la reconnexion.",
   "netAdmin.reconnect": "Se reconnecter",
+  // ADM-003b — supervision bornes
+  "admSuper.title": "Supervision des bornes",
+  "admSuper.subtitle": "État de santé des bornes en temps réel",
+  "admSuper.view.agency": "Vue agence",
+  "admSuper.view.network": "Vue réseau",
+  "admSuper.alerts_active": "alertes actives",
+  "admSuper.status.online": "En ligne",
+  "admSuper.status.degraded": "Dégradée",
+  "admSuper.status.silent": "Muette",
+  "admSuper.status.never_seen": "Jamais vue",
+  "admSuper.silent_label": "Borne muette",
+  "admSuper.last_seen": "Dernier signe",
+  "admSuper.never_seen_hint": "Installation non finalisée",
+  "admSuper.count.online": "En ligne",
+  "admSuper.count.degraded": "Dégradées",
+  "admSuper.count.silent": "Muettes",
+  "admSuper.count.never_seen": "Jamais vues",
+  "admSuper.count.kiosks": "Bornes",
+  "admSuper.network.agencies": "Agences avec bornes muettes",
+  "admSuper.network.no_silent": "Aucune agence en alerte — toutes les bornes répondent",
+  "admSuper.loading": "Chargement de la supervision…",
+  "admSuper.empty": "Aucune borne enregistrée — provisionnez depuis l'onboarding",
+  "admSuper.empty_cta": "Ouvrir l'onboarding",
+  "admSuper.error": "Impossible de charger la supervision des bornes. Veuillez réessayer.",
+  "admSuper.stale": "Supervision indisponible — affichage du dernier état connu",
+  "admSuper.offline": "Mode hors ligne — resynchronisation à la reconnexion",
 };
 
 /** English translations */
@@ -867,6 +919,32 @@ export const EN: TranslationDict = {
   "netAdmin.error": "Unable to load network supervision. Please try again.",
   "netAdmin.offline": "Offline — aggregates frozen, resync on reconnection.",
   "netAdmin.reconnect": "Reconnect",
+  // ADM-003b — kiosk supervision
+  "admSuper.title": "Kiosk supervision",
+  "admSuper.subtitle": "Kiosk health status in real time",
+  "admSuper.view.agency": "Agency view",
+  "admSuper.view.network": "Network view",
+  "admSuper.alerts_active": "active alerts",
+  "admSuper.status.online": "Online",
+  "admSuper.status.degraded": "Degraded",
+  "admSuper.status.silent": "Silent",
+  "admSuper.status.never_seen": "Never seen",
+  "admSuper.silent_label": "Silent kiosk",
+  "admSuper.last_seen": "Last seen",
+  "admSuper.never_seen_hint": "Installation not finalised",
+  "admSuper.count.online": "Online",
+  "admSuper.count.degraded": "Degraded",
+  "admSuper.count.silent": "Silent",
+  "admSuper.count.never_seen": "Never seen",
+  "admSuper.count.kiosks": "Kiosks",
+  "admSuper.network.agencies": "Agencies with silent kiosks",
+  "admSuper.network.no_silent": "No agency in alert — every kiosk is responding",
+  "admSuper.loading": "Loading supervision…",
+  "admSuper.empty": "No kiosk registered — provision one from onboarding",
+  "admSuper.empty_cta": "Open onboarding",
+  "admSuper.error": "Unable to load kiosk supervision. Please try again.",
+  "admSuper.stale": "Supervision unavailable — showing last known state",
+  "admSuper.offline": "Offline mode — resync on reconnection",
 };
 
 /** All locales map */
