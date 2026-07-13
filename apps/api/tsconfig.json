@@ -4,6 +4,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": ".",
+    // JSX pour les gabarits React Email (NOTIF-004) rendus côté serveur.
+    // `react-jsx` = runtime automatique (aucun import React explicite requis).
+    "jsx": "react-jsx",
     "paths": {
       "src/*": ["./src/*"],
       "@sigfa/contracts/events/realtime.js": [
