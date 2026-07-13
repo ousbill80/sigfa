@@ -1,8 +1,14 @@
+> **⚠️ SUPPLANTÉ par [`SIGFA_DESIGN_SYSTEM_v2.md`](./SIGFA_DESIGN_SYSTEM_v2.md) depuis 2026-07-12 — conservé pour historique.**
+> La v2 « Sérénité Premium » est la seule source de vérité design (tokens dans `packages/ui`).
+> Ne rien implémenter depuis ce document. Index : [`docs/README.md`](./README.md).
+
+---
+
 # SIGFA — SYSTÈME DE DESIGN UX/UI
 ## Prompt Design · Kiosque Libre-Service · Dashboard · Mobile · Écran d'Appel
 
 > **Version** : 1.0 · **Date** : Juillet 2026  
-> **Statut** : Document de référence design — source de vérité unique pour toute interface SIGFA  
+> **Statut** : ~~Document de référence design — source de vérité unique pour toute interface SIGFA~~ **SUPPLANTÉ (voir bandeau ci-dessus)**  
 > **Complète** : SIGFA_PROMPT_v5.md (produit) · SIGFA_METHODE_CONCEPTION_AGENTIQUE.md (méthode)  
 > **Consommateurs** : agent-kiosk · agent-web · agent-mobile · designers humains
 

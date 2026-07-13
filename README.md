@@ -5,9 +5,11 @@ Développé en **agentic engineering** : Claude Fable 5 orchestre, Claude Sonnet
 le PRD est le contrat, tout code naît avec son test.
 
 ## Ordre de lecture
+**Index complet de la documentation (normatif vs historique) : [`docs/README.md`](docs/README.md).**
+
 1. `docs/SIGFA_PROMPT_v5.md` — le produit (quoi, pour qui, périmètre, stack)
 2. `docs/SIGFA_METHODE_CONCEPTION_AGENTIQUE.md` — la méthode (orchestration, boucles, API-First, Test Total)
-3. `docs/SIGFA_DESIGN_SYSTEM.md` — le design (tokens, kiosque, écrans)
+3. `docs/SIGFA_DESIGN_SYSTEM_v2.md` — le design v2 « Sérénité Premium » (la v1 est supplantée)
 4. `docs/prd/PRD_PRODUIT.md` — le backlog exécutable (8 modules, DAG, stories EARS)
 5. `CLAUDE.md` — la constitution chargée à chaque session
 6. `SETUP.md` — démarrer

@@ -1,7 +1,7 @@
 # SIGFA — CLAUDE.md (Constitution du projet)
 
 > Chargé à chaque session. Toute règle ici est prioritaire sur les habitudes du modèle.
-> Sources de vérité : `docs/SIGFA_PROMPT_v5.md` (produit) · `docs/SIGFA_METHODE_CONCEPTION_AGENTIQUE.md` (méthode) · `docs/SIGFA_DESIGN_SYSTEM.md` (design) · `docs/prd/` (stories exécutables).
+> Sources de vérité : `docs/SIGFA_PROMPT_v5.md` (produit) · `docs/SIGFA_METHODE_CONCEPTION_AGENTIQUE.md` (méthode) · `docs/SIGFA_DESIGN_SYSTEM_v2.md` (design — la v1 est supplantée) · `docs/prd/` (stories exécutables). Index de navigation : `docs/README.md`.
 
 ---
 
@@ -60,7 +60,7 @@ Hono 4 + TypeScript strict · Drizzle + PostgreSQL 16 RLS (multi-tenant bridge :
 
 kebab-case fichiers · PascalCase classes · camelCase fonctions · Conventional Commits · imports absolus depuis `src/` · variables d'env dans `.env` + `.env.example` · schémas Drizzle = vérité du modèle · schémas Zod partagés via `@sigfa/schemas` · OpenAPI = LA LOI des échanges client↔serveur.
 
-## 8. Design (source : SIGFA_DESIGN_SYSTEM.md)
+## 8. Design (source : SIGFA_DESIGN_SYSTEM_v2.md « Sérénité Premium »)
 
 Tokens uniquement, jamais de valeur en dur · Kiosque : cibles ≥72px, texte ≥24px, contraste ≥7:1, une décision par écran · Theming banque = habillage, jamais structure · 2 langues (FR/EN — décision PO 2026-07, Dioula/Baoulé retirés), icône+texte toujours appariés · 5 états par écran (nominal/loading/empty/error/offline).
 
