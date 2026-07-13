@@ -120,6 +120,16 @@ export interface NotificationInfra {
  */
 export function toFailureReason(err: unknown): NotificationFailureReason {
   if (err instanceof NotificationSendError) return err.reason;
+  // Raison énumérée stashée sur un UnrecoverableError (faute définitive préservée
+  // par le worker — ex. bounce dur email NOTIF-004).
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "failureReason" in err &&
+    typeof (err as { failureReason: unknown }).failureReason === "string"
+  ) {
+    return (err as { failureReason: NotificationFailureReason }).failureReason;
+  }
   return "UNKNOWN";
 }
 
@@ -154,11 +164,17 @@ export function startNotificationInfra(
         try {
           return await processNotificationJob(job.data, { queryFn, send });
         } catch (err) {
-          // Garde tenant (D5) = faute non retriable : ne pas boucler, aller en DLQ.
+          // Garde tenant (D5) OU faute fournisseur définitive (bounce dur email
+          // NOTIF-004) = non retriable : ne pas boucler, aller en DLQ. On préserve
+          // la raison ÉNUMÉRÉE (`toFailureReason`) en la stashant sur l'erreur
+          // UnrecoverableError, sinon la DLQ retomberait sur `UNKNOWN`.
           if (isNonRetryable(err)) {
-            throw new UnrecoverableError(
+            const fatal = new UnrecoverableError(
               err instanceof Error ? err.message : "non-retryable"
             );
+            (fatal as { failureReason?: NotificationFailureReason }).failureReason =
+              toFailureReason(err);
+            throw fatal;
           }
           throw err;
         }
@@ -223,6 +239,17 @@ export function startNotificationInfra(
 /** Vrai si l'erreur ne doit PAS être retentée (garde tenant, déjà unrecoverable). */
 function isNonRetryable(err: unknown): boolean {
   if (err instanceof UnrecoverableError) return true;
+  // Adaptateur fournisseur signalant une faute DÉFINITIVE (ex. bounce dur email
+  // NOTIF-004) via `retryable === false` : router en DLQ sans retry infini, tout
+  // en préservant la raison énumérée (l'erreur reste un NotificationSendError).
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "retryable" in err &&
+    (err as { retryable: unknown }).retryable === false
+  ) {
+    return true;
+  }
   // TenantMismatchError et consorts : la faute est structurelle, pas transitoire.
   return err instanceof Error && err.name === "TenantMismatchError";
 }

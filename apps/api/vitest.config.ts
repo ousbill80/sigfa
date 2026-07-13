@@ -66,7 +66,8 @@ export default defineConfig({
       },
       // `include` scope la couverture aux fichiers projet uniquement — sans cela,
       // vitest instrumente node_modules, dist/, etc. et les métriques sont faussées.
-      include: ["src/**/*.ts"],
+      // `.tsx` inclus pour les gabarits React Email (NOTIF-004).
+      include: ["src/**/*.ts", "src/**/*.tsx"],
       exclude: [
         ...vitestDefaultCoverageExcludes,
         // API-specific exclusions
