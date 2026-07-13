@@ -38,6 +38,13 @@ export type PwaKey =
   | "pwa.confirm.submit"
   | "pwa.confirm.back"
   | "pwa.confirm.submitting"
+  | "pwa.confirm.retry"
+  | "pwa.emit.error_title"
+  | "pwa.emit.error_generic"
+  | "pwa.emit.error_conflict"
+  | "pwa.emit.error_rate_limited"
+  | "pwa.emit.error_offline"
+  | "pwa.emit.error_validation"
   | "pwa.ticket.eyebrow"
   | "pwa.ticket.message"
   | "pwa.ticket.position"
@@ -93,6 +100,13 @@ export const PWA_FR: PwaDict = {
   "pwa.confirm.submit": "Prendre mon ticket",
   "pwa.confirm.back": "Retour",
   "pwa.confirm.submitting": "Émission en cours…",
+  "pwa.confirm.retry": "Réessayer",
+  "pwa.emit.error_title": "Ticket non émis",
+  "pwa.emit.error_generic": "Nous n'avons pas pu émettre votre ticket. Vérifiez votre connexion, puis réessayez.",
+  "pwa.emit.error_conflict": "Une demande identique est déjà en cours. Patientez un instant, puis réessayez.",
+  "pwa.emit.error_rate_limited": "Trop de tentatives en peu de temps. Attendez quelques instants, puis réessayez.",
+  "pwa.emit.error_offline": "Vous semblez hors ligne. Reconnectez-vous, puis réessayez.",
+  "pwa.emit.error_validation": "Le service choisi n'est plus disponible. Revenez en arrière et choisissez à nouveau.",
   "pwa.ticket.eyebrow": "Votre ticket",
   "pwa.ticket.message": "Gardez cet écran ouvert : votre position se met à jour toute seule.",
   "pwa.ticket.position": "Position dans la file",
@@ -146,6 +160,13 @@ export const PWA_EN: PwaDict = {
   "pwa.confirm.submit": "Get my ticket",
   "pwa.confirm.back": "Back",
   "pwa.confirm.submitting": "Issuing…",
+  "pwa.confirm.retry": "Retry",
+  "pwa.emit.error_title": "Ticket not issued",
+  "pwa.emit.error_generic": "We couldn't issue your ticket. Check your connection, then try again.",
+  "pwa.emit.error_conflict": "An identical request is already in progress. Wait a moment, then try again.",
+  "pwa.emit.error_rate_limited": "Too many attempts in a short time. Wait a few moments, then try again.",
+  "pwa.emit.error_offline": "You appear to be offline. Reconnect, then try again.",
+  "pwa.emit.error_validation": "The chosen service is no longer available. Go back and pick another one.",
   "pwa.ticket.eyebrow": "Your ticket",
   "pwa.ticket.message": "Keep this screen open: your position updates on its own.",
   "pwa.ticket.position": "Position in queue",

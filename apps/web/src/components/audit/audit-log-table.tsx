@@ -4,14 +4,30 @@
  * STRICTLY read-only (leçon SEC-F3-01): the DOM contains NO mutation element —
  * no create/edit/delete control, no form that POST/PATCH/DELETEs. The only
  * interactions are filters and pagination, which trigger a GET re-fetch through
- * the typed client (never a mutation). Design system v2 (tokens only, never hard
- * values), 5 states (loading / ready / empty / error / offline), FR/EN.
+ * the typed client (never a mutation). Design system v2 « Sérénité Premium »:
+ * `@sigfa/ui` primitives only (Field / Button / SectionTitle / Overline / Badge
+ * / Spinner / Skeleton / EmptyState / OfflineBanner), tokens only (never a hard
+ * value), the 5 states (loading / ready / empty / error / offline), FR/EN.
+ *
+ * `--danger` is NEVER a solid fill: a destructive action verb (DELETE / revoke /
+ * purge) is carried by a bordered `Badge` with a dot — never a red pavé.
  * @module components/audit/audit-log-table
  */
 "use client";
 
 import { type CSSProperties, type ReactElement } from "react";
-import { Card, EmptyState, OfflineBanner, Skeleton } from "@sigfa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  OfflineBanner,
+  SectionTitle,
+  Skeleton,
+  Spinner,
+  type BadgeTone,
+} from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 import type {
   AuditEntryView,
@@ -47,59 +63,45 @@ export interface AuditLogTableProps {
   onPage: (page: number) => void;
 }
 
+/** Cell padding is roomy so dense audit rows stay legible. */
 const cellStyle: CSSProperties = {
-  padding: "var(--space-3)",
+  padding: "var(--space-4) var(--space-3)",
   fontSize: "var(--text-sm)",
   color: "var(--ink)",
   verticalAlign: "top",
 };
 
 const headStyle: CSSProperties = {
-  padding: "var(--space-2) var(--space-3)",
+  padding: "var(--space-3)",
   textAlign: "left",
   color: "var(--ink-soft)",
   fontSize: "var(--text-xs)",
   textTransform: "uppercase",
   letterSpacing: "var(--tracking-tight)",
-};
-
-const inputStyle: CSSProperties = {
-  padding: "var(--space-2) var(--space-3)",
-  borderRadius: "var(--r-md)",
-  border: "1px solid var(--hairline)",
-  backgroundColor: "var(--surface-2)",
-  color: "var(--ink)",
-  fontSize: "var(--text-sm)",
-  fontFamily: "inherit",
-};
-
-const controlStyle: CSSProperties = {
-  padding: "var(--space-2) var(--space-4)",
-  borderRadius: "var(--r-md)",
-  border: "1px solid var(--hairline)",
-  backgroundColor: "var(--surface-2)",
-  color: "var(--ink)",
-  fontSize: "var(--text-sm)",
   fontWeight: 600,
-  cursor: "pointer",
 };
 
-/** Renders the page header (title + subtitle). */
+/** Faint monospace meta line (UUIDs, secondary identifiers). */
+const metaStyle: CSSProperties = {
+  display: "block",
+  color: "var(--ink-faint)",
+  fontSize: "var(--text-xs)",
+  fontFamily: "var(--font-mono, monospace)",
+};
+
+/** Destructive verbs get a bordered `danger` badge (dot, never a red fill). */
+const DESTRUCTIVE_ACTION = /delete|revoke|purge|remove|révoqu|supprim|purg/i;
+
+/** Maps an audit action to a bordered Badge tone (danger = dot, never fill). */
+function actionTone(action: string): BadgeTone {
+  return DESTRUCTIVE_ACTION.test(action) ? "danger" : "info";
+}
+
+/** Renders the page header (overline kicker + section title + subtitle). */
 function headerBlock(locale: Locale): ReactElement {
   return (
-    <header style={{ marginBottom: "var(--space-4)" }}>
-      <h2
-        style={{
-          margin: 0,
-          fontFamily: "var(--font-display)",
-          fontSize: "var(--text-xl)",
-          fontWeight: 600,
-          letterSpacing: "var(--tracking-tight)",
-          color: "var(--ink)",
-        }}
-      >
-        {t("audit.title", locale)}
-      </h2>
+    <header style={{ marginBottom: "var(--space-5)" }}>
+      <SectionTitle size="xl">{t("audit.title", locale)}</SectionTitle>
       <p style={{ margin: "var(--space-1) 0 0", color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}>
         {t("audit.subtitle", locale)}
       </p>
@@ -113,17 +115,15 @@ function filterForm(
 ): ReactElement {
   const locale = props.locale ?? "fr";
   const field = (key: keyof AuditFilters, labelKey: Parameters<typeof t>[0]): ReactElement => (
-    <label style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)", color: "var(--ink-soft)", fontSize: "var(--text-xs)" }}>
-      {t(labelKey, locale)}
-      <input
-        data-testid={`audit-filter-${key}`}
-        aria-label={t(labelKey, locale)}
-        type={key === "from" || key === "to" ? "datetime-local" : "text"}
-        value={props.filters[key] ?? ""}
-        onChange={(e) => props.onFilterChange(key, e.target.value)}
-        style={inputStyle}
-      />
-    </label>
+    <Field
+      key={key}
+      data-testid={`audit-filter-${key}`}
+      label={t(labelKey, locale)}
+      type={key === "from" || key === "to" ? "datetime-local" : "text"}
+      value={props.filters[key] ?? ""}
+      onChange={(e) => props.onFilterChange(key, e.target.value)}
+      style={{ minWidth: "12rem", flex: 1 }}
+    />
   );
   return (
     <form
@@ -132,7 +132,7 @@ function filterForm(
         e.preventDefault();
         props.onApply();
       }}
-      style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "flex-end", marginBottom: "var(--space-4)" }}
+      style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "flex-end", marginBottom: "var(--space-5)" }}
     >
       {field("entityType", "audit.filter.entityType")}
       {field("entityId", "audit.filter.entityId")}
@@ -140,12 +140,12 @@ function filterForm(
       {field("from", "audit.filter.from")}
       {field("to", "audit.filter.to")}
       {/* Read-only navigation: submit issues a GET re-fetch, never a mutation. */}
-      <button type="submit" data-testid="audit-apply" style={controlStyle}>
+      <Button type="submit" variant="primary" data-testid="audit-apply">
         {t("audit.filter.apply", locale)}
-      </button>
-      <button type="button" data-testid="audit-reset" onClick={props.onReset} style={{ ...controlStyle, backgroundColor: "transparent" }}>
+      </Button>
+      <Button type="button" variant="ghost" data-testid="audit-reset" onClick={props.onReset}>
         {t("audit.filter.reset", locale)}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -187,29 +187,29 @@ function pagination(
     <nav
       data-testid="audit-pagination"
       aria-label={t("audit.pagination.page", locale)}
-      style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginTop: "var(--space-4)", color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}
+      style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginTop: "var(--space-5)", color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}
     >
-      <button
+      <Button
         type="button"
+        variant="secondary"
         data-testid="audit-prev"
         disabled={page <= 1}
         onClick={() => onPage(page - 1)}
-        style={{ ...controlStyle, opacity: page <= 1 ? 0.5 : 1 }}
       >
         {t("audit.pagination.prev", locale)}
-      </button>
-      <span data-testid="audit-page-indicator">
+      </Button>
+      <span data-testid="audit-page-indicator" style={{ fontVariantNumeric: "tabular-nums" }}>
         {t("audit.pagination.page", locale)} {page} / {lastPage}
       </span>
-      <button
+      <Button
         type="button"
+        variant="secondary"
         data-testid="audit-next"
         disabled={page >= lastPage}
         onClick={() => onPage(page + 1)}
-        style={{ ...controlStyle, opacity: page >= lastPage ? 0.5 : 1 }}
       >
         {t("audit.pagination.next", locale)}
-      </button>
+      </Button>
     </nav>
   );
 }
@@ -228,6 +228,9 @@ export function AuditLogTable(props: AuditLogTableProps): ReactElement {
       <Card data-testid="audit-loading" aria-busy="true" style={{ padding: "var(--space-6)" }}>
         {headerBlock(locale)}
         {filters}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)", color: "var(--ink-soft)", fontSize: "var(--text-sm)" }}>
+          <Spinner size="sm" showLabel label={t("audit.loading", locale)} />
+        </div>
         <Skeleton style={{ height: "220px" }} />
       </Card>
     );
@@ -238,7 +241,7 @@ export function AuditLogTable(props: AuditLogTableProps): ReactElement {
       <Card data-testid="audit-error" role="alert" style={{ padding: "var(--space-6)" }}>
         {headerBlock(locale)}
         {filters}
-        <p style={{ margin: 0, color: "var(--ink)", fontSize: "var(--text-md)" }}>{t("audit.error", locale)}</p>
+        <EmptyState title={t("audit.error", locale)} />
       </Card>
     );
   }
@@ -283,20 +286,22 @@ export function AuditLogTable(props: AuditLogTableProps): ReactElement {
               style={{ borderBottom: "1px solid var(--hairline)" }}
             >
               <td style={cellStyle}>
-                <time dateTime={entry.timestamp}>{formatTimestamp(entry.timestamp)}</time>
+                <time dateTime={entry.timestamp} style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {formatTimestamp(entry.timestamp)}
+                </time>
               </td>
               <td style={cellStyle}>
                 <span style={{ fontWeight: 600 }}>{entry.actor.email ?? entry.actor.id}</span>
-                {entry.actor.role && (
-                  <span style={{ display: "block", color: "var(--ink-soft)", fontSize: "var(--text-xs)" }}>{entry.actor.role}</span>
-                )}
+                {entry.actor.role && <span style={metaStyle}>{entry.actor.role}</span>}
               </td>
-              <td style={{ ...cellStyle, fontFamily: "var(--font-mono, monospace)" }}>{entry.action}</td>
+              <td style={cellStyle}>
+                <Badge tone={actionTone(entry.action)} dot data-testid="audit-action-badge">
+                  {entry.action}
+                </Badge>
+              </td>
               <td style={cellStyle}>
                 <span>{entry.entityType}</span>
-                {entry.entityId && (
-                  <span style={{ display: "block", color: "var(--ink-soft)", fontSize: "var(--text-xs)" }}>{entry.entityId}</span>
-                )}
+                {entry.entityId && <span style={metaStyle}>{entry.entityId}</span>}
               </td>
               <td style={{ ...cellStyle, fontVariantNumeric: "tabular-nums" }}>{entry.ip}</td>
               <td style={cellStyle}>{diffCell(entry, locale)}</td>

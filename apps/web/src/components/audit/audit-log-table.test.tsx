@@ -147,6 +147,31 @@ describe("SEC-001b: AuditLogTable — i18n FR/EN + tokens", () => {
     expect(screen.getByText("Adresse IP")).toBeInTheDocument();
   });
 
+  it("SEC-001b: action portée par un Badge bordé — danger (dot) pour un verbe destructif, jamais un aplat", () => {
+    const destructive: AuditEntryView[] = [
+      {
+        actor: { id: "77777777-7777-4777-a777-777777777777", role: "DIRECTOR" },
+        action: "DELETE /agencies/:id",
+        entityType: "agency",
+        entityId: "33333333-3333-4333-a333-333333333333",
+        timestamp: "2026-07-11T10:00:00Z",
+        ip: "41.67.128.5",
+      },
+    ];
+    render(<AuditLogTable {...props({ entries: destructive })} />);
+    const badge = screen.getByTestId("audit-action-badge");
+    // Bordered danger pill with a dot (never a solid red fill).
+    expect(badge.className).toContain("sig-badge--danger");
+    expect(badge.querySelector(".sig-badge__dot")).not.toBeNull();
+    expect(badge).toHaveTextContent("DELETE /agencies/:id");
+  });
+
+  it("SEC-001b: un verbe non destructif reste un Badge info (pas de danger abusif)", () => {
+    render(<AuditLogTable {...props()} />);
+    const first = screen.getAllByTestId("audit-action-badge")[0];
+    expect(first?.className).toContain("sig-badge--info");
+  });
+
   it("SEC-001b: valeurs de style = tokens design (jamais de hex en dur)", () => {
     const { container } = render(<AuditLogTable {...props()} />);
     const table = screen.getByTestId("audit-table");

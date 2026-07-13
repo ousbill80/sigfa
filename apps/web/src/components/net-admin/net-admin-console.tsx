@@ -15,7 +15,17 @@
 "use client";
 
 import type { CSSProperties, ReactElement } from "react";
-import { Badge, Card, EmptyState, OfflineBanner, Skeleton } from "@sigfa/ui";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  Heading,
+  KpiTile,
+  OfflineBanner,
+  Overline,
+  SectionTitle,
+  Skeleton,
+} from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 import type {
   NetAdminLoad,
@@ -46,60 +56,11 @@ const rootStyle: CSSProperties = {
   background: "var(--paper)",
 };
 
-const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-lg)",
-  fontWeight: 600,
-  color: "var(--ink)",
-  letterSpacing: "var(--tracking-tight)",
-  margin: 0,
-};
-
 const subtitleStyle: CSSProperties = {
   fontFamily: "var(--font-text)",
   fontSize: "var(--text-sm)",
   color: "var(--ink-soft)",
   margin: "var(--space-1) 0 0",
-};
-
-const sectionTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-md)",
-  fontWeight: 600,
-  color: "var(--ink)",
-  letterSpacing: "var(--tracking-tight)",
-  margin: "0 0 var(--space-4)",
-};
-
-const tileStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-  flex: 1,
-  minWidth: "10rem",
-  padding: "var(--space-5)",
-  background: "var(--surface-1)",
-  border: "1px solid var(--hairline)",
-  borderRadius: "var(--r-lg)",
-  boxShadow: "var(--shadow-1)",
-};
-
-const tileLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-text)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 500,
-  color: "var(--ink-soft)",
-  letterSpacing: "0.01em",
-};
-
-const tileValueStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-2xl)",
-  fontWeight: 700,
-  lineHeight: 1,
-  fontVariantNumeric: "tabular-nums",
-  letterSpacing: "var(--tracking-numeric)",
-  color: "var(--ink)",
 };
 
 const cellStyle: CSSProperties = {
@@ -203,7 +164,8 @@ function GuaranteeNotice({ locale }: { locale: Locale }): ReactElement {
 function ConsoleHeader({ locale }: { locale: Locale }): ReactElement {
   return (
     <header style={{ marginBottom: "var(--space-6)" }}>
-      <h1 style={titleStyle}>{t("netAdmin.title", locale)}</h1>
+      <Overline>{t("netAdmin.guarantee", locale)}</Overline>
+      <Heading size="xl">{t("netAdmin.title", locale)}</Heading>
       <p style={subtitleStyle}>{t("netAdmin.subtitle", locale)}</p>
       <p
         data-testid="net-admin-read-only"
@@ -289,23 +251,26 @@ export function NetAdminConsole({
 
       {/* Synthèse réseau */}
       <section aria-label={t("netAdmin.synthesis.title", locale)} style={{ marginBottom: "var(--space-8)" }}>
-        <h2 style={sectionTitleStyle}>{t("netAdmin.synthesis.title", locale)}</h2>
+        <SectionTitle style={{ marginBottom: "var(--space-4)" }}>{t("netAdmin.synthesis.title", locale)}</SectionTitle>
         <div
           data-testid="net-admin-synthesis"
           style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap" }}
         >
           {tiles.map((tile) => (
-            <Card key={tile.key} data-testid={`net-synth-${tile.key}`} style={tileStyle}>
-              <span style={tileLabelStyle}>{tile.label}</span>
-              <span style={tileValueStyle}>{tile.value}</span>
-            </Card>
+            <KpiTile
+              key={tile.key}
+              data-testid={`net-synth-${tile.key}`}
+              label={tile.label}
+              value={tile.value}
+              style={{ flex: 1, minWidth: "10rem" }}
+            />
           ))}
         </div>
       </section>
 
       {/* Vue par banque */}
       <section aria-label={t("netAdmin.banks.title", locale)}>
-        <h2 style={sectionTitleStyle}>{t("netAdmin.banks.title", locale)}</h2>
+        <SectionTitle style={{ marginBottom: "var(--space-4)" }}>{t("netAdmin.banks.title", locale)}</SectionTitle>
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <table
             data-testid="net-admin-banks"

@@ -21,6 +21,18 @@ export type FlowStep = (typeof FLOW_STEPS)[number];
 /** Emission status inside the confirm step. */
 export type EmitStatus = "idle" | "submitting" | "error";
 
+/**
+ * Human-mappable reason for an emission failure. Derived from the HTTP status
+ * and the opaque contract error code so the confirm step can show a distinct,
+ * humane message instead of swallowing the failure silently.
+ */
+export type EmitErrorReason =
+  | "offline"
+  | "conflict"
+  | "rate_limited"
+  | "validation"
+  | "generic";
+
 /** Public API of {@link useTicketFlow}. */
 export interface TicketFlow {
   readonly step: FlowStep;
@@ -29,6 +41,8 @@ export interface TicketFlow {
   readonly phone: string;
   readonly consent: boolean;
   readonly emitStatus: EmitStatus;
+  /** Set only while {@link emitStatus} is `"error"` — drives the humane copy. */
+  readonly emitError: EmitErrorReason | null;
   readonly created: PublicTicketCreated | null;
   /** True when the current phone input is acceptable for submission. */
   readonly canSubmit: boolean;
@@ -37,6 +51,8 @@ export interface TicketFlow {
   readonly setConsent: (value: boolean) => void;
   readonly back: () => void;
   readonly submit: () => Promise<void>;
+  /** Re-attempts the last emission, replaying the same idempotency key. */
+  readonly retry: () => Promise<void>;
   readonly reset: () => void;
 }
 
@@ -46,6 +62,18 @@ export interface TicketFlowOptions {
   readonly agencyId: string;
   /** Idempotency key factory (injectable for tests). */
   readonly makeKey?: () => string;
+}
+
+/**
+ * Maps a failed {@link PwaResult} to a human-mappable reason.
+ * A status of `0` means the request never reached the server (offline / DNS).
+ */
+function emitErrorReason(status: number, code?: string): EmitErrorReason {
+  if (status === 0) return "offline";
+  if (status === 429 || code === "TOO_MANY_REQUESTS") return "rate_limited";
+  if (status === 409 || code === "IDEMPOTENCY_CONFLICT") return "conflict";
+  if (status === 400 || status === 422 || code === "VALIDATION_ERROR") return "validation";
+  return "generic";
 }
 
 /** Default idempotency key: crypto UUID when available, else timestamp+random. */
@@ -70,6 +98,7 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
   const [phone, setPhoneState] = useState("");
   const [consent, setConsent] = useState(false);
   const [emitStatus, setEmitStatus] = useState<EmitStatus>("idle");
+  const [emitError, setEmitError] = useState<EmitErrorReason | null>(null);
   const [created, setCreated] = useState<PublicTicketCreated | null>(null);
   // Stable idempotency key per attempt — created lazily at first submit.
   const [idemKey, setIdemKey] = useState<string | null>(null);
@@ -77,6 +106,7 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
   const selectService = useCallback((serviceId: string) => {
     setSelectedServiceId(serviceId);
     setEmitStatus("idle");
+    setEmitError(null);
     setStep("confirm");
   }, []);
 
@@ -84,11 +114,13 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
     setPhoneState(value);
     if (normalizePhone(value).length === 0) setConsent(false);
     setEmitStatus("idle");
+    setEmitError(null);
   }, []);
 
   const back = useCallback(() => {
     setStep((s) => (s === "confirm" ? "service" : s));
     setEmitStatus("idle");
+    setEmitError(null);
   }, []);
 
   const phoneProvided = hasPhone(phone);
@@ -104,6 +136,7 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
     const key = idemKey ?? makeKey();
     if (!idemKey) setIdemKey(key);
     setEmitStatus("submitting");
+    setEmitError(null);
     const normalized = normalizePhone(phone);
     const res = await emitQrTicket(baseUrl, {
       agencyId,
@@ -114,11 +147,19 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
     if (res.ok) {
       setCreated(res.data);
       setEmitStatus("idle");
+      setEmitError(null);
       setStep("ticket");
     } else {
+      // Surface the failure — never swallow it. The stable idempotency key is
+      // kept so `retry` replays the same emission (no duplicate ticket).
       setEmitStatus("error");
+      setEmitError(emitErrorReason(res.status, res.code));
     }
   }, [selectedServiceId, canSubmit, idemKey, makeKey, phone, baseUrl, agencyId, consent]);
+
+  // Retry re-runs the same submit: the idempotency key was persisted on the
+  // first attempt, so a replay resolves to the same ticket (CONTRACT-003).
+  const retry = submit;
 
   const reset = useCallback(() => {
     setStep("service");
@@ -126,6 +167,7 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
     setPhoneState("");
     setConsent(false);
     setEmitStatus("idle");
+    setEmitError(null);
     setCreated(null);
     setIdemKey(null);
   }, []);
@@ -139,6 +181,7 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
     phone,
     consent,
     emitStatus,
+    emitError,
     created,
     canSubmit,
     selectService,
@@ -146,6 +189,7 @@ export function useTicketFlow(options: TicketFlowOptions): TicketFlow {
     setConsent,
     back,
     submit,
+    retry,
     reset,
   };
 }

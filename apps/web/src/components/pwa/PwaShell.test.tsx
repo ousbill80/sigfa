@@ -125,7 +125,7 @@ describe("NOTIF-005-B: PwaShell", () => {
     await waitFor(() => expect(screen.getByTestId("pwa-ticket-position")).toHaveTextContent("4"));
   });
 
-  it("blocks the flow and reports emission errors humanely", async () => {
+  it("surfaces a VISIBLE emission failure with a retry button (no silent swallow)", async () => {
     server.use(
       http.post(`${BASE}/public/tickets`, () =>
         HttpResponse.json({ error: { code: "SERVICE_NOT_FOUND" } }, { status: 404 }),
@@ -135,8 +135,64 @@ describe("NOTIF-005-B: PwaShell", () => {
     const firstOpen = getServices().find((s) => s.isOpen)!;
     await userEvent.click(screen.getByText(serviceName(firstOpen, "fr")));
     await userEvent.click(screen.getByTestId("pwa-confirm-submit"));
+    // The failure is now VISIBLE: an alert + a humane title + a retry button.
+    const alert = await screen.findByTestId("pwa-emit-error");
+    expect(alert).toHaveAttribute("role", "alert");
+    expect(alert).toHaveTextContent(pt("pwa.emit.error_title", "fr"));
+    expect(screen.getByTestId("pwa-emit-retry")).toBeInTheDocument();
     // Stays on the confirm step (no crash, no navigation to ticket).
-    await waitFor(() => expect(screen.getByTestId("pwa-confirm-step")).toBeInTheDocument());
+    expect(screen.getByTestId("pwa-confirm-step")).toBeInTheDocument();
     expect(screen.queryByTestId("pwa-ticket-step")).not.toBeInTheDocument();
+  });
+
+  it("retries a failed emission and reaches the live ticket on success", async () => {
+    let attempts = 0;
+    server.use(
+      http.post(`${BASE}/public/tickets`, () => {
+        attempts += 1;
+        if (attempts === 1) {
+          return HttpResponse.json({ error: { code: "INTERNAL" } }, { status: 500 });
+        }
+        return HttpResponse.json(
+          {
+            trackingId: "V9k2mXpLqRwZsYn8fBjH3",
+            number: "A042",
+            displayNumber: "OC-042",
+            status: "WAITING",
+            channel: "QR",
+            position: 5,
+            estimatedWaitMinutes: 10,
+            serviceId: "svc-1",
+            agencyId: "agency-1",
+            createdAt: "2026-07-11T09:00:00Z",
+          },
+          { status: 201 },
+        );
+      }),
+      http.get(`${BASE}/public/tickets/:id`, () =>
+        HttpResponse.json({
+          trackingId: "V9k2mXpLqRwZsYn8fBjH3",
+          number: "A042",
+          displayNumber: "OC-042",
+          status: "WAITING",
+          channel: "QR",
+          position: 4,
+          estimatedWaitMinutes: 8,
+          agencyId: "agency-1",
+          serviceId: "svc-1",
+          createdAt: "2026-07-11T09:00:00Z",
+        }),
+      ),
+    );
+    render(<PwaShell token={validToken()} baseUrl={BASE} registerServiceWorker={false} pollIntervalMs={999_999} />);
+    const firstOpen = getServices().find((s) => s.isOpen)!;
+    await userEvent.click(screen.getByText(serviceName(firstOpen, "fr")));
+    await userEvent.click(screen.getByTestId("pwa-confirm-submit"));
+    // First attempt fails → retry appears.
+    await userEvent.click(await screen.findByTestId("pwa-emit-retry"));
+    // Second attempt succeeds → live ticket.
+    await waitFor(() => expect(screen.getByTestId("pwa-ticket-step")).toBeInTheDocument());
+    expect(screen.getByText("OC-042")).toBeInTheDocument();
+    expect(attempts).toBe(2);
   });
 });
