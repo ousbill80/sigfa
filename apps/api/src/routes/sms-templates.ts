@@ -8,6 +8,14 @@
  * Toute autre variable → 422 `UNKNOWN_TEMPLATE_VARIABLE`.
  * Persistance dans `notification_templates` (canal SMS, langue FR).
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT2)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. La table
+ * `notification_templates` a la policy `tenant_isolation` (SELECT/INSERT/UPDATE via
+ * WITH CHECK) + GRANT CRUD `sigfa_app` (migration 0004). L'existence de la banque est
+ * vérifiée via `banks` (policy SELECT `tenant_isolation`, id = current_bank_id).
+ *
  * @module
  */
 
@@ -26,6 +34,7 @@ import {
   requireBankId,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur templates SMS. */
 interface SmsEnv {
@@ -134,9 +143,14 @@ function registerGetTemplates(router: Hono<SmsEnv>): void {
     const tenant = c.get("tenant");
     try {
       const id = paramUuid(c, "id");
-      requireBankId(tenant);
-      await assertBankExists(db, id);
-      return c.json({ templates: await loadTemplates(db, id) }, 200);
+      const bankId = requireBankId(tenant);
+      // SEC-002 : vérif d'existence + lecture tenant dans la tx ARMÉE (RLS contraignante).
+      const templates = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        await assertBankExists(armedDb, id);
+        return loadTemplates(armedDb, id);
+      });
+      return c.json({ templates }, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
@@ -150,22 +164,28 @@ function registerPatchTemplates(router: Hono<SmsEnv>): void {
     const tenant = c.get("tenant");
     try {
       const id = paramUuid(c, "id");
-      requireBankId(tenant);
-      await assertBankExists(db, id);
+      const bankId = requireBankId(tenant);
       const input = parseStrict(updateSmsSchema, await parseJson(c));
       for (const template of input.templates) assertKnownVariables(template.content);
-      const before = await loadTemplates(db, id);
-      for (const template of input.templates) {
-        await upsertTemplate(db, id, template);
-      }
-      const after = await loadTemplates(db, id);
-      await recordAudit({
-        db, tenant,
-        action: "PATCH /banks/:id/sms-templates",
-        entityType: "sms_templates",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff({ templates: before }, { templates: after }),
+      // SEC-002 : vérif + upserts + audit atomiques dans la tx ARMÉE (RLS contraignante).
+      const after = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        await assertBankExists(armedDb, id);
+        const before = await loadTemplates(armedDb, id);
+        for (const template of input.templates) {
+          await upsertTemplate(armedDb, id, template);
+        }
+        const updated = await loadTemplates(armedDb, id);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "PATCH /banks/:id/sms-templates",
+          entityType: "sms_templates",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff({ templates: before }, { templates: updated }),
+        });
+        return updated;
       });
       return c.json({ templates: after }, 200);
     } catch (err) {

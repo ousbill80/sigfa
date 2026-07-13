@@ -78,21 +78,24 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
   "feedback-insights-route.ts",
   "banks.ts",
   "data-privacy.ts",
-  "devices.ts",
   "kiosk-session.ts",
-  "kiosks-status.ts",
   "onboarding.ts",
   "operations.ts",
   "public-tickets.ts",
   "queues.ts",
   "reports.ts",
-  "sms-templates.ts",
-  // thresholds.ts — BLOQUÉ (couture packages/database) : PATCH /banks/:id/thresholds
-  // fait `UPDATE banks`, mais `sigfa_app` a INSERT/UPDATE/DELETE RÉVOQUÉS sur `banks`
-  // (migration 0001_rls.sql:235 ; policy `banks` = FOR SELECT seule). Sous connexion
-  // armée NOBYPASSRLS → « permission denied for table banks ». Reste PENDING tant que
-  // la couture DB n'est pas posée (GRANT UPDATE ciblé sur `banks` à `sigfa_app`, ou
-  // déport des seuils vers une table tenant-scoped mutable). Cf. SEC-002-CUTOVER-LOT1.
+  // thresholds.ts — TOUJOURS BLOQUÉ (couture packages/database INCOMPLÈTE) :
+  // PATCH /banks/:id/thresholds fait un `UPDATE banks SET queue_critical_threshold=…,
+  // agent_inactivity_minutes=…, no_show_timeout_minutes=…, updated_at=NOW()`. La
+  // migration 0014_thresholds_tenant_grant.sql accorde UPDATE colonne-scopé sur les
+  // 3 SEULES colonnes de seuils, mais PAS sur `updated_at`. Sous connexion armée
+  // NOBYPASSRLS, un UPDATE qui touche `updated_at` (colonne non accordée) →
+  // « permission denied for table banks » (prouvé Testcontainers, SEC-002-CUTOVER-LOT2).
+  // Reste PENDING tant que la couture n'est pas COMPLÉTÉE côté packages/database :
+  // ajouter `updated_at` au GRANT UPDATE colonne-scopé sur `banks` pour `sigfa_app`
+  //   → `GRANT UPDATE (queue_critical_threshold, agent_inactivity_minutes,
+  //       no_show_timeout_minutes, updated_at) ON banks TO sigfa_app;`
+  // (le trigger `updated_at` n'existe pas sur banks — la colonne est posée par la route).
   "thresholds.ts",
   "tickets-sync.ts",
   "tickets.ts",
@@ -123,6 +126,15 @@ const ARMED: readonly string[] = [
   "services.ts",
   "hours.ts",
   "counters.ts",
+  // SEC-002-CUTOVER-LOT2 — routes de config/notifications tenant-scoped. Tout accès
+  // DB tenant routé via `withArmedTenant` (armement `app.current_bank_id`).
+  // - sms-templates.ts : `notification_templates` (policy `tenant_isolation` + CRUD, 0004).
+  // - devices.ts : `notification_devices` (policy `tenant_isolation` + CRUD, 0004).
+  // - kiosks-status.ts : `kiosks` (policy `tenant_isolation` + SELECT, 0001).
+  // (thresholds.ts reste PENDING : couture 0014 incomplète, cf. note ci-dessus.)
+  "sms-templates.ts",
+  "devices.ts",
+  "kiosks-status.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
