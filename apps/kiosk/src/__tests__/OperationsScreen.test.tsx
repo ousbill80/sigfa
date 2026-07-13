@@ -306,6 +306,8 @@ describe("MODEL-KIOSK-A: OperationsScreen", () => {
     const back = container.querySelector("[data-testid='operations-back-btn']") as HTMLElement;
     expect(back).toBeInTheDocument();
     expect(back.style.minHeight).toBe("72px");
+    // ICONS-001 : icône SIGFA « retour » appariée au texte (plus de flèche glyphe).
+    expect(back.querySelector("svg[data-icon='retour']")).toBeInTheDocument();
     back.click();
     expect(mockBack).toHaveBeenCalled();
   });

@@ -85,7 +85,7 @@ const servicesMessages = {
     waitEstimate: "~{minutes} min",
     seeMore: "Voir plus de services",
     closedService: "Fermé — {schedule}",
-    accessibilityButton: "♿ Accès prioritaire",
+    accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
     offlineBanner: "Mode hors connexion",
@@ -143,11 +143,11 @@ import { TicketScreen } from "@/components/TicketScreen";
 import { readTicketMomentPii } from "@/lib/ticket-moment-store";
 
 const MOCK_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", icon: "💰", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", icon: "💵", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", icon: "🔄", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", icon: "📋", estimatedMinutes: 15, isOpen: true },
-  { id: "svc-5", name: "Crédit", icon: "🏦", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
+  { id: "svc-1", name: "Dépôt", icon: "deposit", estimatedMinutes: 5, isOpen: true },
+  { id: "svc-2", name: "Retrait", icon: "withdrawal", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-3", name: "Virement", icon: "transfer", estimatedMinutes: 12, isOpen: true },
+  { id: "svc-4", name: "Réclamation", icon: "complaint", estimatedMinutes: 15, isOpen: true },
+  { id: "svc-5", name: "Crédit", icon: "credit", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -271,7 +271,7 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
     const closedService: ServiceItem = {
       id: "svc-closed",
       name: "Crédit",
-      icon: "🏦",
+      icon: "credit",
       estimatedMinutes: 20,
       isOpen: false,
       schedule: "Lu-Ve 09h-17h",
@@ -297,6 +297,8 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
     );
 
     const backBtn = screen.getByTestId("back-btn");
+    // ICONS-001 : icône SIGFA « retour » appariée au texte (plus de flèche glyphe).
+    expect(backBtn.querySelector("svg[data-icon='retour']")).toBeInTheDocument();
     fireEvent.click(backBtn);
 
     expect(mockBack).toHaveBeenCalledTimes(1);
@@ -355,7 +357,7 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
     const closedService: ServiceItem = {
       id: "svc-closed",
       name: "Crédit",
-      icon: "🏦",
+      icon: "credit",
       estimatedMinutes: 20,
       isOpen: false,
       schedule: "Lu-Ve 09h-17h",

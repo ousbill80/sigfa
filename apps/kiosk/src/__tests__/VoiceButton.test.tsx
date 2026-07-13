@@ -1,9 +1,9 @@
 /**
- * KIOSK-008 — Tests TDD pour VoiceButton (bouton 🔊 permanent).
+ * KIOSK-008 — Tests TDD pour VoiceButton (bouton audio permanent).
  * Écrits AVANT l'implémentation (phase rouge).
  *
  * Critères couverts :
- *   - bouton 🔊 ≥ 72×72 px présent (FR/EN),
+ *   - bouton audio ≥ 72×72 px présent (FR/EN), icône SIGFA « audio »,
  *   - clic → SpeechSynthesisUtterance déclenché dans la langue de session,
  *   - mode accessibilité → rate = 0.8 (Vitest spy),
  *   - locale sans voix native → fallback voix FR, zéro erreur visible/log.
@@ -117,8 +117,8 @@ function renderButton(
   );
 }
 
-describe("KIOSK-008: bouton 🔊 permanent", () => {
-  it("KIOSK-008: bouton 🔊 ≥ 72 px présent sur tous les écrans (FR/EN)", () => {
+describe("KIOSK-008: bouton audio permanent", () => {
+  it("KIOSK-008: bouton audio ≥ 72 px présent sur tous les écrans (FR/EN)", () => {
     for (const locale of ["fr", "en"]) {
       mockLocale = locale;
       const { unmount } = renderButton(locale);
@@ -126,8 +126,12 @@ describe("KIOSK-008: bouton 🔊 permanent", () => {
       expect(btn, `voice button for ${locale}`).toBeInTheDocument();
       expect(btn.style.minWidth, `minWidth for ${locale}`).toBe("72px");
       expect(btn.style.minHeight, `minHeight for ${locale}`).toBe("72px");
-      // Icône 🔊 appariée à un label texte (règle icône+texte).
-      expect(btn.textContent, `label for ${locale}`).toContain("🔊");
+      // Icône SIGFA « audio » appariée à un label texte (règle icône+texte).
+      expect(
+        btn.querySelector("svg[data-icon='audio']"),
+        `icône audio for ${locale}`,
+      ).toBeInTheDocument();
+      expect(btn.textContent, `label for ${locale}`).not.toBe("");
       unmount();
     }
   });

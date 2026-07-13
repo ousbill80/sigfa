@@ -1,9 +1,15 @@
 /**
- * UiIcons — petites icônes SVG d'interface (line/stroke, `currentColor`)
- * pour l'écran services : chevron d'action, téléphone (CTA SMS), accessibilité.
- * Cohérentes avec ServiceIcon. AUCUN emoji.
+ * UiIcons — petites icônes d'interface pour les écrans borne.
+ *
+ * Migration ICONS-001 : accessibilité, personne (conseiller) et opération
+ * (guichet) sont rendues par le set SIGFA duotone (`SigfaIcon` de @sigfa/ui).
+ * Le chevron d'action et le téléphone (CTA SMS) n'ont pas d'équivalent dans
+ * le set : ils restent des icônes line/stroke locales (`currentColor`).
+ * AUCUN emoji.
  */
 import type { CSSProperties } from "react";
+
+import { SigfaIcon } from "@sigfa/ui";
 
 interface UiIconProps {
   size?: number;
@@ -45,41 +51,48 @@ export function PhoneIcon({ size = 28, style, "data-testid": id }: UiIconProps) 
   );
 }
 
-/** Silhouette « accès prioritaire » (fauteuil roulant stylisé, line). */
+/** « Accès prioritaire » — icône SIGFA « accessibilite » (duotone). */
 export function AccessibilityIcon({ size = 28, style, "data-testid": id }: UiIconProps) {
   return (
-    <svg {...baseProps(size, id)} style={style}>
-      <circle cx="12" cy="4.5" r="1.8" />
-      <path d="M12 7v5h4l2 5" />
-      <path d="M12 12H8l-1 3a4 4 0 1 0 5 4" />
-    </svg>
+    <SigfaIcon
+      name="accessibilite"
+      size={size}
+      style={style}
+      stroke="currentColor"
+      data-testid={id}
+    />
   );
 }
 
 /**
- * MODEL-KIOSK-B — Silhouette « personne » (buste + épaules, line). Sert de
+ * MODEL-KIOSK-B — « personne » : icône SIGFA « conseiller » (duotone). Sert de
  * repère au chemin « Voir mon conseiller » et de repli d'avatar (jamais
  * d'emoji, jamais d'image réseau externe).
  */
 export function PersonIcon({ size = 28, style, "data-testid": id }: UiIconProps) {
   return (
-    <svg {...baseProps(size, id)} style={style}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21a8 8 0 0 1 16 0" />
-    </svg>
+    <SigfaIcon
+      name="conseiller"
+      size={size}
+      style={style}
+      stroke="currentColor"
+      data-testid={id}
+    />
   );
 }
 
 /**
- * MODEL-KIOSK-B — Pictogramme « opération » (documents/guichet stylisés, line)
- * pour le chemin « Une opération » de l'écran de choix.
+ * MODEL-KIOSK-B — « opération » : icône SIGFA « guichet » (duotone) pour le
+ * chemin « Une opération » de l'écran de choix.
  */
 export function OperationIcon({ size = 28, style, "data-testid": id }: UiIconProps) {
   return (
-    <svg {...baseProps(size, id)} style={style}>
-      <rect x="4" y="4" width="12" height="16" rx="2" />
-      <path d="M8 9h4M8 13h4" />
-      <path d="M16 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3" />
-    </svg>
+    <SigfaIcon
+      name="guichet"
+      size={size}
+      style={style}
+      stroke="currentColor"
+      data-testid={id}
+    />
   );
 }
