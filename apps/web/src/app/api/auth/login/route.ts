@@ -5,13 +5,12 @@
  * accessToken/refreshToken/expiresIn) via le client typé @sigfa/contracts —
  * plus de fetch brut ni de lecture snake_case qui posait des cookies
  * `undefined` contre l'API réelle.
+ * Le dialogue de contrat + la pose des cookies vivent dans lib/auth-login
+ * (mécanisme UNIQUE, partagé avec /api/auth/demo-login).
  * @module app/api/auth/login/route
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createSigfaClient } from "@sigfa/contracts";
-import { setAuthCookies } from "@/lib/auth-cookies";
-
-const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4010";
+import { loginAndSetCookies } from "@/lib/auth-login";
 
 /** POST /api/auth/login */
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -29,19 +28,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Email and password required" }, { status: 400 });
   }
 
-  try {
-    // Client typé @sigfa/contracts — POST /auth/login (LoginRequest → AuthTokens).
-    const client = createSigfaClient("core", API_URL);
-    const { data, error } = await client.POST("/auth/login", {
-      body: { email, password },
-    });
-
-    if (error || !data) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-    }
-
-    return setAuthCookies(NextResponse.json({ ok: true }), data);
-  } catch {
-    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
-  }
+  return loginAndSetCookies(email, password);
 }
