@@ -67,6 +67,26 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("SUPER_ADMIN", "/dashboard/comex")).toBe(true);
     });
 
+    it("REP-003b: RBAC AGENT → /dashboard/reports retourne 403", () => {
+      expect(canAccess("AGENT", "/dashboard/reports")).toBe(false);
+    });
+
+    it("REP-003b: RBAC MANAGER → /dashboard/reports retourne 403", () => {
+      expect(canAccess("MANAGER", "/dashboard/reports")).toBe(false);
+    });
+
+    it("REP-003b: RBAC AGENCY_DIRECTOR — /dashboard/reports autorisé", () => {
+      expect(canAccess("AGENCY_DIRECTOR", "/dashboard/reports")).toBe(true);
+    });
+
+    it("REP-003b: RBAC AUDITOR — /dashboard/reports autorisé", () => {
+      expect(canAccess("AUDITOR", "/dashboard/reports")).toBe(true);
+    });
+
+    it("REP-003b: RBAC BANK_ADMIN — /dashboard/reports autorisé", () => {
+      expect(canAccess("BANK_ADMIN", "/dashboard/reports")).toBe(true);
+    });
+
     it("SUPER_ADMIN has access to all routes", () => {
       expect(canAccess("SUPER_ADMIN", "/admin")).toBe(true);
       expect(canAccess("SUPER_ADMIN", "/dashboard/manager")).toBe(true);

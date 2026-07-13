@@ -145,7 +145,50 @@ export type TranslationKey =
   | "admin.conseiller.kiosk_notice"
   | "admin.conseiller.saved"
   | "admin.conseiller.marked"
-  | "admin.conseiller.unmarked";
+  | "admin.conseiller.unmarked"
+  | "reports.title"
+  | "reports.forbidden"
+  | "reports.export.title"
+  | "reports.export.subtitle"
+  | "reports.export.format"
+  | "reports.export.format.pdf"
+  | "reports.export.format.xlsx"
+  | "reports.export.format.json"
+  | "reports.export.scope"
+  | "reports.export.scope.agency"
+  | "reports.export.scope.network"
+  | "reports.export.period"
+  | "reports.export.launch"
+  | "reports.export.status.pending"
+  | "reports.export.status.processing"
+  | "reports.export.status.ready"
+  | "reports.export.status.failed"
+  | "reports.export.download"
+  | "reports.export.expired"
+  | "reports.export.retry"
+  | "reports.export.error"
+  | "reports.export.offline"
+  | "reports.export.empty"
+  | "reports.benchmark.title"
+  | "reports.benchmark.subtitle"
+  | "reports.benchmark.sort"
+  | "reports.benchmark.col.rank"
+  | "reports.benchmark.col.agency"
+  | "reports.benchmark.col.status"
+  | "reports.benchmark.status.vert"
+  | "reports.benchmark.status.orange"
+  | "reports.benchmark.status.rouge"
+  | "reports.benchmark.status.na"
+  | "reports.benchmark.empty"
+  | "reports.benchmark.error"
+  | "reports.benchmark.offline"
+  | "reports.kpi.tauxSLA"
+  | "reports.kpi.tma"
+  | "reports.kpi.tmt"
+  | "reports.kpi.tts"
+  | "reports.kpi.tauxAbandon"
+  | "reports.kpi.nps"
+  | "reports.kpi.occupation";
 
 /** Translation dictionary type */
 export type TranslationDict = Record<TranslationKey, string>;
@@ -288,6 +331,50 @@ export const FR: TranslationDict = {
   "admin.conseiller.saved": "Profil conseiller enregistré.",
   "admin.conseiller.marked": "Conseiller",
   "admin.conseiller.unmarked": "Non conseiller",
+  "reports.title": "RAPPORTS & BENCHMARKING",
+  "reports.forbidden":
+    "Vous n'avez pas les droits pour accéder aux rapports et au benchmarking.",
+  "reports.export.title": "EXPORT DE RAPPORT",
+  "reports.export.subtitle": "Générez un rapport au format PDF, Excel ou JSON.",
+  "reports.export.format": "Format",
+  "reports.export.format.pdf": "PDF",
+  "reports.export.format.xlsx": "Excel",
+  "reports.export.format.json": "JSON",
+  "reports.export.scope": "Périmètre",
+  "reports.export.scope.agency": "Agence",
+  "reports.export.scope.network": "Réseau",
+  "reports.export.period": "Période",
+  "reports.export.launch": "Lancer l'export",
+  "reports.export.status.pending": "En file d'attente…",
+  "reports.export.status.processing": "Génération en cours…",
+  "reports.export.status.ready": "Rapport prêt",
+  "reports.export.status.failed": "Échec de la génération",
+  "reports.export.download": "Télécharger le rapport",
+  "reports.export.expired": "Le lien de téléchargement a expiré.",
+  "reports.export.retry": "Relancer l'export",
+  "reports.export.error": "Impossible de lancer l'export. Veuillez réessayer.",
+  "reports.export.offline": "Connexion requise pour générer un export.",
+  "reports.export.empty": "Aucun export lancé pour le moment.",
+  "reports.benchmark.title": "BENCHMARKING INTER-AGENCES",
+  "reports.benchmark.subtitle": "Classement des agences par KPI de tri.",
+  "reports.benchmark.sort": "Trier par",
+  "reports.benchmark.col.rank": "Rang",
+  "reports.benchmark.col.agency": "Agence",
+  "reports.benchmark.col.status": "Statut",
+  "reports.benchmark.status.vert": "Vert",
+  "reports.benchmark.status.orange": "Orange",
+  "reports.benchmark.status.rouge": "Rouge",
+  "reports.benchmark.status.na": "N/A",
+  "reports.benchmark.empty": "Aucune agence à classer sur cette période.",
+  "reports.benchmark.error": "Impossible de charger le benchmarking. Veuillez réessayer.",
+  "reports.benchmark.offline": "Mode hors ligne — classement figé.",
+  "reports.kpi.tauxSLA": "Taux SLA",
+  "reports.kpi.tma": "TMA",
+  "reports.kpi.tmt": "TMT",
+  "reports.kpi.tts": "TTS",
+  "reports.kpi.tauxAbandon": "Taux d'abandon",
+  "reports.kpi.nps": "NPS",
+  "reports.kpi.occupation": "Occupation",
 };
 
 /** English translations */
@@ -428,6 +515,49 @@ export const EN: TranslationDict = {
   "admin.conseiller.saved": "Relationship manager profile saved.",
   "admin.conseiller.marked": "Relationship manager",
   "admin.conseiller.unmarked": "Not a manager",
+  "reports.title": "REPORTS & BENCHMARKING",
+  "reports.forbidden": "You do not have permission to access reports and benchmarking.",
+  "reports.export.title": "REPORT EXPORT",
+  "reports.export.subtitle": "Generate a report as PDF, Excel or JSON.",
+  "reports.export.format": "Format",
+  "reports.export.format.pdf": "PDF",
+  "reports.export.format.xlsx": "Excel",
+  "reports.export.format.json": "JSON",
+  "reports.export.scope": "Scope",
+  "reports.export.scope.agency": "Agency",
+  "reports.export.scope.network": "Network",
+  "reports.export.period": "Period",
+  "reports.export.launch": "Start export",
+  "reports.export.status.pending": "Queued…",
+  "reports.export.status.processing": "Generating…",
+  "reports.export.status.ready": "Report ready",
+  "reports.export.status.failed": "Generation failed",
+  "reports.export.download": "Download report",
+  "reports.export.expired": "The download link has expired.",
+  "reports.export.retry": "Restart export",
+  "reports.export.error": "Unable to start the export. Please try again.",
+  "reports.export.offline": "Connection required to generate an export.",
+  "reports.export.empty": "No export started yet.",
+  "reports.benchmark.title": "INTER-AGENCY BENCHMARKING",
+  "reports.benchmark.subtitle": "Agency ranking by sort KPI.",
+  "reports.benchmark.sort": "Sort by",
+  "reports.benchmark.col.rank": "Rank",
+  "reports.benchmark.col.agency": "Agency",
+  "reports.benchmark.col.status": "Status",
+  "reports.benchmark.status.vert": "Green",
+  "reports.benchmark.status.orange": "Orange",
+  "reports.benchmark.status.rouge": "Red",
+  "reports.benchmark.status.na": "N/A",
+  "reports.benchmark.empty": "No agency to rank for this period.",
+  "reports.benchmark.error": "Unable to load benchmarking. Please try again.",
+  "reports.benchmark.offline": "Offline mode — ranking frozen.",
+  "reports.kpi.tauxSLA": "SLA rate",
+  "reports.kpi.tma": "AWT",
+  "reports.kpi.tmt": "AHT",
+  "reports.kpi.tts": "ATS",
+  "reports.kpi.tauxAbandon": "Abandonment rate",
+  "reports.kpi.nps": "NPS",
+  "reports.kpi.occupation": "Occupancy",
 };
 
 /** All locales map */
