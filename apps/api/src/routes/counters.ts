@@ -9,6 +9,14 @@
  * est auto-attribué (max+1 par agence). L'agence cible provient de `?agencyId=`
  * (list/create) ou de la ligne du guichet (patch), validée contre le scope JWT.
  *
+ * ## Sécurité (SEC-002)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Les policies
+ * `tenant_isolation` de `counters` / `counter_services` / `services` (et l'audit
+ * composé SEC-001) deviennent la vraie barrière tenant, en plus du filtrage
+ * applicatif `WHERE bank_id` conservé.
+ *
  * @module
  */
 
@@ -30,6 +38,7 @@ import {
   UUID_RE,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur guichets. */
 interface CounterEnv {
@@ -117,20 +126,27 @@ function registerListCounters(router: Hono<CounterEnv>): void {
       const bankId = requireBankId(tenant);
       const agencyId = requireAgencyId(c, tenant);
       const { page, limit, offset } = readPagination(c);
-      const res = await db.query(
-        `SELECT ${CTR_COLS} FROM counters
-          WHERE bank_id=$1 AND agency_id=$2
-          ORDER BY number ASC LIMIT $3 OFFSET $4`,
-        [bankId, agencyId, limit, offset]
-      );
-      const count = await db.query(
-        `SELECT COUNT(*)::int AS total FROM counters WHERE bank_id=$1 AND agency_id=$2`,
-        [bankId, agencyId]
-      );
+      // SEC-002 : lectures tenant à travers la connexion ARMÉE (RLS contraignante).
+      const { rows, total } = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const res = await conn.query(
+          `SELECT ${CTR_COLS} FROM counters
+            WHERE bank_id=$1 AND agency_id=$2
+            ORDER BY number ASC LIMIT $3 OFFSET $4`,
+          [bankId, agencyId, limit, offset]
+        );
+        const count = await conn.query(
+          `SELECT COUNT(*)::int AS total FROM counters WHERE bank_id=$1 AND agency_id=$2`,
+          [bankId, agencyId]
+        );
+        return {
+          rows: res.rows as CounterRow[],
+          total: (count.rows[0] as { total: number }).total,
+        };
+      });
       return c.json(
         {
-          data: (res.rows as CounterRow[]).map(toCounter),
-          meta: { page, limit, total: (count.rows[0] as { total: number }).total },
+          data: rows.map(toCounter),
+          meta: { page, limit, total },
         },
         200
       );
@@ -149,16 +165,21 @@ function registerCreateCounter(router: Hono<CounterEnv>): void {
       const bankId = requireBankId(tenant);
       const agencyId = requireAgencyId(c, tenant);
       const input = parseStrict(createCounterSchema, await parseJson(c));
-      const created = await insertCounter(db, bankId, agencyId, input);
-      await syncCounterServices(db, bankId, created.id, input.serviceIds ?? []);
-      await recordAudit({
-        db,
-        tenant,
-        action: "POST /counters",
-        entityType: "counter",
-        entityId: created.id,
-        ip: extractIp(c),
-        diff: buildDiff({}, { label: created.label, serviceIds: input.serviceIds ?? [] }),
+      // SEC-002 : insertion + n-n + audit atomiques dans la transaction ARMÉE.
+      const created = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await insertCounter(armedDb, bankId, agencyId, input);
+        await syncCounterServices(armedDb, bankId, row.id, input.serviceIds ?? []);
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "POST /counters",
+          entityType: "counter",
+          entityId: row.id,
+          ip: extractIp(c),
+          diff: buildDiff({}, { label: row.label, serviceIds: input.serviceIds ?? [] }),
+        });
+        return row;
       });
       return c.json(toCounter(created), 201);
     } catch (err) {
@@ -230,24 +251,29 @@ function registerPatchCounter(router: Hono<CounterEnv>): void {
     try {
       const id = paramUuid(c, "id");
       const bankId = requireBankId(tenant);
-      const before = await loadCounter(db, bankId, id);
-      assertAgencyScope(tenant, before.agency_id);
       const input = parseStrict(updateCounterSchema, await parseJson(c));
-      const after = await updateCounter(db, bankId, id, input);
-      if (input.serviceIds !== undefined) {
-        await syncCounterServices(db, bankId, id, input.serviceIds);
-      }
-      await recordAudit({
-        db,
-        tenant,
-        action: "PATCH /counters/:id",
-        entityType: "counter",
-        entityId: id,
-        ip: extractIp(c),
-        diff: buildDiff(
-          { status: before.status, agentId: before.agent_id },
-          { status: after.status, agentId: after.agent_id }
-        ),
+      // SEC-002 : lecture (scope) + mutation + n-n + audit atomiques dans la tx ARMÉE.
+      const after = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const before = await loadCounter(armedDb, bankId, id);
+        assertAgencyScope(tenant, before.agency_id);
+        const updated = await updateCounter(armedDb, bankId, id, input);
+        if (input.serviceIds !== undefined) {
+          await syncCounterServices(armedDb, bankId, id, input.serviceIds);
+        }
+        await recordAudit({
+          db: armedDb,
+          tenant,
+          action: "PATCH /counters/:id",
+          entityType: "counter",
+          entityId: id,
+          ip: extractIp(c),
+          diff: buildDiff(
+            { status: before.status, agentId: before.agent_id },
+            { status: updated.status, agentId: updated.agent_id }
+          ),
+        });
+        return updated;
       });
       return c.json(toCounter(after), 200);
     } catch (err) {

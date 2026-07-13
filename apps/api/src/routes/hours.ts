@@ -11,6 +11,14 @@
  *     (contrat), sans jamais toucher l'hebdo.
  *   - Les fériés nationaux CI sont en LECTURE SEULE (référentiel `public_holidays`).
  *
+ * ## Sécurité (SEC-002)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Les policies
+ * `tenant_isolation` de `agencies` / `agency_exceptional_closures` (et l'audit
+ * composé SEC-001) deviennent la vraie barrière tenant, en plus du `WHERE bank_id`
+ * applicatif conservé. Le référentiel `public_holidays` est national (SELECT seul).
+ *
  * @module
  */
 
@@ -30,6 +38,7 @@ import {
   assertAgencyScope,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur horaires. */
 interface HoursEnv {
@@ -163,8 +172,13 @@ function registerGetHours(router: Hono<HoursEnv>): void {
       const agencyId = paramUuid(c, "id");
       assertAgencyScope(tenant, agencyId);
       const bankId = requireBankId(tenant);
-      const weekly = await loadWeekly(db, bankId, agencyId);
-      return c.json(await composeHours(db, bankId, agencyId, weekly), 200);
+      // SEC-002 : lectures tenant à travers la connexion ARMÉE (RLS contraignante).
+      const payload = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const weekly = await loadWeekly(armedDb, bankId, agencyId);
+        return composeHours(armedDb, bankId, agencyId, weekly);
+      });
+      return c.json(payload, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
@@ -181,18 +195,23 @@ function registerPatchHours(router: Hono<HoursEnv>): void {
       assertAgencyScope(tenant, agencyId);
       const bankId = requireBankId(tenant);
       const input = parseStrict(updateHoursSchema, await parseJson(c));
-      const before = await loadWeekly(db, bankId, agencyId);
-      const merged = mergeWeekly(before, input.weeklySchedule);
-      await persistHours(db, bankId, agencyId, merged, input.exceptionalClosures);
-      await recordAudit({
-        db, tenant,
-        action: "PATCH /agencies/:id/hours",
-        entityType: "agency_hours",
-        entityId: agencyId,
-        ip: extractIp(c),
-        diff: buildDiff({ weeklySchedule: before }, { weeklySchedule: merged }),
+      // SEC-002 : lecture + mutations + audit atomiques dans la transaction ARMÉE.
+      const payload = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const before = await loadWeekly(armedDb, bankId, agencyId);
+        const merged = mergeWeekly(before, input.weeklySchedule);
+        await persistHours(armedDb, bankId, agencyId, merged, input.exceptionalClosures);
+        await recordAudit({
+          db: armedDb, tenant,
+          action: "PATCH /agencies/:id/hours",
+          entityType: "agency_hours",
+          entityId: agencyId,
+          ip: extractIp(c),
+          diff: buildDiff({ weeklySchedule: before }, { weeklySchedule: merged }),
+        });
+        return composeHours(armedDb, bankId, agencyId, merged);
       });
-      return c.json(await composeHours(db, bankId, agencyId, merged), 200);
+      return c.json(payload, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
