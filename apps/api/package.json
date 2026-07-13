@@ -51,6 +51,7 @@
     "pino": "^10.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "smpp": "0.6.0-rc.4",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "zod": "^4.4.3"
