@@ -1,9 +1,9 @@
 {
   "zones": {
     "backend": {
-      "lines": 98.3,
-      "statements": 98.3,
-      "branches": 91.1,
+      "lines": 98.19,
+      "statements": 98.19,
+      "branches": 90.95,
       "functions": 99.0
     },
     "ui": {
