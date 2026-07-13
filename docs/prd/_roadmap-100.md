@@ -24,16 +24,16 @@
 - ⏳ **ADM-002a** clone+onboarding (api) · 🔒 **ADM-002b** Stepper (DESIGN-gate).
 - ⏳ **ADM-003a** heartbeat+supervision (api) · 🔒 **ADM-003b** écran supervision (DESIGN-gate).
 
-## F9 — Sécurité & Charge (partiel)
-- ⏳ **SEC-001a** audit exhaustif (api) · **SEC-001b** écran Auditor (web) — 🔒 bloqué sur périmètre `31ee3ac`.
-- ⏳ **SEC-002** tenant-isolation exhaustif (ferme dette RLS `withTenant` ; intègre `harden/f3-debt`) — 🔒 bloqué sur `31ee3ac`.
+## F9 — Sécurité & Charge (quasi complet)
+- ✅ **SEC-001** audit trail exhaustif (mutation-registry + wrapper transactionnel) + écran Auditor.
+- 🔄 **SEC-002** tenant-isolation exhaustif + RLS `withTenant` armée (ferme dette SEC-F3-02 + Schemathesis response-conformance) — EN COURS.
 - ✅ **SEC-003** PRA backup/restore chiffré (mock S3, game day CI) — 🔒 RTO/RPO réel gated infra.
 - 🔒 **SEC-004** k6 charge — env de charge réel (PgBouncer×prepared-statements à tester tôt).
 - ✅ **SEC-005** Stryker mutation **100 %** sur queue-engine + sla-engine.
 
-## F10 — IA & Prédiction (code+synthétique mergeable ; critères pilote 🔒)
-- ⏳ **IA-001** features · **IA-002** prévision · **IA-003** anomalies · **IA-004** NLP FR/EN · **IA-005** surfaces (mock).
-- 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j).
+## F10 — IA & Prédiction ✅ (code+synthétique complet, poussé ; critères pilote 🔒)
+- ✅ **IA-001** features · ✅ **IA-002** prévision+staffing · ✅ **IA-003** anomalies · ✅ **IA-004** NLP FR/EN · ✅ **IA-005** surfaces insights/COMEX.
+- 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j) ; ⏳ couture : câbler feature-store→table `ai_features` (DB-AI-FEATURES ✅ poussée).
 
 ## F11 — Supervision réseau (ops fait)
 - ⏳ **NET-001-API** super admin lecture seule (après SEC-002) · 🔒 **NET-001-WEB** console (DESIGN-gate).
