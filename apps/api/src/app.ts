@@ -79,6 +79,12 @@ export interface AppOptions {
    * `checks.queues` sur `GET /health` (extension non-breaking, CONTRACT-013).
    */
   queueHealth?: QueueHealthProvider;
+  /**
+   * Enfile le build d'un export sur l'infra BullMQ (REP-003). Injecté par
+   * l'entrypoint serveur quand l'infra d'export est démarrée. Absent → le job
+   * d'export reste `PENDING` (aucun échec de route).
+   */
+  exportEnqueue?: (jobId: string, bankId: string) => Promise<void>;
 }
 
 /**
@@ -201,7 +207,10 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // Routes reporting KPI (REP-001, reporting.yaml) : GET /reports/kpis (agency|network)
   // + GET /reports/daily/:agencyId. Moteur de calcul PUR (sla-engine), lecture des
   // agrégats matérialisés daily_agency_stats. Champ `partial` (jour figé J+2 07 h Abidjan).
-  app.route("/api/v1", createReportRouter());
+  app.route(
+    "/api/v1",
+    createReportRouter(options.exportEnqueue ? { enqueueExport: options.exportEnqueue } : {})
+  );
 
   // Webhook d'accusé de livraison des notifications (NOTIF-002, CONTRACT-007) —
   // public (pas de JWT) mais signature fournisseur obligatoire. Routeur isolé.
