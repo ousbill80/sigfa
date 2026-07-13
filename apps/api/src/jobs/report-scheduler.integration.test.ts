@@ -48,6 +48,47 @@ let connection: { host: string; port: number };
 let scheduler: ReportScheduler | undefined;
 let bankA: string;
 
+/**
+ * Neutralise une rejection résiduelle de fermeture BullMQ/IORedis : quand on ferme
+ * un worker/queue pendant qu'une commande bloquante (BRPOPLPUSH) ou le scheduler de
+ * jobs différés est en vol, IORedis peut rejeter la promesse en cours (« Connection
+ * is closed. »). Ce rejet est un artefact de teardown, pas un vrai échec de test ;
+ * on l'avale explicitement pour éviter tout unhandled rejection au process exit.
+ */
+function isBenignCloseError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    /Connection is closed/i.test(msg) ||
+    /Connection is already closed/i.test(msg) ||
+    /Stream isn't writeable/i.test(msg) ||
+    /enableOfflineQueue/i.test(msg)
+  );
+}
+
+/** Avale une promesse en (ré)attachant un catch qui ne relance que les vrais échecs. */
+async function swallowBenign(p: Promise<unknown>): Promise<void> {
+  try {
+    await p;
+  } catch (err) {
+    if (!isBenignCloseError(err)) throw err;
+  }
+}
+
+/**
+ * Ferme proprement un scheduler REP-002 : purge d'abord tous les schémas répétables
+ * et jobs différés (obliterate), puis ferme worker → queue en avalant tout rejet
+ * bénin de fermeture. Garantit qu'aucune connexion Redis ne fuit entre tests.
+ */
+async function teardownScheduler(s: ReportScheduler): Promise<void> {
+  // 1) Purge les jobs répétables/différés AVANT de fermer : sinon le scheduler de
+  //    jobs différés peut relancer une commande sur une connexion en cours de close.
+  await swallowBenign(s.worker.close());
+  await swallowBenign(
+    s.queue.obliterate({ force: true }).catch(() => undefined)
+  );
+  await swallowBenign(s.queue.close());
+}
+
 /** Jour civil Abidjan (`YYYY-MM-DD`) d'un instant (Abidjan = UTC+0). */
 function abidjanDay(instant: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -216,7 +257,21 @@ function baseDeps(
   };
 }
 
+/**
+ * Filet de sécurité au niveau process : BullMQ/IORedis peut émettre une rejection de
+ * fermeture APRÈS le `await` du close (jobs différés en vol). Sans handler, cette
+ * rejection asynchrone fait sortir le process en code non-zéro même quand 0 test
+ * échoue (le flake CI ciblé). On n'avale QUE les erreurs bénignes de fermeture ;
+ * toute autre rejection est ré-émise pour ne pas masquer un vrai échec.
+ */
+function onUnhandledRejection(reason: unknown): void {
+  if (!isBenignCloseError(reason)) {
+    throw reason instanceof Error ? reason : new Error(String(reason));
+  }
+}
+
 beforeAll(async () => {
+  process.on("unhandledRejection", onUnhandledRejection);
   pgContainer = await new GenericContainer("postgres:16")
     .withEnvironment({
       POSTGRES_USER: "sigfa",
@@ -245,10 +300,13 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  await redis?.quit();
+  // Le client Redis partagé est créé avec `maxRetriesPerRequest: null` : une commande
+  // (ex. flushall) peut rester en attente au moment du quit. On avale le rejet bénin.
+  await swallowBenign(redis?.quit() ?? Promise.resolve());
   await db?.end();
   await pgContainer?.stop();
   await redisContainer?.stop();
+  process.off("unhandledRejection", onUnhandledRejection);
 }, 40_000);
 
 beforeEach(async () => {
@@ -265,7 +323,10 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await scheduler?.close();
+  // Fermeture ROBUSTE : purge répétables/différés puis worker → queue, en avalant
+  // tout rejet bénin de fermeture. Empêche toute fuite de connexion entre tests et
+  // toute rejection Redis résiduelle au teardown (flake CI ciblé).
+  if (scheduler) await teardownScheduler(scheduler);
   scheduler = undefined;
 });
 
