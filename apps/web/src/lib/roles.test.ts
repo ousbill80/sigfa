@@ -78,6 +78,22 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("SUPER_ADMIN", "/dashboard/comex")).toBe(true);
     });
 
+    it("IA-005: RBAC AGENT → /dashboard/insights retourne 403", () => {
+      expect(canAccess("AGENT", "/dashboard/insights")).toBe(false);
+    });
+
+    it("IA-005: RBAC MANAGER → /dashboard/insights retourne 403", () => {
+      expect(canAccess("MANAGER", "/dashboard/insights")).toBe(false);
+    });
+
+    it("IA-005: RBAC AGENCY_DIRECTOR — /dashboard/insights autorisé (DIRECTOR+)", () => {
+      expect(canAccess("AGENCY_DIRECTOR", "/dashboard/insights")).toBe(true);
+    });
+
+    it("IA-005: RBAC BANK_ADMIN — /dashboard/insights autorisé (réseau)", () => {
+      expect(canAccess("BANK_ADMIN", "/dashboard/insights")).toBe(true);
+    });
+
     it("REP-003b: RBAC AGENT → /dashboard/reports retourne 403", () => {
       expect(canAccess("AGENT", "/dashboard/reports")).toBe(false);
     });
