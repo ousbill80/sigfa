@@ -30,14 +30,18 @@
     "loading": "Chargement..."
   },
   "services003": {
-    "title": "Quel service souhaitez-vous ?",
+    "title": "Prise de ticket",
+    "subtitle": "Touchez l'opération de votre choix",
     "backButton": "Retour",
     "waitEstimate": "~{minutes} min",
-    "seeMore": "Voir plus de services",
     "closedService": "Fermé — {schedule}",
     "accessibilityButton": "Accès prioritaire",
     "emptyTitle": "Aucun service disponible",
     "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
+    "loadingMessage": "Chargement des opérations...",
+    "errorTitle": "Opérations indisponibles",
+    "errorMessage": "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
+    "retryButton": "Réessayer",
     "offlineBanner": "Mode hors connexion"
   },
   "choiceModelB": {

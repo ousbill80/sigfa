@@ -30,14 +30,18 @@
     "loading": "Loading..."
   },
   "services003": {
-    "title": "Which service do you need?",
+    "title": "Take a ticket",
+    "subtitle": "Tap the operation of your choice",
     "backButton": "Back",
     "waitEstimate": "~{minutes} min",
-    "seeMore": "See more services",
     "closedService": "Closed — {schedule}",
     "accessibilityButton": "Priority access",
     "emptyTitle": "No services available",
     "emptyMessage": "Please go to reception — a staff member will assist you.",
+    "loadingMessage": "Loading operations...",
+    "errorTitle": "Operations unavailable",
+    "errorMessage": "Unable to load operations. Retry or go to reception.",
+    "retryButton": "Retry",
     "offlineBanner": "Offline mode"
   },
   "choiceModelB": {

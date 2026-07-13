@@ -1,85 +1,162 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'en') 1`] = `
+exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → tuile grisée avec horaire, non cliquable (snapshot 'en') 1`] = `
 <main
   role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-8); gap: var(--space-6);"
+  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-6) var(--space-8) var(--space-8); gap: var(--space-6); overflow-y: auto;"
 >
   <header
-    style="display: flex; align-items: center; gap: var(--space-4);"
+    data-testid="kiosk-header-banner"
+    style="display: flex; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-6); background-color: var(--night-2); border-radius: var(--r-lg); box-shadow: var(--shadow-1);"
+  >
+    <div
+      style="display: flex; align-items: center; gap: var(--space-4); min-width: 0;"
+    >
+      <span
+        aria-hidden="true"
+        data-testid="kiosk-header-bank-badge"
+        style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-md); background-color: var(--brand); color: var(--brand-contrast); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 28px; font-weight: 700;"
+      >
+        B
+      </span>
+      <div
+        style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"
+      >
+        <span
+          data-testid="kiosk-header-bank"
+          style="font-size: 18px; font-weight: 600; letter-spacing: var(--tracking-tight); color: var(--ink-muted-inv); text-transform: uppercase; white-space: nowrap;"
+        >
+          Banque Ivoire
+        </span>
+        <span
+          data-testid="kiosk-header-agency"
+          style="font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--ink-inverse); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+        >
+          Cocody Angré
+        </span>
+      </div>
+    </div>
+    <div
+      style="margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;"
+    >
+      <span
+        data-testid="kiosk-header-time"
+        style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-numeric); font-size: 30px; font-weight: 700; color: var(--ink-inverse);"
+      >
+        10:30
+      </span>
+      <span
+        data-testid="kiosk-header-date"
+        style="font-size: 18px; color: var(--ink-muted-inv);"
+      >
+        lundi 13 juillet 2026
+      </span>
+    </div>
+  </header>
+  <div
+    style="display: flex; align-items: baseline; gap: var(--space-4); width: 100%; max-width: 960px; margin: 0px auto;"
   >
     <button
       data-testid="back-btn"
-      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: var(--space-2); min-width: 72px; min-height: 72px;"
+      style="font-size: 20px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-width: 72px; min-height: 72px;"
     >
       ← 
       Back
     </button>
-    <span
-      style="font-size: 28px; color: var(--ink-muted-inv); margin-left: auto;"
-    >
-      FR
-    </span>
-  </header>
-  <h1
-    style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); text-align: center; margin: 0px;"
-  >
-    Which service do you need?
-  </h1>
-  <div
-    style="width: 100%; max-width: 960px; margin: 0px auto; display: flex; flex-direction: column; gap: var(--space-6); flex: 1 1 0%;"
-  >
     <div
-      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--space-6);"
+      style="flex: 1 1 0%; text-align: center;"
     >
-      <button
-        aria-disabled="true"
-        data-testid="service-card"
-        style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
+      <h1
+        style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
+      >
+        Take a ticket
+      </h1>
+      <p
+        style="font-size: 20px; color: var(--ink-muted-inv); margin: var(--space-1) 0 0;"
+      >
+        Tap the operation of your choice
+      </p>
+    </div>
+    <span
+      aria-hidden="true"
+      style="min-width: 72px;"
+    />
+  </div>
+  <div
+    style="flex: 1 1 0%; display: flex; flex-direction: column; gap: var(--space-8); width: 100%; max-width: 960px; margin: 0px auto;"
+  >
+    <section
+      aria-label="Virement international"
+      data-testid="family-section"
+      style="display: flex; flex-direction: column; gap: var(--space-4);"
+    >
+      <div
+        style="display: flex; align-items: center; gap: var(--space-3);"
       >
         <span
-          data-testid="service-icon"
-          style="flex-shrink: 0; width: 72px; height: 72px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
+          aria-hidden="true"
+          style="width: 6px; height: 28px; border-radius: var(--r-full); background-color: var(--gold); flex-shrink: 0;"
+        />
+        <h2
+          data-testid="family-title"
+          style="font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
         >
-          <svg
-            aria-hidden="true"
-            data-icon="transfer"
-            fill="none"
-            focusable="false"
-            height="40"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="40"
-          >
-            <path
-              d="M4 9h13l-3-3"
-            />
-            <path
-              d="M20 15H7l3 3"
-            />
-          </svg>
-        </span>
-        <div
-          style="display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); flex: 1 1 0%; min-width: 0;"
+          Virement international
+        </h2>
+      </div>
+      <div
+        data-testid="family-grid"
+        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4);"
+      >
+        <button
+          aria-disabled="true"
+          data-testid="service-tile"
+          style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: none; cursor: not-allowed; opacity: 0.4; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); text-align: left;"
         >
           <span
-            data-testid="service-label"
-            style="font-size: 28px; font-weight: 600; color: var(--action-label);"
+            data-testid="operation-tile-icon"
+            style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
           >
-            Virement international
+            <svg
+              aria-hidden="true"
+              data-icon="transfer"
+              fill="none"
+              focusable="false"
+              height="32"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="32"
+            >
+              <path
+                d="M4 9h13l-3-3"
+              />
+              <path
+                d="M20 15H7l3 3"
+              />
+            </svg>
           </span>
           <span
-            data-testid="service-schedule"
-            style="font-size: 20px; color: var(--ink-soft); background-color: var(--surface-2); border-radius: var(--r-full); padding: var(--space-1) var(--space-3);"
+            style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
           >
-            Closed — lundi 08h00
+            <span
+              data-testid="operation-tile-label"
+              style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--action-label);"
+            >
+              Virement international
+            </span>
+            <span
+              data-testid="service-schedule"
+              style="font-size: 18px; color: var(--ink-soft);"
+            >
+              Closed — lundi 08h00
+            </span>
           </span>
-        </div>
-      </button>
-    </div>
+        </button>
+      </div>
+    </section>
   </div>
   <button
     data-testid="accessibility-btn"
@@ -109,91 +186,168 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
         d="M12 12H8l-1 3a4 4 0 1 0 5 4"
       />
     </svg>
-    ♿ Priority access
+    Priority access
   </button>
 </main>
 `;
 
-exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot 'fr') 1`] = `
+exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → tuile grisée avec horaire, non cliquable (snapshot 'fr') 1`] = `
 <main
   role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-8); gap: var(--space-6);"
+  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-6) var(--space-8) var(--space-8); gap: var(--space-6); overflow-y: auto;"
 >
   <header
-    style="display: flex; align-items: center; gap: var(--space-4);"
+    data-testid="kiosk-header-banner"
+    style="display: flex; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-6); background-color: var(--night-2); border-radius: var(--r-lg); box-shadow: var(--shadow-1);"
+  >
+    <div
+      style="display: flex; align-items: center; gap: var(--space-4); min-width: 0;"
+    >
+      <span
+        aria-hidden="true"
+        data-testid="kiosk-header-bank-badge"
+        style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-md); background-color: var(--brand); color: var(--brand-contrast); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 28px; font-weight: 700;"
+      >
+        B
+      </span>
+      <div
+        style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"
+      >
+        <span
+          data-testid="kiosk-header-bank"
+          style="font-size: 18px; font-weight: 600; letter-spacing: var(--tracking-tight); color: var(--ink-muted-inv); text-transform: uppercase; white-space: nowrap;"
+        >
+          Banque Ivoire
+        </span>
+        <span
+          data-testid="kiosk-header-agency"
+          style="font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--ink-inverse); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+        >
+          Cocody Angré
+        </span>
+      </div>
+    </div>
+    <div
+      style="margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;"
+    >
+      <span
+        data-testid="kiosk-header-time"
+        style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-numeric); font-size: 30px; font-weight: 700; color: var(--ink-inverse);"
+      >
+        10:30
+      </span>
+      <span
+        data-testid="kiosk-header-date"
+        style="font-size: 18px; color: var(--ink-muted-inv);"
+      >
+        lundi 13 juillet 2026
+      </span>
+    </div>
+  </header>
+  <div
+    style="display: flex; align-items: baseline; gap: var(--space-4); width: 100%; max-width: 960px; margin: 0px auto;"
   >
     <button
       data-testid="back-btn"
-      style="font-size: 20px; color: var(--ink-inverse); background: none; cursor: pointer; padding: var(--space-2); min-width: 72px; min-height: 72px;"
+      style="font-size: 20px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-width: 72px; min-height: 72px;"
     >
       ← 
       Retour
     </button>
-    <span
-      style="font-size: 28px; color: var(--ink-muted-inv); margin-left: auto;"
-    >
-      FR
-    </span>
-  </header>
-  <h1
-    style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); text-align: center; margin: 0px;"
-  >
-    Quel service souhaitez-vous ?
-  </h1>
-  <div
-    style="width: 100%; max-width: 960px; margin: 0px auto; display: flex; flex-direction: column; gap: var(--space-6); flex: 1 1 0%;"
-  >
     <div
-      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--space-6);"
+      style="flex: 1 1 0%; text-align: center;"
     >
-      <button
-        aria-disabled="true"
-        data-testid="service-card"
-        style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: var(--shadow-1); cursor: not-allowed; display: flex; align-items: center; padding: var(--space-4) var(--space-6); gap: var(--space-6); opacity: 0.4; text-align: left;"
+      <h1
+        style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
+      >
+        Prise de ticket
+      </h1>
+      <p
+        style="font-size: 20px; color: var(--ink-muted-inv); margin: var(--space-1) 0 0;"
+      >
+        Touchez l'opération de votre choix
+      </p>
+    </div>
+    <span
+      aria-hidden="true"
+      style="min-width: 72px;"
+    />
+  </div>
+  <div
+    style="flex: 1 1 0%; display: flex; flex-direction: column; gap: var(--space-8); width: 100%; max-width: 960px; margin: 0px auto;"
+  >
+    <section
+      aria-label="Virement international"
+      data-testid="family-section"
+      style="display: flex; flex-direction: column; gap: var(--space-4);"
+    >
+      <div
+        style="display: flex; align-items: center; gap: var(--space-3);"
       >
         <span
-          data-testid="service-icon"
-          style="flex-shrink: 0; width: 72px; height: 72px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
+          aria-hidden="true"
+          style="width: 6px; height: 28px; border-radius: var(--r-full); background-color: var(--gold); flex-shrink: 0;"
+        />
+        <h2
+          data-testid="family-title"
+          style="font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
         >
-          <svg
-            aria-hidden="true"
-            data-icon="transfer"
-            fill="none"
-            focusable="false"
-            height="40"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="40"
-          >
-            <path
-              d="M4 9h13l-3-3"
-            />
-            <path
-              d="M20 15H7l3 3"
-            />
-          </svg>
-        </span>
-        <div
-          style="display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); flex: 1 1 0%; min-width: 0;"
+          Virement international
+        </h2>
+      </div>
+      <div
+        data-testid="family-grid"
+        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4);"
+      >
+        <button
+          aria-disabled="true"
+          data-testid="service-tile"
+          style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: none; cursor: not-allowed; opacity: 0.4; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); text-align: left;"
         >
           <span
-            data-testid="service-label"
-            style="font-size: 28px; font-weight: 600; color: var(--action-label);"
+            data-testid="operation-tile-icon"
+            style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
           >
-            Virement international
+            <svg
+              aria-hidden="true"
+              data-icon="transfer"
+              fill="none"
+              focusable="false"
+              height="32"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="32"
+            >
+              <path
+                d="M4 9h13l-3-3"
+              />
+              <path
+                d="M20 15H7l3 3"
+              />
+            </svg>
           </span>
           <span
-            data-testid="service-schedule"
-            style="font-size: 20px; color: var(--ink-soft); background-color: var(--surface-2); border-radius: var(--r-full); padding: var(--space-1) var(--space-3);"
+            style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
           >
-            Fermé — lundi 08h00
+            <span
+              data-testid="operation-tile-label"
+              style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--action-label);"
+            >
+              Virement international
+            </span>
+            <span
+              data-testid="service-schedule"
+              style="font-size: 18px; color: var(--ink-soft);"
+            >
+              Fermé — lundi 08h00
+            </span>
           </span>
-        </div>
-      </button>
-    </div>
+        </button>
+      </div>
+    </section>
   </div>
   <button
     data-testid="accessibility-btn"
@@ -223,7 +377,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
         d="M12 12H8l-1 3a4 4 0 1 0 5 4"
       />
     </svg>
-    ♿ Accès prioritaire
+    Accès prioritaire
   </button>
 </main>
 `;

@@ -1,11 +1,17 @@
 /**
- * KIOSK-003 — Tests TDD pour ServicesScreen.tsx
- * Écrits AVANT l'implémentation (phase rouge).
+ * KIOSK-BORNE — Tests de l'écran « Prise de ticket » groupé par familles.
+ *
+ * Refonte : une SECTION par service (famille) avec la grille des tuiles de ses
+ * opérations (chargées en PARALLÈLE via @sigfa/contracts), bandeau d'en-tête
+ * persistant (banque + agence + date/heure vivante), clic tuile → confirmation
+ * DIRECTE. Service sans opération → tuile unique du service. 5 états conservés.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach, afterAll } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
+import { http, HttpResponse } from "msw";
+import { server } from "@/mocks/server";
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -27,37 +33,37 @@ vi.mock("@/hooks/useAccessibilityMode", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useQueueStatus", () => ({
-  useQueueStatus: () => ({ count: 3, estimatedMinutes: 8, isOffline: false }),
-}));
-
-export interface ServiceItem {
-  id: string;
-  name: string;
-  icon: string;
-  estimatedMinutes: number;
-  isOpen: boolean;
-  schedule?: string;
-}
+import { ServicesScreen, type ServiceItem } from "@/components/ServicesScreen";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
 const MOCK_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", icon: "💰", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", icon: "💵", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", icon: "🔄", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", icon: "📋", estimatedMinutes: 15, isOpen: true },
-  { id: "svc-5", name: "Crédit", icon: "🏦", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
+  { id: "svc-1", name: "Caisse", code: "deposit", estimatedMinutes: 5, isOpen: true },
+  { id: "svc-2", name: "Moyens de paiement", code: "card", estimatedMinutes: 8, isOpen: true },
 ];
+
+const CLOSED_SERVICE: ServiceItem = {
+  id: "svc-closed",
+  name: "Crédit",
+  code: "credit",
+  estimatedMinutes: 20,
+  isOpen: false,
+  schedule: "Lu-Ve 09h-17h",
+};
 
 const frMessages = {
   services003: {
-    title: "Quel service souhaitez-vous ?",
+    title: "Prise de ticket",
+    subtitle: "Touchez l'opération de votre choix",
     backButton: "Retour",
     waitEstimate: "~{minutes} min",
-    seeMore: "Voir plus de services",
     closedService: "Fermé — {schedule}",
-    accessibilityButton: "♿ Accès prioritaire",
+    accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
+    loadingMessage: "Chargement des opérations...",
+    errorTitle: "Opérations indisponibles",
+    errorMessage: "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
+    retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
   },
   degraded007: {
@@ -69,14 +75,18 @@ const frMessages = {
 
 const enMessages = {
   services003: {
-    title: "Which service do you need?",
+    title: "Take a ticket",
+    subtitle: "Tap the operation of your choice",
     backButton: "Back",
     waitEstimate: "~{minutes} min",
-    seeMore: "See more services",
     closedService: "Closed — {schedule}",
-    accessibilityButton: "♿ Priority access",
+    accessibilityButton: "Priority access",
     emptyTitle: "No services available",
     emptyMessage: "Please go to reception — a staff member will assist you.",
+    loadingMessage: "Loading operations...",
+    errorTitle: "Operations unavailable",
+    errorMessage: "Unable to load operations. Retry or go to reception.",
+    retryButton: "Retry",
     offlineBanner: "Offline mode",
   },
   degraded007: {
@@ -86,167 +96,185 @@ const enMessages = {
   },
 };
 
-import { ServicesScreen } from "@/components/ServicesScreen";
-import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
+function renderScreen(
+  services: ServiceItem[] = MOCK_SERVICES,
+  { locale = "fr", messages = frMessages }: { locale?: string; messages?: typeof frMessages } = {}
+) {
+  return render(
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      <ServicesScreen
+        services={services}
+        agencyId="agt-001"
+        agencyName="Cocody Angré"
+        bankName="Banque Ivoire"
+      />
+    </NextIntlClientProvider>
+  );
+}
 
-describe("KIOSK-003: ServicesScreen", () => {
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("KIOSK-003: cards rendered height ≥ 96 px, icon 40 px + label 28 px (FR/EN)", () => {
-    const locales = [
+  it("KIOSK-BORNE: une section par famille, tuiles ≥ 96px, icône pastille --brand-soft, libellé ≥ 20px (FR/EN)", async () => {
+    for (const { locale, messages } of [
       { locale: "fr", messages: frMessages },
       { locale: "en", messages: enMessages },
-    ];
+    ]) {
+      const { unmount, container } = renderScreen(MOCK_SERVICES, { locale, messages });
 
-    for (const { locale, messages } of locales) {
-      const { unmount, container } = render(
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <ServicesScreen services={MOCK_SERVICES.slice(0, 4)} agencyId="agt-001" />
-        </NextIntlClientProvider>
-      );
+      // Une section par service, dans l'ordre.
+      const sections = await screen.findAllByTestId("family-section");
+      expect(sections.length, `Sections for ${locale}`).toBe(2);
+      const titles = screen.getAllByTestId("family-title");
+      expect(titles.map((el) => el.textContent)).toEqual(["Caisse", "Moyens de paiement"]);
 
-      const cards = container.querySelectorAll("[data-testid='service-card']");
-      expect(cards.length, `Expected 4 cards for locale ${locale}`).toBe(4);
-
-      cards.forEach((card) => {
-        const cardEl = card as HTMLElement;
-        expect(cardEl.style.minHeight, `Card minHeight for ${locale}`).toBe("96px");
+      // Tuiles d'opérations (4 par famille — handler MSW).
+      const tiles = screen.getAllByTestId("operation-tile");
+      expect(tiles.length, `Tiles for ${locale}`).toBe(8);
+      tiles.forEach((tile) => {
+        expect((tile as HTMLElement).style.minHeight).toBe("96px");
       });
 
-      // v2 : plus d'emoji. Chaque carte porte une icône SVG cohérente
-      // (cercle --brand-soft) au lieu du glyphe emoji.
-      const icons = container.querySelectorAll("[data-testid='service-icon']");
-      expect(icons.length, `Icon count for ${locale}`).toBe(4);
+      // Icône SVG dans une pastille --brand-soft — zéro emoji.
+      const icons = container.querySelectorAll("[data-testid='operation-tile-icon']");
       icons.forEach((icon) => {
         const iconEl = icon as HTMLElement;
-        expect(iconEl.style.backgroundColor, `Icon circle bg for ${locale}`).toBe(
-          "var(--brand-soft)"
-        );
-        expect(
-          iconEl.querySelector("svg"),
-          `SVG icon present for ${locale}`
-        ).toBeInTheDocument();
-        expect(iconEl.textContent, `No emoji glyph for ${locale}`).toBe("");
+        expect(iconEl.style.backgroundColor).toBe("var(--brand-soft)");
+        expect(iconEl.querySelector("svg")).toBeInTheDocument();
+        expect(iconEl.textContent).toBe("");
       });
 
-      const labels = container.querySelectorAll("[data-testid='service-label']");
+      // Libellé lisible ≥ 20px, accents intacts (UTF-8).
+      const labels = screen.getAllByTestId("operation-tile-label");
       labels.forEach((label) => {
-        const labelEl = label as HTMLElement;
-        expect(labelEl.style.fontSize, `Label fontSize for ${locale}`).toBe("28px");
+        expect(parseInt((label as HTMLElement).style.fontSize, 10)).toBeGreaterThanOrEqual(20);
       });
+      expect(screen.getAllByText("Dépôt espèces").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Retrait espèces").length).toBeGreaterThan(0);
 
       unmount();
     }
   });
 
-  it("KIOSK-003: max 4 cards visible, 'see more' button present if > 4 services", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
+  it("KIOSK-BORNE: bandeau d'en-tête persistant — banque (pastille brand), agence, date + heure vivante", async () => {
+    renderScreen();
+    await screen.findAllByTestId("family-section");
 
-    // With 5 services, only 4 cards should be visible initially
-    const cards = container.querySelectorAll("[data-testid='service-card']");
-    expect(cards.length).toBe(4);
-
-    // "See more" button should be present
-    const seeMoreBtn = container.querySelector("[data-testid='see-more-btn']");
-    expect(seeMoreBtn).toBeInTheDocument();
+    const banner = screen.getByTestId("kiosk-header-banner");
+    expect(banner).toBeInTheDocument();
+    expect(screen.getByTestId("kiosk-header-bank").textContent).toBe("Banque Ivoire");
+    expect(screen.getByTestId("kiosk-header-agency").textContent).toBe("Cocody Angré");
+    // Pastille brand avec l'initiale de la banque (texte, jamais d'image).
+    const badge = screen.getByTestId("kiosk-header-bank-badge");
+    expect(badge.textContent).toBe("B");
+    expect((badge as HTMLElement).style.backgroundColor).toBe("var(--brand)");
+    // Date + heure présentes (formats localisés).
+    expect(screen.getByTestId("kiosk-header-time").textContent).toMatch(/\d/);
+    expect(screen.getByTestId("kiosk-header-date").textContent).toMatch(/\d{4}/);
   });
 
-  it("KIOSK-003: queue:updated → estimate updated on card without reload (Socket mock test)", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES.slice(0, 4)} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
+  it("KIOSK-BORNE: clic tuile opération → navigation DIRECTE vers la confirmation (serviceId + operationId + libellé)", async () => {
+    renderScreen();
+    const tiles = await screen.findAllByTestId("operation-tile");
+    fireEvent.click(tiles[0]); // « Dépôt espèces » (op-dep) de la famille Caisse.
 
-    // Queue status is displayed
-    const estimates = container.querySelectorAll("[data-testid='service-estimate']");
-    expect(estimates.length).toBeGreaterThan(0);
-  });
-
-  it("KIOSK-003: CLOSED service → grayed card with schedule, not clickable", () => {
-    const closedService: ServiceItem = {
-      id: "svc-closed",
-      name: "Crédit",
-      icon: "🏦",
-      estimatedMinutes: 20,
-      isOpen: false,
-      schedule: "Lu-Ve 09h-17h",
-    };
-
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={[closedService]} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
-
-    const card = container.querySelector("[data-testid='service-card']") as HTMLElement;
-    expect(card).toBeInTheDocument();
-
-    // Card should be visually grayed out (opacity)
-    expect(card.style.opacity).toBe("0.4");
-
-    // Card should not be clickable (aria-disabled)
-    expect(card.getAttribute("aria-disabled")).toBe("true");
-
-    // Schedule text should be visible
-    expect(container.querySelector("[data-testid='service-schedule']")).toBeInTheDocument();
-  });
-
-  it("KIOSK-003: ♿ button → text +20%, doubled inactivity delay (Vitest)", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
-
-    const a11yBtn = container.querySelector("[data-testid='accessibility-btn']");
-    expect(a11yBtn).toBeInTheDocument();
-
-    // Normal timeout is 30s
-    expect(useInactivityTimeout).toHaveBeenCalledWith(
-      expect.any(Function),
-      30000
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const target = mockPush.mock.calls[0][0] as string;
+    expect(target).toContain("/fr/confirmation?");
+    expect(target).toContain("serviceId=svc-1");
+    expect(target).toContain("operationId=op-dep");
+    expect(target).toContain("agencyId=agt-001");
+    expect(target).toContain(
+      new URLSearchParams({ operationLabel: "Dépôt espèces" }).toString()
     );
   });
 
-  it("KIOSK-003: empty state → human message visible (Testing Library)", () => {
-    render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={[]} agencyId="agt-001" />
-      </NextIntlClientProvider>
+  it("KIOSK-BORNE: service SANS opération → tuile unique du service lui-même (confirmation sans operationId)", async () => {
+    server.use(
+      http.get("*/public/agencies/:agencyId/operations", () =>
+        HttpResponse.json({ data: [] }, { status: 200 })
+      )
     );
+    renderScreen([MOCK_SERVICES[0]]);
 
+    const tile = await screen.findByTestId("service-tile");
+    expect(tile).toBeInTheDocument();
+    expect(screen.queryAllByTestId("operation-tile").length).toBe(0);
+
+    fireEvent.click(tile);
+    const target = mockPush.mock.calls[0][0] as string;
+    expect(target).toContain("serviceId=svc-1");
+    expect(target).not.toContain("operationId=");
+    expect(target).toContain(`operationLabel=${encodeURIComponent("Caisse")}`);
+  });
+
+  it("KIOSK-003: service FERMÉ → tuile grisée avec horaire, non cliquable", async () => {
+    renderScreen([CLOSED_SERVICE]);
+
+    const tile = await screen.findByTestId("service-tile");
+    expect(tile.getAttribute("aria-disabled")).toBe("true");
+    expect((tile as HTMLElement).style.opacity).toBe("0.4");
+    expect(screen.getByTestId("service-schedule").textContent).toContain("Lu-Ve 09h-17h");
+
+    fireEvent.click(tile);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("KIOSK-BORNE: état loading pendant le chargement parallèle des familles", () => {
+    renderScreen();
+    expect(screen.getByTestId("services-loading")).toBeInTheDocument();
+  });
+
+  it("KIOSK-BORNE: échec réseau TOTAL → état error + bandeau offline + bouton réessayer qui recharge", async () => {
+    server.use(
+      http.get("*/public/agencies/:agencyId/operations", () => HttpResponse.error())
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId("services-error")).toBeInTheDocument();
+    expect(screen.getByTestId("offline-banner")).toBeInTheDocument();
+
+    // Réessayer : le réseau revient → sections rendues.
+    server.resetHandlers();
+    fireEvent.click(screen.getByTestId("services-retry"));
+    expect(await screen.findAllByTestId("family-section")).toHaveLength(2);
+  });
+
+  it("KIOSK-003: aucune famille → empty state humain visible", () => {
+    renderScreen([]);
     expect(screen.getByText("Aucun service disponible")).toBeInTheDocument();
     expect(screen.getByText("Rendez-vous à l'accueil — un agent vous aidera.")).toBeInTheDocument();
   });
 
-  it("KIOSK-003: card contrast ≥ 7:1 on --surface-kiosk (CSS token assertion)", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
+  it("KIOSK-003: bouton accessibilité présent + délai d'inactivité nominal 30 s (×2 en mode accessibilité)", async () => {
+    renderScreen();
+    await screen.findAllByTestId("family-section");
 
-    const cards = container.querySelectorAll("[data-testid='service-card']");
-    cards.forEach((card) => {
-      const cardEl = card as HTMLElement;
-      expect(cardEl.style.backgroundColor).toBe("var(--surface-1)");
+    expect(screen.getByTestId("accessibility-btn")).toBeInTheDocument();
+    expect(useInactivityTimeout).toHaveBeenCalledWith(expect.any(Function), 30000);
+  });
 
-      const label = card.querySelector("[data-testid='service-label']") as HTMLElement;
-      expect(label?.style.color).toBe("var(--action-label)");
+  it("KIOSK-003: contraste — tuiles sur --surface-1, libellés --action-label (tokens uniquement)", async () => {
+    renderScreen();
+    const tiles = await screen.findAllByTestId("operation-tile");
+    tiles.forEach((tile) => {
+      expect((tile as HTMLElement).style.backgroundColor).toBe("var(--surface-1)");
+    });
+    screen.getAllByTestId("operation-tile-label").forEach((label) => {
+      expect((label as HTMLElement).style.color).toBe("var(--action-label)");
     });
   });
 
-  // KIOSK-003: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)
+  it("KIOSK-BORNE: retour — le bouton back appelle router.back()", async () => {
+    renderScreen();
+    await screen.findAllByTestId("family-section");
+    fireEvent.click(screen.getByTestId("back-btn"));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
 });
