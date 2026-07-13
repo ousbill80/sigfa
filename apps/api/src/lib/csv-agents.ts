@@ -10,7 +10,7 @@
  * Ce module ne fait AUCUN accès base : il transforme un texte CSV en lignes
  * structurées + erreurs de FORMAT par ligne (email vide, rôle invalide,
  * téléphone non E.164). La création (transaction par ligne, doublons) est du
- * ressort du routeur. Champs entre guillemets supportés (ex. `"FR,DIOULA"`).
+ * ressort du routeur. Champs entre guillemets supportés (ex. `"FR,EN"`).
  *
  * @module
  */
@@ -34,8 +34,11 @@ const VALID_ROLES = new Set([
   "AUDITOR",
 ]);
 
-/** Langues valides (LA LOI `AgentLanguage`). */
-const VALID_LANGUAGES = new Set(["FR", "DIOULA", "BAOULE", "EN"]);
+/**
+ * Langues valides (LA LOI `AgentLanguage`).
+ * Décision PO 2026-07 : DIOULA et BAOULE retirés du périmètre.
+ */
+const VALID_LANGUAGES = new Set(["FR", "EN"]);
 
 /** Regex E.164 : `+`, chiffre 1–9, puis 6 à 14 chiffres. */
 const E164_REGEX = /^\+[1-9]\d{6,14}$/;
@@ -284,7 +287,7 @@ function buildRow(
   };
 }
 
-/** Extrait les langues valides d'un champ `"FR,DIOULA"`, défaut ['FR']. */
+/** Extrait les langues valides d'un champ `"FR,EN"`, défaut ['FR']. */
 function parseLanguages(raw: string): string[] {
   const parsed = raw
     .split(",")

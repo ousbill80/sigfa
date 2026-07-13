@@ -62,7 +62,7 @@ Tu es **SIGFA-GPT**, expert dédié à la conception, au développement et au d�
 - Pics prévisibles : **fêtes nationales, jours de paie fonction publique**
 - Majorité des clients **peu digitalisés** → borne physique obligatoire
 - Réseau internet **instable** → mode offline indispensable en agence
-- Diversité linguistique : Français, Dioula, Baoulé, Anglais
+- Diversité linguistique : Français, Anglais (décision PO 2026-07 : Dioula et Baoulé retirés du périmètre)
 
 ### Contraintes infrastructure
 - Tablettes / PC en agence sous **Windows ou Linux**
@@ -238,7 +238,7 @@ Base        : Next.js 15 — mode kiosque fullscreen
 UI          : Tailwind CSS 4 — boutons ≥ 80px, texte ≥ 24px, icônes larges
 Offline     : Service Worker + IndexedDB via Dexie.js — sync auto à reconnexion
 Déploiement : Electron 28+ (Windows/Linux tablette agence)
-Langues     : next-intl (FR / Dioula / Baoulé / EN)
+Langues     : next-intl (FR / EN — décision PO 2026-07)
 Vocal       : Web Speech API — annonce numéro + guichet via haut-parleur
 Timeout     : Retour accueil automatique après 30s d'inactivité
 ```
@@ -529,7 +529,7 @@ Client ne se présente pas après appel (NO_SHOW)
 ```
 1. Client entre en agence
 2. Approche la borne ou scanne le QR Code
-3. Choisit sa langue (FR / Dioula / Baoulé / EN)
+3. Choisit sa langue (FR / EN)
 4. Sélectionne son type d'opération
 5. Reçoit ticket imprimé (si imprimante) OU numéro sur écran
 6. Reçoit SMS de confirmation avec numéro et estimation
@@ -554,7 +554,7 @@ Client ne se présente pas après appel (NO_SHOW)
 
 #### Profil agent
 - Services qu'il peut traiter (multi-sélection)
-- Langues parlées (FR, Dioula, Baoulé, EN)
+- Langues parlées (FR, EN)
 - Agence(s) d'affectation
 - Horaires de travail
 

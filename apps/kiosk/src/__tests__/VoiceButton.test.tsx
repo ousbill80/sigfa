@@ -83,9 +83,8 @@ const messagesByLocale: Record<string, Record<string, Record<string, string>>> =
     },
     voice008: { playLabel: "Listen" },
   },
-  // Locale synthétique SANS voix TTS native — sert à prouver le repli FR.
-  // (Décision PO : plus de Dioula/Baoulé ; le repli reste vérifié.)
-  dyu: {
+  // Locale synthétique SANS voix TTS native (es) — sert à prouver le repli FR.
+  es: {
     ticket005: {
       voiceAnnounce:
         "Ticket {displayNumber}. Position {position}. {minutes} minutes.",
@@ -165,8 +164,8 @@ describe("KIOSK-008: bouton 🔊 permanent", () => {
   it("KIOSK-008: locale sans voix native → fallback voix FR, zéro erreur visible", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const user = userEvent.setup();
-    mockLocale = "dyu";
-    renderButton("dyu");
+    mockLocale = "es";
+    renderButton("es");
     await user.click(screen.getByTestId("voice-button"));
 
     expect(speakSpy).toHaveBeenCalledTimes(1);

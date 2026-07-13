@@ -78,7 +78,7 @@ export const pushPlatformEnum = pgEnum("push_platform", ["IOS", "ANDROID", "EXPO
  *   par type/canal/langue.
  * - Variables autorisées (`{{number}}`, `{{position}}`, `{{estimate}}`) validées
  *   côté API (CONTRACT-005) ; la base stocke le body sans validation.
- * - `lang` : sous-ensemble des langues supportées (FR/DIOULA/BAOULE/EN — aligné
+ * - `lang` : sous-ensemble des langues supportées (FR/EN — aligné
  *   `AgentLanguage` de LA LOI mais utilisé ici comme code de template).
  *
  * ## Décision d'audit (DB-005)
@@ -102,7 +102,7 @@ export const notificationTemplates = pgTable(
     type: notificationTypeEnum("type").notNull(),
     /** Canal de livraison (LA LOI `NotificationChannel`). */
     channel: notificationChannelEnum("channel").notNull(),
-    /** Langue du template (FR/DIOULA/BAOULE/EN). */
+    /** Langue du template (FR/EN). */
     lang: text("lang").notNull(),
     /**
      * Corps du template.

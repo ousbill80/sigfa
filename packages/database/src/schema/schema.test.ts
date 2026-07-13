@@ -339,9 +339,9 @@ describe("DB-001: schéma cœur Drizzle sur PostgreSQL 16 (Testcontainers)", () 
   });
 
   it("DB-001: jointures de routage réalisables — counter_services × user_services × languages", async () => {
-    // Kofi parle FR+DIOULA et sait traiter OC ; le guichet 1 couvre OC.
+    // Kofi parle FR+EN et sait traiter OC ; le guichet 1 couvre OC.
     await pg.query(
-      `UPDATE users SET languages = '{FR,DIOULA}' WHERE id = '${IDS.agentKofi}'`
+      `UPDATE users SET languages = '{FR,EN}' WHERE id = '${IDS.agentKofi}'`
     );
     await pg.query(
       `INSERT INTO user_services (id, bank_id, user_id, service_id)
@@ -355,14 +355,14 @@ describe("DB-001: schéma cœur Drizzle sur PostgreSQL 16 (Testcontainers)", () 
       `INSERT INTO agency_users (id, bank_id, agency_id, user_id)
        VALUES (gen_random_uuid(), '${IDS.bankA}', '${IDS.agencyA}', '${IDS.agentKofi}')`
     );
-    // Couple attendu : (Kofi, guichet 1, OC), Kofi parlant DIOULA.
+    // Couple attendu : (Kofi, guichet 1, OC), Kofi parlant EN.
     const rows = await pg.query(
       `SELECT u.id AS user_id, cs.counter_id, us.service_id
          FROM user_services us
          JOIN counter_services cs ON cs.service_id = us.service_id
          JOIN users u ON u.id = us.user_id
         WHERE us.service_id = '${IDS.serviceOC}'
-          AND 'DIOULA' = ANY(u.languages)`
+          AND 'EN' = ANY(u.languages)`
     );
     expect(rows.rows.length).toBe(1);
     expect(rows.rows[0]?.user_id).toBe(IDS.agentKofi);

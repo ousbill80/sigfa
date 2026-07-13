@@ -62,7 +62,7 @@ kebab-case fichiers · PascalCase classes · camelCase fonctions · Conventional
 
 ## 8. Design (source : SIGFA_DESIGN_SYSTEM.md)
 
-Tokens uniquement, jamais de valeur en dur · Kiosque : cibles ≥72px, texte ≥24px, contraste ≥7:1, une décision par écran · Theming banque = habillage, jamais structure · 4 langues (FR/Dioula/Baoulé/EN), icône+texte toujours appariés · 5 états par écran (nominal/loading/empty/error/offline).
+Tokens uniquement, jamais de valeur en dur · Kiosque : cibles ≥72px, texte ≥24px, contraste ≥7:1, une décision par écran · Theming banque = habillage, jamais structure · 2 langues (FR/EN — décision PO 2026-07, Dioula/Baoulé retirés), icône+texte toujours appariés · 5 états par écran (nominal/loading/empty/error/offline).
 
 ## 9. Contrats de sortie des subagents
 

@@ -1,7 +1,7 @@
 openapi: "3.1.0"
 info:
   title: SIGFA Admin API
-  version: "1.0.0"
+  version: "2.0.0"
   description: |
     Contrat admin SIGFA : RBAC, configuration banque/agence, theming, templates SMS,
     audit trail (immuable) et droit à l'oubli UEMOA. Servi sous /api/v1.
@@ -84,8 +84,6 @@ paths:
                   background: "#ffffff"
                 welcomeMessages:
                   fr: "Bienvenue à la Banque Nationale de Côte d'Ivoire"
-                  dioula: "Bienvenida BNCI"
-                  baoule: "Akwaba BNCI"
                   en: "Welcome to BNCI"
         "400":
           $ref: "./core.yaml#/components/responses/BadRequest"
@@ -117,7 +115,7 @@ paths:
 
         Messages de bienvenue (`welcomeMessages`) :
         - `fr` : requis, texte brut, max 200 caractères
-        - `dioula`, `baoule`, `en` : optionnels, texte brut, max 200 caractères
+        - `en` : optionnel, texte brut, max 200 caractères
       x-tenant-scope: bank
       x-required-role: BANK_ADMIN
       parameters:
@@ -1489,8 +1487,9 @@ components:
     WelcomeMessages:
       type: object
       description: |
-        Messages de bienvenue en 4 langues (texte brut, max 200 caractères).
-        `fr` est requis. `dioula`, `baoule` et `en` sont optionnels.
+        Messages de bienvenue en 2 langues (texte brut, max 200 caractères).
+        `fr` est requis. `en` est optionnel.
+        Décision PO 2026-07 : Dioula et Baoulé retirés du périmètre.
       additionalProperties: false
       required:
         - fr
@@ -1500,16 +1499,6 @@ components:
           maxLength: 200
           description: Message en français (requis)
           example: "Bienvenue à la Banque Nationale de Côte d'Ivoire"
-        dioula:
-          type: string
-          maxLength: 200
-          description: Message en dioula (optionnel)
-          example: "Bienvenida BNCI"
-        baoule:
-          type: string
-          maxLength: 200
-          description: Message en baoulé (optionnel)
-          example: "Akwaba BNCI"
         en:
           type: string
           maxLength: 200

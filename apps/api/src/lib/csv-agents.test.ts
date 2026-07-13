@@ -86,11 +86,16 @@ describe("API-009: CSV agents — validation par ligne", () => {
 
   it("langues entre guillemets → parsées, défaut FR si vide", () => {
     const result = parseAgentCsv(
-      build([`a@b.ci,A,B,AGENT,AG001,"FR,DIOULA",`, "c@d.ci,C,D,AGENT,,,"])
+      build([`a@b.ci,A,B,AGENT,AG001,"FR,EN",`, "c@d.ci,C,D,AGENT,,,"])
     );
-    expect(result.rows[0]?.languages).toEqual(["FR", "DIOULA"]);
+    expect(result.rows[0]?.languages).toEqual(["FR", "EN"]);
     expect(result.rows[0]?.agencyCode).toBe("AG001");
     expect(result.rows[1]?.languages).toEqual(["FR"]);
+  });
+
+  it("langues retirées du périmètre (DIOULA/BAOULE) → ignorées, repli FR (décision PO 2026-07)", () => {
+    const result = parseAgentCsv(build([`a@b.ci,A,B,AGENT,AG001,"DIOULA,BAOULE",`]));
+    expect(result.rows[0]?.languages).toEqual(["FR"]);
   });
 
   it("lignes valides et invalides coexistent (valides conservées)", () => {

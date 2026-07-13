@@ -15,7 +15,8 @@ import { applyMigrations } from "src/test-support/migrate.js";
  *   - Structure Drizzle in-process (sans base) : colonne présente, nullable, type enum
  *   - Assertion base réelle (Testcontainers PostgreSQL 16) :
  *       · NULL par défaut à l'insertion
- *       · Toutes les valeurs de langue acceptées (FR/DIOULA/BAOULE/EN)
+ *       · Toutes les valeurs de langue acceptées (FR/EN — décision PO 2026-07,
+ *         DIOULA/BAOULE retirés par la migration 0011)
  *       · Valeur hors-enum rejetée par la base
  *       · Mise à jour de la valeur (nullable → valeur → NULL)
  */
@@ -43,9 +44,9 @@ describe("DB-010: tickets.required_language — structure Drizzle (in-process)",
     expect(col?.columnType, "required_language doit être un PgEnumColumn").toBe("PgEnumColumn");
   });
 
-  it("DB-010: agentLanguageEnum porte exactement les 4 valeurs de langue (FR/DIOULA/BAOULE/EN)", () => {
-    expect(agentLanguageEnum.enumValues).toEqual(["FR", "DIOULA", "BAOULE", "EN"]);
-    expect(agentLanguageEnum.enumValues).toHaveLength(4);
+  it("DB-010: agentLanguageEnum porte exactement les 2 valeurs de langue (FR/EN)", () => {
+    expect(agentLanguageEnum.enumValues).toEqual(["FR", "EN"]);
+    expect(agentLanguageEnum.enumValues).toHaveLength(2);
   });
 });
 
@@ -117,30 +118,24 @@ describe("DB-010: tickets.required_language — assertions base réelle (Testcon
     expect(result.rows[0]?.required_language).toBe("FR");
   });
 
-  it("DB-010: required_language accepte DIOULA", async () => {
-    const ticketId = "d0100000-0000-4000-a000-000000000003";
-    await pg.query(
-      `INSERT INTO tickets (id, bank_id, agency_id, queue_id, service_id, number, channel, status, tracking_id, issued_at, required_language)
-       VALUES ('${ticketId}', '${IDS.bank}', '${IDS.agency}', '${IDS.queue}', '${IDS.service}',
-               3, 'KIOSK', 'WAITING', 'db010trk00000000003', now(), 'DIOULA')`
-    );
-    const result = await pg.query(
-      `SELECT required_language FROM tickets WHERE id = '${ticketId}'`
-    );
-    expect(result.rows[0]?.required_language).toBe("DIOULA");
+  it("DB-010: required_language rejette DIOULA (retiré du périmètre — décision PO 2026-07)", async () => {
+    await expect(
+      pg.query(
+        `INSERT INTO tickets (id, bank_id, agency_id, queue_id, service_id, number, channel, status, tracking_id, issued_at, required_language)
+         VALUES (gen_random_uuid(), '${IDS.bank}', '${IDS.agency}', '${IDS.queue}', '${IDS.service}',
+                 3, 'KIOSK', 'WAITING', 'db010trk00000000003', now(), 'DIOULA')`
+      )
+    ).rejects.toThrow();
   });
 
-  it("DB-010: required_language accepte BAOULE", async () => {
-    const ticketId = "d0100000-0000-4000-a000-000000000004";
-    await pg.query(
-      `INSERT INTO tickets (id, bank_id, agency_id, queue_id, service_id, number, channel, status, tracking_id, issued_at, required_language)
-       VALUES ('${ticketId}', '${IDS.bank}', '${IDS.agency}', '${IDS.queue}', '${IDS.service}',
-               4, 'KIOSK', 'WAITING', 'db010trk00000000004', now(), 'BAOULE')`
-    );
-    const result = await pg.query(
-      `SELECT required_language FROM tickets WHERE id = '${ticketId}'`
-    );
-    expect(result.rows[0]?.required_language).toBe("BAOULE");
+  it("DB-010: required_language rejette BAOULE (retiré du périmètre — décision PO 2026-07)", async () => {
+    await expect(
+      pg.query(
+        `INSERT INTO tickets (id, bank_id, agency_id, queue_id, service_id, number, channel, status, tracking_id, issued_at, required_language)
+         VALUES (gen_random_uuid(), '${IDS.bank}', '${IDS.agency}', '${IDS.queue}', '${IDS.service}',
+                 4, 'KIOSK', 'WAITING', 'db010trk00000000004', now(), 'BAOULE')`
+      )
+    ).rejects.toThrow();
   });
 
   it("DB-010: required_language accepte EN", async () => {

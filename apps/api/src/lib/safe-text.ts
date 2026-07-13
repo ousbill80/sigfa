@@ -8,7 +8,7 @@
  * afin d'émettre un 422 déterministe au lieu d'un 500.
  *
  * Autorisés : tab (`\t`), saut de ligne (`\n`), retour chariot (`\r`), et TOUT
- * l'Unicode imprimable — les lettres accentuées FR/Dioula/Baoulé (`é`, `à`, `ô`,
+ * l'Unicode imprimable — les lettres accentuées FR (`é`, `à`, `ô`,
  * `ç`, …) NE SONT PAS filtrées (ce ne sont pas des caractères de contrôle).
  *
  * @module

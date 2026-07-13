@@ -77,5 +77,8 @@ export const roleEnum = pgEnum("role", [
   "AUDITOR",
 ]);
 
-/** Langues parlées par un agent (LA LOI `AgentLanguage`) — données du routage API-004. */
-export const agentLanguageEnum = pgEnum("agent_language", ["FR", "DIOULA", "BAOULE", "EN"]);
+/**
+ * Langues parlées par un agent (LA LOI `AgentLanguage`) — données du routage API-004.
+ * Décision PO 2026-07 : DIOULA et BAOULE retirés du périmètre (migration 0011).
+ */
+export const agentLanguageEnum = pgEnum("agent_language", ["FR", "EN"]);

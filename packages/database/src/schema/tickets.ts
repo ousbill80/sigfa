@@ -121,7 +121,7 @@ export const tickets = pgTable(
     /**
      * Langue préférée du porteur du ticket pour le routage par l'API-004.
      * Nullable — la préférence est optionnelle ; NULL = aucune contrainte de langue.
-     * Valeurs : `FR` | `DIOULA` | `BAOULE` | `EN` (LA LOI `AgentLanguage`).
+     * Valeurs : `FR` | `EN` (LA LOI `AgentLanguage`).
      */
     requiredLanguage: agentLanguageEnum("required_language"),
     /** Horodatage du feedback. */

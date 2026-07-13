@@ -65,7 +65,7 @@ describe("WEB-001: theming", () => {
       expect(css).toContain("--ink-strong:");
     });
 
-    it("generates CSS vars for tenant 2 (BCI - orange brand)", () => {
+    it("generates CSS vars for tenant 2 (SIB - orange brand)", () => {
       const css = generateCSSVars({ brand: "#e65c00" });
       expect(css).toContain("--brand:");
       // Orange is dark enough on white

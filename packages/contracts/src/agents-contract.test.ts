@@ -245,7 +245,8 @@ describe("CONTRACT-004", () => {
     const patchOp = (pathItem as Record<string, unknown>)["patch"] as OperationObject | undefined;
     expect(patchOp, `PATCH ${agentIdPath} doit exister`).toBeDefined();
 
-    // Le schéma AgentProfile doit documenter langues FR|DIOULA|BAOULE|EN
+    // Le schéma AgentProfile doit documenter langues FR|EN
+    // (décision PO 2026-07 : DIOULA et BAOULE retirés du périmètre)
     const schemas = openapi.components?.schemas as Record<string, unknown> | undefined;
     const agentLang = schemas?.["AgentLanguage"] ?? schemas?.["Language"];
     expect(agentLang, "Un schéma de langue agent doit être défini (AgentLanguage ou Language)").toBeDefined();
@@ -253,10 +254,7 @@ describe("CONTRACT-004", () => {
     const langSchema = agentLang as Record<string, unknown>;
     const langEnum = langSchema?.enum as string[] | undefined;
     expect(Array.isArray(langEnum), "AgentLanguage doit avoir un enum").toBe(true);
-    const expectedLangs = ["FR", "DIOULA", "BAOULE", "EN"];
-    for (const l of expectedLangs) {
-      expect(langEnum, `AgentLanguage enum doit contenir ${l}`).toContain(l);
-    }
+    expect(langEnum, "AgentLanguage enum = exactement [FR, EN]").toEqual(["FR", "EN"]);
   });
 
   // ─── Critère additionnel : stats agent ────────────────────────────────────

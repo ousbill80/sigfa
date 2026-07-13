@@ -94,6 +94,13 @@ describe("API-009: theming — appliedColors corrigé ≥4.5:1 + presign R2", ()
     expect(res.status).toBe(422);
   });
 
+  it("API-009: welcomeMessages.dioula/baoule retirés du périmètre → 422 (décision PO 2026-07)", async () => {
+    const res = await req("PATCH", `/banks/${bankA.bankId}/theme`, adminToken, {
+      welcomeMessages: { fr: "Bienvenue", dioula: "Bienvenida", baoule: "Akwaba" },
+    });
+    expect(res.status).toBe(422);
+  });
+
   it("API-009: presign R2 formé quand configuré (stub S3 local)", async () => {
     setR2Env();
     const res = await req("GET", `/banks/${bankA.bankId}/theme/logo-upload-url?contentType=image/png`, adminToken);

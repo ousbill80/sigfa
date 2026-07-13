@@ -64,8 +64,8 @@ describe("KIOSK-008: mapping locale → BCP-47", () => {
   it("KIOSK-008: locale sans voix native → fallback fr-FR", () => {
     // Décision PO : plus de Dioula/Baoulé. Toute locale hors table (ex. langue
     // ivoirienne sans TTS) retombe explicitement sur le repli FR.
-    expect(localeToBcp47("dyu")).toBe("fr-FR");
-    expect(localeToBcp47("bci")).toBe("fr-FR");
+    expect(localeToBcp47("es")).toBe("fr-FR");
+    expect(localeToBcp47("de")).toBe("fr-FR");
   });
 
   it("KIOSK-008: locale inconnue → fallback fr-FR", () => {
@@ -82,18 +82,18 @@ describe("KIOSK-008: sélection de voix avec fallback FR", () => {
 
   it("KIOSK-008: locale sans voix native → fallback voix FR", () => {
     const voices = [makeVoice("fr-FR"), makeVoice("en-US")];
-    const v = pickVoiceForLocale("dyu", voices);
+    const v = pickVoiceForLocale("es", voices);
     expect(v?.lang).toBe("fr-FR");
   });
 
   it("KIOSK-008: seconde locale sans voix native → fallback voix FR", () => {
     const voices = [makeVoice("fr-FR"), makeVoice("en-US")];
-    const v = pickVoiceForLocale("bci", voices);
+    const v = pickVoiceForLocale("de", voices);
     expect(v?.lang).toBe("fr-FR");
   });
 
   it("KIOSK-008: aucune voix disponible → null, sans lever d'erreur", () => {
-    expect(pickVoiceForLocale("dyu", [])).toBeNull();
+    expect(pickVoiceForLocale("es", [])).toBeNull();
   });
 
   it("KIOSK-008: correspondance de préfixe de langue (fr matche fr-CA)", () => {

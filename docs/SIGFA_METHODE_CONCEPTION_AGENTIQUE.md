@@ -143,7 +143,7 @@ Les cinq agents d'exécution suivent le même gabarit avec leur périmètre :
 | `agent-api` | `apps/api/` | Règles Hono + RLS + contrats OpenAPI |
 | `agent-database` | `packages/database/` | Schéma Drizzle, migrations, policies RLS, seed |
 | `agent-web` | `apps/web/` | Next.js 15, shadcn/ui, Zustand, Socket.io client |
-| `agent-kiosk` | `apps/kiosk/` | UX borne (boutons ≥80px), offline Dexie.js, next-intl (FR/Dioula/Baoulé/EN), Web Speech API |
+| `agent-kiosk` | `apps/kiosk/` | UX borne (boutons ≥80px), offline Dexie.js, next-intl (FR/EN), Web Speech API |
 
 Et trois agents de vérification (lecture seule — `tools: Read, Grep, Glob, Bash` sans Write) :
 
@@ -441,8 +441,8 @@ CONDITIONNEL  : SI [condition], ALORS le système doit [réponse]
      localement dans IndexedDB avec numérotation séquentielle garantie."
 
 OPTIONNEL     : LÀ OÙ [feature activée], le système doit [comportement]
-  → "LÀ OÙ la langue Dioula est activée, la borne doit annoncer
-     vocalement le numéro appelé en Dioula."
+  → "LÀ OÙ la langue anglaise est activée, la borne doit annoncer
+     vocalement le numéro appelé en anglais."
 
 INDÉSIRABLE   : SI [condition anormale], le système doit [mitigation]
   → "SI un agent se déconnecte avec un ticket en cours, le système doit

@@ -14,7 +14,7 @@ export interface paths {
         /**
          * Obtenir le profil d'un agent
          * @description Retourne le profil complet d'un agent : services traitables (multi-sélection,
-         *     ids du catalogue), langues parlées (FR | DIOULA | BAOULE | EN), agences
+         *     ids du catalogue), langues parlées (FR | EN), agences
          *     d'affectation et horaires de travail.
          *
          *     Scope **agency** — AGENCY_DIRECTOR ou MANAGER minimum.
@@ -48,8 +48,7 @@ export interface paths {
                          *       "agencyId": "33333333-3333-4333-a333-333333333333",
                          *       "status": "AVAILABLE",
                          *       "languages": [
-                         *         "FR",
-                         *         "DIOULA"
+                         *         "FR"
                          *       ],
                          *       "serviceIds": [
                          *         "77777777-7777-4777-a777-777777777777",
@@ -92,7 +91,7 @@ export interface paths {
         /**
          * Mettre à jour le profil d'un agent
          * @description Mise à jour partielle du profil agent : services traitables (serviceIds),
-         *     langues parlées (FR | DIOULA | BAOULE | EN), agences d'affectation (agencyIds)
+         *     langues parlées (FR | EN), agences d'affectation (agencyIds)
          *     et horaires de travail (workSchedule).
          *
          *     **Marquage conseiller (MODEL-CONTRACT-B, additif — D5)** : `isRelationshipManager`,
@@ -121,7 +120,6 @@ export interface paths {
                      * @example {
                      *       "languages": [
                      *         "FR",
-                     *         "BAOULE",
                      *         "EN"
                      *       ],
                      *       "serviceIds": [
@@ -158,7 +156,6 @@ export interface paths {
                          *       "status": "AVAILABLE",
                          *       "languages": [
                          *         "FR",
-                         *         "BAOULE",
                          *         "EN"
                          *       ],
                          *       "serviceIds": [
@@ -392,8 +389,8 @@ export interface paths {
          *     **Exemple CSV** :
          *     ```csv
          *     email,firstName,lastName,role,agencyCode,languages,phone
-         *     kofi@banque-ci.com,Kofi,Asante,AGENT,AG001,"FR,DIOULA",+2250700000001
-         *     aminata@banque-ci.com,Aminata,Coulibaly,AGENT,AG001,"FR,BAOULE",+2250700000002
+         *     kofi@banque-ci.com,Kofi,Asante,AGENT,AG001,"FR,EN",+2250700000001
+         *     aminata@banque-ci.com,Aminata,Coulibaly,AGENT,AG001,"FR",+2250700000002
          *     ```
          *
          *     **Réponse** : rapport détaillé avec le nombre de lignes créées, ignorées et les
@@ -490,12 +487,13 @@ export interface components {
          *     Utilisées par le moteur de routage de file (API-004) pour le matching
          *     compétence + langue lors de l'attribution des tickets.
          *     - FR : Français
-         *     - DIOULA : Dioula (langue véhiculaire Côte d'Ivoire)
-         *     - BAOULE : Baoulé (langue locale Côte d'Ivoire)
          *     - EN : Anglais
+         *
+         *     Décision PO 2026-07 : DIOULA et BAOULE retirés du périmètre
+         *     (breaking change assumé — voir CHANGELOG du package contracts).
          * @enum {string}
          */
-        AgentLanguage: "FR" | "DIOULA" | "BAOULE" | "EN";
+        AgentLanguage: "FR" | "EN";
         /**
          * @description États de disponibilité de l'agent dans la machine à états SIGFA.
          *
@@ -564,7 +562,7 @@ export interface components {
              * @description Langues parlées par l'agent (au moins une)
              * @example [
              *       "FR",
-             *       "DIOULA"
+             *       "EN"
              *     ]
              */
             languages: components["schemas"]["AgentLanguage"][];

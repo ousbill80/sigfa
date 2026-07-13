@@ -56,12 +56,13 @@ const colorSetSchema = z
   })
   .strict();
 
-/** Messages de bienvenue (LA LOI WelcomeMessages). */
+/**
+ * Messages de bienvenue (LA LOI WelcomeMessages).
+ * Décision PO 2026-07 : dioula et baoule retirés (contrat admin v2.0.0).
+ */
 const welcomeMessagesSchema = z
   .object({
     fr: z.string().max(200),
-    dioula: z.string().max(200).optional(),
-    baoule: z.string().max(200).optional(),
     en: z.string().max(200).optional(),
   })
   .strict();

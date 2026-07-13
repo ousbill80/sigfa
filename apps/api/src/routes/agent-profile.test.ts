@@ -61,20 +61,27 @@ afterAll(async () => {
 describe("API-008: PATCH profil agent + audit", () => {
   it("API-008: DIRECTOR met à jour langues/services/horaires + audit", async () => {
     const res = await req("PATCH", `/agents/${agentId}`, dirToken, {
-      languages: ["FR", "BAOULE"],
+      languages: ["FR", "EN"],
       serviceIds: [serviceId],
       workSchedule: { monday: { start: "09:00", end: "18:00" } },
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { languages: string[]; serviceIds: string[] };
-    expect(body.languages).toEqual(["FR", "BAOULE"]);
+    expect(body.languages).toEqual(["FR", "EN"]);
     expect(body.serviceIds).toContain(serviceId);
     const audit = await h.db.query(
       `SELECT diff FROM audit_log WHERE action='PATCH /agents/:id' AND entity_id=$1`, [agentId]
     );
     expect(audit.rows.length).toBeGreaterThanOrEqual(1);
     const row = audit.rows[audit.rows.length - 1] as { diff: { after: { languages: string[] } } };
-    expect(row.diff.after.languages).toEqual(["FR", "BAOULE"]);
+    expect(row.diff.after.languages).toEqual(["FR", "EN"]);
+  });
+
+  it("API-008: langue retirée du périmètre (BAOULE) → 422 (décision PO 2026-07)", async () => {
+    const res = await req("PATCH", `/agents/${agentId}`, dirToken, {
+      languages: ["FR", "BAOULE"],
+    });
+    expect(res.status).toBe(422);
   });
 
   it("API-008: service inconnu → 422", async () => {

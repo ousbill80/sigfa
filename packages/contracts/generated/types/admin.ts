@@ -50,8 +50,6 @@ export interface paths {
                          *       },
                          *       "welcomeMessages": {
                          *         "fr": "Bienvenue à la Banque Nationale de Côte d'Ivoire",
-                         *         "dioula": "Bienvenida BNCI",
-                         *         "baoule": "Akwaba BNCI",
                          *         "en": "Welcome to BNCI"
                          *       }
                          *     }
@@ -85,7 +83,7 @@ export interface paths {
          *
          *     Messages de bienvenue (`welcomeMessages`) :
          *     - `fr` : requis, texte brut, max 200 caractères
-         *     - `dioula`, `baoule`, `en` : optionnels, texte brut, max 200 caractères
+         *     - `en` : optionnel, texte brut, max 200 caractères
          */
         patch: {
             parameters: {
@@ -1829,8 +1827,9 @@ export interface components {
             background: string;
         };
         /**
-         * @description Messages de bienvenue en 4 langues (texte brut, max 200 caractères).
-         *     `fr` est requis. `dioula`, `baoule` et `en` sont optionnels.
+         * @description Messages de bienvenue en 2 langues (texte brut, max 200 caractères).
+         *     `fr` est requis. `en` est optionnel.
+         *     Décision PO 2026-07 : Dioula et Baoulé retirés du périmètre.
          */
         WelcomeMessages: {
             /**
@@ -1838,16 +1837,6 @@ export interface components {
              * @example Bienvenue à la Banque Nationale de Côte d'Ivoire
              */
             fr: string;
-            /**
-             * @description Message en dioula (optionnel)
-             * @example Bienvenida BNCI
-             */
-            dioula?: string;
-            /**
-             * @description Message en baoulé (optionnel)
-             * @example Akwaba BNCI
-             */
-            baoule?: string;
             /**
              * @description Message en anglais (optionnel)
              * @example Welcome to BNCI

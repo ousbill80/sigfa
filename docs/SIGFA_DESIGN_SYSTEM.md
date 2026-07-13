@@ -28,7 +28,7 @@ Tout est conçu pour le toucher : cibles généreuses, retours immédiats, geste
 Chaque écran pose UNE question ou montre UNE information principale. Si un écran demande deux décisions, c'est deux écrans.
 
 **Loi 4 — Le contexte ivoirien est une donnée de design, pas une contrainte.**
-Lumière de plein soleil sur les bornes, clients pressés en fin de mois, diversité linguistique (FR/Dioula/Baoulé/EN), tous niveaux de littératie numérique. Ce terrain façonne chaque choix : contrastes élevés, icônes universelles, voix de synthèse, pictogrammes systématiques.
+Lumière de plein soleil sur les bornes, clients pressés en fin de mois, diversité linguistique (FR/EN — décision PO 2026-07 : Dioula et Baoulé retirés du périmètre), tous niveaux de littératie numérique. Ce terrain façonne chaque choix : contrastes élevés, icônes universelles, voix de synthèse, pictogrammes systématiques.
 
 **Loi 5 — Chaque banque garde son identité, SIGFA garde sa structure.**
 Le theming par tenant (logo, couleur primaire, ton) change l'habillage — jamais la disposition, les tailles de cibles, ni les parcours. La qualité UX est non-négociable et identique pour toutes les banques.
@@ -157,11 +157,10 @@ Le kiosque est l'interface la plus importante du projet : c'est le premier conta
 │      Choisissez votre langue                │
 │                                             │
 │  ┌──────────────┐  ┌──────────────┐        │
-│  │   Français    │  │    Dioula    │        │  ← 4 cartes égales
+│  │   Français    │  │   English    │        │  ← 2 cartes égales
 │  └──────────────┘  └──────────────┘        │    min 120px de haut
-│  ┌──────────────┐  ┌──────────────┐        │    icône drapeau/motif
-│  │    Baoulé     │  │   English    │        │    + label 28px
-│  └──────────────┘  └──────────────┘        │
+│                                             │    icône drapeau/motif
+│                                             │    + label 28px
 │                                             │
 │  ● file actuelle : 8 personnes en attente   │  ← honnêteté immédiate
 └─────────────────────────────────────────────┘
@@ -370,7 +369,7 @@ Checklist de verdict (chaque item = PASS/FAIL, un FAIL = story REVIEW) :
 - [ ] Un écran = une décision (compter les CTA primaires : max 1)
 - [ ] Tous les états conçus : loading, empty, error, offline (T7 lié)
 - [ ] Icône + texte appariés sur toute action kiosque
-- [ ] i18n : aucun texte en dur, les 4 langues rendues sans débordement
+- [ ] i18n : aucun texte en dur, les 2 langues (FR/EN) rendues sans débordement
 - [ ] prefers-reduced-motion : chaque animation a son fallback
 - [ ] Voix UI : verbes actifs, le bouton dit ce qu'il fait, même nom
       pour la même action sur tout le parcours
@@ -381,9 +380,9 @@ Checklist de verdict (chaque item = PASS/FAIL, un FAIL = story REVIEW) :
 **Stories de design dans le PRD** : chaque écran majeur a une story `DESIGN-xxx` en amont de sa story d'implémentation dans le DAG — wireframe + états + copie validés par gate humain avant que l'agent d'exécution ne code.
 
 **Tests visuels automatisés** (s'ajoute au gate 9 étapes) :
-- Regression visuelle par screenshots (Playwright) sur les écrans clés dans les 4 langues
+- Regression visuelle par screenshots (Playwright) sur les écrans clés dans les 2 langues (FR/EN)
 - Audit de contraste automatisé (axe-core) — build rouge si un ratio passe sous le plancher
-- Test de débordement i18n : les libellés Dioula/Baoulé les plus longs ne cassent aucun layout
+- Test de débordement i18n : les libellés FR/EN les plus longs ne cassent aucun layout
 
 ## 12. La copie est du design
 
@@ -421,7 +420,7 @@ Un écran est terminé quand :
 
 - [ ] Il respecte 100% des tokens (vérifié par design-reviewer)
 - [ ] Ses 5 états existent : nominal, loading, empty, error, offline
-- [ ] Il passe l'audit de contraste automatisé dans les 4 langues
+- [ ] Il passe l'audit de contraste automatisé dans les 2 langues (FR/EN)
 - [ ] Le parcours a été testé au doigt sur écran tactile réel (pas seulement en simulateur)
 - [ ] La copie suit le registre SIGFA et la synthèse vocale a été écoutée
 - [ ] Un utilisateur non-initié accomplit la tâche sans aide en moins de 30 secondes (test de couloir, 3 personnes minimum pour les écrans kiosque)

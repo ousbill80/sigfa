@@ -1,8 +1,8 @@
 /**
  * Tests unitaires — refinement `safeText` anti-caractères de contrôle.
  *
- * Prouve : octet NUL / C0 interdits → rejet ; Unicode accentué (FR/Dioula/
- * Baoulé) préservé ; `\t`/`\n`/`\r` autorisés ; chaînage `.min`/`.max`/
+ * Prouve : octet NUL / C0 interdits → rejet ; Unicode accentué (FR)
+ * préservé ; `\t`/`\n`/`\r` autorisés ; chaînage `.min`/`.max`/
  * `.optional` fonctionnel.
  *
  * @module
@@ -33,12 +33,12 @@ describe("safeText — durcissement anti-octet-NUL / contrôle C0", () => {
     expect(safeText().safeParse("l1\nl2\tfin\r").success).toBe(true);
   });
 
-  it("PRÉSERVE l'Unicode accentué FR/Dioula/Baoulé (non filtré)", () => {
+  it("PRÉSERVE l'Unicode accentué FR (non filtré)", () => {
     for (const s of [
       "Agence Générale Abidjan",
       "Service Épargne",
       "çà ô é à ù î ",
-      "Bɛ na — Dioula",
+      "Cœur d'Ivoire — Yamoussoukro",
     ]) {
       expect(safeText().safeParse(s).success).toBe(true);
     }

@@ -31,7 +31,8 @@ const LA_LOI = {
   PrinterStatus: ["OK", "PAPER_LOW", "ERROR", "OFFLINE"],
   // Role complet de LA LOI (7 valeurs, NONE inclus)
   Role: ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AGENT", "AUDITOR", "NONE"],
-  AgentLanguage: ["FR", "DIOULA", "BAOULE", "EN"],
+  // Décision PO 2026-07 : DIOULA et BAOULE retirés du périmètre (migration 0011)
+  AgentLanguage: ["FR", "EN"],
 } as const;
 
 describe("DB-001: alignement des enums Drizzle ↔ LA LOI", () => {

@@ -195,13 +195,13 @@ describe("CONTRACT-005", () => {
     expect(themeStr, "theme doit contenir appliedColors").toContain("appliedColors");
     expect(themeStr, "theme doit contenir requestedColors").toContain("requestedColors");
 
-    // welcomeMessages avec 4 langues
+    // welcomeMessages avec 2 langues (décision PO 2026-07 : Dioula/Baoulé retirés)
     const adminYaml = readFileSync(ADMIN_YAML_PATH, "utf-8");
     expect(adminYaml, "welcomeMessages doit être défini").toContain("welcomeMessages");
     expect(adminYaml, "welcomeMessages doit avoir fr").toContain("fr:");
-    expect(adminYaml, "welcomeMessages doit avoir dioula").toContain("dioula");
-    expect(adminYaml, "welcomeMessages doit avoir baoule").toContain("baoule");
     expect(adminYaml, "welcomeMessages doit avoir en").toContain("en:");
+    expect(adminYaml, "welcomeMessages ne doit plus avoir dioula:").not.toContain("dioula:");
+    expect(adminYaml, "welcomeMessages ne doit plus avoir baoule:").not.toContain("baoule:");
 
     // GET /banks/{id}/theme/logo-upload-url (R2 2 étapes)
     const logoUpload = getOp("/banks/{id}/theme/logo-upload-url", "get");

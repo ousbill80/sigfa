@@ -88,7 +88,8 @@ const workScheduleSchema = z
 /** Corps de PATCH /agents/:id (LA LOI UpdateAgentProfileRequest). */
 const updateProfileSchema = z
   .object({
-    languages: z.array(z.enum(["FR", "DIOULA", "BAOULE", "EN"])).min(1).optional(),
+    // Décision PO 2026-07 : DIOULA et BAOULE retirés (LA LOI AgentLanguage v2).
+    languages: z.array(z.enum(["FR", "EN"])).min(1).optional(),
     serviceIds: z.array(z.string().uuid()).optional(),
     agencyIds: z.array(z.string().uuid()).optional(),
     workSchedule: workScheduleSchema.optional(),

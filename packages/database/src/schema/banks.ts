@@ -21,7 +21,7 @@ export interface BankTheme {
   requestedColors?: Record<string, string>;
   /** Couleurs effectivement appliquées (après conformité contraste ≥7:1). */
   appliedColors?: Record<string, string>;
-  /** Messages d'accueil localisés (FR/Dioula/Baoulé/EN). */
+  /** Messages d'accueil localisés (FR/EN). */
   welcomeMessages?: Record<string, string>;
   /** URL du logo de la banque. */
   logoUrl?: string;
