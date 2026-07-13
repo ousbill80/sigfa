@@ -26,14 +26,38 @@ export const notificationChannelEnum = pgEnum("notification_channel", [
 ]);
 
 /**
- * Types de messages du parcours client SIGFA (LA LOI `NotificationType`, 4 valeurs).
- * SOURCE : packages/contracts/generated/bundled/notifications.yaml#NotificationType
+ * Types de messages du parcours client SIGFA (LA LOI `NotificationType`, 6 valeurs).
+ * SOURCE : packages/contracts/generated/bundled/{core,admin}.yaml#NotificationType
+ *
+ * `POSITION_NEAR` / `POSITION_NEXT` sont additifs CONTRACT-013 (NOTIF-002/003) :
+ *  - POSITION_NEAR : le client approche (seuil configurable) ;
+ *  - POSITION_NEXT : le client est le suivant. Supprime POSITION_NEAR si trop proche.
+ * Ajoutés par la migration 0012 (à la suite de 0011).
  */
 export const notificationTypeEnum = pgEnum("notification_type", [
   "TICKET_CONFIRMATION",
   "POSITION_UPDATE",
   "YOUR_TURN",
   "DAILY_REPORT",
+  "POSITION_NEAR",
+  "POSITION_NEXT",
+]);
+
+/**
+ * Origine tracée d'un consentement opt-in (LA LOI `ConsentSource`, 5 valeurs — traçabilité UEMOA).
+ * SOURCE : packages/contracts/generated/bundled/notifications.yaml#ConsentSource
+ * Additif CONTRACT-013 — enum fermée, colonne `source` NULLABLE sur `notification_consents`.
+ *  - AGENT / KIOSK / WEB / IMPORT : canaux de saisie usuels ;
+ *  - INBOUND_WHATSAPP : opt-in créé par un message WhatsApp ENTRANT de l'abonné
+ *    (l'utilisateur a initié le contact — base légale UEMOA tracée, NOTIF-003).
+ * Ajouté par la migration 0012.
+ */
+export const consentSourceEnum = pgEnum("consent_source", [
+  "AGENT",
+  "KIOSK",
+  "WEB",
+  "INBOUND_WHATSAPP",
+  "IMPORT",
 ]);
 
 /**
@@ -183,6 +207,11 @@ export const notificationConsents = pgTable(
     optedAt: timestamp("opted_at", { withTimezone: true }),
     /** Horodatage d'opt-out (null si opt-in actif ou jamais opté). */
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /**
+     * Origine tracée du consentement (LA LOI `ConsentSource`, nullable — additif CONTRACT-013).
+     * `INBOUND_WHATSAPP` pour un opt-in créé par un message WhatsApp entrant (NOTIF-003).
+     */
+    source: consentSourceEnum("source"),
     /** Horodatage de création. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Horodatage de dernière mise à jour. */

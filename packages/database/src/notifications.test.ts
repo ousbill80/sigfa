@@ -447,6 +447,8 @@ describe("DB-005 — tables notifications (intégration PG16, Testcontainers)", 
       `);
       expect(typeLabels.rows.map((r) => r.enumlabel)).toEqual([
         "TICKET_CONFIRMATION", "POSITION_UPDATE", "YOUR_TURN", "DAILY_REPORT",
+        // CONTRACT-013 : additifs migration 0012 (ADD VALUE → en fin d'enumsortorder).
+        "POSITION_NEAR", "POSITION_NEXT",
       ]);
 
       const failureLabels = await harness.query(`

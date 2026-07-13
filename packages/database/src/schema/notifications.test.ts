@@ -11,6 +11,7 @@ import {
   notificationStatusEnum,
   notificationFailureReasonEnum,
   pushPlatformEnum,
+  consentSourceEnum,
 } from "./notifications.js";
 
 /**
@@ -27,12 +28,17 @@ import {
 /** Valeurs canoniques LA LOI (contrats bundlés notifications.yaml) */
 const LA_LOI_NOTIFICATIONS = {
   NotificationChannel: ["SMS", "WHATSAPP", "EMAIL", "PUSH"],
+  // CONTRACT-013 : + POSITION_NEAR, POSITION_NEXT (additifs, migration 0012 / NOTIF-002).
   NotificationType: [
     "TICKET_CONFIRMATION",
     "POSITION_UPDATE",
     "YOUR_TURN",
     "DAILY_REPORT",
+    "POSITION_NEAR",
+    "POSITION_NEXT",
   ],
+  // CONTRACT-013 : origine tracée d'un consentement opt-in (migration 0012).
+  ConsentSource: ["AGENT", "KIOSK", "WEB", "INBOUND_WHATSAPP", "IMPORT"],
   NotificationStatus: ["QUEUED", "SENT", "DELIVERED", "FAILED"],
   NotificationFailureReason: [
     "PROVIDER_UNREACHABLE",
@@ -52,9 +58,15 @@ describe("DB-005: enums notifications — alignement LA LOI", () => {
     );
   });
 
-  it("DB-005: NotificationType Drizzle === LA LOI (4 valeurs)", () => {
+  it("DB-005: NotificationType Drizzle === LA LOI (6 valeurs, + POSITION_NEAR/POSITION_NEXT CONTRACT-013)", () => {
     expect(notificationTypeEnum.enumValues).toEqual(
       LA_LOI_NOTIFICATIONS.NotificationType
+    );
+  });
+
+  it("DB-NOTIF: ConsentSource Drizzle === LA LOI (5 valeurs, INBOUND_WHATSAPP inclus)", () => {
+    expect(consentSourceEnum.enumValues).toEqual(
+      LA_LOI_NOTIFICATIONS.ConsentSource
     );
   });
 
@@ -142,6 +154,9 @@ describe("DB-005: modèle notification_consents (structure)", () => {
       "opted_in",
       "opted_at",
       "revoked_at",
+      // DB-NOTIF : traçabilité d'origine (INBOUND_WHATSAPP), consentement par canal
+      // toujours assuré par l'unicité (bank_id, phone_hash, channel).
+      "source",
     ]) {
       expect(names, `colonne ${col}`).toContain(col);
     }

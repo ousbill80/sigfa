@@ -11,6 +11,7 @@ export * from "./users.js";
 export * from "./tickets.js";
 export * from "./audit-log.js";
 export * from "./notifications.js";
+export * from "./whatsapp.js";
 export * from "./reporting.js";
 export * from "./retention.js";
 export * from "./ai.js";

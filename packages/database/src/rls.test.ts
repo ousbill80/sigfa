@@ -18,7 +18,8 @@ import { assertTenantIsolated } from "@sigfa/testing/tenant-isolation";
  * Tables métier attendues avec RLS activé.
  * DB-009 : ajout de banks (SELECT only, REVOKE mutations) et retention_policies.
  * MODEL-DB-A : ajout de operations (RLS FORCE + tenant_isolation, D8).
- * Total : 28 tables (scan exhaustif RLS).
+ * DB-NOTIF : ajout des 3 tables WhatsApp (RLS FORCE + tenant_isolation, migration 0012).
+ * Total : 31 tables (scan exhaustif RLS).
  */
 const BUSINESS_TABLES = [
   // DB-009 : banks avec RLS SELECT only + REVOKE INSERT/UPDATE/DELETE sigfa_app
@@ -45,6 +46,10 @@ const BUSINESS_TABLES = [
   "notification_log",
   "notification_devices",
   "notification_test_recipients",
+  // DB-NOTIF : tables WhatsApp (migration 0012)
+  "whatsapp_config",
+  "whatsapp_menu_mapping",
+  "whatsapp_inbound_messages",
   // DB-006 : tables de reporting
   "daily_agency_stats",
   "export_jobs",

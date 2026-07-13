@@ -290,6 +290,27 @@ describe("DB-003: sans SEED_DEMO → aucune donnée de démo ; avec → tenant c
   );
 
   it(
+    "DB-NOTIF: avec SEED_DEMO=1, ≥1 whatsapp_config + ≥1 whatsapp_menu_mapping pour la banque de démo",
+    async () => {
+      const banks = await harnessB.query(
+        "SELECT id FROM banks WHERE slug LIKE 'demo%' LIMIT 1"
+      );
+      const bankId = String(banks.rows[0]!.id);
+
+      const config = await harnessB.query(
+        `SELECT COUNT(*) AS cnt FROM whatsapp_config WHERE bank_id = '${bankId}' AND enabled = true`
+      );
+      expect(Number(config.rows[0]!.cnt)).toBeGreaterThanOrEqual(1);
+
+      const mapping = await harnessB.query(
+        `SELECT COUNT(*) AS cnt FROM whatsapp_menu_mapping WHERE bank_id = '${bankId}'`
+      );
+      expect(Number(mapping.rows[0]!.cnt)).toBeGreaterThanOrEqual(1);
+    },
+    30_000
+  );
+
+  it(
     "DB-003: SEED_DEMO idempotent — 2ème exécution avec SEED_DEMO n'insère pas de doublon",
     async () => {
       await runSeed(harnessB.query.bind(harnessB), { seedDemo: true });

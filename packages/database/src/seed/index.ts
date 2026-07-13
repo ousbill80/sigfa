@@ -505,6 +505,30 @@ async function seedDefaultNotificationTemplates(
 }
 
 /**
+ * Insère la config WhatsApp Business de la banque de démo (DB-NOTIF, idempotent).
+ * Fournit ≥1 `whatsapp_config` + un mapping menu de démonstration (mot-clé « 1 » →
+ * service OC de l'agence 1). Secret de démo local — jamais un vrai secret de prod.
+ *
+ * @param query - Connexion migrateur (BYPASSRLS)
+ */
+async function seedDemoWhatsAppConfig(query: QueryFn): Promise<void> {
+  await query(`
+    INSERT INTO whatsapp_config (bank_id, business_number, webhook_secret, default_agency_id, enabled)
+    VALUES (
+      '${DEMO_BANK_ID}', '+2250700000000', 'demo-whatsapp-webhook-secret',
+      '${DEMO_AGENCY_1_ID}', true
+    )
+    ON CONFLICT (bank_id) DO NOTHING
+  `);
+  const serviceOcId = generateDemoServiceId(DEMO_AGENCY_1_ID, "OC");
+  await query(`
+    INSERT INTO whatsapp_menu_mapping (bank_id, keyword, service_id)
+    VALUES ('${DEMO_BANK_ID}', '1', '${serviceOcId}')
+    ON CONFLICT (bank_id, keyword) DO NOTHING
+  `);
+}
+
+/**
  * Convertit un hash hex en UUID v4-like déterministe.
  *
  * @param hash - Hash hex de 64 caractères (SHA256)
@@ -595,6 +619,7 @@ async function seedDemoTenant(query: QueryFn): Promise<void> {
   }
 
   await seedDefaultNotificationTemplates(query, DEMO_BANK_ID);
+  await seedDemoWhatsAppConfig(query);
   printDemoPasswords(passwords);
 }
 
