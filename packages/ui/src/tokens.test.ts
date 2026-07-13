@@ -42,6 +42,11 @@ describe("design tokens", () => {
     expect(font.text).toContain("General Sans");
   });
 
+  it("carries a mono stack (audit codes / identifiers)", () => {
+    expect(font.mono).toContain("ui-monospace");
+    expect(font.mono).toContain("monospace");
+  });
+
   it("bundles all groups for a mobile RN theme", () => {
     expect(tokens.color).toBe(color);
     expect(tokens.fontSize).toBe(fontSize);

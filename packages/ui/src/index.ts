@@ -33,6 +33,30 @@ export { Card } from "./components/Card";
 export type { CardProps } from "./components/Card";
 export { Field } from "./components/Field";
 export type { FieldProps } from "./components/Field";
+export { Textarea } from "./components/Textarea";
+export type { TextareaProps } from "./components/Textarea";
+export { Select } from "./components/Select";
+export type { SelectProps, SelectOption } from "./components/Select";
+export { SegmentedControl } from "./components/SegmentedControl";
+export type {
+  SegmentedControlProps,
+  SegmentedOption,
+} from "./components/SegmentedControl";
+export { Spinner } from "./components/Spinner";
+export type { SpinnerProps, SpinnerSize } from "./components/Spinner";
+export {
+  Heading,
+  PageTitle,
+  SectionTitle,
+  Overline,
+} from "./components/Typography";
+export type {
+  HeadingProps,
+  HeadingSize,
+  SectionTitleProps,
+  SectionTitleSize,
+  OverlineProps,
+} from "./components/Typography";
 export { Badge } from "./components/Badge";
 export type { BadgeProps, BadgeTone } from "./components/Badge";
 export { KpiTile } from "./components/KpiTile";
