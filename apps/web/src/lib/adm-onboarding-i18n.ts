@@ -49,6 +49,14 @@ export type AdmOnboardKey =
   | "admOnboard.verify.confirmed"
   // agents step
   | "admOnboard.agents.intro"
+  // cloned-config recap chips (per verify step)
+  | "admOnboard.recap_chip.services"
+  | "admOnboard.recap_chip.sla"
+  | "admOnboard.recap_chip.counters"
+  | "admOnboard.recap_chip.thresholds"
+  | "admOnboard.recap_chip.agents"
+  | "admOnboard.recap_chip.roles"
+  | "admOnboard.recap_chip.cloned"
   // kiosk / QR step
   | "admOnboard.kiosk.intro"
   | "admOnboard.kiosk.provision"
@@ -114,6 +122,13 @@ export const ADM_ONBOARD_FR: AdmOnboardDict = {
   "admOnboard.verify.confirmed": "Vérification confirmée.",
   "admOnboard.agents.intro":
     "Importez les agents de l'agence via un fichier CSV (réutilise l'import agents).",
+  "admOnboard.recap_chip.services": "Services",
+  "admOnboard.recap_chip.sla": "SLA",
+  "admOnboard.recap_chip.counters": "Guichets",
+  "admOnboard.recap_chip.thresholds": "Seuils",
+  "admOnboard.recap_chip.agents": "Agents",
+  "admOnboard.recap_chip.roles": "Rôles",
+  "admOnboard.recap_chip.cloned": "Cloné depuis la source",
   "admOnboard.kiosk.intro":
     "Provisionnez la borne pour obtenir le QR d'installation à scanner depuis la borne.",
   "admOnboard.kiosk.provision": "Provisionner la borne",
@@ -176,6 +191,13 @@ export const ADM_ONBOARD_EN: AdmOnboardDict = {
   "admOnboard.verify.confirmed": "Verification confirmed.",
   "admOnboard.agents.intro":
     "Import the agency's agents from a CSV file (reuses the agents import).",
+  "admOnboard.recap_chip.services": "Services",
+  "admOnboard.recap_chip.sla": "SLA",
+  "admOnboard.recap_chip.counters": "Counters",
+  "admOnboard.recap_chip.thresholds": "Thresholds",
+  "admOnboard.recap_chip.agents": "Agents",
+  "admOnboard.recap_chip.roles": "Roles",
+  "admOnboard.recap_chip.cloned": "Cloned from source",
   "admOnboard.kiosk.intro":
     "Provision the kiosk to get the installation QR to scan from the kiosk.",
   "admOnboard.kiosk.provision": "Provision the kiosk",

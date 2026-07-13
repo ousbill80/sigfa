@@ -45,6 +45,9 @@ export type AdmThemeKey =
   | "admTheme.state_empty"
   | "admTheme.state_error"
   | "admTheme.state_offline"
+  | "admTheme.state_retry"
+  | "admTheme.contrast_requested"
+  | "admTheme.contrast_applied"
   | "admTheme.forbidden";
 
 /** Translation dictionary for the theming console. */
@@ -85,6 +88,9 @@ export const ADM_THEME_FR: AdmThemeDict = {
   "admTheme.state_empty": "Aucune identité configurée pour le moment.",
   "admTheme.state_error": "Impossible de charger l'identité. Veuillez réessayer.",
   "admTheme.state_offline": "Connexion requise pour configurer.",
+  "admTheme.state_retry": "Réessayer",
+  "admTheme.contrast_requested": "Demandée",
+  "admTheme.contrast_applied": "Appliquée",
   "admTheme.forbidden": "Vous n'avez pas les droits pour configurer l'identité de la banque.",
 };
 
@@ -123,6 +129,9 @@ export const ADM_THEME_EN: AdmThemeDict = {
   "admTheme.state_empty": "No identity configured yet.",
   "admTheme.state_error": "Unable to load the identity. Please try again.",
   "admTheme.state_offline": "Connection required to configure.",
+  "admTheme.state_retry": "Retry",
+  "admTheme.contrast_requested": "Requested",
+  "admTheme.contrast_applied": "Applied",
   "admTheme.forbidden": "You do not have permission to configure the bank identity.",
 };
 
