@@ -14,6 +14,11 @@ import {
   type KioskSession,
 } from "@/lib/kiosk-session";
 import { KIOSK_SESSION_CREATE_CHANNEL } from "./kiosk-session-ipc";
+import {
+  KIOSK_PRINT_TICKET_CHANNEL,
+  handleKioskPrintTicket,
+  type PrintableWebContents,
+} from "./kiosk-print-ipc";
 
 /** Configuration de la fenêtre Electron kiosque */
 export const KIOSK_WINDOW_CONFIG = {
@@ -91,6 +96,12 @@ export async function createMainWindow(): Promise<void> {
 
   // S5 : provisionnement de session borne servi par le main process.
   ipcMain.handle(KIOSK_SESSION_CREATE_CHANNEL, () => handleKioskSessionCreate());
+
+  // KIOSK-BORNE : impression SILENCIEUSE du ticket (thermique 80 mm) sur
+  // demande du renderer — imprimante SIGFA_KIOSK_PRINTER (sinon défaut OS).
+  ipcMain.handle(KIOSK_PRINT_TICKET_CHANNEL, (event) =>
+    handleKioskPrintTicket(event.sender as unknown as PrintableWebContents)
+  );
 
   const win = new BrowserWindow({
     ...KIOSK_WINDOW_CONFIG,
