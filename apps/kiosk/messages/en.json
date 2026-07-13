@@ -24,6 +24,7 @@
     "chooseLanguage": "Choose your language",
     "languageFr": "Français",
     "languageEn": "English",
+    "languageName": "English",
     "queueStatus": "Queue: {count} people — estimated wait: {minutes} min",
     "queueUnavailable": "Queue unavailable",
     "offlineBanner": "Offline mode — your tickets remain valid",

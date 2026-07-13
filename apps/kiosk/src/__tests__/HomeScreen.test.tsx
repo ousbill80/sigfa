@@ -10,15 +10,15 @@ import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Catalogues réels : la phrase annoncée doit venir de la clé i18n
-// `choiceModelB.languageChosen` (source unique, pas de chaîne dupliquée).
+// Catalogues réels : le nom de langue annoncé doit venir de la clé i18n
+// `home002.languageName` (source unique, pas de chaîne dupliquée).
 // Même convention de chargement fs qu'i18n.test.ts (messages/ hors src/).
 const MESSAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../messages");
-function languageChosenFromCatalog(locale: string): string {
+function languageNameFromCatalog(locale: string): string {
   const catalog = JSON.parse(
     readFileSync(resolve(MESSAGES_DIR, `${locale}.json`), "utf-8")
-  ) as { choiceModelB: { languageChosen: string } };
-  return catalog.choiceModelB.languageChosen;
+  ) as { home002: { languageName: string } };
+  return catalog.home002.languageName;
 }
 
 // Mock next/navigation
@@ -246,7 +246,7 @@ describe("KIOSK-002: HomeScreen", () => {
       vi.unstubAllGlobals();
     });
 
-    it("KIOSK-002: carte FR → la voix dit « Vous avez choisi Français » en fr-FR (pas le code « fr »)", () => {
+    it("KIOSK-002: carte FR → la voix dit UNIQUEMENT « Français » en fr-FR (pas la phrase affichée, pas le code « fr »)", () => {
       const { container } = render(
         <NextIntlClientProvider locale="fr" messages={frMessages}>
           <HomeScreen />
@@ -258,14 +258,14 @@ describe("KIOSK-002: HomeScreen", () => {
 
       expect(speak).toHaveBeenCalledTimes(1);
       const utterance = speak.mock.calls[0][0] as FakeUtterance;
-      expect(utterance.text).toBe(languageChosenFromCatalog("fr"));
-      expect(utterance.text).toBe("Vous avez choisi Français");
+      expect(utterance.text).toBe(languageNameFromCatalog("fr"));
+      expect(utterance.text).toBe("Français");
       expect(utterance.lang).toBe("fr-FR");
       expect(mockPush).toHaveBeenCalledWith("/fr/choice");
     });
 
-    it("KIOSK-002: carte EN → la voix dit « You have chosen English » en en-US, même depuis un rendu fr", () => {
-      // L'écran est rendu dans la locale COURANTE (fr) : la phrase doit malgré
+    it("KIOSK-002: carte EN → la voix dit UNIQUEMENT « English » en en-US, même depuis un rendu fr", () => {
+      // L'écran est rendu dans la locale COURANTE (fr) : le nom doit malgré
       // tout être dans la langue CHOISIE (en).
       const { container } = render(
         <NextIntlClientProvider locale="fr" messages={frMessages}>
@@ -278,8 +278,8 @@ describe("KIOSK-002: HomeScreen", () => {
 
       expect(speak).toHaveBeenCalledTimes(1);
       const utterance = speak.mock.calls[0][0] as FakeUtterance;
-      expect(utterance.text).toBe(languageChosenFromCatalog("en"));
-      expect(utterance.text).toBe("You have chosen English");
+      expect(utterance.text).toBe(languageNameFromCatalog("en"));
+      expect(utterance.text).toBe("English");
       expect(utterance.lang).toBe("en-US");
       expect(mockPush).toHaveBeenCalledWith("/en/choice");
     });

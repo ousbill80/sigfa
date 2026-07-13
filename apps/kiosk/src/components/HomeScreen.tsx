@@ -14,7 +14,7 @@ import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { localeToBcp47, voiceRate } from "@/lib/kiosk-voice";
 // Catalogues i18n importés en direct : l'annonce vocale doit être dite dans la
 // langue CHOISIE (pas la locale courante de rendu) — source unique = clé
-// `choiceModelB.languageChosen`, même racine `messages/` qu'i18n/request.ts.
+// `home002.languageName`, même racine `messages/` qu'i18n/request.ts.
 /* eslint-disable no-restricted-imports, import/no-relative-parent-imports -- catalogues i18n hors src/ (cf. commentaire ci-dessus), même parade que lib/contracts-realtime.ts */
 import frMessages from "../../messages/fr.json";
 import enMessages from "../../messages/en.json";
@@ -36,10 +36,11 @@ const LANGUAGE_CARDS: LanguageCard[] = [
   { locale: "en", labelKey: "languageEn", icon: "🇬🇧" },
 ];
 
-/** Phrase « langue choisie » par locale (fr → « Vous avez choisi Français »). */
-const LANGUAGE_CHOSEN_ANNOUNCEMENT: Record<string, string> = {
-  fr: frMessages.choiceModelB.languageChosen,
-  en: enMessages.choiceModelB.languageChosen,
+/** Nom parlé de la langue par locale (ajustement PO : la voix dit UNIQUEMENT
+ * « Français » / « English », pas la phrase complète affichée à l'écran). */
+const LANGUAGE_NAME_ANNOUNCEMENT: Record<string, string> = {
+  fr: frMessages.home002.languageName,
+  en: enMessages.home002.languageName,
 };
 
 export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
@@ -59,12 +60,13 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
   }, timeoutMs);
 
   const handleLanguageSelect = (locale: string) => {
-    // Annonce vocale (Web Speech API) : phrase humaine dans la langue choisie,
-    // jamais le code de locale brut (« FR »/« EN »). Repli FR par cohérence
+    // Annonce vocale (Web Speech API) : UNIQUEMENT le nom de la langue choisie
+    // (« Français » / « English »), jamais le code de locale brut ni la phrase
+    // complète affichée à l'écran (ajustement PO). Repli FR par cohérence
     // avec kiosk-voice si une locale inconnue arrivait ici.
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       const text =
-        LANGUAGE_CHOSEN_ANNOUNCEMENT[locale] ?? LANGUAGE_CHOSEN_ANNOUNCEMENT.fr;
+        LANGUAGE_NAME_ANNOUNCEMENT[locale] ?? LANGUAGE_NAME_ANNOUNCEMENT.fr;
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = localeToBcp47(locale);
       utterance.rate = voiceRate(isAccessibilityMode);

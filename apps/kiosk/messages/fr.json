@@ -24,6 +24,7 @@
     "chooseLanguage": "Choisissez votre langue",
     "languageFr": "Français",
     "languageEn": "English",
+    "languageName": "Français",
     "queueStatus": "File d'attente : {count} personnes — attente estimée : {minutes} min",
     "queueUnavailable": "File d'attente non disponible",
     "offlineBanner": "Mode hors connexion — vos tickets restent valables",
