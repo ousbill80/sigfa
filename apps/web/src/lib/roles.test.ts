@@ -114,6 +114,31 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("BANK_ADMIN", "/dashboard/reports")).toBe(true);
     });
 
+    it("NET-001: RBAC SUPER_ADMIN — /platform/network autorisé (console cross-tenant)", () => {
+      expect(canAccess("SUPER_ADMIN", "/platform/network")).toBe(true);
+      expect(canAccess("SUPER_ADMIN", "/platform")).toBe(true);
+    });
+
+    it("NET-001: RBAC BANK_ADMIN — /platform/network retourne 403 (jamais rabaissé à un rôle tenant)", () => {
+      expect(canAccess("BANK_ADMIN", "/platform/network")).toBe(false);
+    });
+
+    it("NET-001: RBAC AGENCY_DIRECTOR — /platform/network retourne 403", () => {
+      expect(canAccess("AGENCY_DIRECTOR", "/platform/network")).toBe(false);
+    });
+
+    it("NET-001: RBAC MANAGER — /platform/network retourne 403", () => {
+      expect(canAccess("MANAGER", "/platform/network")).toBe(false);
+    });
+
+    it("NET-001: RBAC AGENT — /platform/network retourne 403", () => {
+      expect(canAccess("AGENT", "/platform/network")).toBe(false);
+    });
+
+    it("NET-001: RBAC AUDITOR — /platform/network retourne 403", () => {
+      expect(canAccess("AUDITOR", "/platform/network")).toBe(false);
+    });
+
     it("SUPER_ADMIN has access to all routes", () => {
       expect(canAccess("SUPER_ADMIN", "/admin")).toBe(true);
       expect(canAccess("SUPER_ADMIN", "/dashboard/manager")).toBe(true);
