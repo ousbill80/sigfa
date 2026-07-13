@@ -11,6 +11,14 @@ import { useRouter, useParams } from "next/navigation";
 import { useQueueStatus } from "@/hooks/useQueueStatus";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
+import { localeToBcp47, voiceRate } from "@/lib/kiosk-voice";
+// Catalogues i18n importés en direct : l'annonce vocale doit être dite dans la
+// langue CHOISIE (pas la locale courante de rendu) — source unique = clé
+// `choiceModelB.languageChosen`, même racine `messages/` qu'i18n/request.ts.
+/* eslint-disable no-restricted-imports, import/no-relative-parent-imports -- catalogues i18n hors src/ (cf. commentaire ci-dessus), même parade que lib/contracts-realtime.ts */
+import frMessages from "../../messages/fr.json";
+import enMessages from "../../messages/en.json";
+/* eslint-enable no-restricted-imports, import/no-relative-parent-imports */
 
 interface HomeScreenProps {
   /** Override for offline state (useful for testing) */
@@ -27,6 +35,12 @@ const LANGUAGE_CARDS: LanguageCard[] = [
   { locale: "fr", labelKey: "languageFr", icon: "🇫🇷" },
   { locale: "en", labelKey: "languageEn", icon: "🇬🇧" },
 ];
+
+/** Phrase « langue choisie » par locale (fr → « Vous avez choisi Français »). */
+const LANGUAGE_CHOSEN_ANNOUNCEMENT: Record<string, string> = {
+  fr: frMessages.choiceModelB.languageChosen,
+  en: enMessages.choiceModelB.languageChosen,
+};
 
 export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
   const t = useTranslations("home002");
@@ -45,10 +59,15 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
   }, timeoutMs);
 
   const handleLanguageSelect = (locale: string) => {
-    // Web Speech API voice announcement
+    // Annonce vocale (Web Speech API) : phrase humaine dans la langue choisie,
+    // jamais le code de locale brut (« FR »/« EN »). Repli FR par cohérence
+    // avec kiosk-voice si une locale inconnue arrivait ici.
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(locale);
-      utterance.lang = locale === "fr" ? "fr-FR" : "en-US";
+      const text =
+        LANGUAGE_CHOSEN_ANNOUNCEMENT[locale] ?? LANGUAGE_CHOSEN_ANNOUNCEMENT.fr;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = localeToBcp47(locale);
+      utterance.rate = voiceRate(isAccessibilityMode);
       window.speechSynthesis.speak(utterance);
     }
     // MODEL-KIOSK-B : après la langue, la borne offre DEUX chemins clairs

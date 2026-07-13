@@ -3,9 +3,23 @@
  * Écrits AVANT l'implémentation (phase rouge).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Catalogues réels : la phrase annoncée doit venir de la clé i18n
+// `choiceModelB.languageChosen` (source unique, pas de chaîne dupliquée).
+// Même convention de chargement fs qu'i18n.test.ts (messages/ hors src/).
+const MESSAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../messages");
+function languageChosenFromCatalog(locale: string): string {
+  const catalog = JSON.parse(
+    readFileSync(resolve(MESSAGES_DIR, `${locale}.json`), "utf-8")
+  ) as { choiceModelB: { languageChosen: string } };
+  return catalog.choiceModelB.languageChosen;
+}
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -206,6 +220,68 @@ describe("KIOSK-002: HomeScreen", () => {
     expect(cards.length).toBe(2);
     cards.forEach((card) => {
       expect((card as HTMLElement).getAttribute("aria-disabled")).not.toBe("true");
+    });
+  });
+
+  describe("annonce vocale de la langue choisie (Web Speech API)", () => {
+    /** Double minimal de SpeechSynthesisUtterance (jsdom ne l'expose pas). */
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      rate = 1;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+
+    const speak = vi.fn();
+
+    beforeEach(() => {
+      speak.mockClear();
+      vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+      vi.stubGlobal("speechSynthesis", { speak, getVoices: () => [] });
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("KIOSK-002: carte FR → la voix dit « Vous avez choisi Français » en fr-FR (pas le code « fr »)", () => {
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      const cards = container.querySelectorAll("[data-testid='language-card']");
+      fireEvent.click(cards[0]); // carte fr
+
+      expect(speak).toHaveBeenCalledTimes(1);
+      const utterance = speak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.text).toBe(languageChosenFromCatalog("fr"));
+      expect(utterance.text).toBe("Vous avez choisi Français");
+      expect(utterance.lang).toBe("fr-FR");
+      expect(mockPush).toHaveBeenCalledWith("/fr/choice");
+    });
+
+    it("KIOSK-002: carte EN → la voix dit « You have chosen English » en en-US, même depuis un rendu fr", () => {
+      // L'écran est rendu dans la locale COURANTE (fr) : la phrase doit malgré
+      // tout être dans la langue CHOISIE (en).
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      const cards = container.querySelectorAll("[data-testid='language-card']");
+      fireEvent.click(cards[1]); // carte en
+
+      expect(speak).toHaveBeenCalledTimes(1);
+      const utterance = speak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.text).toBe(languageChosenFromCatalog("en"));
+      expect(utterance.text).toBe("You have chosen English");
+      expect(utterance.lang).toBe("en-US");
+      expect(mockPush).toHaveBeenCalledWith("/en/choice");
     });
   });
 
