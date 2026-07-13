@@ -40,6 +40,7 @@ import { createAuditLogRouter } from "src/routes/audit-logs.js";
 import { createDeviceRouter } from "src/routes/devices.js";
 import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
 import { createReportRouter } from "src/routes/reports.js";
+import { createNotificationWebhookRouter } from "src/routes/webhooks-notifications.js";
 import { mountGlobalRateLimits } from "src/config/rate-limits.js";
 import { tenantMiddleware, type TenantContext } from "src/middleware/tenant.js";
 import { validateRouteMapping } from "src/middleware/rbac-route-map.js";
@@ -201,6 +202,10 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
   // + GET /reports/daily/:agencyId. Moteur de calcul PUR (sla-engine), lecture des
   // agrégats matérialisés daily_agency_stats. Champ `partial` (jour figé J+2 07 h Abidjan).
   app.route("/api/v1", createReportRouter());
+
+  // Webhook d'accusé de livraison des notifications (NOTIF-002, CONTRACT-007) —
+  // public (pas de JWT) mais signature fournisseur obligatoire. Routeur isolé.
+  app.route("/api/v1", createNotificationWebhookRouter());
 
   // Handler 404 pour les routes inconnues
   app.notFound((c) =>
