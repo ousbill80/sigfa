@@ -45,6 +45,13 @@ export interface TenantEnv {
     redis: Redis;
     jwtSecret: Uint8Array;
     tenant: TenantContext;
+    /**
+     * SEC-002 — vrai quand la connexion `db` de la requête est DÉJÀ dans une
+     * transaction armée (`withArmedTenant` a posé `app.current_bank_id`). Lu par
+     * `auditContextFrom` pour composer `withAudit` en SAVEPOINT plutôt qu'en
+     * BEGIN/COMMIT concurrent. Absent → chemin SEC-001 historique.
+     */
+    tenantTxOpen?: boolean;
   };
 }
 

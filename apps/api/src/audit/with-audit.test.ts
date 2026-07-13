@@ -67,6 +67,60 @@ describe("SEC-001a: withAudit — atomicité audit↔métier", () => {
     expect(sqls).not.toContain("COMMIT");
   });
 
+  it("SEC-002: composé (inTransaction) → SAVEPOINT/RELEASE, jamais de BEGIN/COMMIT concurrent", async () => {
+    const calls: string[] = [];
+    const query = vi.fn(async (sql: string) => {
+      calls.push(sql.trim().split(/\s+/).slice(0, 3).join(" "));
+      return { rows: [{ id: "audit-1" }] };
+    });
+    const ctx: AuditRequestContext = {
+      db: { query } as unknown as Client,
+      tenant,
+      ip: "41.67.128.1",
+      inTransaction: true,
+    };
+    const result = await withAudit(ctx, async (db) => {
+      await db.query("UPDATE queues SET status = 'PAUSED' WHERE id = '1'");
+      return {
+        result: { ok: true },
+        audit: { action: "PATCH /queues/:id", entityType: "queue", entityId: "1" },
+      };
+    });
+    expect(result).toEqual({ ok: true });
+    const sqls = query.mock.calls.map((c) => String(c[0]));
+    // Compose dans la transaction englobante : savepoint, pas de BEGIN/COMMIT.
+    expect(sqls.some((s) => s.startsWith("SAVEPOINT"))).toBe(true);
+    expect(sqls.some((s) => s.startsWith("RELEASE SAVEPOINT"))).toBe(true);
+    expect(sqls).not.toContain("BEGIN");
+    expect(sqls).not.toContain("COMMIT");
+    expect(sqls.some((s) => s.includes("INSERT INTO audit_log"))).toBe(true);
+  });
+
+  it("SEC-002: composé + échec → ROLLBACK TO SAVEPOINT propagé (l'englobant décide du ROLLBACK global)", async () => {
+    const query = vi.fn(async (sql: string): Promise<{ rows: Record<string, unknown>[] }> => {
+      if (sql.includes("INSERT INTO audit_log")) throw new Error("audit write failed");
+      return { rows: [] };
+    });
+    const ctx: AuditRequestContext = {
+      db: { query } as unknown as Client,
+      tenant,
+      ip: null,
+      inTransaction: true,
+    };
+    await expect(
+      withAudit(ctx, async (db) => {
+        await db.query("UPDATE queues SET status = 'PAUSED' WHERE id = '1'");
+        return {
+          result: { ok: true },
+          audit: { action: "PATCH /queues/:id", entityType: "queue", entityId: "1" },
+        };
+      })
+    ).rejects.toThrow("audit write failed");
+    const sqls = query.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((s) => s.startsWith("ROLLBACK TO SAVEPOINT"))).toBe(true);
+    expect(sqls).not.toContain("COMMIT");
+  });
+
   it("SEC-001a: échec d'écriture d'audit → ROLLBACK propagé (pas de best-effort)", async () => {
     // BEGIN ok, UPDATE ok, INSERT audit_log échoue → ROLLBACK, erreur propagée.
     const query = vi.fn(async (sql: string) => {
