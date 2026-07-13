@@ -18,6 +18,9 @@ export type Role = (typeof ROLES)[number];
 
 /** Route permission matrix — which roles can access which route prefixes */
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
+  // Theming console (ADM-001b): theming = BANK_ADMIN+ incl. AGENCY_DIRECTOR.
+  // Must precede "/admin" so the more specific prefix match wins.
+  "/admin/theming": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR"],
   "/admin": ["SUPER_ADMIN", "BANK_ADMIN"],
   // AUDITOR reaches the manager dashboard in read-only mode (WEB-003).
   "/dashboard/manager": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AUDITOR"],
