@@ -26,6 +26,9 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // Theming console (ADM-001b): theming = BANK_ADMIN+ incl. AGENCY_DIRECTOR.
   // Must precede "/admin" so the more specific prefix match wins.
   "/admin/theming": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR"],
+  // Kiosk supervision (ADM-003b): AGENCY_DIRECTOR+ (AGENT / AUDITOR → 403).
+  // Must precede "/admin" so the more specific prefix match wins.
+  "/admin/kiosks": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR"],
   "/admin": ["SUPER_ADMIN", "BANK_ADMIN"],
   // AUDITOR reaches the manager dashboard in read-only mode (WEB-003).
   "/dashboard/manager": ["SUPER_ADMIN", "BANK_ADMIN", "AGENCY_DIRECTOR", "MANAGER", "AUDITOR"],

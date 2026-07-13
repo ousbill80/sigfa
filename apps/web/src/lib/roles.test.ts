@@ -43,6 +43,17 @@ describe("WEB-001: RBAC", () => {
       expect(canAccess("AGENCY_DIRECTOR", "/dashboard/network")).toBe(true);
     });
 
+    it("ADM-003b: RBAC /admin/kiosks — AGENCY_DIRECTOR+ autorisé (supervision bornes)", () => {
+      expect(canAccess("AGENCY_DIRECTOR", "/admin/kiosks")).toBe(true);
+      expect(canAccess("BANK_ADMIN", "/admin/kiosks")).toBe(true);
+      expect(canAccess("SUPER_ADMIN", "/admin/kiosks")).toBe(true);
+    });
+
+    it("ADM-003b: RBAC /admin/kiosks — AGENT / AUDITOR refusés (403)", () => {
+      expect(canAccess("AGENT", "/admin/kiosks")).toBe(false);
+      expect(canAccess("AUDITOR", "/admin/kiosks")).toBe(false);
+    });
+
     it("SEC-001b: RBAC /audit — AUDITOR et SUPER_ADMIN autorisés (lecture seule)", () => {
       expect(canAccess("AUDITOR", "/audit")).toBe(true);
       expect(canAccess("SUPER_ADMIN", "/audit")).toBe(true);
