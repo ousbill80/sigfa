@@ -48,6 +48,7 @@
   "choiceModelB": {
     "title": "Que souhaitez-vous ?",
     "backButton": "Retour",
+    "languageChosen": "Vous avez choisi Français",
     "operationCard": "Une opération",
     "operationHint": "Dépôt, retrait, virement…",
     "managerCard": "Voir mon conseiller",

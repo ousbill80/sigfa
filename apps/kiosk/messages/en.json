@@ -48,6 +48,7 @@
   "choiceModelB": {
     "title": "What would you like to do?",
     "backButton": "Back",
+    "languageChosen": "You have chosen English",
     "operationCard": "An operation",
     "operationHint": "Deposit, withdrawal, transfer…",
     "managerCard": "See my advisor",

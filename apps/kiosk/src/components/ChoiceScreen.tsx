@@ -79,13 +79,14 @@ export function ChoiceScreen() {
           ← {t("backButton")}
         </button>
         <span
+          data-testid="choice-language-note"
           style={{
-            fontSize: "28px",
+            fontSize: "20px",
             color: "var(--ink-muted-inv)",
             marginLeft: "auto",
           }}
         >
-          {currentLocale.toUpperCase()}
+          {t("languageChosen")}
         </span>
       </header>
 
