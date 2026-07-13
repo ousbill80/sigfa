@@ -1,5 +1,5 @@
 /**
- * TvDisplay — orchestration de l'affichage TV plein écran (TV-001/002 + RT-003).
+ * TvDisplay — orchestration de l'affichage TV split permanent (TV v3 + RT-003).
  *
  * Composant client partagé par `/tv` et `/tv/[agencyId]`. Il choisit la source
  * d'état :
@@ -10,8 +10,10 @@
  *     en mémoire (dernier état du reducer), sinon écran d'attente.
  *   - mode `off` : simulation F4 inchangée (fixtures TV_SEED_STATE).
  *
- * L'habillage premium v2 (« Sérénité Premium ») est intégralement porté par
- * {@link TvScreen} : ce composant n'ajoute QUE la logique de données/connexion.
+ * TV v3 (design-gate PO 2026-07-13, réf. BNI) : plus de bascule repos↔appel —
+ * {@link TvScreen} affiche pub ET colonne d'appels en permanence. Ce composant
+ * n'ajoute QUE la logique de données/connexion + l'horodatage (horloge + date
+ * complète FR/EN). La logique temps réel est INCHANGÉE.
  *
  * @module components/tv/tv-display
  */
@@ -22,7 +24,6 @@ import { useEffect, useMemo, useState } from "react";
 import { TvScreen } from "@/components/tv/tv-screen";
 import { useTvClock } from "@/lib/use-tv-clock";
 import { useTvSimulation } from "@/lib/use-tv-simulation";
-import { useTvMode } from "@/lib/use-tv-mode";
 import { useSocket } from "@/lib/socket-provider";
 import { autoCorrectedBrand } from "@/lib/theme";
 import { TV_SEED_STATE } from "@/lib/tv-fixtures";
@@ -46,7 +47,25 @@ export interface TvDisplayProps {
 }
 
 /**
- * Écran TV plein écran, piloté par le socket (real) ou la simulation (off).
+ * Formate la date complète du bandeau TV (jour de semaine + jour + mois +
+ * année), localisée FR/EN, première lettre capitalisée (le français rend les
+ * jours en minuscules).
+ * @param date - La date à formater.
+ * @param locale - La langue d'affichage.
+ * @returns La date complète localisée (ex. « Lundi 13 juillet 2026 »).
+ */
+export function formatTvDate(date: Date, locale: Locale): string {
+  const formatted = new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+/**
+ * Écran TV split permanent, piloté par le socket (real) ou la simulation (off).
  * @param props - {@link TvDisplayProps}.
  * @returns L'élément d'affichage.
  */
@@ -70,7 +89,13 @@ export function TvDisplay({ tenant }: TvDisplayProps): ReactElement {
     return { ...socket.tv, connection };
   }, [isRealtime, simState, socket.tv, socket.connected, online]);
 
-  const mode = useTvMode({ hasActiveCall: state.hero !== null });
+  // Date complète du bandeau — dérivée du tick horloge (rendu client only,
+  // comme l'horloge : chaîne vide côté serveur → pas de mismatch d'hydratation).
+  const dateLabel = useMemo(
+    () => (clock === "" ? "" : formatTvDate(new Date(), tenant.locale)),
+    [clock, tenant.locale],
+  );
+
   const brand = autoCorrectedBrand(tenant.brand);
 
   return (
@@ -90,8 +115,8 @@ export function TvDisplay({ tenant }: TvDisplayProps): ReactElement {
         locale={tenant.locale}
         tenantName={tenant.name}
         clock={clock}
+        dateLabel={dateLabel}
         celebration={isRealtime ? false : celebration}
-        mode={mode}
       />
     </div>
   );

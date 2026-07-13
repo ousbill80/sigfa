@@ -1,5 +1,7 @@
 /**
- * Tests for AdZone — rendering, slide rotation (fake-timers), overlay, tokens.
+ * Tests for AdZone — rendering, slide rotation (fake-timers), tokens.
+ * TV v3 : l'AdZone vit dans le split permanent sous le bandeau global — elle ne
+ * rend PLUS son propre header (nom banque/horloge portés par TvScreen).
  * @module components/tv/ad-zone.test
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -20,13 +22,18 @@ describe("AdZone — rendu", () => {
     expect(screen.getAllByTestId("tv-adslide")).toHaveLength(DEFAULT_AD_SLIDES.length);
   });
 
-  it("AdZone: overlay banque — nom sur --brand + horloge", () => {
-    render(<AdZone tenantName="Banque du Commerce" clock="14:37:22" />);
-    const overlay = screen.getByTestId("tv-adzone-overlay");
-    expect(within(overlay).getByText("Banque du Commerce")).toBeInTheDocument();
-    const name = within(overlay).getByText("Banque du Commerce");
-    expect(name.getAttribute("style")).toContain("var(--brand)");
-    expect(screen.getByTestId("tv-adzone-clock")).toHaveTextContent("14:37:22");
+  it("TV-V3: pas de header propre — le bandeau global est porté par TvScreen", () => {
+    render(<AdZone />);
+    expect(screen.queryByTestId("tv-adzone-overlay")).toBeNull();
+    expect(screen.queryByTestId("tv-adzone-clock")).toBeNull();
+  });
+
+  it("TV-V3: s'adapte au conteneur — remplit 100% (plus de min-height plein écran)", () => {
+    render(<AdZone />);
+    const root = screen.getByTestId("tv-adzone");
+    const style = root.getAttribute("style") ?? "";
+    expect(style).toContain("height: 100%");
+    expect(style).not.toContain("100vh");
   });
 
   it("AdZone: pied — accueil + « file d'attente en cours »", () => {
@@ -79,17 +86,15 @@ describe("AdZone — rendu", () => {
     expect(style).toContain("text-wrap: balance");
   });
 
-  it("AdZone: grille header / contenu centré / footer — zones distinctes (anti-chevauchement)", () => {
-    render(<AdZone tenantName="Banque du Commerce" clock="14:37:22" />);
+  it("AdZone: grille contenu centré / footer — zones distinctes (anti-chevauchement)", () => {
+    render(<AdZone />);
     // Le contenu (titre/sous-titre) vit dans sa propre rangée centrée, séparée
-    // des overlays haut (header) et bas (footer) → aucun chevauchement possible.
+    // du footer → aucun chevauchement possible.
     const content = screen.getByTestId("tv-adzone-content");
     expect(content).toBeInTheDocument();
     expect(within(content).getByTestId("tv-adslide-title")).toBeInTheDocument();
     const root = screen.getByTestId("tv-adzone");
     expect(root.getAttribute("style")).toContain("grid-template-rows");
-    // Header et footer restent présents et distincts du contenu.
-    expect(within(content).queryByTestId("tv-adzone-overlay")).toBeNull();
     expect(within(content).queryByTestId("tv-adzone-footer")).toBeNull();
   });
 
