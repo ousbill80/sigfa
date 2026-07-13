@@ -1,0 +1,24 @@
+{
+  "uid": "sigfa-kiosks",
+  "title": "SIGFA — Parc bornes",
+  "domain": "kiosks",
+  "schemaVersion": 39,
+  "tags": ["sigfa", "net-003", "kiosks"],
+  "panels": [
+    {
+      "title": "Bornes ONLINE / OFFLINE (dérivé ADM-003)",
+      "type": "stat",
+      "targets": [
+        { "expr": "sum(kiosk_status == 1)", "legendFormat": "online" },
+        { "expr": "sum(kiosk_status == 0)", "legendFormat": "offline" }
+      ]
+    },
+    {
+      "title": "Échecs de rollout (cohérent NET-002)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(kiosk_rollout_failures_total[15m]))", "legendFormat": "échecs" }
+      ]
+    }
+  ]
+}

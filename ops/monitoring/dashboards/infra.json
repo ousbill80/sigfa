@@ -1,0 +1,47 @@
+{
+  "uid": "sigfa-infra",
+  "title": "SIGFA — Infra",
+  "domain": "infra",
+  "schemaVersion": 39,
+  "tags": ["sigfa", "net-003", "infra"],
+  "panels": [
+    {
+      "title": "CPU par service (seuil 80%)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "avg(rate(process_cpu_seconds_total[5m])) by (service)", "legendFormat": "{{service}}" }
+      ]
+    },
+    {
+      "title": "Mémoire par service (seuil 85%)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "process_resident_memory_bytes / node_memory_MemTotal_bytes", "legendFormat": "{{service}}" }
+      ]
+    },
+    {
+      "title": "Pool DB (PgBouncer)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "pgbouncer_pools_client_active_connections", "legendFormat": "actifs" },
+        { "expr": "pgbouncer_pools_client_waiting_connections", "legendFormat": "en attente" }
+      ]
+    },
+    {
+      "title": "Redis",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "redis_connected_clients", "legendFormat": "clients" },
+        { "expr": "redis_memory_used_bytes", "legendFormat": "mémoire" }
+      ]
+    },
+    {
+      "title": "BullMQ — profondeur / retry / dead-letter",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "bullmq_queue_waiting", "legendFormat": "waiting" },
+        { "expr": "bullmq_queue_failed", "legendFormat": "failed" }
+      ]
+    }
+  ]
+}
