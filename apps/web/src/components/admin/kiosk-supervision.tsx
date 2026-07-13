@@ -2,24 +2,34 @@
  * KioskSupervision — kiosk supervision screen (ADM-003b).
  *
  * Two views over the same live state (SILENT-first ordering, calm density):
- *   - agency: a grid of StatusPill cards (ONLINE=--success, DEGRADED=--warning,
- *     SILENT=--danger as a dotted/bordered pill — NEVER a solid red fill, DS v2
- *     §1/§4 — NEVER_SEEN neutral) with a relative "last seen" and an active-alert
- *     counter; silent cards surface on top;
- *   - network: status counters + agencies holding ≥1 silent kiosk, ordered by
- *     severity.
+ *   - agency: a grid of kiosk tiles with a `@sigfa/ui` `Badge` status pill
+ *     (ONLINE=success, DEGRADED=warning, SILENT=danger — a bordered pill, NEVER
+ *     a solid red fill, DS v2 §1/§4 — NEVER_SEEN=info neutral), a human label as
+ *     title and the UUID as faint meta, a relative "last seen" and an
+ *     active-alert counter; silent tiles surface on top;
+ *   - network: status counters (KpiTile — the tile IS the card, no double
+ *     border) + agencies holding ≥1 silent kiosk, ordered by severity, with a
+ *     positive EmptyState when none is silent.
  * Five states covered (loading skeleton / empty / error / stale-offline / ready).
- * Tokens only, zero emoji, icon+label always paired, @sigfa/ui components. The
+ * Tokens only, zero emoji, icon+label always paired, @sigfa/ui primitives. The
  * clock is injected (`nowMs`) so the relative time is deterministic in tests.
  * @module components/admin/kiosk-supervision
  */
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
-import { Badge, Button, Card, EmptyState, KpiTile, OfflineBanner, Skeleton } from "@sigfa/ui";
+import {
+  Badge,
+  EmptyState,
+  KpiTile,
+  OfflineBanner,
+  SectionTitle,
+  SegmentedControl,
+  Skeleton,
+  type BadgeTone,
+} from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 import {
-  statusToken,
   orderBySeverity,
   countStatuses,
   activeAlertCount,
@@ -51,6 +61,14 @@ export interface KioskSupervisionProps {
   nowMs?: number;
 }
 
+/** Design-System Badge tone for a supervision status. */
+const STATUS_TONE: Record<KioskStatus, BadgeTone> = {
+  ONLINE: "success",
+  DEGRADED: "warning",
+  SILENT: "danger",
+  NEVER_SEEN: "info",
+};
+
 /** i18n label for a status. */
 function statusLabel(status: KioskStatus, locale: Locale): string {
   switch (status) {
@@ -66,51 +84,27 @@ function statusLabel(status: KioskStatus, locale: Locale): string {
   }
 }
 
-/** Soft-tinted background derived from a functional token (never a solid fill). */
-const softOf: Record<string, string> = {
-  "var(--success)": "var(--success-soft)",
-  "var(--warning)": "var(--warning-soft)",
-  "var(--danger)": "var(--danger-soft)",
-  "var(--ink-faint)": "var(--surface-2)",
-};
+/** Human label from an id: a friendly noun + short handle (UUID stays as meta). */
+function shortHandle(id: string): string {
+  return id.slice(0, 8);
+}
 
-/**
- * StatusPill style — the functional token drives the dot + border + ink only.
- * `--danger` (SILENT) stays a bordered/dotted pill; the background is a soft tint,
- * NEVER a solid red fill (DS v2 §1/§4).
- */
-const pillStyle = (token: string): CSSProperties => ({
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  padding: "var(--space-1) var(--space-3)",
-  borderRadius: "var(--r-full)",
-  backgroundColor: softOf[token] ?? "var(--surface-2)",
-  border: `1px solid ${token}`,
-  color: "var(--ink)",
-  fontSize: "var(--text-xs)",
-  fontWeight: 600,
-  whiteSpace: "nowrap",
-});
-
-const sectionLabel: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 600,
-  letterSpacing: "var(--tracking-tight)",
-  textTransform: "uppercase",
-  color: "var(--ink-soft)",
-  marginBottom: "var(--space-3)",
+const tileStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+  padding: "var(--space-4)",
+  background: "var(--surface-1)",
+  border: "1px solid var(--hairline)",
+  borderRadius: "var(--r-lg)",
+  boxShadow: "var(--shadow-1)",
 };
 
 const shell: CSSProperties = {
-  padding: "var(--space-6)",
-  maxWidth: "1200px",
-  margin: "0 auto",
-  backgroundColor: "var(--paper)",
+  padding: "var(--space-0)",
 };
 
-/** A single kiosk card in the agency grid. */
+/** A single kiosk tile in the agency grid. */
 function KioskCard({
   kiosk,
   locale,
@@ -120,59 +114,53 @@ function KioskCard({
   locale: Locale;
   nowMs: number;
 }): ReactElement {
-  const token = statusToken(kiosk.status);
   const isSilent = kiosk.status === "SILENT";
   const rel = relativeLastSeen(kiosk.lastSeen, nowMs, locale);
   const label = isSilent
     ? t("admSuper.silent_label", locale)
     : statusLabel(kiosk.status, locale);
   return (
-    <Card
+    <div
       data-testid="kiosk-card"
       data-status={kiosk.status}
       style={{
-        padding: "var(--space-4)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-3)",
+        ...tileStyle,
         borderColor: isSilent ? "var(--danger)" : "var(--hairline)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)" }}>
-        <span
-          data-testid="kiosk-status-pill"
-          role="img"
-          aria-label={label}
-          style={pillStyle(token)}
-        >
-          <span
-            aria-hidden="true"
-            style={{ width: "8px", height: "8px", borderRadius: "var(--r-full)", backgroundColor: token }}
-          />
-          {label}
-        </span>
-      </div>
+      <Badge
+        data-testid="kiosk-status-pill"
+        tone={STATUS_TONE[kiosk.status]}
+        dot
+        role="img"
+        aria-label={label}
+      >
+        {label}
+      </Badge>
+      {/* Human label as title, UUID demoted to faint meta. */}
       <span
         style={{
           fontFamily: "var(--font-display)",
           fontWeight: 600,
           color: "var(--ink)",
-          fontVariantNumeric: "tabular-nums",
-          fontSize: "var(--text-sm)",
+          fontSize: "var(--text-md)",
         }}
       >
-        {kiosk.kioskId.slice(0, 8)}
+        {t("admSuper.kiosk_label", locale)} · {shortHandle(kiosk.kioskId)}
+      </span>
+      <span style={{ fontSize: "var(--text-xs)", color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>
+        {t("admSuper.id_meta", locale)} : {kiosk.kioskId}
       </span>
       <span style={{ fontSize: "var(--text-xs)", color: "var(--ink-soft)" }}>
         {rel
           ? `${t("admSuper.last_seen", locale)} · ${rel}`
           : t("admSuper.never_seen_hint", locale)}
       </span>
-    </Card>
+    </div>
   );
 }
 
-/** Counter tiles shared by both views. */
+/** Counter tiles shared by both views — KpiTile IS the card (no Card wrapper). */
 function CounterRow({
   kiosks,
   locale,
@@ -192,19 +180,27 @@ function CounterRow({
         marginBottom: "var(--space-8)",
       }}
     >
-      <Card style={{ padding: "var(--space-4)" }}>
-        <KpiTile label={t("admSuper.count.online", locale)} value={String(counts.online)} />
-      </Card>
-      <Card style={{ padding: "var(--space-4)" }}>
-        <KpiTile label={t("admSuper.count.degraded", locale)} value={String(counts.degraded)} />
-      </Card>
-      <Card style={{ padding: "var(--space-4)" }}>
-        <KpiTile label={t("admSuper.count.silent", locale)} value={String(counts.silent)} />
-      </Card>
-      <Card style={{ padding: "var(--space-4)" }}>
-        <KpiTile label={t("admSuper.count.never_seen", locale)} value={String(counts.neverSeen)} />
-      </Card>
+      <KpiTile label={t("admSuper.count.online", locale)} value={String(counts.online)} />
+      <KpiTile label={t("admSuper.count.degraded", locale)} value={String(counts.degraded)} />
+      <KpiTile label={t("admSuper.count.silent", locale)} value={String(counts.silent)} />
+      <KpiTile label={t("admSuper.count.never_seen", locale)} value={String(counts.neverSeen)} />
     </section>
+  );
+}
+
+/** Small triangle glyph for the error EmptyState (icon+text pairing). */
+function WarnGlyph(): ReactElement {
+  return (
+    <svg width="28" height="28" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 1.5 15 14H1L8 1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path d="M8 6v3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="8" cy="11.5" r="0.85" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -232,11 +228,11 @@ export function KioskSupervision({
   if (load === "loading") {
     return (
       <div data-testid="supervision-skeleton" aria-busy="true" style={shell}>
-        <Skeleton style={{ height: "44px", marginBottom: "var(--space-6)" }} />
+        <Skeleton style={{ height: "2.75rem", marginBottom: "var(--space-6)" }} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-4)" }}>
-          <Skeleton style={{ height: "120px" }} />
-          <Skeleton style={{ height: "120px" }} />
-          <Skeleton style={{ height: "120px" }} />
+          <Skeleton style={{ height: "7.5rem" }} />
+          <Skeleton style={{ height: "7.5rem" }} />
+          <Skeleton style={{ height: "7.5rem" }} />
         </div>
       </div>
     );
@@ -245,11 +241,9 @@ export function KioskSupervision({
   if (load === "error") {
     return (
       <div style={shell}>
-        <Card data-testid="supervision-error" role="alert" style={{ padding: "var(--space-8)", textAlign: "center", color: "var(--ink)" }}>
-          <p style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-lg)", fontWeight: 600 }}>
-            {t("admSuper.error", locale)}
-          </p>
-        </Card>
+        <div data-testid="supervision-error" role="alert">
+          <EmptyState icon={<WarnGlyph />} title={t("admSuper.error", locale)} />
+        </div>
       </div>
     );
   }
@@ -257,22 +251,20 @@ export function KioskSupervision({
   if (load === "empty" || state.kiosks.length === 0) {
     return (
       <div style={shell}>
-        <Card style={{ padding: "var(--space-8)" }}>
-          <EmptyState
-            data-testid="supervision-empty"
-            title={t("admSuper.empty", locale)}
-            action={
-              <a
-                data-testid="supervision-empty-cta"
-                href={ONBOARDING_HREF}
-                className="sig-btn sig-btn--primary sig-btn--md"
-                style={{ textDecoration: "none" }}
-              >
-                {t("admSuper.empty_cta", locale)}
-              </a>
-            }
-          />
-        </Card>
+        <EmptyState
+          data-testid="supervision-empty"
+          title={t("admSuper.empty", locale)}
+          action={
+            <a
+              data-testid="supervision-empty-cta"
+              href={ONBOARDING_HREF}
+              className="sig-btn sig-btn--primary sig-btn--md"
+              style={{ textDecoration: "none" }}
+            >
+              {t("admSuper.empty_cta", locale)}
+            </a>
+          }
+        />
       </div>
     );
   }
@@ -318,39 +310,24 @@ export function KioskSupervision({
       )}
 
       {networkEnabled && (
-        <nav
-          role="tablist"
-          aria-label={t("admSuper.title", locale)}
-          style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-6)" }}
-        >
-          <Button
-            role="tab"
-            aria-selected={view === "agency"}
-            data-testid="view-agency"
-            variant={view === "agency" ? "primary" : "secondary"}
-            size="dense"
-            onClick={() => setView("agency")}
-          >
-            {t("admSuper.view.agency", locale)}
-          </Button>
-          <Button
-            role="tab"
-            aria-selected={view === "network"}
-            data-testid="view-network"
-            variant={view === "network" ? "primary" : "secondary"}
-            size="dense"
-            onClick={() => setView("network")}
-          >
-            {t("admSuper.view.network", locale)}
-          </Button>
-        </nav>
+        <div style={{ marginBottom: "var(--space-6)" }}>
+          <SegmentedControl
+            ariaLabel={t("admSuper.title", locale)}
+            value={view}
+            onChange={(v) => setView(v === "network" ? "network" : "agency")}
+            options={[
+              { value: "agency", label: t("admSuper.view.agency", locale) },
+              { value: "network", label: t("admSuper.view.network", locale) },
+            ]}
+          />
+        </div>
       )}
 
       <CounterRow kiosks={state.kiosks} locale={locale} />
 
       {view === "agency" || !networkEnabled ? (
         <section aria-label={t("admSuper.view.agency", locale)}>
-          <div style={sectionLabel}>{t("admSuper.view.agency", locale)}</div>
+          <SectionTitle style={{ marginBottom: "var(--space-3)" }}>{t("admSuper.view.agency", locale)}</SectionTitle>
           <div
             data-testid="kiosk-grid"
             style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-4)" }}
@@ -362,35 +339,63 @@ export function KioskSupervision({
         </section>
       ) : (
         <section data-testid="network-view" aria-label={t("admSuper.view.network", locale)}>
-          <div style={sectionLabel}>{t("admSuper.network.agencies", locale)}</div>
+          <SectionTitle style={{ marginBottom: "var(--space-3)" }}>{t("admSuper.network.agencies", locale)}</SectionTitle>
           {rollup.length === 0 ? (
-            <Card data-testid="network-no-silent" style={{ padding: "var(--space-6)", color: "var(--ink-soft)" }}>
-              {t("admSuper.network.no_silent", locale)}
-            </Card>
+            <div data-testid="network-no-silent">
+              <EmptyState
+                icon={
+                  <span style={{ color: "var(--forest)" }}>
+                    <CheckGlyph />
+                  </span>
+                }
+                title={t("admSuper.network.no_silent", locale)}
+              />
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               {rollup.map((r) => (
-                <Card
+                <div
                   key={r.agencyId}
                   data-testid="network-agency-row"
-                  style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", padding: "var(--space-4)" }}
+                  style={{ ...tileStyle, flexDirection: "row", alignItems: "center", gap: "var(--space-4)" }}
                 >
                   <Badge tone="danger" dot>
                     {r.counts.silent} {t("admSuper.count.silent", locale)}
                   </Badge>
-                  <span style={{ fontWeight: 600, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
-                    {r.agencyId.slice(0, 8)}
-                  </span>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontWeight: 600, color: "var(--ink)", fontSize: "var(--text-md)" }}>
+                      {t("admSuper.agency_label", locale)} · {shortHandle(r.agencyId)}
+                    </span>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>
+                      {t("admSuper.id_meta", locale)} : {r.agencyId}
+                    </span>
+                  </div>
                   <span style={{ marginLeft: "auto", fontSize: "var(--text-xs)", color: "var(--ink-soft)" }}>
                     {r.counts.online} {t("admSuper.count.online", locale)} ·{" "}
                     {r.counts.degraded} {t("admSuper.count.degraded", locale)}
                   </span>
-                </Card>
+                </div>
               ))}
             </div>
           )}
         </section>
       )}
     </div>
+  );
+}
+
+/** Positive check glyph for the "no silent kiosk" EmptyState (forest tone). */
+function CheckGlyph(): ReactElement {
+  return (
+    <svg width="28" height="28" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M5 8.2 7 10.2 11 6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

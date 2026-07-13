@@ -24,7 +24,19 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { Badge, Button, Card, EmptyState, Field, Skeleton, Stepper } from "@sigfa/ui";
+import QRCode from "qrcode";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Heading,
+  Overline,
+  SegmentedControl,
+  Skeleton,
+  Stepper,
+} from "@sigfa/ui";
 import {
   ADM_ONBOARDING_STEPS,
   ADM_ONBOARDING_STEP_COUNT,
@@ -106,39 +118,11 @@ const STEP_LABEL: Record<AdmOnboardingStep, AdmOnboardKey> = {
   kiosk: "admOnboard.step.kiosk",
 };
 
-const overlineStyle: CSSProperties = {
-  fontFamily: "var(--font-text)",
-  fontSize: "var(--text-xs)",
-  fontWeight: 600,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--ink-faint)",
-  margin: "0 0 var(--space-2)",
-};
-
-const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "var(--text-2xl)",
-  fontWeight: 600,
-  color: "var(--ink)",
-  margin: "0 0 var(--space-2)",
-};
-
 const subtitleStyle: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--ink-soft)",
   margin: "0 0 var(--space-6)",
   maxWidth: "48rem",
-};
-
-const noticeStyle: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  color: "var(--ink-soft)",
-  background: "var(--surface-2)",
-  border: "1px solid var(--hairline)",
-  borderRadius: "var(--r-md)",
-  padding: "var(--space-3) var(--space-4)",
-  margin: "0 0 var(--space-6)",
 };
 
 const stepPanelStyle: CSSProperties = {
@@ -270,10 +254,12 @@ export function AdmOnboardingStepper(props: AdmOnboardingStepperProps): ReactEle
 
   return (
     <section data-testid="adm-onboard-stepper" aria-label={tr("admOnboard.title")} style={{ padding: "var(--space-8)" }}>
-      <p style={overlineStyle}>{tr("admOnboard.step_of")}</p>
-      <h1 style={titleStyle}>{tr("admOnboard.title")}</h1>
+      <Overline>{tr("admOnboard.step_of")}</Overline>
+      <Heading size="xl" style={{ margin: "var(--space-1) 0 var(--space-2)" }}>
+        {tr("admOnboard.title")}
+      </Heading>
       <p style={subtitleStyle}>{tr("admOnboard.subtitle")}</p>
-      <p style={noticeStyle}>{tr("admOnboard.target_notice")}</p>
+      <p className="adm-notice">{tr("admOnboard.target_notice")}</p>
 
       {/* Global chronometer + < 2h indicator */}
       <div
@@ -321,20 +307,12 @@ export function AdmOnboardingStepper(props: AdmOnboardingStepperProps): ReactEle
 
       {/* Inline error / loading feedback */}
       {state.view === "error" && state.error && (
-        <p
-          data-testid="adm-onboard-error"
-          role="alert"
-          style={{
-            color: "var(--danger)",
-            background: "var(--danger-soft, var(--surface-2))",
-            border: "1px solid var(--danger)",
-            borderRadius: "var(--r-md)",
-            padding: "var(--space-3) var(--space-4)",
-            marginBottom: "var(--space-4)",
-          }}
-        >
-          {state.error}
-        </p>
+        <div data-testid="adm-onboard-error" role="alert" className="adm-danger-note">
+          <span className="adm-danger-note__icon">
+            <DangerGlyph />
+          </span>
+          <span>{state.error}</span>
+        </div>
       )}
       {state.view === "loading" && (
         <Skeleton data-testid="adm-onboard-loading" style={{ height: "1.5rem", marginBottom: "var(--space-4)" }} />
@@ -446,31 +424,21 @@ function CloneStep(props: {
         value={props.name}
         onChange={(e) => props.onName(e.target.value)}
       />
-      <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
-        <legend style={{ fontSize: "var(--text-sm)", color: "var(--ink-soft)", marginBottom: "var(--space-2)" }}>
+      <div>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--ink-soft)", marginBottom: "var(--space-2)" }}>
           {tr("admOnboard.clone.source_label")}
-        </legend>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)", marginRight: "var(--space-4)" }}>
-          <input
-            type="radio"
-            name="adm-clone-source"
-            data-testid="adm-clone-source-template"
-            checked={props.sourceKind === "template"}
-            onChange={() => props.onSourceKind("template")}
-          />
-          {tr("admOnboard.clone.source_template")}
-        </label>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
-          <input
-            type="radio"
-            name="adm-clone-source"
-            data-testid="adm-clone-source-agency"
-            checked={props.sourceKind === "agency"}
-            onChange={() => props.onSourceKind("agency")}
-          />
-          {tr("admOnboard.clone.source_agency")}
-        </label>
-      </fieldset>
+        </p>
+        <SegmentedControl
+          data-testid="adm-clone-source"
+          ariaLabel={tr("admOnboard.clone.source_label")}
+          value={props.sourceKind}
+          onChange={(v) => props.onSourceKind(v === "agency" ? "agency" : "template")}
+          options={[
+            { value: "template", label: tr("admOnboard.clone.source_template") },
+            { value: "agency", label: tr("admOnboard.clone.source_agency") },
+          ]}
+        />
+      </div>
       <Field
         id="adm-clone-template"
         data-testid="adm-clone-template"
@@ -516,10 +484,25 @@ function VerifyStep(props: {
       : step === "counters"
         ? "admOnboard.verify.counters"
         : "admOnboard.agents.intro";
+  const chips: AdmOnboardKey[] = STEP_RECAP_CHIPS[step];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <p style={stepBodyLead}>{tr(STEP_LABEL_FOR[step])}</p>
       <p style={{ fontSize: "var(--text-sm)", color: "var(--ink-soft)", margin: 0 }}>{tr(intro)}</p>
+      {/* Cloned-config recap — concrete chips, never a hollow paragraph. */}
+      <div
+        data-testid={`adm-verify-recap-${step}`}
+        style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "center" }}
+      >
+        {chips.map((k) => (
+          <Badge key={k} tone="brand">
+            {tr(k)}
+          </Badge>
+        ))}
+        <Badge tone="success" dot>
+          {tr("admOnboard.recap_chip.cloned")}
+        </Badge>
+      </div>
       <div>
         <Button type="button" variant="secondary" data-testid="adm-verify-confirm" onClick={props.onConfirm}>
           {tr("admOnboard.verify.confirm")}
@@ -533,6 +516,13 @@ function VerifyStep(props: {
     </div>
   );
 }
+
+/** Cloned-config recap chips per verify step. */
+const STEP_RECAP_CHIPS: Record<"services" | "counters" | "agents", AdmOnboardKey[]> = {
+  services: ["admOnboard.recap_chip.services", "admOnboard.recap_chip.sla"],
+  counters: ["admOnboard.recap_chip.counters", "admOnboard.recap_chip.thresholds"],
+  agents: ["admOnboard.recap_chip.agents", "admOnboard.recap_chip.roles"],
+};
 
 /** Step-label lookup restricted to the verify steps (typed helper). */
 const STEP_LABEL_FOR: Record<"services" | "counters" | "agents", AdmOnboardKey> = {
@@ -579,7 +569,7 @@ function KioskStep(props: {
             alignItems: "center",
             gap: "var(--space-3)",
             padding: "var(--space-6)",
-            background: "var(--surface-0, #fff)",
+            background: "var(--surface-1)",
             border: "1px solid var(--hairline)",
             borderRadius: "var(--r-lg)",
           }}
@@ -623,24 +613,49 @@ function KioskStep(props: {
   );
 }
 
+/** QR pixel size (printable) — a plain number, not a CSS length literal. */
+const QR_PIXELS = 280;
+
 /**
- * QR image. Renders a large, printable QR via a public quickchart endpoint when
- * available; the enrollment URL is always shown as accessible text so the code
- * is never the only channel (icon+text pairing, WCAG). The QR encodes the
+ * QR image — generated LOCALLY (lib `qrcode`) as a client-side data-URL. No
+ * third-party endpoint (offline-friendly, RGPD): the enrollment URL never
+ * leaves the browser. The URL is always shown as accessible text so the code is
+ * never the only channel (icon+text pairing, WCAG). The QR encodes the
  * enrollment URL only — never the raw token.
  */
 function QrImage(props: { value: string; label: string }): ReactElement {
-  const src = `https://quickchart.io/qr?size=280&text=${encodeURIComponent(props.value)}`;
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void QRCode.toDataURL(props.value, { width: QR_PIXELS, margin: 1, errorCorrectionLevel: "M" })
+      .then((url) => {
+        if (active) setDataUrl(url);
+      })
+      .catch(() => {
+        if (active) setDataUrl(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [props.value]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--space-2)" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         data-testid="adm-kiosk-qr"
-        src={src}
+        src={dataUrl ?? undefined}
         alt={props.label}
-        width={280}
-        height={280}
-        style={{ width: "280px", height: "280px", borderRadius: "var(--r-md)", border: "1px solid var(--hairline)", background: "#fff" }}
+        width={QR_PIXELS}
+        height={QR_PIXELS}
+        style={{
+          width: `${QR_PIXELS / 16}rem`,
+          height: `${QR_PIXELS / 16}rem`,
+          borderRadius: "var(--r-md)",
+          border: "1px solid var(--hairline)",
+          background: "var(--surface-1)",
+        }}
       />
       <code style={{ fontSize: "var(--text-xs)", color: "var(--ink-faint)", wordBreak: "break-all", maxWidth: "24rem", textAlign: "center" }}>
         {props.value}
@@ -660,12 +675,18 @@ function Recap(props: {
   return (
     <Card
       data-testid="adm-onboard-recap"
-      style={{ marginTop: "var(--space-6)", padding: "var(--space-6)", borderColor: "var(--success)" }}
+      style={{
+        marginTop: "var(--space-6)",
+        padding: "var(--space-8)",
+        borderRadius: "var(--r-xl)",
+        borderTop: "3px solid var(--gold)",
+        background: "var(--gold-soft)",
+      }}
     >
-      <p style={overlineStyle}>{tr("admOnboard.recap.title")}</p>
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <Badge tone="success">{tr("admOnboard.recap.operational")}</Badge>
-      </div>
+      <Overline>{tr("admOnboard.recap.title")}</Overline>
+      <Heading size="xl" style={{ margin: "var(--space-1) 0 var(--space-4)", color: "var(--forest)" }}>
+        {tr("admOnboard.recap.operational")}
+      </Heading>
       <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-2) var(--space-4)", margin: 0 }}>
         <DtDd term={tr("admOnboard.recap.total_duration")}>
           <strong data-testid="adm-onboard-total-duration" style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -676,6 +697,22 @@ function Recap(props: {
         {props.kioskId && <DtDd term={tr("admOnboard.recap.kiosk_id")}>{props.kioskId}</DtDd>}
       </dl>
     </Card>
+  );
+}
+
+/** Small danger triangle glyph (icon+text pairing), colour via currentColor. */
+function DangerGlyph(): ReactElement {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 1.5 15 14H1L8 1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M8 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="8" cy="11.5" r="0.85" fill="currentColor" />
+    </svg>
   );
 }
 

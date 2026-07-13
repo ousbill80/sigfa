@@ -2,16 +2,17 @@
  * ThemingConsole — bank identity theming editor with live preview (ADM-001b).
  *
  * A BANK_ADMIN / AGENCY_DIRECTOR picks the `--brand` colour, uploads a logo and
- * edits FR/EN welcome messages. A live preview (primary button, badge, header)
- * re-themes in real time and displays the WCAG contrast — an EXACT MIRROR of the
- * server derivation (shared @sigfa/ui utilities via lib/adm-theme). When the
- * colour fails 4.5:1, an inline warning shows the corrected value that will be
- * applied. Save issues PATCH (with X-Idempotency-Key) and shows the persisted
- * value without a page reload.
+ * edits FR/EN welcome messages. A live preview (primary button, badge, header,
+ * welcome message) re-themes in real time and displays the WCAG contrast — an
+ * EXACT MIRROR of the server derivation (shared @sigfa/ui utilities via
+ * lib/adm-theme). When the colour fails 4.5:1, a dedicated warning encart shows
+ * the ratio (large) plus the requested and applied swatches. Save issues PATCH
+ * (with X-Idempotency-Key) and shows the persisted value without a page reload.
  *
  * Theming is a SKIN, never the structure: only colour / logo / messages change.
  * No layout / font / spacing control is ever exposed. Tokens only, zero emoji,
- * @sigfa/ui components, FR/EN via the `admTheme.*` namespace, 5 states.
+ * @sigfa/ui primitives (EmptyState / OfflineBanner / Textarea / Heading /
+ * Overline / Badge), FR/EN via the `admTheme.*` namespace, 5 states.
  *
  * @module components/admin/theming-console
  */
@@ -25,7 +26,18 @@ import {
   type CSSProperties,
   type ReactElement,
 } from "react";
-import { Badge, BankThemeProvider, Button, Field, Skeleton } from "@sigfa/ui";
+import {
+  Badge,
+  BankThemeProvider,
+  Button,
+  EmptyState,
+  Field,
+  Heading,
+  OfflineBanner,
+  Overline,
+  Skeleton,
+  Textarea,
+} from "@sigfa/ui";
 import { canConfigureTheming, previewBrand } from "@/lib/adm-theme";
 import { tAdmTheme } from "@/lib/adm-theme-i18n";
 import type { LoadedTheme, ThemeMutationResult, ThemeStatus } from "@/lib/use-adm-theme";
@@ -53,24 +65,21 @@ export interface ThemingConsoleProps {
 
 const DEFAULT_BRAND = "#c25a16";
 
-const overline: CSSProperties = {
-  fontFamily: "var(--font-text)",
-  fontSize: "var(--text-xs)",
-  fontWeight: 600,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--ink-faint)",
-  margin: "0 0 var(--space-2)",
-};
-
-const noticeStyle: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  color: "var(--ink-soft)",
-  background: "var(--surface-2)",
-  borderRadius: "var(--r-md)",
-  padding: "var(--space-3) var(--space-4)",
-  margin: "0 0 var(--space-6)",
-};
+/** A small danger cross glyph (icon+text pairing), tokenised via CSS colour. */
+function WarnGlyph(): ReactElement {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 1.5 15 14H1L8 1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M8 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="8" cy="11.5" r="0.85" fill="currentColor" />
+    </svg>
+  );
+}
 
 /**
  * Bank identity theming console.
@@ -85,7 +94,7 @@ export function ThemingConsole(props: ThemingConsoleProps): ReactElement {
   if (!canConfigureTheming(role)) {
     return (
       <section data-testid="theming-forbidden" role="alert" aria-label={tAdmTheme("admTheme.forbidden", locale)}>
-        <p style={{ color: "var(--ink-soft)" }}>{tAdmTheme("admTheme.forbidden", locale)}</p>
+        <EmptyState title={tAdmTheme("admTheme.forbidden", locale)} />
       </section>
     );
   }
@@ -104,8 +113,8 @@ export function ThemingConsole(props: ThemingConsoleProps): ReactElement {
 
   if (status === "offline") {
     return (
-      <section data-testid="theming-offline" role="status">
-        <p style={{ color: "var(--ink-soft)" }}>{tAdmTheme("admTheme.state_offline", locale)}</p>
+      <section data-testid="theming-offline">
+        <OfflineBanner message={tAdmTheme("admTheme.state_offline", locale)} />
       </section>
     );
   }
@@ -113,20 +122,25 @@ export function ThemingConsole(props: ThemingConsoleProps): ReactElement {
   if (status === "error") {
     return (
       <section data-testid="theming-error" role="alert">
-        <p style={{ color: "var(--ink-soft)" }}>{tAdmTheme("admTheme.state_error", locale)}</p>
-        {onRetry && (
-          <Button type="button" variant="secondary" data-testid="theming-retry" onClick={onRetry}>
-            {tAdmTheme("admTheme.save", locale)}
-          </Button>
-        )}
+        <EmptyState
+          icon={<WarnGlyph />}
+          title={tAdmTheme("admTheme.state_error", locale)}
+          action={
+            onRetry ? (
+              <Button type="button" variant="secondary" data-testid="theming-retry" onClick={onRetry}>
+                {tAdmTheme("admTheme.state_retry", locale)}
+              </Button>
+            ) : undefined
+          }
+        />
       </section>
     );
   }
 
   if (status === "empty" || theme === null) {
     return (
-      <section data-testid="theming-empty" role="status">
-        <p style={{ color: "var(--ink-soft)" }}>{tAdmTheme("admTheme.state_empty", locale)}</p>
+      <section data-testid="theming-empty">
+        <EmptyState title={tAdmTheme("admTheme.state_empty", locale)} />
       </section>
     );
   }
@@ -157,6 +171,7 @@ function ThemingEditor(props: {
   const [saved, setSaved] = useState(false);
   const [serverError, setServerError] = useState<string | undefined>();
   const [logoError, setLogoError] = useState<string | undefined>();
+  const colorRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const preview = useMemo(() => previewBrand(brand), [brand]);
@@ -198,14 +213,19 @@ function ThemingEditor(props: {
   const pickerValue = preview.valid ? preview.tokens!.brand : DEFAULT_BRAND;
   // Preview surface uses the applied (possibly corrected) colour.
   const appliedBrand = preview.valid ? preview.appliedBrand : DEFAULT_BRAND;
+  // The welcome message injected into the preview (FR first, EN fallback).
+  const previewWelcome = fr.trim() || en.trim();
 
   return (
     <section data-testid="theming-console" aria-label={tAdmTheme("admTheme.title", locale)}>
-      <p style={overline}>{tAdmTheme("admTheme.title", locale)}</p>
+      <Overline>{tAdmTheme("admTheme.title", locale)}</Overline>
+      <Heading size="xl" style={{ margin: "var(--space-1) 0 var(--space-2)" }}>
+        {tAdmTheme("admTheme.title", locale)}
+      </Heading>
       <p style={{ color: "var(--ink-soft)", margin: "0 0 var(--space-4)" }}>
         {tAdmTheme("admTheme.subtitle", locale)}
       </p>
-      <p data-testid="theming-habillage-notice" style={noticeStyle}>
+      <p data-testid="theming-habillage-notice" className="adm-notice">
         {tAdmTheme("admTheme.habillage_notice", locale)}
       </p>
 
@@ -224,41 +244,45 @@ function ThemingEditor(props: {
                 aria-invalid={!preview.valid || undefined}
               />
             </div>
+            {/* Native colour input is sr-only; a styled, focusable swatch
+                button triggers it (keeps hover / focus, token dimensions). */}
+            <button
+              type="button"
+              className="adm-color-trigger"
+              aria-label={tAdmTheme("admTheme.brand_picker_label", locale)}
+              onClick={() => colorRef.current?.click()}
+              style={{ backgroundColor: pickerValue }}
+            />
             <input
+              ref={colorRef}
               type="color"
               data-testid="adm-brand-picker"
               aria-label={tAdmTheme("admTheme.brand_picker_label", locale)}
+              className="adm-visually-hidden-input"
               value={pickerValue}
               onChange={handleColorPicker}
-              style={{
-                width: "44px",
-                height: "44px",
-                border: "1px solid var(--hairline)",
-                borderRadius: "var(--r-md)",
-                background: "none",
-                padding: 0,
-                flexShrink: 0,
-              }}
             />
           </div>
 
-          <Field
+          <Textarea
             id="adm-welcome-fr"
             data-testid="adm-welcome-fr"
             label={tAdmTheme("admTheme.welcome_fr_label", locale)}
             hint={tAdmTheme("admTheme.welcome_hint", locale)}
             maxLength={200}
+            rows={2}
             value={fr}
             onChange={(e) => {
               setFr(e.target.value);
               setSaved(false);
             }}
           />
-          <Field
+          <Textarea
             id="adm-welcome-en"
             data-testid="adm-welcome-en"
             label={tAdmTheme("admTheme.welcome_en_label", locale)}
             maxLength={200}
+            rows={2}
             value={en}
             onChange={(e) => {
               setEn(e.target.value);
@@ -268,27 +292,33 @@ function ThemingEditor(props: {
 
           {/* ── Logo ─────────────────────────────────────────────── */}
           <div>
-            <p style={overline}>{tAdmTheme("admTheme.logo_label", locale)}</p>
+            <Overline>{tAdmTheme("admTheme.logo_label", locale)}</Overline>
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 data-testid="adm-logo-preview"
                 src={logoUrl}
                 alt={tAdmTheme("admTheme.logo_label", locale)}
-                style={{ maxHeight: "48px", borderRadius: "var(--r-sm)" }}
+                style={{ maxHeight: "3rem", borderRadius: "var(--r-sm)" }}
               />
             ) : (
               <p data-testid="adm-logo-placeholder" style={{ color: "var(--ink-faint)", fontFamily: "var(--font-display)" }}>
                 {tAdmTheme("admTheme.logo_placeholder", locale)}
               </p>
             )}
+            {/* Native file input is sr-only; a styled Button triggers it. */}
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()}>
+                {tAdmTheme("admTheme.logo_upload", locale)}
+              </Button>
+            </div>
             <input
               ref={fileRef}
               type="file"
               data-testid="adm-logo-input"
               accept="image/png,image/svg+xml,image/jpeg"
+              className="adm-visually-hidden-input"
               onChange={handleLogoChange}
-              style={{ marginTop: "var(--space-2)" }}
             />
             <p style={{ fontSize: "var(--text-xs)", color: "var(--ink-faint)", marginTop: "var(--space-1)" }}>
               {tAdmTheme("admTheme.logo_hint", locale)}
@@ -328,7 +358,7 @@ function ThemingEditor(props: {
             background: "var(--surface-1)",
           }}
         >
-          <p style={overline}>{tAdmTheme("admTheme.preview_title", locale)}</p>
+          <Overline>{tAdmTheme("admTheme.preview_title", locale)}</Overline>
 
           <div
             data-testid="preview-header"
@@ -339,10 +369,20 @@ function ThemingEditor(props: {
               borderRadius: "var(--r-md)",
               fontFamily: "var(--font-display)",
               fontWeight: 600,
+              marginTop: "var(--space-2)",
             }}
           >
             {tAdmTheme("admTheme.preview_header", locale)}
           </div>
+
+          {previewWelcome && (
+            <p
+              data-testid="preview-welcome"
+              style={{ margin: "var(--space-3) 0 0", color: "var(--ink)", fontSize: "var(--text-sm)" }}
+            >
+              {previewWelcome}
+            </p>
+          )}
 
           <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", margin: "var(--space-4) 0" }}>
             <Button type="button" variant="primary" data-testid="preview-button">
@@ -359,19 +399,36 @@ function ThemingEditor(props: {
               <p style={{ fontSize: "var(--text-xs)", color: "var(--ink-faint)", margin: 0 }}>
                 {tAdmTheme("admTheme.contrast_label", locale)}
               </p>
-              <p data-testid="preview-contrast-ratio" style={{ fontVariantNumeric: "tabular-nums", margin: "var(--space-1) 0 0" }}>
-                {preview.ratio.toFixed(2)}:1
-              </p>
               {preview.passes ? (
-                <Badge tone="success" dot data-testid="preview-contrast-pass">
-                  {tAdmTheme("admTheme.contrast_pass", locale)}
-                </Badge>
-              ) : (
-                <div data-testid="preview-contrast-warning" role="status" style={{ marginTop: "var(--space-2)" }}>
-                  <Badge tone="warning" dot>
-                    {tAdmTheme("admTheme.contrast_warning", locale)}
+                <>
+                  <p data-testid="preview-contrast-ratio" style={{ fontVariantNumeric: "tabular-nums", margin: "var(--space-1) 0 var(--space-2)" }}>
+                    {preview.ratio.toFixed(2)}:1
+                  </p>
+                  <Badge tone="success" dot data-testid="preview-contrast-pass">
+                    {tAdmTheme("admTheme.contrast_pass", locale)}
                   </Badge>
-                  <p data-testid="preview-applied-brand" style={{ fontSize: "var(--text-sm)", color: "var(--ink-soft)", marginTop: "var(--space-1)" }}>
+                </>
+              ) : (
+                <div data-testid="preview-contrast-warning" role="status" className="adm-contrast-warn" style={{ marginTop: "var(--space-2)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <Badge tone="warning" dot>
+                      {tAdmTheme("admTheme.contrast_warning", locale)}
+                    </Badge>
+                  </div>
+                  <span data-testid="preview-contrast-ratio" className="adm-contrast-warn__ratio">
+                    {preview.ratio.toFixed(2)}:1
+                  </span>
+                  <div className="adm-swatches">
+                    <span className="adm-swatch">
+                      <span className="adm-swatch__chip" style={{ backgroundColor: pickerValue }} />
+                      {tAdmTheme("admTheme.contrast_requested", locale)}
+                    </span>
+                    <span className="adm-swatch">
+                      <span className="adm-swatch__chip" style={{ backgroundColor: appliedBrand }} />
+                      {tAdmTheme("admTheme.contrast_applied", locale)}
+                    </span>
+                  </div>
+                  <p data-testid="preview-applied-brand" style={{ fontSize: "var(--text-sm)", color: "var(--ink-soft)", margin: 0 }}>
                     {tAdmTheme("admTheme.applied_value", locale)} : {preview.appliedBrand}
                   </p>
                 </div>

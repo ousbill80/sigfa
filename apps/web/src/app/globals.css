@@ -66,3 +66,196 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * AdminShell (DESIGN-FIX-ADMIN) — shared admin coquille: product header +
+ * navigation. Real hover / focus states live here (never inline styles).
+ * ───────────────────────────────────────────────────────────────────────── */
+.adm-shell {
+  min-height: 100vh;
+  background-color: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+}
+
+.adm-shell__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-8);
+  background-color: var(--surface-1);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.adm-shell__brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.adm-shell__wordmark {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-tight);
+  color: var(--brand);
+}
+
+.adm-shell__product-title {
+  font-family: var(--font-text);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.adm-shell__nav {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.adm-shell__nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--r-md);
+  font-family: var(--font-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition:
+    background-color var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+
+.adm-shell__nav-link:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+
+.adm-shell__nav-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.adm-shell__nav-link[aria-current="page"] {
+  background-color: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.adm-shell__main {
+  flex: 1;
+  width: 100%;
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: var(--space-8);
+}
+
+/* Habillage / notice card shared by the consoles (side accent, calm). */
+.adm-notice {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  background-color: var(--surface-2);
+  border-left: 3px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-6);
+}
+
+/* Danger accent card — side accent + icon, NEVER a near-solid red fill. */
+.adm-danger-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background-color: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--r-md);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+
+.adm-danger-note__icon {
+  color: var(--danger);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Warning contrast callout — dedicated encart, large ratio, two swatches. */
+.adm-contrast-warn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--warning);
+  border-radius: var(--r-md);
+  background-color: var(--surface-1);
+  padding: var(--space-4);
+}
+
+.adm-contrast-warn__ratio {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--warning);
+  line-height: var(--leading-tight);
+}
+
+.adm-swatches {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.adm-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.adm-swatch__chip {
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hairline);
+}
+
+/* Hidden native input triggered by a styled control (color / file). */
+.adm-visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Color swatch trigger — a real focusable control (keeps hover / focus). */
+.adm-color-trigger {
+  width: var(--space-12);
+  height: var(--space-12);
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: box-shadow var(--dur-1) var(--ease);
+}
+
+.adm-color-trigger:hover {
+  box-shadow: var(--shadow-1);
+}
+
+.adm-color-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

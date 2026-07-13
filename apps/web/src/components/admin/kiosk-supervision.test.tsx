@@ -66,7 +66,7 @@ describe("ADM-003b: vue agence — StatusPill + last seen relatif", () => {
 });
 
 describe("ADM-003b: SILENT = pastille danger, JAMAIS fond rouge plein", () => {
-  it("ADM-003b: SILENT rend --danger en bordure/point, background = tint doux (jamais var(--danger) plein)", () => {
+  it("ADM-003b: SILENT rend le Badge danger (bordé, jamais un fond rouge plein)", () => {
     render(
       <KioskSupervision
         state={stateWith([kiosk({ status: "SILENT", lastSeen: new Date(NOW - 120_000).toISOString() })])}
@@ -75,11 +75,10 @@ describe("ADM-003b: SILENT = pastille danger, JAMAIS fond rouge plein", () => {
       />,
     );
     const pill = screen.getByTestId("kiosk-status-pill");
+    // Le Badge @sigfa/ui porte la classe danger (fond transparent + bordure
+    // --danger via components.css), jamais un fond rouge plein inline.
+    expect(pill.className).toContain("sig-badge--danger");
     const style = pill.getAttribute("style") ?? "";
-    // La bordure porte --danger…
-    expect(style).toContain("var(--danger)");
-    // …mais le fond est le tint doux, jamais un fond rouge plein.
-    expect(style).toContain("var(--danger-soft)");
     expect(style).not.toMatch(/background-color:\s*var\(--danger\)\b/);
   });
 
@@ -140,10 +139,12 @@ describe("ADM-003b: vue réseau (BANK_ADMIN+)", () => {
         nowMs={NOW}
       />,
     );
-    fireEvent.click(screen.getByTestId("view-network"));
+    fireEvent.click(screen.getByRole("radio", { name: "Vue réseau" }));
     const rows = screen.getAllByTestId("network-agency-row");
     expect(rows).toHaveLength(1);
-    expect(within(rows[0]!).getByText(A2.slice(0, 8))).toBeInTheDocument();
+    // Libellé humain (handle court) en titre + UUID complet en méta faible.
+    expect(within(rows[0]!).getByText(/Agence · 44444444/)).toBeInTheDocument();
+    expect(within(rows[0]!).getByText(new RegExp(A2))).toBeInTheDocument();
   });
 
   it("ADM-003b: vue réseau sans borne muette → message « aucune agence en alerte »", () => {
@@ -155,13 +156,13 @@ describe("ADM-003b: vue réseau (BANK_ADMIN+)", () => {
         nowMs={NOW}
       />,
     );
-    fireEvent.click(screen.getByTestId("view-network"));
+    fireEvent.click(screen.getByRole("radio", { name: "Vue réseau" }));
     expect(screen.getByTestId("network-no-silent")).toBeInTheDocument();
   });
 
   it("ADM-003b: sans networkEnabled → pas d'onglet vue réseau (RBAC AGENCY_DIRECTOR)", () => {
     render(<KioskSupervision state={stateWith([kiosk()])} load="ready" nowMs={NOW} />);
-    expect(screen.queryByTestId("view-network")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Vue réseau" })).not.toBeInTheDocument();
   });
 });
 

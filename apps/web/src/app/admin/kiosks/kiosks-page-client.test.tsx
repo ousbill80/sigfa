@@ -58,7 +58,7 @@ describe("ADM-003b: shell supervision (mode mock, repli poll)", () => {
       <KiosksPageClient apiBase={BASE} agencyId={AGENCY} role="AGENCY_DIRECTOR" realtime={false} />,
     );
     await waitFor(() => expect(screen.getByTestId("kiosk-grid")).toBeInTheDocument());
-    expect(screen.queryByTestId("view-network")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Vue réseau" })).not.toBeInTheDocument();
   });
 
   it("ADM-003b: BANK_ADMIN → onglet vue réseau disponible", async () => {
@@ -66,7 +66,7 @@ describe("ADM-003b: shell supervision (mode mock, repli poll)", () => {
     render(
       <KiosksPageClient apiBase={BASE} agencyId={AGENCY} role="BANK_ADMIN" realtime={false} />,
     );
-    await waitFor(() => expect(screen.getByTestId("view-network")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Vue réseau" })).toBeInTheDocument());
   });
 
   it("ADM-003b: route en erreur (500) au premier appel → état error", async () => {

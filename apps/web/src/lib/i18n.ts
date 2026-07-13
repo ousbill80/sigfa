@@ -303,6 +303,9 @@ export type TranslationKey =
   | "admSuper.status.silent"
   | "admSuper.status.never_seen"
   | "admSuper.silent_label"
+  | "admSuper.kiosk_label"
+  | "admSuper.agency_label"
+  | "admSuper.id_meta"
   | "admSuper.last_seen"
   | "admSuper.never_seen_hint"
   | "admSuper.count.online"
@@ -618,6 +621,9 @@ export const FR: TranslationDict = {
   "admSuper.status.silent": "Muette",
   "admSuper.status.never_seen": "Jamais vue",
   "admSuper.silent_label": "Borne muette",
+  "admSuper.kiosk_label": "Borne",
+  "admSuper.agency_label": "Agence",
+  "admSuper.id_meta": "Identifiant",
   "admSuper.last_seen": "Dernier signe",
   "admSuper.never_seen_hint": "Installation non finalisée",
   "admSuper.count.online": "En ligne",
@@ -930,6 +936,9 @@ export const EN: TranslationDict = {
   "admSuper.status.silent": "Silent",
   "admSuper.status.never_seen": "Never seen",
   "admSuper.silent_label": "Silent kiosk",
+  "admSuper.kiosk_label": "Kiosk",
+  "admSuper.agency_label": "Agency",
+  "admSuper.id_meta": "Identifier",
   "admSuper.last_seen": "Last seen",
   "admSuper.never_seen_hint": "Installation not finalised",
   "admSuper.count.online": "Online",
