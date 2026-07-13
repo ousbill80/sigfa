@@ -30,6 +30,8 @@ import {
   assertAgencyScope,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
+import { signAgencyToken } from "src/lib/agency-qr-token.js";
+import { resolveAgencyQrConfig, type AgencyQrConfig } from "src/config/agency-qr.js";
 
 /** Variables de contexte Hono du routeur agences. */
 interface AgencyEnv {
@@ -84,9 +86,11 @@ interface AgencyRow {
  */
 export function createAgencyRouter(): Hono<AgencyEnv> {
   const router = new Hono<AgencyEnv>();
+  const qrConfig = resolveAgencyQrConfig();
   registerListAgencies(router);
   registerCreateAgency(router);
   registerGetAgency(router);
+  registerAgencyQr(router, qrConfig);
   registerPatchAgency(router);
   registerDeleteAgency(router);
   return router;
@@ -212,6 +216,80 @@ function registerGetAgency(router: Hono<AgencyEnv>): void {
       return errorResponse(c, err);
     }
   });
+}
+
+/**
+ * Enregistre GET /agencies/:id/qr (NOTIF-005-A / CONTRACT-013).
+ *
+ * Renvoie le payload QR d'une agence : `agencyId`, `signedAgencyToken`
+ * (HMAC-SHA256 sur `{ agencyId, exp, keyVersion }`, TTL 30 j, clé rotative
+ * versionnée), `keyVersion`, `expiresAt` et l'URL PWA (`qrUrl`) encodant le token.
+ *
+ * Sécurité :
+ * - Scope agence (AGENT) : `assertAgencyScope` (403 hors périmètre) puis
+ *   `loadAgency` (404 opaque si l'agence est inconnue/supprimée/hors tenant).
+ * - Agence inactive (`is_active = false`) → 404 opaque (anti-énumération), même
+ *   corps qu'une agence inexistante.
+ * - Payload **sans PII** : aucun email/téléphone/hash — uniquement l'`agencyId`
+ *   signé (non-PII) et les métadonnées de token.
+ *
+ * @param router   - Routeur agences
+ * @param qrConfig - Trousseau de clés + base d'URL PWA
+ */
+function registerAgencyQr(router: Hono<AgencyEnv>, qrConfig: AgencyQrConfig): void {
+  router.get("/agencies/:id/qr", async (c) => {
+    const db = c.get("db");
+    const tenant = c.get("tenant");
+    try {
+      const id = paramUuid(c, "id");
+      assertAgencyScope(tenant, id);
+      const bankId = requireBankId(tenant);
+      const agency = await loadActiveAgency(db, bankId, id);
+      return c.json(buildQrPayload(agency.id, qrConfig), 200);
+    } catch (err) {
+      return errorResponse(c, err);
+    }
+  });
+}
+
+/**
+ * Charge une agence ACTIVE et non supprimée du tenant, ou 404 opaque.
+ * Une agence inactive est traitée comme inexistante (anti-énumération).
+ *
+ * @param db     - Connexion PG
+ * @param bankId - Banque du tenant
+ * @param id     - Agence ciblée
+ * @throws {SigfaError} 404 NOT_FOUND si absente/inactive/supprimée/hors tenant
+ */
+async function loadActiveAgency(db: Client, bankId: string, id: string): Promise<AgencyRow> {
+  const res = await db.query(
+    `SELECT ${AGENCY_COLS} FROM agencies
+      WHERE id = $1 AND bank_id = $2 AND is_active = true AND deleted_at IS NULL`,
+    [id, bankId]
+  );
+  const row = res.rows[0] as AgencyRow | undefined;
+  if (!row) throw new SigfaError("NOT_FOUND", "Agence introuvable.", 404);
+  return row;
+}
+
+/**
+ * Construit le payload QR (LA LOI `AgencyQRPayload`) : token signé + URL PWA.
+ * Aucune PII n'est incluse ; le token encode uniquement l'`agencyId` (non-PII).
+ *
+ * @param agencyId - Agence signée
+ * @param qrConfig - Trousseau + base d'URL PWA
+ */
+function buildQrPayload(agencyId: string, qrConfig: AgencyQrConfig): Record<string, unknown> {
+  const signed = signAgencyToken({ agencyId, keyring: qrConfig.keyring });
+  const qrUrl = `${qrConfig.pwaBaseUrl}/${agencyId}?t=${encodeURIComponent(signed.token)}`;
+  return {
+    agencyId,
+    qrUrl,
+    payload: signed.token,
+    signedAgencyToken: signed.token,
+    keyVersion: signed.keyVersion,
+    expiresAt: signed.expiresAt.toISOString(),
+  };
 }
 
 /** Enregistre PATCH /agencies/:id (merge partiel) + audit. */
