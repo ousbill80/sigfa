@@ -106,7 +106,13 @@ describe("ManagerDashboard — --danger réservé aux alertes", () => {
     const row = screen.getByTestId("agent-row");
     expect(row).toHaveAttribute("data-alerted", "on");
     expect(row.getAttribute("style")).toContain("var(--danger)");
-    expect(screen.getByTestId("agent-alert-icon")).toBeInTheDocument();
+    const alertIcon = screen.getByTestId("agent-alert-icon");
+    expect(alertIcon).toBeInTheDocument();
+    // ICONS-001 : icône alerte du set SIGFA, plus de glyphe unicode.
+    expect(
+      alertIcon.querySelector('svg[data-icon="alerte"]'),
+    ).toBeInTheDocument();
+    expect(alertIcon.textContent).not.toContain("⚠");
   });
 });
 
@@ -142,6 +148,17 @@ describe("ManagerDashboard — RBAC & 5 états", () => {
     setup({ load: "empty", state: baseState({ kpis: null }) });
     expect(screen.getByTestId("manager-empty")).toBeInTheDocument();
     expect(screen.queryByTestId("kpi-tma-value")).not.toBeInTheDocument();
+  });
+
+  it("ICONS-001: état empty — icône statistiques du set SIGFA, zéro emoji", () => {
+    setup({ load: "empty", state: baseState({ kpis: null }) });
+    const empty = screen.getByTestId("manager-empty");
+    expect(
+      empty.querySelector('svg[data-icon="statistiques"]'),
+    ).toBeInTheDocument();
+    expect(empty.textContent).not.toMatch(
+      /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u,
+    );
   });
 
   it("WEB-003: état offline — badge Hors ligne + dernière sync", () => {

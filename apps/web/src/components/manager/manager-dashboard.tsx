@@ -9,7 +9,16 @@
 "use client";
 
 import type { CSSProperties, ReactElement } from "react";
-import { Badge, Button, Card, EmptyState, KpiTile, Skeleton } from "@sigfa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  IconAlerte,
+  IconStatistiques,
+  KpiTile,
+  Skeleton,
+} from "@sigfa/ui";
 import { t, type Locale } from "@/lib/i18n";
 import { slaColor, tmaRatio, type ManagerState } from "@/lib/manager-state";
 import type { DashboardLoad } from "@/lib/use-manager-dashboard";
@@ -105,7 +114,10 @@ export function ManagerDashboard({
         data-testid="manager-empty"
         style={{ padding: "var(--space-12) var(--space-6)", maxWidth: "1200px", margin: "0 auto" }}
       >
-        <EmptyState icon="📊" title={t("manager.empty", locale)} />
+        <EmptyState
+          icon={<IconStatistiques size="xl" />}
+          title={t("manager.empty", locale)}
+        />
       </div>
     );
   }
@@ -249,9 +261,14 @@ export function ManagerDashboard({
                         data-testid="agent-alert-icon"
                         aria-label="alerte"
                         role="img"
-                        style={{ color: "var(--danger)", marginRight: "var(--space-1)" }}
+                        style={{
+                          color: "var(--danger)",
+                          marginRight: "var(--space-1)",
+                          display: "inline-flex",
+                          verticalAlign: "-3px",
+                        }}
                       >
-                        ⚠
+                        <IconAlerte size="sm" />
                       </span>
                     )}{" "}
                     {a.agentName}

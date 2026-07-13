@@ -22,6 +22,9 @@ export type { BankTheme } from "./theme/bank-theme";
 export { BankThemeProvider, useBankLogo } from "./theme/BankThemeProvider";
 export type { BankThemeProviderProps } from "./theme/BankThemeProvider";
 
+// Set d'icônes SIGFA duotone (métier banque + UI)
+export * from "./components/icons";
+
 // Components
 export { Button } from "./components/Button";
 export type {
