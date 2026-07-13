@@ -190,8 +190,13 @@ describe("DB-0014: migration 0014 — GRANT UPDATE seuils tenant-scopé sur bank
   );
 
   it(
-    "DB-0014: sigfa_app détient UPDATE UNIQUEMENT sur les 3 colonnes de seuils (privilège colonne)",
+    "DB-0014: sigfa_app détient UPDATE colonne-scopé sur les 3 seuils (+ updated_at ajouté par 0015)",
     async () => {
+      // NB : le harnais applique TOUTES les migrations en cumulé. 0015
+      // (DB-THRESHOLDS-GRANT-UPDATEDAT) élargit le GRANT colonne d'UNE colonne
+      // (`updated_at`) pour couvrir l'horodatage automatique du PATCH thresholds.
+      // L'invariant reste : GRANT colonne-scopé (jamais pleine table) ; name, slug,
+      // theme, is_active… restent hors GRANT.
       const result = await harness.query(
         `SELECT column_name
            FROM information_schema.column_privileges
@@ -207,6 +212,7 @@ describe("DB-0014: migration 0014 — GRANT UPDATE seuils tenant-scopé sur bank
           "agent_inactivity_minutes",
           "no_show_timeout_minutes",
           "queue_critical_threshold",
+          "updated_at",
         ].sort()
       );
     },
