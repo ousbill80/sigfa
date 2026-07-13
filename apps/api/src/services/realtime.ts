@@ -1,11 +1,13 @@
 /**
  * realtime — bus d'événements typé et validé par Zod (injectable).
  *
- * RT-001a : les payloads émis vers le bus sont désormais conformes AU CONTRAT
- * (`packages/contracts/events/realtime.ts`, chaque `*.payloadSchema`). Les
- * `EVENT_SCHEMAS` ci-dessous TRANSCRIVENT ces schémas contractuels (le contrat
- * reste LA LOI ; une suite de PARITÉ importe le contrat et prouve l'équivalence
- * champ à champ, par événement — cf. `contract-parity.test.ts`).
+ * RT-001a : les payloads émis vers le bus sont validés directement contre LE
+ * CONTRAT (`packages/contracts/events/realtime.ts`, chaque `*.payloadSchema`).
+ * `EVENT_SCHEMAS` RÉFÉRENCE ces schémas contractuels (aucune transcription :
+ * le contrat est l'unique source de vérité, importé tel quel). Depuis
+ * l'unification zod v4 (CHORE-ZOD-V4-UNIFY), api et contracts partagent la même
+ * version de zod ; la duplication historique (et sa suite de parité) n'a plus
+ * lieu d'être.
  *
  * Signature du bus : `emit(event, agencyId, payload)`. L'`agencyId` en 2e
  * position est la room cible (`agency:{agencyId}`) ; le payload est la forme
@@ -20,155 +22,54 @@
  * @module
  */
 
-import { z } from "zod";
+import type { z } from "zod";
+import {
+  ticketCreatedEvent,
+  ticketCalledEvent,
+  ticketClosedEvent,
+  queueUpdatedEvent,
+  counterStatusEvent,
+  alertManagerEvent,
+  kioskPrinterErrorEvent,
+  kioskSilentEvent,
+  kioskRecoveredEvent,
+  kioskStatusEvent,
+} from "@sigfa/contracts/events/realtime.js";
 import { SigfaError } from "src/lib/errors.js";
 
-// ─── Fragments réutilisés (transcription du contrat CONTRACT-002) ────────────
-
-/** Statuts de ticket (contrat `ticketStatusSchema`). */
-const ticketStatusSchema = z.enum([
-  "WAITING",
-  "CALLED",
-  "SERVING",
-  "DONE",
-  "NO_SHOW",
-  "ABANDONED",
-  "TRANSFERRED",
-]);
-
-/** Canaux d'émission (contrat `ticketChannelSchema`). */
-const ticketChannelSchema = z.enum(["KIOSK", "QR", "MOBILE", "WHATSAPP"]);
-
-/** Statut de guichet (contrat `counterStatusEnumSchema`). */
-const counterStatusEnumSchema = z.enum(["OPEN", "PAUSED", "CLOSED"]);
-
-/** Résumé de ticket embarqué (contrat `ticketSummarySchema`). */
-const ticketSummarySchema = z.object({
-  id: z.string().uuid(),
-  number: z.string().min(1),
-  status: ticketStatusSchema,
-  serviceId: z.string().uuid(),
-  agencyId: z.string().uuid(),
-  channel: ticketChannelSchema,
-  createdAt: z.string().datetime(),
-});
-
-/** Résumé de guichet embarqué (contrat `counterSummarySchema`). */
-const counterSummarySchema = z.object({
-  id: z.string().uuid(),
-  label: z.string().min(1),
-});
-
-// ─── Schémas de payload — forme CONTRAT par événement ────────────────────────
-
-/** Schéma du payload `ticket:created` (contrat `ticketCreatedEvent`). */
-export const ticketCreatedSchema = z.object({
-  ticket: ticketSummarySchema,
-  position: z.number().int().min(0),
-  estimate: z.number().int().min(0),
-});
-
-/** Schéma du payload `ticket:called` (contrat `ticketCalledEvent`). */
-export const ticketCalledSchema = z.object({
-  ticket: ticketSummarySchema,
-  counter: counterSummarySchema,
-});
-
-/** Schéma du payload `ticket:closed` (contrat `ticketClosedEvent`). */
-export const ticketClosedSchema = z.object({
-  ticketId: z.string().uuid(),
-  waitTime: z.number().int().min(0),
-  serviceTime: z.number().int().min(0),
-});
-
-/** Schéma du payload `queue:updated` (contrat `queueUpdatedEvent`). */
-export const queueUpdatedSchema = z.object({
-  queueId: z.string().uuid(),
-  length: z.number().int().min(0),
-  estimate: z.number().int().min(0),
-});
+// ─── Schémas de payload — LE CONTRAT (CONTRACT-002), sans transcription ───────
 
 /**
- * Types d'alertes manager — contrat `alertManagerTypeSchema`. Énuméré fermé :
- * QUEUE_CRITICAL (API-004), KIOSK_SYSTEM_ERROR (API-005), AGENT_INACTIVE /
- * AGENT_DISCONNECTED_WITH_TICKET / SLA_BREACH (API-007).
+ * Schéma du payload `queue:updated` (contrat `queueUpdatedEvent`). Réexporté
+ * ici car consommé directement par la suite unitaire du bus (`realtime.test.ts`).
  */
-export const alertManagerTypeSchema = z.enum([
-  "AGENT_INACTIVE",
-  "AGENT_DISCONNECTED_WITH_TICKET",
-  "SLA_BREACH",
-  "QUEUE_CRITICAL",
-  "KIOSK_SYSTEM_ERROR",
-]);
-
-/** Schéma du payload `alert:manager` (contrat `alertManagerEvent`). */
-export const alertManagerSchema = z.object({
-  type: alertManagerTypeSchema,
-  payload: z.record(z.string(), z.unknown()),
-});
-
-/** Schéma du payload `counter:status` (contrat `counterStatusEvent`). */
-export const counterStatusSchema = z.object({
-  counterId: z.string().uuid(),
-  status: counterStatusEnumSchema,
-  agentId: z.string().uuid().optional(),
-});
-
-/** Schéma du payload `kiosk:printer-error` (contrat `kioskPrinterErrorEvent`). */
-export const kioskPrinterErrorSchema = z.object({
-  kioskId: z.string().uuid(),
-  agencyId: z.string().uuid(),
-  since: z.string().datetime(),
-});
+export const queueUpdatedSchema = queueUpdatedEvent.payloadSchema;
 
 /**
- * Statut de supervision d'une borne — contrat `KioskStatus` (admin.yaml,
- * CONTRACT-013 / ADM-003). Énuméré fermé, transcrit du contrat.
+ * Schéma du payload `alert:manager` (contrat `alertManagerEvent`). Réexporté ici
+ * car consommé directement par la suite unitaire du bus (`realtime.test.ts`).
  */
-export const kioskSupervisionStatusSchema = z.enum([
-  "ONLINE",
-  "DEGRADED",
-  "SILENT",
-  "NEVER_SEEN",
-]);
+export const alertManagerSchema = alertManagerEvent.payloadSchema;
 
 /**
- * Schéma commun des payloads de supervision borne (`kiosk:silent`,
- * `kiosk:recovered`, `kiosk:status`) — contrat CONTRACT-013 / ADM-003. PII-free :
- * identifiants + statut + horodatage uniquement. Ces trois événements partagent
- * exactement la même forme au contrat.
+ * Association nom d'événement → schéma Zod du payload. Chaque schéma provient
+ * DIRECTEMENT du contrat (`*.payloadSchema`) : le contrat est LA LOI, référencée
+ * sans copie.
  */
-const kioskSupervisionPayloadSchema = z.object({
-  kioskId: z.string().uuid(),
-  agencyId: z.string().uuid(),
-  status: kioskSupervisionStatusSchema,
-  since: z.string().datetime(),
-});
-
-/** Schéma du payload `kiosk:silent` (contrat `kioskSilentEvent`). */
-export const kioskSilentSchema = kioskSupervisionPayloadSchema;
-
-/** Schéma du payload `kiosk:recovered` (contrat `kioskRecoveredEvent`). */
-export const kioskRecoveredSchema = kioskSupervisionPayloadSchema;
-
-/** Schéma du payload `kiosk:status` (contrat `kioskStatusEvent`). */
-export const kioskStatusSchema = kioskSupervisionPayloadSchema;
-
-/** Association nom d'événement → schéma Zod du payload (forme CONTRAT). */
 export const EVENT_SCHEMAS = {
-  "ticket:created": ticketCreatedSchema,
-  "ticket:called": ticketCalledSchema,
-  "ticket:closed": ticketClosedSchema,
-  "queue:updated": queueUpdatedSchema,
-  "counter:status": counterStatusSchema,
-  "alert:manager": alertManagerSchema,
-  "kiosk:printer-error": kioskPrinterErrorSchema,
+  "ticket:created": ticketCreatedEvent.payloadSchema,
+  "ticket:called": ticketCalledEvent.payloadSchema,
+  "ticket:closed": ticketClosedEvent.payloadSchema,
+  "queue:updated": queueUpdatedEvent.payloadSchema,
+  "counter:status": counterStatusEvent.payloadSchema,
+  "alert:manager": alertManagerEvent.payloadSchema,
+  "kiosk:printer-error": kioskPrinterErrorEvent.payloadSchema,
   // ── CONTRACT-013 / ADM-003 : supervision borne (STAFF, fail-closed) ────────
   // Absents de DISPLAY_EVENTS → diffusés vers `agency:{id}:staff` (jamais la room
   // publique DISPLAY). Cf. TV-hardening F-SEC-TV-01.
-  "kiosk:silent": kioskSilentSchema,
-  "kiosk:recovered": kioskRecoveredSchema,
-  "kiosk:status": kioskStatusSchema,
+  "kiosk:silent": kioskSilentEvent.payloadSchema,
+  "kiosk:recovered": kioskRecoveredEvent.payloadSchema,
+  "kiosk:status": kioskStatusEvent.payloadSchema,
 } as const;
 
 /** Noms d'événements supportés (les 7 événements serveur→client). */

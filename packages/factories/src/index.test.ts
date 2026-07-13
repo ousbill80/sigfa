@@ -102,4 +102,44 @@ describe("@sigfa/factories — createFactory", () => {
       );
     });
   });
+
+  // ─── CHORE-ZOD-V4-UNIFY : introspection du générateur portée en zod v4 ───────
+  //
+  // Le générateur lit désormais les internals zod v4 (`_zod.def.checks` avec
+  // `check`/`format`, `_def.entries` pour les enums, `_def.shape` objet,
+  // `_def.element` pour les arrays). Ce schéma imbriqué exerce en une passe tous
+  // les types introspectés (uuid, min/max string, int min/max, enum, optional,
+  // array, objet imbriqué) et prouve que la fixture générée reste VALIDE.
+  describe("INFRA-005 (CHORE-ZOD-V4-UNIFY): introspection zod v4 — fixtures valides", () => {
+    const nested = z.object({
+      id: z.string().uuid(),
+      code: z.string().min(2).max(6),
+      count: z.number().int().min(1).max(9),
+      ratio: z.number().min(0).max(1),
+      role: z.enum(["ADMIN", "USER", "GUEST"]),
+      alias: z.string().optional(),
+      tags: z.array(z.string().min(1).max(4)),
+      inner: z.object({
+        kioskId: z.string().uuid(),
+        active: z.boolean(),
+      }),
+    });
+
+    it("INFRA-005: schéma imbriqué complet → fixture valide (fast-check, numRuns ≥100)", () => {
+      const factory = createFactory(nested);
+      fc.assert(
+        fc.property(fc.nat({ max: 999999 }), (seed) => {
+          const fixture = factory({ seed });
+          return nested.safeParse(fixture).success;
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    it("INFRA-005: enum introspecté via _def.entries → valeur dans l'ensemble", () => {
+      const factory = createFactory(nested);
+      const fixture = factory({ seed: 7 });
+      expect(["ADMIN", "USER", "GUEST"]).toContain(fixture.role);
+    });
+  });
 });
