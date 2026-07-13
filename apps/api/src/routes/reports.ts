@@ -37,6 +37,8 @@ import {
   sumAggregates,
   toAbidjanDay,
   isDayPartial,
+  type KpiSet,
+  type KpiValue,
 } from "src/reporting/sla-engine.js";
 
 /** Variables de contexte Hono du routeur reports. */
@@ -53,6 +55,47 @@ interface ReportEnv {
 function asQueryFn(db: Client): QueryFn {
   return (sql: string, values?: unknown[]) =>
     db.query(sql, values).then((r) => ({ rows: r.rows as Array<Record<string, unknown>> }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Conversion d'unité à la FRONTIÈRE ROUTE (API-First : le contrat fait loi)
+//
+// Le moteur pur (`sla-engine`) calcule TMA/TMT/TTS en SECONDES (source
+// `total_wait_seconds` / `total_service_seconds`). Le contrat CONTRACT-006
+// `KpiValue.unit` n'admet que `minutes|percent|score` : la valeur EXPOSÉE doit
+// donc être en minutes pour que `unit:"minutes"` soit VRAI. On convertit ici,
+// à la sortie route, sans jamais toucher le moteur (qui reste en secondes).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Secondes par minute (conversion durée → minutes exposées). */
+const SECONDS_PER_MINUTE = 60;
+
+/** Convertit une durée en secondes vers des minutes (1 décimale) ; `null` inchangé. */
+function secondsToMinutes(seconds: number | null): number | null {
+  if (seconds === null) return null;
+  return Math.round((seconds / SECONDS_PER_MINUTE) * 10) / 10;
+}
+
+/** Convertit un `KpiValue` de durée (secondes moteur) en minutes exposées. */
+function timeKpiToMinutes(kpi: KpiValue): KpiValue {
+  return { value: secondsToMinutes(kpi.value), unit: "minutes" };
+}
+
+/**
+ * Projette un `KpiSet` moteur (TMA/TMT/TTS en secondes) vers la forme
+ * contractuelle exposée : durées converties en minutes (`unit:"minutes"` VRAI),
+ * KPIs `percent` (abandon/SLA/occupation) et `score` (NPS) inchangés.
+ */
+function projectKpiSet(kpis: KpiSet): KpiSet {
+  return {
+    tma: timeKpiToMinutes(kpis.tma),
+    tmt: timeKpiToMinutes(kpis.tmt),
+    tts: timeKpiToMinutes(kpis.tts),
+    tauxAbandon: kpis.tauxAbandon,
+    tauxSLA: kpis.tauxSLA,
+    nps: kpis.nps,
+    occupation: kpis.occupation,
+  };
 }
 
 /**
@@ -124,7 +167,7 @@ async function buildAgencyResponse(
     scope: "agency",
     period: bounds.periodKey,
     agencyId,
-    kpis: response.kpis,
+    kpis: projectKpiSet(response.kpis),
     partial: response.partial,
     periodMeta: buildPeriodMeta(bounds),
   };
@@ -169,9 +212,10 @@ async function buildNetworkResponse(
     period: bounds.periodKey,
     aggregate: {
       totalTickets: aggregate.ticketsIssued,
-      avgTma: kpis.tma.value ?? 0,
-      avgTmt: kpis.tmt.value ?? 0,
-      avgTts: kpis.tts.value ?? 0,
+      // Durées exposées en MINUTES (frontière route) — le moteur les calcule en secondes.
+      avgTma: secondsToMinutes(kpis.tma.value) ?? 0,
+      avgTmt: secondsToMinutes(kpis.tmt.value) ?? 0,
+      avgTts: secondsToMinutes(kpis.tts.value) ?? 0,
       avgTauxAbandon: kpis.tauxAbandon.value ?? 0,
       avgTauxSLA: kpis.tauxSLA.value ?? 0,
       avgOccupation: kpis.occupation.value ?? 0,
@@ -205,7 +249,7 @@ function registerDailyReport(router: Hono<ReportEnv>): void {
           agencyId,
           ...(agencyName !== null ? { agencyName } : {}),
           date: day,
-          kpis: computeKpiSet(aggregate),
+          kpis: projectKpiSet(computeKpiSet(aggregate)),
           totalTickets: aggregate.ticketsIssued,
           peakHour: null,
           slaAlerts: [],

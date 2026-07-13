@@ -236,6 +236,9 @@ describe("REP-001: sla-engine — agrégation multi-jours = somme puis division"
 
 describe("REP-001: sla-engine — computeKpiSet (forme contractuelle KpiSet)", () => {
   it("REP-001: computeKpiSet retourne les 7 KPIs typés avec unités", () => {
+    // Moteur PUR : TMA/TMT/TTS calculés en SECONDES (source total_*_seconds).
+    // La conversion secondes → minutes se fait à la FRONTIÈRE ROUTE (reports.ts),
+    // seul endroit où `unit:"minutes"` devient VRAI vis-à-vis de la valeur exposée.
     const kpis = computeKpiSet(FIXTURE);
     expect(kpis.tma).toEqual({ value: 638, unit: "minutes" });
     expect(kpis.tmt).toEqual({ value: 540, unit: "minutes" });

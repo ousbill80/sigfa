@@ -98,12 +98,26 @@ describe("REP-001: GET /reports/kpis — scope agency", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       scope: string; period: string; partial: boolean;
-      kpis: { tmt: { value: number }; tauxSLA: { value: number }; nps: number | null; occupation: { value: number } };
+      kpis: {
+        tma: { value: number; unit: string };
+        tmt: { value: number; unit: string };
+        tts: { value: number; unit: string };
+        tauxSLA: { value: number }; nps: number | null; occupation: { value: number };
+      };
     };
     expect(body.scope).toBe("agency");
     expect(body.period).toBe("2026-07-01");
     expect(body.partial).toBe(false);
-    expect(body.kpis.tmt.value).toBe(540);
+    // Durées EXPOSÉES en minutes (frontière route) : le moteur calcule en secondes.
+    // TMT = 2160 s service / 4 DONE = 540 s → 9 min. `unit:"minutes"` doit être VRAI.
+    expect(body.kpis.tmt.value).toBe(9);
+    expect(body.kpis.tmt.unit).toBe("minutes");
+    // TMA = 2550 s attente / (4 DONE + 1 NO_SHOW = 5 servedCount) = 510 s → 8.5 min.
+    expect(body.kpis.tma.value).toBe(8.5);
+    expect(body.kpis.tma.unit).toBe("minutes");
+    // TTS = TMA + TMT (secondes moteur : 510 + 540 = 1050 s) → 17.5 min.
+    expect(body.kpis.tts.value).toBe(17.5);
+    expect(body.kpis.tts.unit).toBe("minutes");
     expect(body.kpis.tauxSLA.value).toBe(50); // met 3 / total 6
     expect(body.kpis.nps).toBe(0);
     expect(body.kpis.occupation.value).toBe(100);
@@ -155,6 +169,38 @@ describe("REP-001: GET /reports/kpis — scope agency", () => {
   });
 });
 
+describe("REP-001: conversion d'unité secondes → minutes (frontière route)", () => {
+  it("REP-001: TMA moteur 90 s → 1,5 min exposées, unit:\"minutes\" VRAI", async () => {
+    // Agrégat contrôlé : 1 DONE, 90 s d'attente, 60 s de service.
+    // Moteur (secondes) : TMA = 90/1 = 90 s ; TMT = 60/1 = 60 s ; TTS = 150 s.
+    // Frontière route (minutes) : TMA = 1.5 ; TMT = 1.0 ; TTS = 2.5.
+    await h.db.query(
+      `INSERT INTO daily_agency_stats (bank_id, agency_id, service_id, day,
+         tickets_issued, tickets_served, tickets_abandoned, tickets_no_show,
+         total_wait_seconds, total_service_seconds, sla_met_count, sla_total_count,
+         feedback_count, feedback_sum, nps_promoters, nps_passives, nps_detractors,
+         agent_active_seconds, agent_available_seconds)
+       VALUES ($1,$2,NULL,'2026-06-15', 1,1,0,0, 90,60, 1,1, 0,0, 0,0,0, NULL,NULL)`,
+      [bankA.bankId, bankA.agencyId]
+    );
+    const res = await req("GET", `/reports/kpis?scope=agency&period=2026-06-15&agencyId=${bankA.agencyId}`, auditorToken);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      kpis: {
+        tma: { value: number; unit: string };
+        tmt: { value: number; unit: string };
+        tts: { value: number; unit: string };
+      };
+    };
+    expect(body.kpis.tma.value).toBe(1.5);
+    expect(body.kpis.tma.unit).toBe("minutes");
+    expect(body.kpis.tmt.value).toBe(1);
+    expect(body.kpis.tmt.unit).toBe("minutes");
+    expect(body.kpis.tts.value).toBe(2.5);
+    expect(body.kpis.tts.unit).toBe("minutes");
+  });
+});
+
 describe("REP-001: GET /reports/kpis — scope network (AnonymizedNetworkAggregate)", () => {
   it("REP-001: SUPER_ADMIN lit le réseau — zéro champ personnel", async () => {
     const res = await req("GET", `/reports/kpis?scope=network&period=2026-07`, superToken);
@@ -196,12 +242,14 @@ describe("REP-001: GET /reports/daily/:agencyId", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       agencyId: string; date: string; totalTickets: number;
-      kpis: { tmt: { value: number } }; partial: boolean;
+      kpis: { tmt: { value: number; unit: string } }; partial: boolean;
     };
     expect(body.agencyId).toBe(bankA.agencyId);
     expect(body.date).toBe("2026-07-01");
     expect(body.totalTickets).toBe(6);
-    expect(body.kpis.tmt.value).toBe(540);
+    // 540 s moteur → 9 min exposées (frontière route), `unit:"minutes"` VRAI.
+    expect(body.kpis.tmt.value).toBe(9);
+    expect(body.kpis.tmt.unit).toBe("minutes");
     expect(body.partial).toBe(false);
   });
 
