@@ -121,6 +121,39 @@ export const kioskPrinterErrorSchema = z.object({
   since: z.string().datetime(),
 });
 
+/**
+ * Statut de supervision d'une borne — contrat `KioskStatus` (admin.yaml,
+ * CONTRACT-013 / ADM-003). Énuméré fermé, transcrit du contrat.
+ */
+export const kioskSupervisionStatusSchema = z.enum([
+  "ONLINE",
+  "DEGRADED",
+  "SILENT",
+  "NEVER_SEEN",
+]);
+
+/**
+ * Schéma commun des payloads de supervision borne (`kiosk:silent`,
+ * `kiosk:recovered`, `kiosk:status`) — contrat CONTRACT-013 / ADM-003. PII-free :
+ * identifiants + statut + horodatage uniquement. Ces trois événements partagent
+ * exactement la même forme au contrat.
+ */
+const kioskSupervisionPayloadSchema = z.object({
+  kioskId: z.string().uuid(),
+  agencyId: z.string().uuid(),
+  status: kioskSupervisionStatusSchema,
+  since: z.string().datetime(),
+});
+
+/** Schéma du payload `kiosk:silent` (contrat `kioskSilentEvent`). */
+export const kioskSilentSchema = kioskSupervisionPayloadSchema;
+
+/** Schéma du payload `kiosk:recovered` (contrat `kioskRecoveredEvent`). */
+export const kioskRecoveredSchema = kioskSupervisionPayloadSchema;
+
+/** Schéma du payload `kiosk:status` (contrat `kioskStatusEvent`). */
+export const kioskStatusSchema = kioskSupervisionPayloadSchema;
+
 /** Association nom d'événement → schéma Zod du payload (forme CONTRAT). */
 export const EVENT_SCHEMAS = {
   "ticket:created": ticketCreatedSchema,
@@ -130,6 +163,12 @@ export const EVENT_SCHEMAS = {
   "counter:status": counterStatusSchema,
   "alert:manager": alertManagerSchema,
   "kiosk:printer-error": kioskPrinterErrorSchema,
+  // ── CONTRACT-013 / ADM-003 : supervision borne (STAFF, fail-closed) ────────
+  // Absents de DISPLAY_EVENTS → diffusés vers `agency:{id}:staff` (jamais la room
+  // publique DISPLAY). Cf. TV-hardening F-SEC-TV-01.
+  "kiosk:silent": kioskSilentSchema,
+  "kiosk:recovered": kioskRecoveredSchema,
+  "kiosk:status": kioskStatusSchema,
 } as const;
 
 /** Noms d'événements supportés (les 7 événements serveur→client). */

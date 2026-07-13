@@ -45,6 +45,7 @@ import { createHealthRouter } from "src/routes/health.js";
 import { createAuditLogRouter } from "src/routes/audit-logs.js";
 import { createDeviceRouter } from "src/routes/devices.js";
 import { createKioskStatusRouter } from "src/routes/kiosks-status.js";
+import { createKioskSupervisionRouter } from "src/routes/kiosk-supervision.js";
 import { createReportRouter } from "src/routes/reports.js";
 import { createNotificationWebhookRouter } from "src/routes/webhooks-notifications.js";
 import { createWhatsAppInboundRouter } from "src/routes/webhooks-whatsapp-inbound.js";
@@ -145,6 +146,9 @@ export function buildRouteRegistry(opts: AppOptions): readonly RouteDescriptor[]
     // - /health : public, checks postgres+redis (+ queues si injecté), 503 si down.
     mount("/api/v1", createHealthRouter("0.0.0", opts.queueHealth)),
     mount("/api/v1", createKioskStatusRouter()),
+    // Supervision borne ADM-003a (admin.yaml, CONTRACT-013) : état dérivé à la
+    // lecture (ONLINE/DEGRADED/SILENT/NEVER_SEEN) + alerte « muette » débouncée.
+    mount("/api/v1", createKioskSupervisionRouter()),
     mount("/api/v1", createAuditLogRouter()),
     mount("/api/v1", createDeviceRouter()),
     // Routes reporting KPI (REP-001) : GET /reports/kpis + /reports/daily/:agencyId.

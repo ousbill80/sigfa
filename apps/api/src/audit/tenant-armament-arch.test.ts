@@ -100,7 +100,11 @@ const ARMED_CUTOVER_PENDING: readonly string[] = [
  * de la livraison du primitif ; se remplit à mesure de la bascule. Quand
  * `ARMED_CUTOVER_PENDING` est vide, la dette SEC-F3-02 est fermée.
  */
-const ARMED: readonly string[] = [];
+const ARMED: readonly string[] = [
+  // ADM-003a — supervision borne (GET /agencies/{id}/kiosks/status). Lecture
+  // tenant routée via `withArmedTenant` (RLS armée) : première route basculée.
+  "kiosk-supervision.ts",
+];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */
 interface RouteFile {

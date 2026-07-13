@@ -26,6 +26,9 @@ import {
   counterStatusEvent,
   alertManagerEvent,
   kioskPrinterErrorEvent,
+  kioskSilentEvent,
+  kioskRecoveredEvent,
+  kioskStatusEvent,
 } from "@sigfa/contracts/events/realtime.js";
 import { createSocketBus } from "src/services/socket-bus.js";
 import { isDisplayEvent, type EventName } from "src/services/realtime.js";
@@ -108,6 +111,24 @@ const CONTRACT_PAYLOADS: Record<EventName, Record<string, unknown>> = {
     agencyId: AGENCY_ID,
     since: "2026-07-12T10:00:00.000Z",
   },
+  "kiosk:silent": {
+    kioskId: "00000000-0000-4000-a000-000000000006",
+    agencyId: AGENCY_ID,
+    status: "SILENT",
+    since: "2026-07-12T10:00:00.000Z",
+  },
+  "kiosk:recovered": {
+    kioskId: "00000000-0000-4000-a000-000000000006",
+    agencyId: AGENCY_ID,
+    status: "ONLINE",
+    since: "2026-07-12T10:00:00.000Z",
+  },
+  "kiosk:status": {
+    kioskId: "00000000-0000-4000-a000-000000000006",
+    agencyId: AGENCY_ID,
+    status: "DEGRADED",
+    since: "2026-07-12T10:00:00.000Z",
+  },
 };
 
 /** Table nom→payloadSchema du CONTRAT (source de vérité de la parité). */
@@ -119,6 +140,9 @@ const CONTRACT_SCHEMAS = {
   "counter:status": counterStatusEvent.payloadSchema,
   "alert:manager": alertManagerEvent.payloadSchema,
   "kiosk:printer-error": kioskPrinterErrorEvent.payloadSchema,
+  "kiosk:silent": kioskSilentEvent.payloadSchema,
+  "kiosk:recovered": kioskRecoveredEvent.payloadSchema,
+  "kiosk:status": kioskStatusEvent.payloadSchema,
 } as const;
 
 const ALL: EventName[] = [
@@ -129,6 +153,9 @@ const ALL: EventName[] = [
   "counter:status",
   "alert:manager",
   "kiosk:printer-error",
+  "kiosk:silent",
+  "kiosk:recovered",
+  "kiosk:status",
 ];
 
 afterEach(() => {
@@ -140,7 +167,7 @@ function expectedRoom(event: EventName, agencyId: string): string {
   return isDisplayEvent(event) ? `agency:${agencyId}` : `agency:${agencyId}:staff`;
 }
 
-describe("RT-001a: createSocketBus — adaptateur bus↔contrat (7 événements)", () => {
+describe("RT-001a: createSocketBus — adaptateur bus↔contrat (10 événements)", () => {
   it.each(ALL)(
     "RT-001a: %s — diffusé dans la room ségrégée par rôle, payload conforme au payloadSchema du CONTRAT (parité)",
     (event) => {
@@ -184,6 +211,10 @@ describe("RT-001a: createSocketBus — adaptateur bus↔contrat (7 événements)
       "counter:status",
       "alert:manager",
       "kiosk:printer-error",
+      // ADM-003a : supervision borne — STAFF uniquement (jamais DISPLAY).
+      "kiosk:silent",
+      "kiosk:recovered",
+      "kiosk:status",
     ];
     for (const event of staffEvents) {
       const { io, toCalls } = makeFakeIo();
