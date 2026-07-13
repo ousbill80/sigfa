@@ -18,14 +18,17 @@
 
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
+import type { Client } from "pg";
 import {
   createAiForecastRouter,
   emptyForecastDataProvider,
+  dbFeatureStoreProvider,
   type ForecastDataProvider,
 } from "src/routes/ai-forecast.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import { makeDay, makeFeature, FX_BANK, FX_AGENCY } from "src/ai/forecast-fixtures.js";
 import type { FeatureRecord } from "src/ai/feature-engine.js";
+import { featureRecordToParams } from "src/ai/db-feature-store.js";
 
 /** Construit un tenant AGENCY_DIRECTOR ayant accès à l'agence de test. */
 function tenant(overrides: Partial<TenantContext> = {}): TenantContext {
@@ -53,6 +56,69 @@ function appWith(provider: ForecastDataProvider, tctx: TenantContext): Hono<Test
   });
   app.route("/api/v1", createAiForecastRouter({ provider }));
   return app;
+}
+
+/** Env du mini-app quand la route utilise le feature-store DB (injecte `db`). */
+interface TestDbEnv {
+  Variables: { tenant: TenantContext; db: Client };
+}
+
+/** Colonnes SELECT de `getByAgency` (ordre = db-feature-store SELECT_COLUMNS). */
+const AI_FEATURES_SELECT_COLS = [
+  "bank_id", "agency_id", "service_id", "date", "hour_bucket", "bucket_minutes",
+  "arrivals", "served", "no_show", "abandoned", "avg_wait_seconds", "p90_wait_seconds",
+  "avg_service_seconds", "counters_open", "agents_active", "day_of_week", "is_month_end",
+  "is_public_pay_day", "is_public_holiday", "is_eve_of_holiday", "factors",
+  "arrivals_lag_1d", "arrivals_lag_7d", "arrivals_roll_mean_4w", "is_partial",
+  "available_days", "feature_set_version",
+] as const;
+
+/** Projette un `FeatureRecord` en ligne `ai_features` (snake_case pg) pour le stub. */
+function featureRecordToDbRow(r: FeatureRecord): Record<string, unknown> {
+  const params = featureRecordToParams(r);
+  const row: Record<string, unknown> = {};
+  AI_FEATURES_SELECT_COLS.forEach((col, i) => {
+    // params[20] = factors JSON string → le driver pg renvoie du JSON déjà parsé.
+    row[col] = col === "factors" ? r.factors : params[i];
+  });
+  return row;
+}
+
+/**
+ * Fake `Client` pg satisfaisant `withArmedTenant` : capture BEGIN / SET LOCAL /
+ * COMMIT et rend les lignes `ai_features` (une par record) sur le SELECT du store.
+ */
+function fakeArmedClient(records: readonly FeatureRecord[]): {
+  client: Client;
+  sql: string[];
+} {
+  const sql: string[] = [];
+  const client = {
+    query: async (text: string) => {
+      sql.push(text);
+      if (/^SELECT .* FROM ai_features/i.test(text)) {
+        return { rows: records.map(featureRecordToDbRow) };
+      }
+      return { rows: [] };
+    },
+  } as unknown as Client;
+  return { client, sql };
+}
+
+/** Monte le routeur en mode feature-store DB, injectant un `db` fake armé. */
+function appWithDb(records: readonly FeatureRecord[], tctx: TenantContext): {
+  app: Hono<TestDbEnv>;
+  sql: string[];
+} {
+  const { client, sql } = fakeArmedClient(records);
+  const app = new Hono<TestDbEnv>();
+  app.use("*", async (c, next) => {
+    c.set("tenant", tctx);
+    c.set("db", client);
+    await next();
+  });
+  app.route("/api/v1", createAiForecastRouter({ useDbFeatureStore: true }));
+  return { app, sql };
 }
 
 /** Provider synthétique renvoyant des records fixes. */
@@ -195,5 +261,58 @@ describe("ai-forecast route", () => {
     const app = appWith(emptyForecastDataProvider, tenant({ bankId: null }));
     const res = await app.request(`/api/v1/ai/forecast?agencyId=${FX_AGENCY}&date=2026-07-15`);
     expect(res.status).toBe(403);
+  });
+
+  // ── F10-FEATURE-STORE : provider DB-backed armé (withArmedTenant) ─────────────
+  it("F10: feature-store DB — lecture ai_features ARMÉE (BEGIN + SET LOCAL app.current_bank_id + COMMIT)", async () => {
+    const recs = sufficientHistory();
+    const target = "2026-07-15";
+    recs.push(...makeDay(target, [{ hour: 9, roll: 20 }]));
+    const { app, sql } = appWithDb(recs, tenant());
+    const res = await app.request(`/api/v1/ai/forecast?agencyId=${FX_AGENCY}&date=${target}`);
+    expect(res.status).toBe(200);
+    // L'accès ai_features s'exécute DANS une transaction armée sur le bankId du tenant.
+    expect(sql[0]).toBe("BEGIN");
+    expect(sql[1]).toBe(`SET LOCAL app.current_bank_id = '${FX_BANK}'`);
+    expect(sql.some((s) => /SELECT .* FROM ai_features WHERE bank_id = \$1 AND agency_id = \$2/i.test(s))).toBe(true);
+    expect(sql[sql.length - 1]).toBe("COMMIT");
+  });
+
+  it("F10: feature-store DB — 200 avec série prédite quand ai_features fournit ≥ 90 j", async () => {
+    const recs = sufficientHistory();
+    const target = "2026-07-15";
+    recs.push(...makeDay(target, [
+      { hour: 8, roll: 12 },
+      { hour: 9, roll: 25 },
+    ]));
+    const { app } = appWithDb(recs, tenant());
+    const res = await app.request(`/api/v1/ai/forecast?agencyId=${FX_AGENCY}&date=${target}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      forecast: Array<{ hour: string }>;
+      meta: { availableDays: number };
+    };
+    expect(body.forecast.map((h) => h.hour)).toEqual(["08:00", "09:00"]);
+    expect(body.meta.availableDays).toBeGreaterThanOrEqual(90);
+  });
+
+  it("F10: feature-store DB — 422 INSUFFICIENT_HISTORY si ai_features vide (gated réel)", async () => {
+    const { app } = appWithDb([], tenant());
+    const res = await app.request(`/api/v1/ai/forecast?agencyId=${FX_AGENCY}&date=2026-07-15`);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: { code: string; details: { availableDays: number } } };
+    expect(body.error.code).toBe("INSUFFICIENT_HISTORY");
+    expect(body.error.details.availableDays).toBe(0);
+  });
+
+  it("F10: dbFeatureStoreProvider — arme sur le bankId fourni et ne lit QUE l'agence demandée", async () => {
+    const recs = makeDay("2026-07-15", [{ hour: 9, roll: 20 }]);
+    const { client, sql } = fakeArmedClient(recs);
+    const provider = dbFeatureStoreProvider(client);
+    const out = await provider({ bankId: FX_BANK, agencyId: FX_AGENCY, date: "2026-07-15" });
+    expect(out.records).toHaveLength(1);
+    expect(sql[1]).toBe(`SET LOCAL app.current_bank_id = '${FX_BANK}'`);
+    const select = sql.find((s) => /FROM ai_features/i.test(s));
+    expect(select).toContain("agency_id = $2");
   });
 });
