@@ -6,12 +6,17 @@
  * gauche ~75 % = AdZone permanente ; colonne droite ~25 % = carte appel courant
  * (flash --brand à l'appel) + derniers appelés + longueur de file.
  * 5 états : nominal · loading · empty · error · offline.
+ *
+ * TV-V3-FIX (retour visuel PO, capture écran 16:9 réel) : numéro courant sur
+ * UNE ligne (clamp sur la largeur colonne), historique DISCRET (--text-2xl /
+ * --text-md, une ligne « OC-046 · Guichet 1 »), liste bornée sans chevaucher
+ * « En attente » (flex sain, overflow hidden, jamais de scroll).
  * @module components/tv/tv-screen.test
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { TvScreen } from "./tv-screen";
-import { initialTvState, type TvState, type TvCall } from "@/lib/tv-state";
+import { initialTvState, TV_PREVIOUS_COUNT, type TvState, type TvCall } from "@/lib/tv-state";
 import { SUPPORTED_LOCALES, t } from "@/lib/i18n";
 
 function call(displayNumber: string, counterLabel: string, calledAt: string): TvCall {
@@ -87,7 +92,90 @@ describe("TvScreen — TV-V3 split permanent", () => {
     expect(within(queue).getByText(t("tv.waiting", "fr"))).toBeInTheDocument();
     const count = within(queue).getByTestId("tv-queue-count");
     expect(count).toHaveTextContent(String(nominal.queue.length));
-    expect(count.getAttribute("style")).toContain("var(--display-tv-counter)");
+    expect(count.getAttribute("style")).toContain("var(--display-tv)");
+  });
+});
+
+describe("TvScreen — TV-V3-FIX retour visuel PO (hiérarchie + bornage de la colonne)", () => {
+  it("TV-V3-FIX: numéro courant sur UNE ligne — nowrap + clamp() borné par tokens, adapté à la largeur colonne", () => {
+    render(<TvScreen state={nominal} />);
+    const number = screen.getByTestId("tv-hero-number");
+    const style = number.getAttribute("style") ?? "";
+    // Jamais de retour à la ligne, quelle que soit la longueur raisonnable (XX-999).
+    expect(style).toContain("white-space: nowrap");
+    // Taille fluide : clamp(token min, largeur colonne, token max) — reste TRÈS lisible à 6-8 m.
+    expect(style).toContain("clamp(var(--text-4xl)");
+    expect(style).toContain("cqw");
+    expect(style).toContain("var(--display-tv-counter)");
+    // La colonne d'appels est le conteneur de taille de référence du clamp.
+    const column = screen.getByTestId("tv-call-column");
+    expect(column.getAttribute("style")).toContain("container-type: inline-size");
+  });
+
+  it("TV-V3-FIX: hiérarchie — numéros historiques en --text-2xl max, guichet en --text-md (plus de --display-tv)", () => {
+    render(<TvScreen state={nominal} />);
+    const cards = screen.getAllByTestId("tv-previous-card");
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) {
+      const number = within(card).getByTestId("tv-previous-number");
+      expect(number.getAttribute("style")).toContain("var(--text-2xl)");
+      const counter = within(card).getByTestId("tv-previous-counter");
+      expect(counter.getAttribute("style")).toContain("var(--text-md)");
+      // L'historique est DISCRET : plus aucune taille display dans l'entrée.
+      expect(card.getAttribute("style") ?? "").not.toContain("var(--display-tv");
+      expect(number.getAttribute("style") ?? "").not.toContain("var(--display-tv");
+    }
+  });
+
+  it("TV-V3-FIX: chaque entrée historique tient sur UNE ligne « OC-046 · Guichet 1 »", () => {
+    render(<TvScreen state={nominal} />);
+    const first = screen.getAllByTestId("tv-previous-card")[0];
+    expect(first).toHaveTextContent("OC-046 · Guichet 1");
+    const style = first?.getAttribute("style") ?? "";
+    expect(style).toContain("white-space: nowrap");
+    expect(style).toContain("overflow: hidden");
+  });
+
+  it("TV-V3-FIX: liste bornée — au plus TV_PREVIOUS_COUNT entrées rendues, même si l'état en fournit plus", () => {
+    const overflowing: TvState = {
+      ...nominal,
+      previous: [
+        ...nominal.previous,
+        call("OC-044", "Guichet 5", "2026-07-11T09:26:00Z"),
+        call("OC-043", "Guichet 6", "2026-07-11T09:25:00Z"),
+        call("OC-042", "Guichet 7", "2026-07-11T09:24:00Z"),
+      ],
+    };
+    render(<TvScreen state={overflowing} />);
+    expect(screen.getAllByTestId("tv-previous-card")).toHaveLength(TV_PREVIOUS_COUNT);
+  });
+
+  it("TV-V3-FIX: aucun chevauchement — la liste vit dans un espace flexible borné (flex 1, min-height 0, overflow hidden)", () => {
+    render(<TvScreen state={nominal} />);
+    const previous = screen.getByTestId("tv-previous");
+    const style = previous.getAttribute("style") ?? "";
+    expect(style).toContain("flex: 1 1 0%");
+    expect(style).toContain("min-height: 0");
+    expect(style).toContain("overflow: hidden");
+  });
+
+  it("TV-V3-FIX: « En attente » ancré en bas dans son espace réservé (flex-shrink 0, plus de marge auto), colonne sans scroll", () => {
+    render(<TvScreen state={nominal} />);
+    const queue = screen.getByTestId("tv-queue");
+    const qStyle = queue.getAttribute("style") ?? "";
+    expect(qStyle).toContain("flex-shrink: 0");
+    expect(qStyle).not.toContain("margin-top: auto");
+    // La colonne entière ne scrolle jamais (720p, 1080p, 4K : mêmes invariants).
+    const column = screen.getByTestId("tv-call-column");
+    expect(column.getAttribute("style")).toContain("overflow: hidden");
+  });
+
+  it("TV-V3-FIX: hiérarchie — compteur « En attente » nettement sous le numéro courant (--display-tv, plus --display-tv-counter)", () => {
+    render(<TvScreen state={nominal} />);
+    const count = screen.getByTestId("tv-queue-count");
+    const style = count.getAttribute("style") ?? "";
+    expect(style).toContain("var(--display-tv)");
+    expect(style).not.toContain("var(--display-tv-counter)");
   });
 });
 
