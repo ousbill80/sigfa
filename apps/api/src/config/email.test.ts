@@ -9,10 +9,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
   getEmailConfig,
+  getEmailAdapter,
   DEFAULT_INTERNAL_DOMAINS,
   DEFAULT_EMAIL_FROM,
 } from "src/config/email.js";
 import { DEFAULT_ATTACHMENT_LIMIT_BYTES } from "src/services/email/attachment-storage.js";
+import { MockResendAdapter } from "src/services/email/email-adapter.js";
+import { ResendEmailAdapter } from "src/services/email/resend-email-adapter.js";
 
 const KEYS = [
   "EMAIL_INTERNAL_DOMAINS",
@@ -20,6 +23,9 @@ const KEYS = [
   "EMAIL_ATTACHMENT_SIGNING_SECRET",
   "EMAIL_ATTACHMENT_BASE_URL",
   "EMAIL_ATTACHMENT_LIMIT_BYTES",
+  "EMAIL_PROVIDER",
+  "RESEND_API_KEY",
+  "RESEND_FROM",
 ];
 
 afterEach(() => {
@@ -51,5 +57,21 @@ describe("NOTIF-004 config email", () => {
     const cfg = getEmailConfig();
     expect(cfg.internalDomains).toEqual([...DEFAULT_INTERNAL_DOMAINS]);
     expect(cfg.attachmentLimitBytes).toBe(DEFAULT_ATTACHMENT_LIMIT_BYTES);
+  });
+
+  it("RESEND-EMAIL: getEmailAdapter → mock par défaut (aucune config resend)", () => {
+    expect(getEmailAdapter()).toBeInstanceOf(MockResendAdapter);
+  });
+
+  it("RESEND-EMAIL: getEmailAdapter → Resend si provider+clé+from présents (client injecté)", () => {
+    process.env["EMAIL_PROVIDER"] = "resend";
+    process.env["RESEND_API_KEY"] = "re_test_key";
+    process.env["RESEND_FROM"] = "no-reply@prodestic.net";
+    const adapter = getEmailAdapter({
+      clientFactory: () => ({
+        emails: { send: async () => ({ data: { id: "x" }, error: null }) },
+      }),
+    });
+    expect(adapter).toBeInstanceOf(ResendEmailAdapter);
   });
 });
