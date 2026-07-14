@@ -51,4 +51,16 @@ describe("TicketMoment", () => {
     );
     expect(container.querySelector(".sig-ticket__actions")).toBeNull();
   });
+
+  it("renders the brand halo layer and the themed number (v3 hooks)", () => {
+    // v3 « Neutre Premium » : le halo et le numero sont stylés par tokens
+    // (halo --brand discret, numero --brand-inv) via ces classes canoniques.
+    const { container } = render(
+      <TicketMoment eyebrow="e" ticketNumber="A-1" message="m" />,
+    );
+    expect(container.querySelector(".sig-ticket__halo")).not.toBeNull();
+    expect(screen.getByTestId("ticket-number")).toHaveClass(
+      "sig-ticket__number",
+    );
+  });
 });

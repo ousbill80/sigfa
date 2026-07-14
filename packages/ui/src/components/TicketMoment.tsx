@@ -1,6 +1,7 @@
 /**
  * TicketMoment — THE hero of SIGFA. The ticket number rendered in `--display`
- * on `--night`, wrapped in a `--gold` halo, entering with a soft spring. A
+ * (`--brand-inv`) on `--night`, wrapped in a discreet `--brand` halo,
+ * entering with a soft spring. A
  * calming message + actions (SMS / voice) turn waiting into tranquillity.
  * Every string comes from props (i18n-agnostic).
  *

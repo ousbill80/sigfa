@@ -1,6 +1,7 @@
 /**
- * SIGFA Design System v2 — component styles.
- * Consumes ONLY the tokens from tokens.css. No hex literal here.
+ * SIGFA Design System v3 « Neutre Premium » — component styles.
+ * Consumes ONLY the tokens from tokens.css. No colour literal here:
+ * neutral shadows, sober states, the tenant brand as the only accent.
  */
 
 /* ============================= Button ============================= */
@@ -322,14 +323,15 @@
   width: min(320px, 80vw);
   height: min(320px, 80vw);
   border-radius: var(--r-full);
+  /* v3 : halo brand discret (color-mix faible alpha) — plus d'or. */
   background: radial-gradient(
     circle,
-    var(--gold-soft) 0%,
-    rgba(199, 154, 58, 0.18) 40%,
+    color-mix(in srgb, var(--brand-inv) 28%, transparent) 0%,
+    color-mix(in srgb, var(--brand) 16%, transparent) 40%,
     transparent 70%
   );
   opacity: 0.5;
-  box-shadow: var(--shadow-gold);
+  box-shadow: 0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent);
 }
 /* Tighten hero paddings + fluid ticket number on narrow phones (<380px). */
 @media (max-width: 380px) {
@@ -355,7 +357,8 @@
   font-size: var(--display);
   font-weight: 700;
   line-height: 1;
-  color: var(--gold);
+  /* v3 : numero en brand eclairci, >= 7:1 garanti sur --night/--night-2. */
+  color: var(--brand-inv);
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--tracking-numeric);
   animation: sig-ticket-in var(--dur-3) var(--ease) both;
@@ -481,7 +484,7 @@
   line-height: var(--leading-body);
   color: var(--sig-empty-desc, var(--ink-soft));
 }
-/* Variante inverse — fonds sombres (--night / --night-2) : 17.4:1 / 8.3:1. */
+/* Variante inverse — fonds sombres (--night / --night-2) : 18.97:1 / 7.85:1. */
 .sig-empty--inverse {
   --sig-empty-title: var(--ink-inverse);
   --sig-empty-desc: var(--ink-inverse-soft);
@@ -498,7 +501,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-6);
-  background: rgba(26, 19, 12, 0.45);
+  background: color-mix(in srgb, var(--night) 45%, transparent);
   animation: sig-fade var(--dur-2) var(--ease) both;
   z-index: 50;
 }
@@ -602,9 +605,9 @@
   font-weight: 600;
 }
 .sig-stepper__step--done .sig-stepper__marker {
-  background: var(--forest);
-  border-color: var(--forest);
-  color: var(--brand-contrast);
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--ink-inverse);
 }
 .sig-stepper__connector {
   flex: 1 1 auto;
@@ -614,7 +617,7 @@
   border-radius: var(--r-full);
 }
 .sig-stepper__connector--done {
-  background: var(--forest);
+  background: var(--success);
 }
 
 /* ============================= Typography ============================= */

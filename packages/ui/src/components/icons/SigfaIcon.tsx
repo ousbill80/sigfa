@@ -3,7 +3,7 @@
  *
  * Rendu : SVG 24 x 24 en deux couches `currentColor` (fond duotone doux +
  * trait 2 px arrondi) — l'icône prend la couleur du texte parent et reste
- * donc 100 % thémable par token (`--brand`, `--ink`, `--gold`, ...).
+ * donc 100 % thémable par token (`--brand`, `--ink`, `--success`, ...).
  *
  * Accessibilité : `aria-hidden` par défaut — la règle design system est
  * « icône + texte toujours appariés », le texte porte le sens. Passer `title`
