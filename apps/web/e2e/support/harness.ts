@@ -139,16 +139,26 @@ async function applySchema(db: pg.Client): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
+  // `timezone` / `weekly_schedule` / `deleted_at` : requis par le clone structurel
+  // d'agence (ADM-002a — `createAgency` hérite l'horaire/timezone de la source, et
+  // les gardes tenant filtrent `deleted_at IS NULL`). Parité minimale DB-002.
   await db.query(`
     CREATE TABLE IF NOT EXISTS agencies (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+      name TEXT NOT NULL, timezone TEXT NOT NULL DEFAULT 'Africa/Abidjan',
+      weekly_schedule JSONB NOT NULL DEFAULT '{}'::jsonb, deleted_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
+  // `display_order` / `is_active` / `deleted_at` : le clone recopie les services
+  // ACTIFS de la source (ORDER BY display_order, WHERE is_active AND deleted_at IS
+  // NULL). Parité minimale DB-002 pour le parcours d'onboarding réel.
   await db.query(`
     CREATE TABLE IF NOT EXISTS services (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
       agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL,
-      sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+      sla_minutes INTEGER NOT NULL DEFAULT 10, display_order INTEGER NOT NULL DEFAULT 0,
+      is_active BOOLEAN NOT NULL DEFAULT true, deleted_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
   await db.query(`
     CREATE TABLE IF NOT EXISTS queues (
@@ -177,9 +187,11 @@ async function applySchema(db: pg.Client): Promise<void> {
       status counter_status NOT NULL DEFAULT 'OPEN', agent_id UUID, current_ticket_id UUID,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
+  // `bank_id` : le clone lit/écrit les liaisons counter_services scopées banque
+  // (`WHERE bank_id = $1`). Nullable-défaut pour l'insert seed sans bank_id.
   await db.query(`
     CREATE TABLE IF NOT EXISTS counter_services (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID REFERENCES banks(id),
       counter_id UUID NOT NULL REFERENCES counters(id), service_id UUID NOT NULL REFERENCES services(id),
       UNIQUE(counter_id, service_id));
   `);
@@ -301,9 +313,11 @@ async function seed(db: pg.Client): Promise<E2eFixtures> {
     [bankId, agencyId, agentId]
   );
   const counterId = (ctr.rows[0] as { id: string }).id;
+  // `bank_id` renseigné → le clone d'agence (ADM-002b) retrouve les liaisons de la
+  // source (`WHERE bank_id = $1 AND counter_id = $2`) et les recopie vers la cible.
   await db.query(
-    `INSERT INTO counter_services (counter_id, service_id) VALUES ($1,$2)`,
-    [counterId, serviceId]
+    `INSERT INTO counter_services (bank_id, counter_id, service_id) VALUES ($1,$2,$3)`,
+    [bankId, counterId, serviceId]
   );
   // Agent AVAILABLE (le cycle ticket pilotera SERVING/AVAILABLE).
   await db.query(
