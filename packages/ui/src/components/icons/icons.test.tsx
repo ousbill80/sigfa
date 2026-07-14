@@ -56,6 +56,10 @@ const UI_NAMES: IconName[] = [
   "horloge",
   "statistiques",
   "parametres",
+  // Complément du set (GO PO 2026-07) : dicter, navigation, CTA SMS.
+  "micro",
+  "chevron",
+  "telephone",
 ];
 
 describe("ICONS-001: registre du set", () => {
@@ -154,6 +158,31 @@ describe("ICONS-001: rendu SVG duotone", () => {
       expect(literals, `${file}: ${String(literals)}`).toBeNull();
       expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     }
+  });
+});
+
+describe("ICONS-002: complément micro / chevron / telephone", () => {
+  it.each(["micro", "chevron", "telephone"] as const)(
+    "%s est rendue par le set duotone avec composant dédié",
+    (name) => {
+      const pascal = `Icon${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      const Component = Icons[pascal as keyof typeof Icons];
+      expect(Component, `composant manquant: ${pascal}`).toBeTypeOf("function");
+      const { container } = render(<SigfaIcon name={name} />);
+      const svg = container.querySelector("svg");
+      expect(svg?.getAttribute("data-icon")).toBe(name);
+      expect(svg?.querySelector('[data-layer="duo"]')).not.toBeNull();
+      expect(svg?.querySelector('[data-layer="line"]')).not.toBeNull();
+    },
+  );
+
+  it("chevron pointe à droite — la rotation reste au consommateur (style)", () => {
+    const { container } = render(
+      <SigfaIcon name="chevron" style={{ transform: "rotate(90deg)" }} />,
+    );
+    const svg = container.querySelector("svg");
+    // Une seule icône directionnelle : le consommateur tourne via transform.
+    expect(svg?.style.transform).toBe("rotate(90deg)");
   });
 });
 
