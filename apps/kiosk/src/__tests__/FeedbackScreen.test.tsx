@@ -423,6 +423,24 @@ describe("KIOSK-009: FeedbackScreen", () => {
     return Number(match![1]);
   }
 
+  /**
+   * BARRIÈRE DÉTERMINISTE (leçon CI 2 cœurs) : la phase « merci » arrive via un
+   * POST asynchrone HORS act — l'intervalle du décompte est donc posé par un
+   * effet React flushé de façon ASYNCHRONE (tâche MessageChannel du scheduler)
+   * APRÈS que waitFor a vu le DOM « merci ». Sous charge (coverage, runner
+   * 2 cœurs), le setTimeout(0) auto-avancé du drain de waitFor, en retard, bat
+   * la tâche MessageChannel : avancer l'horloge factice à ce moment-là perd les
+   * ticks (le décompte reste figé). On attend donc d'OBSERVER un 1er tick —
+   * preuve que l'intervalle vit sur l'horloge factice — puis toute la suite du
+   * test est 100 % synchrone, donc déterministe.
+   */
+  async function waitForCountdownStart(before: number): Promise<number> {
+    await waitFor(() => expect(returningSeconds()).toBeLessThan(before), {
+      timeout: 15_000,
+    });
+    return returningSeconds();
+  }
+
   it("AUDIT-F21: après merci — compte à rebours 10 s VISIBLE (pattern Moment Ticket), puis retour accueil", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockGet(doneTicket(2));
@@ -447,18 +465,22 @@ describe("KIOSK-009: FeedbackScreen", () => {
     expect(s0).toBeLessThanOrEqual(10);
     expect(s0).toBeGreaterThanOrEqual(7);
 
+    // Attendre le 1er tick avant d'avancer l'horloge (cf. waitForCountdownStart).
+    const s1 = await waitForCountdownStart(s0);
+    expect(s1).toBeGreaterThan(3); // garde-fou : dérive auto-avance anormale
+
     mockPush.mockClear();
     act(() => {
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime((s1 - 3) * 1000);
     });
-    expect(returningSeconds()).toBe(s0 - 3);
+    expect(returningSeconds()).toBe(3);
     expect(mockPush).not.toHaveBeenCalled();
 
     act(() => {
-      vi.advanceTimersByTime((s0 - 3) * 1000);
+      vi.advanceTimersByTime(3000);
     });
     expect(mockPush).toHaveBeenCalledWith("/fr");
-  });
+  }, 30_000);
 
   it("AUDIT-F21: après merci — bouton « Terminer » (≥ 72 px) → retour accueil immédiat", async () => {
     mockGet(doneTicket(2));
@@ -509,6 +531,10 @@ describe("KIOSK-009: FeedbackScreen", () => {
     expect(s0).toBeLessThanOrEqual(20);
     expect(s0).toBeGreaterThan(15);
 
+    // Attendre le 1er tick avant d'avancer l'horloge (cf. waitForCountdownStart).
+    const s1 = await waitForCountdownStart(s0);
+    expect(s1).toBeGreaterThan(10); // délai doublé : encore > 10 s après le 1er tick
+
     mockPush.mockClear();
     act(() => {
       vi.advanceTimersByTime(10_000);
@@ -516,10 +542,10 @@ describe("KIOSK-009: FeedbackScreen", () => {
     // Après 10 s (le délai nominal entier), l'écran accessibilité est TOUJOURS là.
     expect(mockPush).not.toHaveBeenCalled();
     act(() => {
-      vi.advanceTimersByTime(10_000);
+      vi.advanceTimersByTime(s1 * 1000); // solde large : dépasse le délai doublé restant
     });
     expect(mockPush).toHaveBeenCalledWith("/fr");
-  });
+  }, 30_000);
 
   // ─── Critère 9 : contraste ≥ 7:1 ──────────────────────────────────────────
   it("KIOSK-009: contraste ≥ 7:1 sur --surface-kiosk (axe-core)", async () => {
