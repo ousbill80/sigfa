@@ -31,6 +31,7 @@ import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { AccessibilityIcon, ChevronIcon, PersonIcon } from "@/components/icons/UiIcons";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { SelectionSkeletonGrid } from "@/components/SelectionSkeletonGrid";
 import { purgeTicketOperationLabel } from "@/lib/ticket-operation-store";
 
 /** Conseiller public tel qu'exposé par le contrat (zéro PII). */
@@ -265,30 +266,16 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
     gap: "var(--space-6)",
   };
 
-  // ── LOADING ────────────────────────────────────────────────────────────────
+  // ── LOADING (AUDIT-F20) — skeleton de tuiles animé, plus d'icône figée ─────
   if (state === "loading") {
     return (
       <main role="main" style={shellStyle}>
         {header}
         {title}
-        <div
+        <SelectionSkeletonGrid
           data-testid="managers-loading"
-          role="status"
-          aria-live="polite"
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "var(--space-4)",
-            color: "var(--ink-inverse)",
-            fontSize: "24px",
-          }}
-        >
-          <PersonIcon size={48} style={{ color: "var(--ink-inverse)" }} />
-          {t("loadingMessage")}
-        </div>
+          label={t("loadingMessage")}
+        />
       </main>
     );
   }

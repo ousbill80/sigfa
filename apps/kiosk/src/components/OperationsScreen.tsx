@@ -30,6 +30,7 @@ import { EmptyState, IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
+import { SelectionSkeletonGrid } from "@/components/SelectionSkeletonGrid";
 import { AccessibilityIcon, ChevronIcon } from "@/components/icons/UiIcons";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { storeTicketOperationLabel } from "@/lib/ticket-operation-store";
@@ -189,29 +190,15 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
     gap: "var(--space-6)",
   };
 
-  // ── LOADING ──────────────────────────────────────────────────────────────
+  // ── LOADING (AUDIT-F20) — skeleton de tuiles animé, plus d'icône figée ────
   if (state === "loading") {
     return (
       <main role="main" style={shellStyle}>
         {headerAndA11y}
-        <div
+        <SelectionSkeletonGrid
           data-testid="operations-loading"
-          role="status"
-          aria-live="polite"
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "var(--space-4)",
-            color: "var(--ink-inverse)",
-            fontSize: "24px",
-          }}
-        >
-          <ServiceIcon name="generic" size={48} style={{ color: "var(--ink-inverse)" }} />
-          {t("loadingMessage")}
-        </div>
+          label={t("loadingMessage")}
+        />
       </main>
     );
   }
