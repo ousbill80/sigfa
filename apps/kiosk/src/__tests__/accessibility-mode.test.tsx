@@ -4,7 +4,7 @@
  * Écrits AVANT l'implémentation (phase rouge).
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { readFileSync } from "node:fs";
@@ -55,15 +55,20 @@ import {
 
 const frMessages = {
   ticket005: {
+    eyebrow: "Votre ticket",
     position: "Position dans la file : {position}e",
     waitEstimate: "Attente estimée : {minutes} minutes",
     printing: "Votre ticket s'imprime...",
     smsSent: "SMS envoyé au {maskedPhone}",
     returning: "Retour automatique dans {seconds} s",
+    finishButton: "Terminer",
     voiceAnnounce:
       "Ticket {displayNumber}. Vous êtes {position}e dans la file. Environ {minutes} minutes.",
+    voiceAnnounceOffline:
+      "Votre numéro est {displayNumber}. Position et attente estimées dès la reconnexion.",
     offlineBanner: "Mode hors connexion — ticket temporaire",
     offlineInfo: "Ticket local — synchronisation dès reconnexion",
+    offlineEstimate: "Position et attente : estimation à la reconnexion",
     printerError: "Imprimante indisponible — un agent vous remettra votre ticket",
   },
   degraded007: {
@@ -204,7 +209,7 @@ describe("KIOSK-008: prefers-reduced-motion → transition instantanée", () => 
   });
 });
 
-describe("KIOSK-008: retour accueil à 8 s au Moment Ticket (accessibilité)", () => {
+describe("KIOSK-008: retour accueil à 20 s au Moment Ticket (accessibilité — audit F9)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -213,15 +218,19 @@ describe("KIOSK-008: retour accueil à 8 s au Moment Ticket (accessibilité)", (
     vi.useRealTimers();
   });
 
-  it("KIOSK-008: mode accessibilité → retour accueil à 8 s au Moment Ticket (Vitest fake-timer)", () => {
+  it("KIOSK-008: mode accessibilité → retour accueil à 20 s au Moment Ticket (Vitest fake-timer)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <TicketScreen {...defaultProps} isAccessibilityMode={true} />
       </NextIntlClientProvider>
     );
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 

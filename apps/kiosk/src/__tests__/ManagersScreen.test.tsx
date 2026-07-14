@@ -70,6 +70,10 @@ const enMessages = {
 };
 
 import { ManagersScreen } from "@/components/ManagersScreen";
+import {
+  storeTicketOperationLabel,
+  readTicketOperationLabel,
+} from "@/lib/ticket-operation-store";
 
 const AGENCY_ID = "agt-001";
 
@@ -198,6 +202,20 @@ describe("MODEL-KIOSK-B: ManagersScreen", () => {
     expect(mockPush).toHaveBeenCalledWith(
       `/fr/confirmation?targetManagerId=rm-1&agencyId=${AGENCY_ID}&managerName=${encodeURIComponent("Kofi A.")}`
     );
+  });
+
+  it("KIOSK-005b (audit F8): parcours conseiller → purge du libellé d'opération périmé", async () => {
+    // Un parcours opération abandonné a laissé un libellé dans le store.
+    storeTicketOperationLabel("Retrait espèces");
+    mockManagers(3);
+    renderScreen();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("manager-card").length).toBe(3);
+    });
+    screen.getAllByTestId("manager-card")[0].click();
+    // Le Moment Ticket du chemin conseiller n'affichera JAMAIS l'opération
+    // d'un client précédent.
+    expect(readTicketOperationLabel()).toBeNull();
   });
 
   it("MODEL-KIOSK-B: empty → message humain « aucun conseiller disponible », jamais d'écran mort", async () => {

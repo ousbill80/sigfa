@@ -87,14 +87,18 @@
     "managerReminder": "Vous verrez : {name}"
   },
   "ticket005": {
+    "eyebrow": "Votre ticket",
     "position": "Position dans la file : {position}e",
     "waitEstimate": "Attente estimée : {minutes} minutes",
     "printing": "Votre ticket s'imprime...",
     "smsSent": "SMS envoyé au {maskedPhone}",
     "returning": "Retour automatique dans {seconds} s",
+    "finishButton": "Terminer",
     "voiceAnnounce": "Votre numéro est {displayNumber}. Vous êtes en position {position}. Attente estimée : {minutes} minutes.",
+    "voiceAnnounceOffline": "Votre numéro est {displayNumber}. Position et attente estimées dès la reconnexion.",
     "offlineBanner": "Mode hors connexion — ticket temporaire",
     "offlineInfo": "Ticket local — synchronisation dès reconnexion",
+    "offlineEstimate": "Position et attente : estimation à la reconnexion",
     "printerError": "Imprimante indisponible — un agent vous remettra votre ticket",
     "managerReminder": "Vous verrez : {name}"
   },

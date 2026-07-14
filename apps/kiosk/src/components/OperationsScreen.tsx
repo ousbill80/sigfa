@@ -32,6 +32,7 @@ import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
 import { AccessibilityIcon, ChevronIcon } from "@/components/icons/UiIcons";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { storeTicketOperationLabel } from "@/lib/ticket-operation-store";
 
 /** Opération publique telle qu'exposée par le contrat (SLA résolu). */
 export interface OperationItem {
@@ -72,11 +73,17 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
     router.push(`/${currentLocale}`);
   }, timeoutMs);
 
-  /** Navigue vers la confirmation en portant serviceId ET operationId. */
+  /**
+   * Navigue vers la confirmation en portant serviceId ET operationId.
+   * KIOSK-005b (audit F8) : le libellé PUBLIC de l'opération est déposé dans
+   * le store mémoire — le Moment Ticket l'affichera en eyebrow (vérification
+   * du choix d'un coup d'œil).
+   */
   const goToConfirmation = useCallback(
-    (operationId: string) => {
+    (operation: Pick<OperationItem, "id" | "name">) => {
+      storeTicketOperationLabel(operation.name);
       router.push(
-        `/${currentLocale}/confirmation?serviceId=${serviceId}&operationId=${operationId}&agencyId=${agencyId}`
+        `/${currentLocale}/confirmation?serviceId=${serviceId}&operationId=${operation.id}&agencyId=${agencyId}`
       );
     },
     [router, currentLocale, serviceId, agencyId]
@@ -98,7 +105,7 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
       const ops = (data.data ?? []) as OperationItem[];
       // Saut « opération unique » : une seule opération → confirmation directe.
       if (ops.length === 1) {
-        goToConfirmation(ops[0].id);
+        goToConfirmation(ops[0]);
         return;
       }
       if (ops.length === 0) {
@@ -310,7 +317,7 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
             <button
               key={operation.id}
               data-testid="operation-card"
-              onClick={() => goToConfirmation(operation.id)}
+              onClick={() => goToConfirmation(operation)}
               style={{
                 minHeight: "96px",
                 backgroundColor: "var(--surface-1)",

@@ -134,13 +134,40 @@ describe("KIOSK-008: timeout doublé en accessibilité", () => {
 });
 
 describe("KIOSK-008: retour accueil Moment Ticket", () => {
-  it("KIOSK-008: 4 s en nominal", () => {
-    expect(NOMINAL_TICKET_RETURN_MS).toBe(4000);
-    expect(ticketReturnDelayMs(false)).toBe(4000);
+  it("KIOSK-005b (audit F9): 10 s en nominal — temps de lire 6 lignes + écouter l'annonce", () => {
+    expect(NOMINAL_TICKET_RETURN_MS).toBe(10000);
+    expect(ticketReturnDelayMs(false)).toBe(10000);
   });
 
-  it("KIOSK-008: 8 s en accessibilité", () => {
-    expect(A11Y_TICKET_RETURN_MS).toBe(8000);
-    expect(ticketReturnDelayMs(true)).toBe(8000);
+  it("KIOSK-005b (audit F9): 20 s en accessibilité (délai doublé, patron ×2 du kiosque)", () => {
+    expect(A11Y_TICKET_RETURN_MS).toBe(20000);
+    expect(ticketReturnDelayMs(true)).toBe(20000);
+  });
+});
+
+describe("KIOSK-005b (audit F5): annonce vocale honnête sur ticket hors-ligne", () => {
+  const t = (key: string, values?: Record<string, string | number>) =>
+    `${key}:${JSON.stringify(values ?? {})}`;
+
+  it("KIOSK-005b: ticket online → registre voiceAnnounce complet (numéro, position, attente)", () => {
+    const text = buildVoiceAnnouncement(
+      { displayNumber: "A007", position: 4, estimatedWaitMinutes: 12 },
+      t
+    );
+    expect(text).toContain("voiceAnnounce:");
+    expect(text).toContain("A007");
+    expect(text).toContain("4");
+    expect(text).toContain("12");
+  });
+
+  it("KIOSK-005b: ticket hors-ligne → voiceAnnounceOffline SANS position ni attente mensongères", () => {
+    const text = buildVoiceAnnouncement(
+      { displayNumber: "H001", position: 1, estimatedWaitMinutes: 0, isOffline: true },
+      t
+    );
+    expect(text).toContain("voiceAnnounceOffline:");
+    expect(text).toContain("H001");
+    expect(text).not.toContain("position");
+    expect(text).not.toContain("minutes");
   });
 });

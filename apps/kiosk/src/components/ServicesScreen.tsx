@@ -17,6 +17,7 @@ import { EmptyState, IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { DEFAULT_LONG_QUEUE_THRESHOLD_MIN } from "@/hooks/useDegradedState";
+import { purgeTicketOperationLabel } from "@/lib/ticket-operation-store";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
 import { AccessibilityIcon, ChevronIcon, PhoneIcon } from "@/components/icons/UiIcons";
 
@@ -66,9 +67,16 @@ export function ServicesScreen({
 
   // KIOSK-007 : file longue si l'attente d'un service ouvert dépasse le seuil.
   // On affiche proactivement un message d'affluence + met en avant le SMS.
-  const longestOpenWait = services
+  // Audit F5 : on retient le SERVICE ouvert le plus chargé (pas seulement son
+  // attente) — le CTA de la bannière doit porter son serviceId, sinon la
+  // confirmation POST un ticket invalide et replie sur un ticket local « 0 min ».
+  const longestOpenService = services
     .filter((s) => s.isOpen)
-    .reduce((max, s) => Math.max(max, s.estimatedMinutes), 0);
+    .reduce<ServiceItem | null>(
+      (max, s) => (max === null || s.estimatedMinutes > max.estimatedMinutes ? s : max),
+      null
+    );
+  const longestOpenWait = longestOpenService?.estimatedMinutes ?? 0;
   const isLongQueue = longestOpenWait >= longQueueThresholdMinutes;
 
   // MODEL-KIOSK-A : parcours 2 niveaux — un service mène à l'écran OPÉRATIONS
@@ -205,12 +213,19 @@ export function ServicesScreen({
             <span style={{ fontSize: "24px", color: "var(--ink-soft)" }}>
               {tDeg("longQueueMessage")}
             </span>
-            {/* Champ téléphone mis en avant — CTA menant à la saisie du numéro. */}
+            {/* Champ téléphone mis en avant — CTA menant à la saisie du numéro.
+                Audit F5 : le CTA PORTE le serviceId de la file la plus chargée
+                (isLongQueue garantit qu'un service ouvert existe) — plus jamais
+                de POST sans serviceId. Aucun libellé d'opération : purge du
+                store pour ne jamais afficher un choix périmé sur le ticket. */}
             <button
               data-testid="long-queue-phone-cta"
-              onClick={() =>
-                router.push(`/${currentLocale}/confirmation?agencyId=${agencyId}`)
-              }
+              onClick={() => {
+                purgeTicketOperationLabel();
+                router.push(
+                  `/${currentLocale}/confirmation?serviceId=${longestOpenService?.id}&agencyId=${agencyId}`
+                );
+              }}
               style={{
                 minHeight: "72px",
                 fontSize: "28px",
