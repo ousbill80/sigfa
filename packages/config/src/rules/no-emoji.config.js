@@ -13,22 +13,13 @@ import { sigfaPlugin } from "./no-emoji.js";
 import { plainTextParser } from "./plain-text-parser.js";
 
 /**
- * Exemption TEMPORAIRE (sous-chaînes de chemin).
+ * Sévérité de la règle, partagée entre les deux blocs de config.
  *
- * TODO: lever après migration icônes kiosk — la piste parallèle
- * `feat/kiosk-icons-sigfa` purge en ce moment même les emojis de `apps/kiosk`
- * (remplacement par le set SigfaIcon de @sigfa/ui, cf. ICONS-001).
- * L'exemption sera retirée dans un commit suivant, une fois cette migration
- * mergée. Toutes les autres zones (api, web, ui, schemas, contracts,
- * database, factories, testing, tools) sont soumises à la règle.
+ * Aucune exemption de chemin : la règle s'applique à TOUT le monorepo
+ * (l'exemption temporaire `apps/kiosk/` a été levée après la migration de la
+ * borne vers le set SigfaIcon de @sigfa/ui, cf. ICONS-001).
  */
-export const TEMP_NO_EMOJI_EXEMPT_PATHS = ["apps/kiosk/"];
-
-/** Options de la règle, partagées entre les deux blocs de config. */
-const NO_EMOJI_RULE_ENTRY = [
-  "error",
-  { ignorePaths: TEMP_NO_EMOJI_EXEMPT_PATHS },
-];
+const NO_EMOJI_RULE_ENTRY = "error";
 
 export const noEmojiConfigs = [
   // Tous les fichiers source JS/TS. Le motif `files` explicite garantit que

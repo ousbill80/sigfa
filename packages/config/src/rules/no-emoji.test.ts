@@ -12,10 +12,7 @@ import { ESLint, RuleTester } from "eslint";
 
 import { noEmojiRule, sigfaPlugin } from "./no-emoji.js";
 import { parseForESLint, plainTextParser } from "./plain-text-parser.js";
-import {
-  noEmojiConfigs,
-  TEMP_NO_EMOJI_EXEMPT_PATHS,
-} from "./no-emoji.config.js";
+import { noEmojiConfigs } from "./no-emoji.config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = resolve(__dirname, "../__fixtures__/no-emoji");
@@ -45,17 +42,19 @@ describe("sigfa/no-emoji — RuleTester", () => {
         `const f = "file \u{2192} guichet"; // \u{2500}\u{2500}\u{2500} section`,
         // Une séquence d'échappement en source reste autorisée (regex de nettoyage).
         `const re = /[\\u{1F000}-\\u{1FAFF}]/gu;`,
-        // Exemption temporaire par chemin (apps/kiosk).
+        // Option générique ignorePaths de la règle (plus utilisée par la
+        // config partagée depuis la levée de l'exemption kiosk, mais le
+        // mécanisme reste supporté).
         {
           code: `const legacy = "\u{2713} ticket";`,
-          filename: "/repo/apps/kiosk/src/screens/accueil.ts",
-          options: [{ ignorePaths: ["apps/kiosk/"] }],
+          filename: "/repo/vendor/legacy/screens/accueil.ts",
+          options: [{ ignorePaths: ["vendor/legacy/"] }],
         },
-        // Exemption Windows : les antislashs sont normalisés avant comparaison.
+        // ignorePaths Windows : les antislashs sont normalisés avant comparaison.
         {
           code: `const legacy = "\u{2713}";`,
-          filename: "C:\\repo\\apps\\kiosk\\src\\a.ts",
-          options: [{ ignorePaths: ["apps/kiosk/"] }],
+          filename: "C:\\repo\\vendor\\legacy\\a.ts",
+          options: [{ ignorePaths: ["vendor/legacy/"] }],
         },
       ],
       invalid: [
@@ -105,11 +104,11 @@ describe("sigfa/no-emoji — RuleTester", () => {
           code: `// erreur \u{274C} bloquante\nconst ok = 1;`,
           errors: [{ messageId: "forbidden", data: { code: "274C" } }],
         },
-        // Un chemin hors exemption reste flagué même avec ignorePaths.
+        // Un chemin hors ignorePaths reste flagué même avec l'option fournie.
         {
           code: `const x = "\u{1F3E6}";`,
           filename: "/repo/apps/web/src/a.ts",
-          options: [{ ignorePaths: ["apps/kiosk/"] }],
+          options: [{ ignorePaths: ["vendor/legacy/"] }],
           errors: [{ messageId: "forbidden", data: { code: "1F3E6" } }],
         },
       ],
@@ -195,18 +194,23 @@ describe("sigfa/no-emoji — intégration config partagée", () => {
     expect(errors).toHaveLength(0);
   });
 
-  it("exemption temporaire apps/kiosk active dans la config partagée", { timeout: ESLINT_TIMEOUT }, async () => {
+  it("apps/kiosk est soumis à la règle (exemption levée après migration SigfaIcon)", { timeout: ESLINT_TIMEOUT }, async () => {
     const errors = emojiErrors(
-      await lint(resolve(FIXTURES, "apps/kiosk/exempt-emoji.ts")),
+      await lint(resolve(FIXTURES, "apps/kiosk/bad-emoji-kiosk.ts")),
     );
-    expect(errors).toHaveLength(0);
+    // U+2713 + (U+1F5A8 U+FE0F) = 3 caractères interdits.
+    expect(errors).toHaveLength(3);
+    expect(errors.every((e) => e.severity === 2)).toBe(true);
   });
 
-  it("l'exemption couvre exactement apps/kiosk (TODO à lever après migration icônes)", () => {
-    expect(TEMP_NO_EMOJI_EXEMPT_PATHS).toEqual(["apps/kiosk/"]);
+  it("le fragment partagé n'exempte aucun chemin", () => {
     // Le fragment expose bien les deux blocs (sources + JSON de messages).
     expect(noEmojiConfigs).toHaveLength(2);
     expect(noEmojiConfigs[1]?.files).toContain("**/messages/**/*.json");
     expect(noEmojiConfigs[0]?.plugins?.sigfa).toBe(sigfaPlugin);
+    // Aucune option ignorePaths : la règle s'applique à tout le monorepo.
+    for (const config of noEmojiConfigs) {
+      expect(config.rules?.["sigfa/no-emoji"]).toBe("error");
+    }
   });
 });
