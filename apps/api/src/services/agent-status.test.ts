@@ -19,6 +19,8 @@ import { createCaptureBus, type CaptureBus } from "src/services/realtime.js";
 import {
   changeAgentStatus,
   getCurrentStatus,
+  getCurrentStatuses,
+  isAgentPresent,
   agentStatusToCounterStatus,
   type AgentStatus,
 } from "src/services/agent-status.js";
@@ -261,5 +263,56 @@ describe("API-007: stats — tickets traités/jour, TMT moyen/jour, ticket en co
     const week = await computeAgentStats(db, ids.agentId, ids.bankId, "week");
     expect(day.ticketsHandled).toBe(0);
     expect(week.ticketsHandled).toBe(1);
+  });
+});
+
+describe("CONTRACT-014: présence dérivée de la machine à états (available)", () => {
+  it("CONTRACT-014: isAgentPresent — présent si guichet non fermé (AVAILABLE/SERVING/PAUSED), absent si ABSENT/OFFLINE", () => {
+    // Sémantique retenue : présent = statut dont le guichet n'est PAS CLOSED
+    // (agentStatusToCounterStatus ≠ CLOSED). PAUSED = pause courte, l'agent est
+    // physiquement en agence. ABSENT/OFFLINE = pas en service aujourd'hui.
+    expect(isAgentPresent("AVAILABLE")).toBe(true);
+    expect(isAgentPresent("SERVING")).toBe(true);
+    expect(isAgentPresent("PAUSED")).toBe(true);
+    expect(isAgentPresent("ABSENT")).toBe(false);
+    expect(isAgentPresent("OFFLINE")).toBe(false);
+  });
+
+  it("CONTRACT-014: getCurrentStatuses lit le DERNIER statut de chaque agent en UNE requête (batch, pas de N+1)", async () => {
+    // Deuxième agent pour vérifier le lot.
+    const other = await db.query(
+      `INSERT INTO users (bank_id, email, role) VALUES ($1,'agent2-c014@b.ci','AGENT')
+       ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role RETURNING id`,
+      [ids.bankId]
+    );
+    const otherId = (other.rows[0] as { id: string }).id;
+    // Historique : l'agent 1 passe AVAILABLE puis ABSENT (le dernier gagne) ;
+    // l'agent 2 est AVAILABLE. `changed_at` explicites : aucun aléa d'horodatage.
+    await db.query(
+      `INSERT INTO agent_status_history (bank_id, agency_id, agent_id, to_status, changed_at) VALUES
+       ($1,$2,$3,'AVAILABLE', NOW() - INTERVAL '2 minutes'),
+       ($1,$2,$3,'ABSENT',    NOW() - INTERVAL '1 minute'),
+       ($1,$2,$4,'AVAILABLE', NOW() - INTERVAL '1 minute')`,
+      [ids.bankId, ids.agencyId, ids.agentId, otherId]
+    );
+    const statuses = await getCurrentStatuses(db, [ids.agentId, otherId]);
+    expect(statuses.get(ids.agentId)).toBe("ABSENT");
+    expect(statuses.get(otherId)).toBe("AVAILABLE");
+  });
+
+  it("CONTRACT-014: getCurrentStatuses — agent jamais journalisé ABSENT de la Map (défaut OFFLINE à l'appelant)", async () => {
+    const ghost = await db.query(
+      `INSERT INTO users (bank_id, email, role) VALUES ($1,'ghost-c014@b.ci','AGENT')
+       ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role RETURNING id`,
+      [ids.bankId]
+    );
+    const ghostId = (ghost.rows[0] as { id: string }).id;
+    const statuses = await getCurrentStatuses(db, [ghostId]);
+    expect(statuses.has(ghostId)).toBe(false);
+  });
+
+  it("CONTRACT-014: getCurrentStatuses([]) → Map vide sans requête SQL", async () => {
+    const statuses = await getCurrentStatuses(db, []);
+    expect(statuses.size).toBe(0);
   });
 });

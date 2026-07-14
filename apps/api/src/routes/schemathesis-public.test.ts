@@ -22,8 +22,9 @@ import { GenericContainer, type StartedTestContainer, Wait } from "testcontainer
 import { serve } from "@hono/node-server";
 import type { Server } from "node:http";
 import { nanoid } from "nanoid";
+import { applyMigrations } from "@sigfa/database/test-support";
+import type { PostgresHarness } from "@sigfa/testing/tenant-isolation";
 import { createApp } from "src/app.js";
-import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 const execAsync = promisify(exec);
 
@@ -42,34 +43,24 @@ process.env["PHONE_HASH_KEY"] =
   process.env["PHONE_HASH_KEY"] ??
   "2222222222222222222222222222222222222222222222222222222222222222";
 
-/** Schéma minimal + un ticket DONE pour alimenter le suivi/feedback. */
+/**
+ * Applique les VRAIES migrations SQL (`packages/database/migrations/`) puis seed
+ * le jeu public — FIDÉLITÉ au schéma de production (même convention que
+ * `schemathesis-auth.test.ts`). Le drift harnais/schéma (ex. table `kiosks`
+ * absente d'un DDL inline → 500 sur POST /kiosk/session au lieu du 401 opaque)
+ * est structurellement impossible : le schéma exercé EST celui des migrations.
+ */
 async function runMigrations(client: pg.Client): Promise<void> {
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_status') THEN
-        CREATE TYPE ticket_status AS ENUM ('WAITING','CALLED','SERVING','DONE','NO_SHOW','ABANDONED','TRANSFERRED'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_priority') THEN
-        CREATE TYPE ticket_priority AS ENUM ('STANDARD','PRIORITY','VIP','PMR','SENIOR'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_channel') THEN
-        CREATE TYPE ticket_channel AS ENUM ('KIOSK','QR','MOBILE','WHATSAPP'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='queue_status') THEN
-        CREATE TYPE queue_status AS ENUM ('OPEN','PAUSED','CLOSED'); END IF;
-    END $$;
-  `);
-  await client.query(`CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS agencies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS services (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS operations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER, display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(service_id, code));`);
-  await client.query(`CREATE TABLE IF NOT EXISTS queues (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), current_ticket_number INTEGER NOT NULL DEFAULT 0, status queue_status NOT NULL DEFAULT 'OPEN', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  // MODEL-API-B : users + agency_users pour la validation targetManagerId (issueTicketFor).
-  await client.query(`CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID REFERENCES banks(id), email TEXT NOT NULL UNIQUE, is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT, is_active BOOLEAN NOT NULL DEFAULT true, deleted_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS agency_users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), user_id UUID NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(agency_id, user_id));`);
-  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL DEFAULT 'KIOSK', status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), closed_at TIMESTAMPTZ, feedback_score INTEGER, feedback_comment TEXT, feedback_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), target_manager_id UUID
-);`);
-  await client.query(`CREATE TABLE IF NOT EXISTS daily_agency_stats (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID REFERENCES services(id), day DATE NOT NULL, tickets_issued INTEGER NOT NULL DEFAULT 0, tickets_served INTEGER NOT NULL DEFAULT 0, tickets_abandoned INTEGER NOT NULL DEFAULT 0, tickets_no_show INTEGER NOT NULL DEFAULT 0, total_wait_seconds INTEGER NOT NULL DEFAULT 0, total_service_seconds INTEGER NOT NULL DEFAULT 0, sla_met_count INTEGER NOT NULL DEFAULT 0, sla_total_count INTEGER NOT NULL DEFAULT 0, feedback_count INTEGER NOT NULL DEFAULT 0, feedback_sum INTEGER NOT NULL DEFAULT 0, nps_promoters INTEGER NOT NULL DEFAULT 0, nps_passives INTEGER NOT NULL DEFAULT 0, nps_detractors INTEGER NOT NULL DEFAULT 0, agent_active_seconds INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS das_no_service_uniq ON daily_agency_stats (bank_id, agency_id, day) WHERE service_id IS NULL;`);
-  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS das_with_service_uniq ON daily_agency_stats (bank_id, agency_id, service_id, day) WHERE service_id IS NOT NULL;`);
+  const harness: PostgresHarness = {
+    connectionString: "",
+    query: async (sql: string, values?: unknown[]) => {
+      const res =
+        values !== undefined ? await client.query(sql, values) : await client.query(sql);
+      return { rows: res.rows as Array<Record<string, unknown>> };
+    },
+    stop: async () => {},
+  };
+  await applyMigrations(harness);
 
   const bank = await client.query(`INSERT INTO banks (name, slug) VALUES ('B','b') RETURNING id`);
   const bankId = (bank.rows[0] as { id: string }).id;
@@ -84,6 +75,19 @@ async function runMigrations(client: pg.Client): Promise<void> {
     `INSERT INTO operations (bank_id, agency_id, service_id, code, name, sla_minutes, display_order)
      VALUES ($1,$2,$3,'DEP','Dépôt',NULL,0)`,
     [bankId, agencyId, serviceId]
+  );
+  // Conseiller actif + statut courant : la liste publique exerce le batch
+  // agent_status_history (CONTRACT-014, champ `available` requis en réponse).
+  const rm = await client.query(
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role, is_relationship_manager, display_name)
+     VALUES ($1,'rm-schemathesis@t.ci','x-none','Kofi','A.','AGENT',true,'Kofi A.') RETURNING id`,
+    [bankId]
+  );
+  const rmId = (rm.rows[0] as { id: string }).id;
+  await client.query(`INSERT INTO agency_users (bank_id, agency_id, user_id) VALUES ($1,$2,$3)`, [bankId, agencyId, rmId]);
+  await client.query(
+    `INSERT INTO agent_status_history (bank_id, agency_id, agent_id, to_status) VALUES ($1,$2,$3,'AVAILABLE')`,
+    [bankId, agencyId, rmId]
   );
   // Un ticket DONE clôturé à l'instant (fenêtre ouverte) + un WAITING pour le suivi.
   await client.query(
@@ -106,7 +110,6 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test` });
   await db.connect();
   await runMigrations(db);
-  await ensureAuditLogSchema(db);
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
 
   const app = createApp({ db, redis, jwtSecret: jwtSecretBytes });
@@ -246,6 +249,48 @@ describe("API-010: Schemathesis module public", () => {
       exitCode = e.code ?? 1;
     }
     console.log("[Schemathesis public relationship-managers] Output:", output.slice(0, 3000));
+    expect(exitCode).toBe(0);
+  }, 180_000);
+
+  it("CONTRACT-014: Schemathesis PASS session borne (/kiosk/session — bankId requis en réponse)", async () => {
+    const contractPath = join(import.meta.dirname, "../../../../packages/contracts/generated/bundled/public.yaml");
+    let dockerOk = false;
+    try {
+      await execAsync("docker --version");
+      dockerOk = true;
+    } catch {
+      console.warn("[Schemathesis kiosk-session] Docker non disponible — SKIP gracieux");
+    }
+    if (!dockerOk) {
+      expect(dockerOk).toBe(false);
+      return;
+    }
+
+    // Credentials aléatoires → 400/401 (jamais 5xx). Le chemin nominal (201 avec
+    // bankId requis) est couvert par kiosk-session.test.ts (assertion stricte).
+    let output = "";
+    let exitCode = 0;
+    try {
+      const result = await execAsync(
+        `docker run --rm \
+          -v "${contractPath}:/contract.yaml" \
+          --add-host=host.docker.internal:host-gateway \
+          schemathesis/schemathesis:stable \
+          run /contract.yaml \
+          --url "http://host.docker.internal:${apiPort}/api/v1" \
+          --include-path-regex "^/kiosk/session$" \
+          --max-examples 20 \
+          --request-timeout 10000 \
+          --checks not_a_server_error`,
+        { timeout: 150_000 }
+      );
+      output = result.stdout + result.stderr;
+    } catch (err: unknown) {
+      const e = err as { stdout?: string; stderr?: string; code?: number };
+      output = (e.stdout ?? "") + (e.stderr ?? "");
+      exitCode = e.code ?? 1;
+    }
+    console.log("[Schemathesis kiosk-session] Output:", output.slice(0, 3000));
     expect(exitCode).toBe(0);
   }, 180_000);
 });

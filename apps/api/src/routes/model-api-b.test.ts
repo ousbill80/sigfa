@@ -185,10 +185,12 @@ describe("MODEL-API-B: liste publique nominative des conseillers (D5)", () => {
     // Un seul conseiller actif avec display_name dans l'agence.
     expect(data).toHaveLength(1);
     const rm = data[0]!;
-    // ZÉRO PII : liste blanche stricte.
-    expect(Object.keys(rm).sort()).toEqual(["displayName", "id", "photoUrl"]);
+    // ZÉRO PII : liste blanche stricte (CONTRACT-014 : + `available`, requis).
+    expect(Object.keys(rm).sort()).toEqual(["available", "displayName", "id", "photoUrl"]);
     expect(rm["id"]).toBe(ids.managerId);
     expect(rm["displayName"]).toBe("Kofi A.");
+    // Sans historique de statut, l'agent est OFFLINE par défaut → absent.
+    expect(rm["available"]).toBe(false);
     // Jamais de PII sérialisée.
     const raw = JSON.stringify(r.data);
     expect(raw).not.toContain("SECRET_PHONE");
@@ -212,6 +214,68 @@ describe("MODEL-API-B: liste publique nominative des conseillers (D5)", () => {
   it("MODEL-API-B: agencyId malformé → 400", async () => {
     const r = await req("GET", `/public/agencies/not-a-uuid/relationship-managers`);
     expect(r.status).toBe(400);
+  });
+});
+
+describe("CONTRACT-014: présence temps réel du conseiller (available) — zéro PII", () => {
+  /** Force le statut courant d'un agent en insérant une ligne d'historique. */
+  async function setAgentStatus(agentId: string, status: string, minutesAgo: number): Promise<void> {
+    await db.query(
+      `INSERT INTO agent_status_history (bank_id, agency_id, agent_id, to_status, changed_at)
+       VALUES ($1,$2,$3,$4::agent_status, NOW() - ($5 || ' minutes')::interval)`,
+      [ids.bankId, ids.agencyId, agentId, status, String(minutesAgo)]
+    );
+  }
+
+  beforeEach(async () => {
+    await db.query(`DELETE FROM agent_status_history`);
+  });
+
+  it("CONTRACT-014: conseiller AVAILABLE → available:true (présent en agence)", async () => {
+    await setAgentStatus(ids.managerId, "AVAILABLE", 5);
+    const r = await req("GET", `/public/agencies/${ids.agencyId}/relationship-managers`);
+    expect(r.status).toBe(200);
+    const data = (r.data as { data: Array<Record<string, unknown>> }).data;
+    expect(data.find((x) => x["id"] === ids.managerId)?.["available"]).toBe(true);
+  });
+
+  it("CONTRACT-014: conseiller SERVING → available:true (en service, guichet ouvert)", async () => {
+    await setAgentStatus(ids.managerId, "SERVING", 5);
+    const r = await req("GET", `/public/agencies/${ids.agencyId}/relationship-managers`);
+    const data = (r.data as { data: Array<Record<string, unknown>> }).data;
+    expect(data.find((x) => x["id"] === ids.managerId)?.["available"]).toBe(true);
+  });
+
+  it("CONTRACT-014: conseiller PAUSED → available:true (pause courte, présent en agence)", async () => {
+    await setAgentStatus(ids.managerId, "PAUSED", 5);
+    const r = await req("GET", `/public/agencies/${ids.agencyId}/relationship-managers`);
+    const data = (r.data as { data: Array<Record<string, unknown>> }).data;
+    expect(data.find((x) => x["id"] === ids.managerId)?.["available"]).toBe(true);
+  });
+
+  it("CONTRACT-014: conseiller ABSENT ou OFFLINE → available:false ; le DERNIER statut gagne", async () => {
+    // AVAILABLE puis ABSENT plus récent : le dernier statut fait foi.
+    await setAgentStatus(ids.managerId, "AVAILABLE", 10);
+    await setAgentStatus(ids.managerId, "ABSENT", 2);
+    const r = await req("GET", `/public/agencies/${ids.agencyId}/relationship-managers`);
+    const data = (r.data as { data: Array<Record<string, unknown>> }).data;
+    expect(data.find((x) => x["id"] === ids.managerId)?.["available"]).toBe(false);
+  });
+
+  it("CONTRACT-014: available est un booléen SANS détail de statut ni horaire exposé (zéro PII)", async () => {
+    await setAgentStatus(ids.managerId, "AVAILABLE", 5);
+    const r = await req("GET", `/public/agencies/${ids.agencyId}/relationship-managers`);
+    const data = (r.data as { data: Array<Record<string, unknown>> }).data;
+    const rm = data.find((x) => x["id"] === ids.managerId)!;
+    expect(Object.keys(rm).sort()).toEqual(["available", "displayName", "id", "photoUrl"]);
+    expect(typeof rm["available"]).toBe("boolean");
+    // Jamais le statut brut, ni d'horodatage de présence, dans la réponse.
+    const raw = JSON.stringify(r.data);
+    expect(raw).not.toContain("AVAILABLE");
+    expect(raw).not.toContain("SERVING");
+    expect(raw).not.toContain("changed_at");
+    expect(raw).not.toContain("changedAt");
+    expect(raw).not.toContain("status");
   });
 });
 

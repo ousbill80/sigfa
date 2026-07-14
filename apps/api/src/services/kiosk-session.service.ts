@@ -145,6 +145,12 @@ export interface KioskSession {
   kioskId: string;
   /** Agence. */
   agencyId: string;
+  /**
+   * Banque (enseigne) de l'agence de la borne — CONTRACT-014, requis LA LOI.
+   * Donnée d'enseigne PUBLIQUE (aucune donnée sensible) : la borne charge son
+   * theming (`--brand`, logo) depuis la session, sans `NEXT_PUBLIC_BANK_ID`.
+   */
+  bankId: string;
 }
 
 /** Ligne borne projetée pour l'authentification. */
@@ -191,7 +197,14 @@ export async function createKioskSession(
       WHERE id = $1`,
     [kioskId, sessionId]
   );
-  return { accessToken, expiresIn: KIOSK_SESSION_TTL_SECONDS, kioskId, agencyId };
+  return {
+    accessToken,
+    expiresIn: KIOSK_SESSION_TTL_SECONDS,
+    kioskId,
+    agencyId,
+    // CONTRACT-014 : la borne connaît sa banque via l'agence/kiosk provisionné.
+    bankId: row.bank_id,
+  };
 }
 
 /** Signe le JWT de session borne (scope agency, role AUTHENTICATED, 12 h). */

@@ -28,15 +28,10 @@ export default defineConfig({
   resolve: {
     alias: {
       // Correspond aux paths TypeScript : src/* → ./src/*
+      // CONTRACT-014 : l'alias @sigfa/contracts/events/realtime.js est supprimé —
+      // le package expose désormais `"./events/*": "./dist/events/*"` dans ses
+      // exports, la résolution Node standard suffit (dist du contrat construit).
       src: resolve(import.meta.dirname, "src"),
-      // Le package @sigfa/contracts n'expose pas ses événements en sous-chemin
-      // via son champ `exports` (`.` → dist/index.js). Pour les tests de PARITÉ
-      // (le contrat = source de vérité), on alias le sous-chemin d'événements
-      // vers la source TS du contrat. Aucune modification de packages/**.
-      "@sigfa/contracts/events/realtime.js": resolve(
-        import.meta.dirname,
-        "../../packages/contracts/events/realtime.ts"
-      ),
     },
   },
   test: {
