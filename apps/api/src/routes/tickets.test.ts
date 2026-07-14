@@ -485,6 +485,62 @@ describe("API-003: cycle de vie du ticket", () => {
     expect(typeof calledPayload.counter["label"]).toBe("string");
   });
 
+  it("WEB-002-OP: call-next expose number + operationId/operationName/serviceName (opération borne)", async () => {
+    const op = await db.query(
+      `INSERT INTO operations (bank_id, agency_id, service_id, code, name)
+       VALUES ($1,$2,$3,'RETESP','Retrait espèces')
+       ON CONFLICT (service_id, code) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [ids.bankId, ids.agencyId, ids.serviceId]
+    );
+    const operationId = (op.rows[0] as { id: string }).id;
+    await issue({ operationId });
+    const called = await post(`/counters/${ids.counterId}/call-next`, {});
+    expect(called.status).toBe(200);
+    const body = called.data as Record<string, unknown>;
+    expect(body["operationId"]).toBe(operationId);
+    expect(body["operationName"]).toBe("Retrait espèces");
+    expect(body["serviceName"]).toBe("Ouverture");
+    // `number` est REQUIS par TicketCallResponse (contrat) — désormais renvoyé.
+    expect(body["number"]).toMatch(/^A\d{3}$/);
+  });
+
+  it("WEB-002-OP: call-next sans opération → operationName null, serviceName présent", async () => {
+    await issue();
+    const called = await post(`/counters/${ids.counterId}/call-next`, {});
+    expect(called.status).toBe(200);
+    const body = called.data as Record<string, unknown>;
+    expect(body["operationName"]).toBeNull();
+    expect(body["serviceName"]).toBe("Ouverture");
+  });
+
+  it("WEB-002-OP: GET /tickets/{id} expose operationName/serviceName (ticket agent)", async () => {
+    const op = await db.query(
+      `INSERT INTO operations (bank_id, agency_id, service_id, code, name)
+       VALUES ($1,$2,$3,'DEPESP','Dépôt espèces')
+       ON CONFLICT (service_id, code) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [ids.bankId, ids.agencyId, ids.serviceId]
+    );
+    const operationId = (op.rows[0] as { id: string }).id;
+    const t = await issue({ operationId });
+    const detail = await get(`/tickets/${t["id"]}`);
+    expect(detail.status).toBe(200);
+    const body = detail.data as Record<string, unknown>;
+    expect(body["operationName"]).toBe("Dépôt espèces");
+    expect(body["serviceName"]).toBe("Ouverture");
+  });
+
+  it("WEB-002-OP: appel ciblé /tickets/{id}/call expose aussi les libellés", async () => {
+    const t = await issue();
+    const ok = await post(`/tickets/${t["id"]}/call`, { counterId: ids.counterId });
+    expect(ok.status).toBe(200);
+    const body = ok.data as Record<string, unknown>;
+    expect(body["serviceName"]).toBe("Ouverture");
+    expect(body["operationName"]).toBeNull();
+    expect(body["number"]).toMatch(/^A\d{3}$/);
+  });
+
   it("API-003: appel ciblé — deuxième guichet → 409 TICKET_ALREADY_CLAIMED (verrou Redis SET NX)", async () => {
     const t = await issue();
     const ok = await post(`/tickets/${t["id"]}/call`, { counterId: ids.counterId });

@@ -717,15 +717,22 @@ function registerGet(router: Hono<TicketEnv>): void {
       const position = await computePositionPriority(row.id, db);
       // D4 : SLA résolu (opération sinon service) en fallback TMT.
       const estimate = await estimateWaitMinutes(position, row.service_id, db, row.operation_id);
-      return c.json(ticketView(row, position, estimate), 200);
+      // WEB-002-OP : libellés opération/service pour l'affichage agent.
+      const labels = await loadCallLabels(db, row.id);
+      return c.json(ticketView(row, position, estimate, labels), 200);
     } catch (err) {
       return errorResponse(c, err);
     }
   });
 }
 
-/** Compose la vue publique d'un ticket. */
-function ticketView(row: TicketRow, position: number, estimate: number): Record<string, unknown> {
+/** Compose la vue publique d'un ticket (WEB-002-OP : + libellés opération/service). */
+function ticketView(
+  row: TicketRow,
+  position: number,
+  estimate: number,
+  labels: CallLabels | null = null
+): Record<string, unknown> {
   return {
     id: row.id,
     number: `A${String(row.number).padStart(3, "0")}`,
@@ -734,6 +741,7 @@ function ticketView(row: TicketRow, position: number, estimate: number): Record<
     priority: row.priority,
     serviceId: row.service_id,
     ...(row.operation_id ? { operationId: row.operation_id } : {}),
+    ...(labels ? { operationName: labels.operationName, serviceName: labels.serviceName } : {}),
     agencyId: row.agency_id,
     channel: row.channel,
     position,
@@ -795,7 +803,9 @@ async function callNext(
     await afterCall(bus, redis, db, { ticketId: selected.id, queueId, counterId });
     // API-004 : vérification débordement après chaque appel
     await checkAndEmitOverflow(db, redis, bus, { queueId, serviceId, bankId, agencyId });
-    return callView(selected.id, selected.serviceId, counterId, now);
+    // WEB-002-OP : numéro + libellés opération/service pour la console agent.
+    const labels = await loadCallLabels(db, selected.id);
+    return callView(selected.id, selected.serviceId, counterId, now, labels);
   } catch (err) {
     await db.query("ROLLBACK");
     throw err;
@@ -901,9 +911,72 @@ async function afterCall(
   await emitQueueUpdated(bus, redis, db, row.agency_id, args.queueId);
 }
 
-/** Vue de réponse d'un appel. */
-function callView(id: string, serviceId: string, counterId: string, calledAt: Date): Record<string, unknown> {
-  return { id, status: "CALLED", counterId, serviceId, position: 0, estimatedWaitMinutes: 0, calledAt: calledAt.toISOString() };
+/** Libellés opération/service + numéro d'un ticket (WEB-002-OP). */
+interface CallLabels {
+  /** Numéro séquentiel brut du ticket. */
+  number: number;
+  /** Opération résolue (null si émis par service seul). */
+  operationId: string | null;
+  /** Libellé de l'opération choisie à la borne (null si aucune). */
+  operationName: string | null;
+  /** Libellé du service du ticket. */
+  serviceName: string;
+}
+
+/**
+ * Charge numéro + libellés opération/service d'un ticket en UNE requête
+ * (JOIN services, LEFT JOIN operations) — WEB-002-OP : l'agent voit
+ * l'opération choisie à la borne au moment de l'appel.
+ * @param db - Client PostgreSQL.
+ * @param ticketId - UUID du ticket.
+ * @returns Les libellés, ou null si le ticket est introuvable.
+ */
+async function loadCallLabels(db: Client, ticketId: string): Promise<CallLabels | null> {
+  const res = await db.query(
+    `SELECT t.number, t.operation_id, o.name AS operation_name, s.name AS service_name
+       FROM tickets t
+       JOIN services s ON s.id = t.service_id
+       LEFT JOIN operations o ON o.id = t.operation_id
+      WHERE t.id = $1`,
+    [ticketId]
+  );
+  const row = res.rows[0] as
+    | { number: number; operation_id: string | null; operation_name: string | null; service_name: string }
+    | undefined;
+  if (!row) return null;
+  return {
+    number: row.number,
+    operationId: row.operation_id,
+    operationName: row.operation_name,
+    serviceName: row.service_name,
+  };
+}
+
+/** Vue de réponse d'un appel (WEB-002-OP : + number et libellés opération/service). */
+function callView(
+  id: string,
+  serviceId: string,
+  counterId: string,
+  calledAt: Date,
+  labels: CallLabels | null = null
+): Record<string, unknown> {
+  return {
+    id,
+    ...(labels
+      ? {
+          number: `A${String(labels.number).padStart(3, "0")}`,
+          operationId: labels.operationId,
+          operationName: labels.operationName,
+          serviceName: labels.serviceName,
+        }
+      : {}),
+    status: "CALLED",
+    counterId,
+    serviceId,
+    position: 0,
+    estimatedWaitMinutes: 0,
+    calledAt: calledAt.toISOString(),
+  };
 }
 
 // ── POST /tickets/:id/call ───────────────────────────────────────────────────
@@ -1015,7 +1088,9 @@ async function callTargeted(
   // Post-commit: libérer le verrou et émettre les événements
   await redis.del(lockKey);
   await afterCall(bus, redis, db, { ticketId: id, queueId: freshRow.queue_id, counterId });
-  return callView(id, freshRow.service_id, counterId, freshRow.called_at ?? now);
+  // WEB-002-OP : numéro + libellés opération/service pour la console agent.
+  const labels = await loadCallLabels(db, id);
+  return callView(id, freshRow.service_id, counterId, freshRow.called_at ?? now, labels);
 }
 
 // ── POST /tickets/:id/serve ──────────────────────────────────────────────────

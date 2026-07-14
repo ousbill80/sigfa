@@ -324,6 +324,55 @@ describe("API-001: auth", () => {
   );
 
   // ─────────────────────────────────────────────────────────────────────────
+  // WEB-002-HDR : claim displayName (additif) — login, refresh, /auth/me
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it(
+    "WEB-002-HDR: login → claim displayName 'Prénom Nom' ; display_name prioritaire ; préservé au refresh ; /auth/me l'expose",
+    async () => {
+      // Fallback « Prénom Nom » (l'agent fixture n'a pas de display_name)
+      const loginRes = await post("/auth/login", {
+        email: fixtures.agentEmail,
+        password: fixtures.agentPassword,
+      });
+      expect(loginRes.status).toBe(200);
+      const tokens = loginRes.data as { accessToken: string; refreshToken: string };
+      const { payload } = await jwtVerify(tokens.accessToken, jwtSecretBytes);
+      expect(payload["displayName"]).toBe("Agent Test");
+
+      // /auth/me expose displayName (UserProfile.displayName — contrat)
+      const meRes = await get("/auth/me", tokens.accessToken);
+      expect(meRes.status).toBe(200);
+      expect((meRes.data as { displayName?: string }).displayName).toBe("Agent Test");
+
+      // Le claim survit à la rotation du refresh token
+      const refreshRes = await post("/auth/refresh", { refreshToken: tokens.refreshToken });
+      expect(refreshRes.status).toBe(200);
+      const { accessToken: at2 } = refreshRes.data as { accessToken: string };
+      const { payload: p2 } = await jwtVerify(at2, jwtSecretBytes);
+      expect(p2["displayName"]).toBe("Agent Test");
+
+      // display_name (conseiller) prioritaire sur « Prénom Nom »
+      const bcrypt = await import("bcryptjs");
+      const hash = await bcrypt.default.hash(fixtures.agentPassword, 10);
+      await db.query(
+        `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role, display_name)
+         VALUES ($1, 'display@test.ci', $2, 'Awa', 'Kone', 'AGENT', 'Mme Koné')
+         ON CONFLICT (email) DO NOTHING`,
+        [fixtures.bankId, hash]
+      );
+      const dnRes = await post("/auth/login", {
+        email: "display@test.ci",
+        password: fixtures.agentPassword,
+      });
+      expect(dnRes.status).toBe(200);
+      const dnTokens = dnRes.data as { accessToken: string };
+      const { payload: p3 } = await jwtVerify(dnTokens.accessToken, jwtSecretBytes);
+      expect(p3["displayName"]).toBe("Mme Koné");
+    }
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Critère 2 : 5 échecs/15min → 429 ; après expiration du verrou → login OK
   // ─────────────────────────────────────────────────────────────────────────
 
