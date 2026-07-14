@@ -40,11 +40,12 @@ test.describe("RT-003 — coupure réseau + resync", () => {
     const d1 = t1.number.replace(/\D/g, "");
     const d2 = t2.number.replace(/\D/g, "");
 
-    // ── TV en ligne (session d'affichage à scope agence) ──────────────────────
+    // ── TV en ligne sur la VRAIE route par agence ─────────────────────────────
+    // `/tv/{agencyId}` (PUBLIC, S2) minte son token DISPLAY (POST /tv/session)
+    // puis rejoint la room `agency:{id}` : socket réel, aucun cookie/JWT agent.
     const tvContext = await browser.newContext();
-    await loginAsAgent(tvContext);
     const tv = await tvContext.newPage();
-    await tv.goto("/tv");
+    await tv.goto(`/tv/${state.agencyId}`);
     await expect(tv.locator('[data-testid="tv-root"]')).toHaveAttribute(
       "data-realtime",
       "on"

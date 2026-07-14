@@ -45,13 +45,14 @@ test.describe("RT-003 — parcours réel bout-en-bout", () => {
     expect(ticket.trackingId).toHaveLength(21);
     const digits = ticket.number.replace(/\D/g, ""); // "A001" → "001"
 
-    // ── ÉCRAN TV : ouvre l'affichage temps réel ───────────────────────────────
-    // La session d'affichage porte un token de scope agence (cookie) : le layout
-    // serveur en dérive l'agencyId et le socket TV rejoint `agency:{id}`.
+    // ── ÉCRAN TV : ouvre l'affichage temps réel de la VRAIE route par agence ────
+    // `/tv/{agencyId}` est PUBLIC (S2) : la page minte elle-même un token DISPLAY
+    // (POST /tv/session { agencyId }, via le proxy same-origin /api/rt) puis le
+    // passe au handshake socket → join `agency:{id}` → reçoit ticket:called /
+    // sync:state. AUCUN cookie/JWT agent ici (le token DISPLAY est par-agence).
     const tvContext = await browser.newContext();
-    await loginAsAgent(tvContext);
     const tv = await tvContext.newPage();
-    await tv.goto("/tv");
+    await tv.goto(`/tv/${state.agencyId}`);
     // Le socket réel est actif (mode real câblé par le layout serveur).
     await expect(tv.locator('[data-testid="tv-root"]')).toHaveAttribute(
       "data-realtime",
