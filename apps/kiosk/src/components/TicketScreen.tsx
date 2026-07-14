@@ -33,6 +33,9 @@ import { TicketMoment } from "@sigfa/ui";
 import { deriveDegradedState, type PrinterStatus } from "@/hooks/useDegradedState";
 import { useVoiceAnnouncement } from "@/hooks/useVoiceAnnouncement";
 import { VoiceButton } from "@/components/VoiceButton";
+import { PrintTicket } from "@/components/PrintTicket";
+import { shouldAutoPrintTicket, triggerTicketPrint } from "@/lib/kiosk-print";
+import { kioskAgencyName, kioskBankName } from "@/lib/kiosk-branding";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import {
   A11Y_BASE_FONT_PX,
@@ -57,9 +60,10 @@ interface TicketScreenProps {
    */
   managerName?: string;
   /**
-   * KIOSK-005b (audit F8) : libellé PUBLIC de l'opération choisie (non-PII,
-   * ex. « Retrait espèces ») — affiché en eyebrow de la carte pour que le
-   * client vérifie son choix d'un coup d'œil. Absent → eyebrow neutre.
+   * KIOSK-005b (audit F8) + KIOSK-BORNE : libellé PUBLIC de l'opération choisie
+   * (non-PII, ex. « Retrait espèces », transite par l'URL) — affiché en eyebrow
+   * de la carte (vérification d'un coup d'œil) ET imprimé sur le ticket 80 mm.
+   * Absent → eyebrow neutre.
    */
   serviceLabel?: string;
   /**
@@ -74,6 +78,11 @@ interface TicketScreenProps {
    * confirmation imprimante → bascule dégradée identique (affichage 20 s).
    */
   networkLostBeforePrinterConfirm?: boolean;
+  /**
+   * KIOSK-BORNE : trackingId public (nanoid 21) — code de suivi court sur le
+   * ticket imprimé. Donnée publique, non-PII.
+   */
+  trackingId?: string;
 }
 
 /**
@@ -132,6 +141,7 @@ export function TicketScreen({
   isOfflineTicket = false,
   isAccessibilityMode = false,
   networkLostBeforePrinterConfirm = false,
+  trackingId,
 }: TicketScreenProps) {
   const t = useTranslations("ticket005");
   const tDeg = useTranslations("degraded007");
@@ -190,6 +200,24 @@ export function TicketScreen({
     announce(announcement);
   }, [announce, announcement]);
 
+  // KIOSK-BORNE — Impression automatique UNE SEULE FOIS, UNIQUEMENT si
+  // l'imprimante est confirmée OK et hors de tout état dégradé/offline
+  // (décision pure `shouldAutoPrintTicket`). En Electron : impression
+  // silencieuse via IPC ; sinon repli window.print(). Le mode dégradé
+  // KIOSK-007 (« Photographiez votre numéro ») n'imprime JAMAIS.
+  const shouldPrint = shouldAutoPrintTicket({
+    printerStatus,
+    networkLostBeforePrinterConfirm,
+    isBrowserOnline:
+      typeof navigator === "undefined" ? undefined : navigator.onLine,
+  });
+  const hasPrintedRef = useRef(false);
+  useEffect(() => {
+    if (!shouldPrint || hasPrintedRef.current) return;
+    hasPrintedRef.current = true;
+    triggerTicketPrint();
+  }, [shouldPrint]);
+
   const reducedMotion = prefersReducedMotion();
 
   return (
@@ -208,6 +236,22 @@ export function TicketScreen({
       {/* Audit F4 : gabarit scopé (reset des marges de la carte + compaction
           sous 820 px de hauteur). Tokens uniquement, aucun style global. */}
       <style>{TICKET_LAYOUT_CSS}</style>
+
+      {/* KIOSK-BORNE — Ticket thermique 80 mm : masqué à l'écran, SEUL rendu
+          en @media print. Rendu uniquement quand l'impression est décidée
+          (imprimante OK, aucun état dégradé). */}
+      {shouldPrint && (
+        <PrintTicket
+          bankName={kioskBankName()}
+          agencyName={kioskAgencyName()}
+          serviceLabel={serviceLabel}
+          displayNumber={displayNumber}
+          position={position}
+          estimatedWaitMinutes={estimatedWaitMinutes}
+          trackingId={trackingId}
+          smsConsent={Boolean(phoneNumber && smsConsent)}
+        />
+      )}
 
       {/* Audit F5 : ticket émis hors-ligne → bandeau honnête « Mode hors
           connexion — ticket temporaire » (clé ticket005 enfin câblée). */}

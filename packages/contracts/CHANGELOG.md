@@ -4,6 +4,19 @@ Journal des évolutions des contrats OpenAPI (LA LOI des échanges client↔serv
 Convention : les changements additifs passent le gate `contract-diff` (oasdiff) ;
 tout breaking change doit être documenté ici et assumé par une décision PO.
 
+## 2026-07-14 — Additif : GET /agencies/{id} accessible AGENT (bandeau session)
+
+Demande PO : toutes les consoles connectées affichent l'agence de rattachement
+de l'utilisateur. Le web résout le nom de l'agence côté serveur via
+`GET /agencies/{id}` : le rôle requis passe de `AGENCY_DIRECTOR` à `AGENT`
+(relaxation de lecture, non-breaking pour tous les clients existants).
+
+- `core.yaml` (`info.version` 1.0.0 → **1.1.0**)
+  - `GET /agencies/{id}` : `x-required-role` `AGENCY_DIRECTOR` → `AGENT`.
+    Le `x-tenant-scope: agency` est INCHANGÉ : un utilisateur ne lit que les
+    agences de son claim `agencyIds` (hors périmètre → 403). Sécurité-neutre :
+    aucune nouvelle donnée exposée hors du périmètre tenant de l'appelant.
+
 ## 2026-07-14 — CONTRACT-014 : dispo conseillers + bankId session borne + exports sous-chemins (additif, non-breaking)
 
 Trois évolutions groupées (décision PO — audit UX borne + dettes consignées).

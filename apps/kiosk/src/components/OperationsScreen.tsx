@@ -79,13 +79,19 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
    * KIOSK-005b (audit F8) : le libellé PUBLIC de l'opération est déposé dans
    * le store mémoire — le Moment Ticket l'affichera en eyebrow (vérification
    * du choix d'un coup d'œil).
+   * KIOSK-BORNE : le libellé est AUSSI porté par l'URL (`operationLabel`,
+   * non-PII) — la confirmation le propage jusqu'au ticket imprimé 80 mm.
    */
   const goToConfirmation = useCallback(
     (operation: Pick<OperationItem, "id" | "name">) => {
       storeTicketOperationLabel(operation.name);
-      router.push(
-        `/${currentLocale}/confirmation?serviceId=${serviceId}&operationId=${operation.id}&agencyId=${agencyId}`
-      );
+      const query = new URLSearchParams({
+        serviceId,
+        operationId: operation.id,
+        agencyId,
+        operationLabel: operation.name,
+      });
+      router.push(`/${currentLocale}/confirmation?${query.toString()}`);
     },
     [router, currentLocale, serviceId, agencyId]
   );

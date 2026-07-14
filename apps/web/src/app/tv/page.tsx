@@ -5,25 +5,28 @@
  * et la logique temps réel (socket real / simulation off) sont portés par
  * {@link TvDisplay}. La variante par agence vit sous `/tv/[agencyId]` (RT-003).
  *
+ * Composant serveur : le logo banque (convention lib/bank-branding,
+ * `NEXT_PUBLIC_BANK_LOGO_URL`) est résolu ici côté serveur puis passé en prop
+ * — repli pastille --brand + initiale sans logo provisionné.
+ *
  * @module app/tv/page
  */
-"use client";
-
 import type { ReactElement } from "react";
 import { TvDisplay, type TvTenant } from "@/components/tv/tv-display";
-
-/** Tenant theming resolved for the default TV display. */
-const TENANT: TvTenant = {
-  name: "Banque du Commerce",
-  // Marque du tenant démo alignée sur la palette v2 « Or & Forêt » (terracotta).
-  brand: "#c25a16",
-  locale: "fr",
-};
+import { bankLogoUrl } from "@/lib/bank-branding";
 
 /**
  * TV route page (agence par défaut).
  * @returns The page element.
  */
 export default function TvPage(): ReactElement {
-  return <TvDisplay tenant={TENANT} />;
+  /** Tenant theming resolved for the default TV display. */
+  const tenant: TvTenant = {
+    name: "Banque du Commerce",
+    // Marque du tenant démo alignée sur la palette v2 « Or & Forêt » (terracotta).
+    brand: "#c25a16",
+    locale: "fr",
+    logoUrl: bankLogoUrl(),
+  };
+  return <TvDisplay tenant={tenant} />;
 }

@@ -70,6 +70,17 @@ describe("S1: verifySessionToken — signature obligatoire", () => {
     expect(await verifySessionToken(token, null)).toBeNull();
   });
 
+  it("WEB-002-HDR: expose displayName quand le claim est présent (trim), null sinon", async () => {
+    const withName = await signTestToken({ role: "AGENT", displayName: "Awa Koné" });
+    expect((await verifySessionToken(withName, SECRET))?.displayName).toBe("Awa Koné");
+
+    const without = await signTestToken({ role: "AGENT" });
+    expect((await verifySessionToken(without, SECRET))?.displayName).toBeNull();
+
+    const blank = await signTestToken({ role: "AGENT", displayName: "   " });
+    expect((await verifySessionToken(blank, SECRET))?.displayName).toBeNull();
+  });
+
   it("normalise les claims tenant absents (bankId null, agencyIds [])", async () => {
     const token = await signTestToken({ role: "SUPER_ADMIN" });
     const claims = await verifySessionToken(token, SECRET);

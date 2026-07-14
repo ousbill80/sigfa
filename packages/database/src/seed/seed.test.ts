@@ -321,6 +321,57 @@ describe("DB-003: sans SEED_DEMO → aucune donnée de démo ; avec → tenant c
     },
     60_000
   );
+
+  it(
+    "SEED-TENANT: SEED_TENANTS=bicici → banque BICICI, 16 agences, thème jsonb avec appliedColors, idempotent",
+    async () => {
+      // Seed du tenant BICICI (paramétrable) sur la même base que la démo — 2×
+      // pour prouver l'idempotence (ON CONFLICT DO NOTHING partout).
+      await runSeed(harnessB.query.bind(harnessB), { tenants: ["bicici"] });
+      await runSeed(harnessB.query.bind(harnessB), { tenants: ["bicici"] });
+
+      const banks = await harnessB.query(
+        "SELECT id, name, theme FROM banks WHERE slug = 'bicici'"
+      );
+      expect(banks.rows).toHaveLength(1);
+      expect(String(banks.rows[0]!.name)).toBe("BICICI");
+      const bankId = String(banks.rows[0]!.id);
+
+      // Thème persisté : requested + applied (contraste WCAG) + messages FR/EN + logo
+      const theme = banks.rows[0]!.theme as {
+        requestedColors: Record<string, string>;
+        appliedColors: Record<string, string>;
+        welcomeMessages: Record<string, string>;
+        logoUrl: string;
+      };
+      expect(theme.requestedColors["primary"]).toBe("#005e42");
+      expect(theme.appliedColors["primary"]).toBeDefined();
+      expect(Object.keys(theme.welcomeMessages).sort()).toEqual(["en", "fr"]);
+      expect(theme.logoUrl).toBe("/tenants/bicici/logo.png");
+
+      const agencies = await harnessB.query(
+        `SELECT COUNT(*) AS cnt FROM agencies WHERE bank_id = '${bankId}'`
+      );
+      expect(Number(agencies.rows[0]!.cnt)).toBe(16);
+
+      const counters = await harnessB.query(
+        `SELECT COUNT(*) AS cnt FROM counters WHERE bank_id = '${bankId}'`
+      );
+      expect(Number(counters.rows[0]!.cnt)).toBe(4);
+
+      const kiosks = await harnessB.query(
+        `SELECT COUNT(*) AS cnt FROM kiosks WHERE bank_id = '${bankId}'`
+      );
+      expect(Number(kiosks.rows[0]!.cnt)).toBe(2);
+
+      // Le tenant démo n'est pas affecté (isolation des configs)
+      const demoBanks = await harnessB.query(
+        "SELECT COUNT(*) AS cnt FROM banks WHERE slug LIKE 'demo%'"
+      );
+      expect(Number(demoBanks.rows[0]!.cnt)).toBe(1);
+    },
+    120_000
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

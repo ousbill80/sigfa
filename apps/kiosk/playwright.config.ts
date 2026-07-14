@@ -40,8 +40,12 @@ export default defineConfig({
   },
   /* Serveur Next.js dev — démarré automatiquement */
   webServer: {
-    /* SIGFA_PLAYWRIGHT=1 désactive output:export dans next.config.ts */
-    command: "SIGFA_PLAYWRIGHT=1 pnpm exec next dev --port 3003",
+    /* SIGFA_PLAYWRIGHT=1 désactive output:export dans next.config.ts.
+       NEXT_PUBLIC_ENABLE_MSW=1 : le worker MSW peuple l'écran de prise de
+       ticket (opérations par famille) sans backend — indispensable depuis la
+       refonte KIOSK-BORNE (ServicesScreen fetch les opérations au rendu). */
+    command:
+      "SIGFA_PLAYWRIGHT=1 NEXT_PUBLIC_ENABLE_MSW=1 pnpm exec next dev --port 3003",
     url: "http://localhost:3003/fr",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

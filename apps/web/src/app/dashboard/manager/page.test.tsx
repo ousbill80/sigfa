@@ -60,11 +60,11 @@ describe("S3: /dashboard/manager — proxy authentifié + agence des claims", ()
     await expect(ManagerDashboardPage()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("mode mock → base mock + fixture agence", async () => {
+  it("mode mock → proxy /api/rt + fixture agence", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await ManagerDashboardPage();
     const client = findElementByType(tree, ManagerPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
     expect(client?.props.agencyId).toBe(MOCK_TENANT.agencyId);
   });
 });

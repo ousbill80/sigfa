@@ -31,7 +31,13 @@ beforeAll(() => {
       cancel: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
-      getVoices: () => [],
+      // Voix déjà chargées : `speakInLocale` parle immédiatement (une liste
+      // vide + addEventListener déclencherait l'attente `voiceschanged`).
+      getVoices: () =>
+        [
+          { lang: "fr-FR", name: "fr-FR", default: false, localService: true, voiceURI: "fr-FR" },
+          { lang: "en-US", name: "en-US", default: false, localService: true, voiceURI: "en-US" },
+        ] as SpeechSynthesisVoice[],
       speaking: false,
       pending: false,
       paused: false,
@@ -68,6 +74,7 @@ beforeAll(() => {
 const homeMessages = {
   home002: {
     title: "Akwaba — Bienvenue",
+    welcomeAgency: "à l'agence {agencyName}",
     chooseLanguage: "Choisissez votre langue",
     languageFr: "Français",
     languageEn: "English",
@@ -80,15 +87,20 @@ const homeMessages = {
 
 const servicesMessages = {
   services003: {
-    title: "Quel service souhaitez-vous ?",
+    title: "Prise de ticket",
+    subtitle: "Touchez l'opération de votre choix",
     backButton: "Retour",
-    waitEstimate: "~{minutes} min",
-    seeMore: "Voir plus de services",
     closedService: "Fermé — {schedule}",
     accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
+    loadingMessage: "Chargement des opérations...",
+    errorTitle: "Opérations indisponibles",
+    errorMessage: "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
+    retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
+    advisorCard: "Voir mon conseiller",
+    advisorHint: "Rencontrer un chargé de clientèle",
   },
   voice008: { playLabel: "Écouter" },
   degraded007: {
@@ -142,12 +154,12 @@ import { ConfirmationScreen } from "@/components/ConfirmationScreen";
 import { TicketScreen } from "@/components/TicketScreen";
 import { readTicketMomentPii } from "@/lib/ticket-moment-store";
 
+// Ids alignés sur le catalogue de démo BNI des handlers MSW (filtrage serviceId).
 const MOCK_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", icon: "deposit", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", icon: "withdrawal", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", icon: "transfer", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", icon: "complaint", estimatedMinutes: 15, isOpen: true },
-  { id: "svc-5", name: "Crédit", icon: "credit", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
+  { id: "svc-caisse", name: "Caisse", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-moyens-paiement", name: "Moyen de paiement", estimatedMinutes: 10, isOpen: true },
+  { id: "svc-conseiller", name: "Accueil / Conseiller client", estimatedMinutes: 15, isOpen: true },
+  { id: "svc-ferme", name: "Crédit", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -217,6 +229,29 @@ describe("KIOSK-002: HomeScreen interactions", () => {
     expect(speakMock).toHaveBeenCalledTimes(1);
   });
 
+  it("KIOSK-002: annonce de langue au débit NOMINAL (rate 1) — un mot ralenti sonne artificiel (retour PO)", () => {
+    const speakMock = vi.fn();
+    window.speechSynthesis = {
+      ...window.speechSynthesis,
+      speak: speakMock,
+    } as unknown as SpeechSynthesis;
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={homeMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const cards = container.querySelectorAll("[data-testid='language-card']");
+    fireEvent.click(cards[1]); // English
+
+    expect(speakMock).toHaveBeenCalledTimes(1);
+    const utterance = speakMock.mock.calls[0][0] as SpeechSynthesisUtterance;
+    expect(utterance.rate).toBe(1);
+    // Voix ANGLAISE explicitement posée (voix en-US du mock, pas de repli FR).
+    expect(utterance.voice?.lang).toBe("en-US");
+  });
+
   it("KIOSK-002: queue unavailable — shows queueUnavailable text when count/minutes are null", () => {
     // Override mock to return null count/minutes
     vi.doMock("@/hooks/useQueueStatus", () => ({
@@ -239,7 +274,7 @@ describe("KIOSK-002: HomeScreen interactions", () => {
 // ServicesScreen — interactions handlers
 // ═══════════════════════════════════════════════════════════
 
-describe("KIOSK-003: ServicesScreen interactions", () => {
+describe("KIOSK-BORNE: ServicesScreen interactions (prise de ticket par familles)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mock("@/hooks/useAccessibilityMode", () => ({
@@ -249,29 +284,35 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
       }),
     }));
     sessionStorage.clear();
+    server.listen({ onUnhandledRequest: "bypass" });
   });
 
-  it("MODEL-KIOSK-A: clicking an open service navigates to the OPERATIONS screen (2 niveaux)", () => {
+  afterEach(() => {
+    server.resetHandlers();
+    server.close();
+  });
+
+  it("KIOSK-BORNE: clicking an operation tile navigates DIRECTLY to confirmation", async () => {
     render(
       <NextIntlClientProvider locale="fr" messages={servicesMessages}>
         <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />
       </NextIntlClientProvider>
     );
 
-    const cards = screen.getAllByTestId("service-card");
-    fireEvent.click(cards[0]); // svc-1, open
+    const tiles = await screen.findAllByTestId("operation-tile");
+    fireEvent.click(tiles[0]); // op-retrait-especes de la famille svc-caisse.
 
-    // Parcours 2 niveaux : le service mène désormais à l'écran opérations.
-    expect(mockPush).toHaveBeenCalledWith(
-      "/fr/operations?serviceId=svc-1&agencyId=agt-001"
-    );
+    const target = mockPush.mock.calls[0][0] as string;
+    expect(target).toContain("/fr/confirmation?");
+    expect(target).toContain("serviceId=svc-caisse");
+    expect(target).toContain("operationId=op-retrait-especes");
+    expect(target).toContain("agencyId=agt-001");
   });
 
-  it("KIOSK-003: clicking a closed service does NOT navigate", () => {
+  it("KIOSK-003: clicking a closed service tile does NOT navigate", async () => {
     const closedService: ServiceItem = {
       id: "svc-closed",
       name: "Crédit",
-      icon: "credit",
       estimatedMinutes: 20,
       isOpen: false,
       schedule: "Lu-Ve 09h-17h",
@@ -283,19 +324,20 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
       </NextIntlClientProvider>
     );
 
-    const card = screen.getByTestId("service-card");
-    fireEvent.click(card);
+    const tile = await screen.findByTestId("service-tile");
+    fireEvent.click(tile);
 
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it("KIOSK-003: back button triggers router.back()", () => {
+  it("KIOSK-003: back button triggers router.back()", async () => {
     render(
       <NextIntlClientProvider locale="fr" messages={servicesMessages}>
         <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />
       </NextIntlClientProvider>
     );
 
+    await screen.findAllByTestId("family-section");
     const backBtn = screen.getByTestId("back-btn");
     // ICONS-001 : icône SIGFA « retour » appariée au texte (plus de flèche glyphe).
     expect(backBtn.querySelector("svg[data-icon='retour']")).toBeInTheDocument();
@@ -304,30 +346,7 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it("KIOSK-003: see-more button shows all services", () => {
-    render(
-      <NextIntlClientProvider locale="fr" messages={servicesMessages}>
-        <ServicesScreen services={MOCK_SERVICES} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
-
-    // Initially only 4 visible
-    let cards = screen.getAllByTestId("service-card");
-    expect(cards.length).toBe(4);
-
-    // Click see-more
-    const seeMoreBtn = screen.getByTestId("see-more-btn");
-    fireEvent.click(seeMoreBtn);
-
-    // Now all 5 visible
-    cards = screen.getAllByTestId("service-card");
-    expect(cards.length).toBe(5);
-
-    // see-more button no longer visible
-    expect(screen.queryByTestId("see-more-btn")).not.toBeInTheDocument();
-  });
-
-  it("KIOSK-003: accessibility button click calls toggleAccessibilityMode", () => {
+  it("KIOSK-003: accessibility button click calls toggleAccessibilityMode", async () => {
     const toggleMock = vi.fn();
     vi.doMock("@/hooks/useAccessibilityMode", () => ({
       useAccessibilityMode: () => ({
@@ -344,6 +363,7 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
       </NextIntlClientProvider>
     );
 
+    await screen.findAllByTestId("family-section");
     const a11yBtn = screen.getByTestId("accessibility-btn");
     expect(a11yBtn).toBeInTheDocument();
     // Verify the button is clickable (not disabled)
@@ -353,11 +373,10 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
     fireEvent.click(a11yBtn);
   });
 
-  it("KIOSK-003: closedService schedule shown with token --ink-soft", () => {
+  it("KIOSK-003: closedService schedule shown with token --ink-soft", async () => {
     const closedService: ServiceItem = {
       id: "svc-closed",
       name: "Crédit",
-      icon: "credit",
       estimatedMinutes: 20,
       isOpen: false,
       schedule: "Lu-Ve 09h-17h",
@@ -369,6 +388,7 @@ describe("KIOSK-003: ServicesScreen interactions", () => {
       </NextIntlClientProvider>
     );
 
+    await screen.findByTestId("service-tile");
     const scheduleEl = container.querySelector("[data-testid='service-schedule']") as HTMLElement;
     expect(scheduleEl).toBeInTheDocument();
     expect(scheduleEl.style.color).toBe("var(--ink-soft)");

@@ -1,11 +1,17 @@
 /**
- * KIOSK-003 — Tests TDD pour ServicesScreen.tsx
- * Écrits AVANT l'implémentation (phase rouge).
+ * KIOSK-BORNE — Tests de l'écran « Prise de ticket » groupé par familles.
+ *
+ * Refonte : une SECTION par service (famille) avec la grille des tuiles de ses
+ * opérations (chargées en PARALLÈLE via @sigfa/contracts), bandeau d'en-tête
+ * persistant (banque + agence + date/heure vivante), clic tuile → confirmation
+ * DIRECTE. Service sans opération → tuile unique du service. 5 états conservés.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach, afterAll } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
+import { http, HttpResponse } from "msw";
+import { server } from "@/mocks/server";
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -27,39 +33,41 @@ vi.mock("@/hooks/useAccessibilityMode", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useQueueStatus", () => ({
-  useQueueStatus: () => ({ count: 3, estimatedMinutes: 8, isOffline: false }),
-}));
+import { ServicesScreen, type ServiceItem } from "@/components/ServicesScreen";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
-export interface ServiceItem {
-  id: string;
-  name: string;
-  icon: string;
-  estimatedMinutes: number;
-  isOpen: boolean;
-  schedule?: string;
-}
-
+// Ids alignés sur le catalogue de démo BNI des handlers MSW : chaque famille
+// reçoit SES opérations (filtrage par serviceId), jamais celles d'une autre.
 const MOCK_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", icon: "deposit", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", icon: "withdrawal", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", icon: "transfer", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", icon: "complaint", estimatedMinutes: 15, isOpen: true },
-  { id: "svc-5", name: "Crédit", icon: "credit", estimatedMinutes: 20, isOpen: false, schedule: "Lu-Ve 09h-17h" },
+  { id: "svc-caisse", name: "Caisse", code: "cash", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-moyens-paiement", name: "Moyen de paiement", code: "card", estimatedMinutes: 10, isOpen: true },
 ];
+
+const CLOSED_SERVICE: ServiceItem = {
+  id: "svc-closed",
+  name: "Crédit",
+  code: "credit",
+  estimatedMinutes: 20,
+  isOpen: false,
+  schedule: "Lu-Ve 09h-17h",
+};
 
 const frMessages = {
   services003: {
-    title: "Quel service souhaitez-vous ?",
+    title: "Prise de ticket",
+    subtitle: "Touchez l'opération de votre choix",
     backButton: "Retour",
-    waitEstimate: "~{minutes} min",
-    seeMore: "Voir plus de services",
     closedService: "Fermé — {schedule}",
     accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
+    loadingMessage: "Chargement des opérations...",
+    errorTitle: "Opérations indisponibles",
+    errorMessage: "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
+    retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
-    loadingMessage: "Chargement des services...",
+    advisorCard: "Voir mon conseiller",
+    advisorHint: "Rencontrer un chargé de clientèle",
     scrollHint: "Plus de services en bas",
   },
   degraded007: {
@@ -71,16 +79,20 @@ const frMessages = {
 
 const enMessages = {
   services003: {
-    title: "Which service do you need?",
+    title: "Take a ticket",
+    subtitle: "Tap the operation of your choice",
     backButton: "Back",
-    waitEstimate: "~{minutes} min",
-    seeMore: "See more services",
     closedService: "Closed — {schedule}",
     accessibilityButton: "Priority access",
     emptyTitle: "No services available",
     emptyMessage: "Please go to reception — a staff member will assist you.",
+    loadingMessage: "Loading operations...",
+    errorTitle: "Operations unavailable",
+    errorMessage: "Unable to load operations. Retry or go to reception.",
+    retryButton: "Retry",
     offlineBanner: "Offline mode",
-    loadingMessage: "Loading services...",
+    advisorCard: "See my advisor",
+    advisorHint: "Meet a relationship manager",
     scrollHint: "More services below",
   },
   degraded007: {
@@ -90,169 +102,244 @@ const enMessages = {
   },
 };
 
-import { ServicesScreen } from "@/components/ServicesScreen";
-import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
+function renderScreen(
+  services: ServiceItem[] = MOCK_SERVICES,
+  { locale = "fr", messages = frMessages }: { locale?: string; messages?: typeof frMessages } = {}
+) {
+  return render(
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      <ServicesScreen
+        services={services}
+        agencyId="agt-001"
+        agencyName="Cocody Angré"
+        bankName="Banque Ivoire"
+      />
+    </NextIntlClientProvider>
+  );
+}
 
-describe("KIOSK-003: ServicesScreen", () => {
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("KIOSK-003: cards rendered height ≥ 96 px, icon 40 px + label 28 px (FR/EN)", () => {
-    const locales = [
+  it("KIOSK-BORNE: une section par famille, tuiles ≥ 96px, icône pastille --brand-soft, libellé ≥ 20px (FR/EN)", async () => {
+    for (const { locale, messages } of [
       { locale: "fr", messages: frMessages },
       { locale: "en", messages: enMessages },
-    ];
+    ]) {
+      const { unmount, container } = renderScreen(MOCK_SERVICES, { locale, messages });
 
-    for (const { locale, messages } of locales) {
-      const { unmount, container } = render(
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <ServicesScreen services={MOCK_SERVICES.slice(0, 4)} agencyId="agt-001" />
-        </NextIntlClientProvider>
-      );
+      // Une section par service, dans l'ordre.
+      const sections = await screen.findAllByTestId("family-section");
+      expect(sections.length, `Sections for ${locale}`).toBe(2);
+      const titles = screen.getAllByTestId("family-title");
+      expect(titles.map((el) => el.textContent)).toEqual(["Caisse", "Moyen de paiement"]);
 
-      const cards = container.querySelectorAll("[data-testid='service-card']");
-      expect(cards.length, `Expected 4 cards for locale ${locale}`).toBe(4);
-
-      cards.forEach((card) => {
-        const cardEl = card as HTMLElement;
-        expect(cardEl.style.minHeight, `Card minHeight for ${locale}`).toBe("96px");
+      // Tuiles d'opérations : catalogue BNI — 11 (Caisse) + 9 (Moyen de paiement).
+      const tiles = screen.getAllByTestId("operation-tile");
+      expect(tiles.length, `Tiles for ${locale}`).toBe(20);
+      tiles.forEach((tile) => {
+        expect((tile as HTMLElement).style.minHeight).toBe("96px");
       });
 
-      // v2 : plus d'emoji. Chaque carte porte une icône SVG cohérente
-      // (cercle --brand-soft) au lieu du glyphe emoji.
-      const icons = container.querySelectorAll("[data-testid='service-icon']");
-      expect(icons.length, `Icon count for ${locale}`).toBe(4);
+      // Icône SVG dans une pastille --brand-soft — zéro emoji.
+      const icons = container.querySelectorAll("[data-testid='operation-tile-icon']");
       icons.forEach((icon) => {
         const iconEl = icon as HTMLElement;
-        expect(iconEl.style.backgroundColor, `Icon circle bg for ${locale}`).toBe(
-          "var(--brand-soft)"
-        );
-        expect(
-          iconEl.querySelector("svg"),
-          `SVG icon present for ${locale}`
-        ).toBeInTheDocument();
-        expect(iconEl.textContent, `No emoji glyph for ${locale}`).toBe("");
+        expect(iconEl.style.backgroundColor).toBe("var(--brand-soft)");
+        expect(iconEl.querySelector("svg")).toBeInTheDocument();
+        expect(iconEl.textContent).toBe("");
       });
 
-      const labels = container.querySelectorAll("[data-testid='service-label']");
+      // Libellé lisible ≥ 20px, accents intacts (UTF-8).
+      const labels = screen.getAllByTestId("operation-tile-label");
       labels.forEach((label) => {
-        const labelEl = label as HTMLElement;
-        expect(labelEl.style.fontSize, `Label fontSize for ${locale}`).toBe("28px");
+        expect(parseInt((label as HTMLElement).style.fontSize, 10)).toBeGreaterThanOrEqual(20);
       });
+      expect(screen.getAllByText("Retrait espèces").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Rechargement de carte prépayée").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Demande de chéquier").length).toBeGreaterThan(0);
 
       unmount();
     }
   });
 
-  it("KIOSK-003: max 4 cards visible, 'see more' button present if > 4 services", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
+  it("KIOSK-BORNE: chaque famille reçoit SES opérations (filtrage serviceId) — aucune duplication entre familles", async () => {
+    renderScreen();
+    const sections = await screen.findAllByTestId("family-section");
+    expect(sections.length).toBe(2);
 
-    // With 5 services, only 4 cards should be visible initially
-    const cards = container.querySelectorAll("[data-testid='service-card']");
-    expect(cards.length).toBe(4);
+    const labelsOf = (section: HTMLElement) =>
+      Array.from(section.querySelectorAll("[data-testid='operation-tile-label']")).map(
+        (el) => el.textContent ?? ""
+      );
+    const caisse = labelsOf(sections[0] as HTMLElement);
+    const paiement = labelsOf(sections[1] as HTMLElement);
 
-    // "See more" button should be present
-    const seeMoreBtn = container.querySelector("[data-testid='see-more-btn']");
-    expect(seeMoreBtn).toBeInTheDocument();
+    // Volumes du catalogue BNI, opérations distinctes par famille.
+    expect(caisse.length).toBe(11);
+    expect(paiement.length).toBe(9);
+    expect(caisse).toContain("Transfert Orange Money");
+    expect(paiement).toContain("Demande d'opposition carte/chèque");
+    // Régression « mêmes 4 ops partout » : intersection VIDE entre familles.
+    const overlap = caisse.filter((label) => paiement.includes(label));
+    expect(overlap).toEqual([]);
   });
 
-  it("KIOSK-003: queue:updated → estimate updated on card without reload (Socket mock test)", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES.slice(0, 4)} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
+  it("KIOSK-BORNE: bandeau d'en-tête persistant — banque (pastille brand), agence, date + heure vivante", async () => {
+    renderScreen();
+    await screen.findAllByTestId("family-section");
 
-    // Queue status is displayed
-    const estimates = container.querySelectorAll("[data-testid='service-estimate']");
-    expect(estimates.length).toBeGreaterThan(0);
+    const banner = screen.getByTestId("kiosk-header-banner");
+    expect(banner).toBeInTheDocument();
+    expect(screen.getByTestId("kiosk-header-bank").textContent).toBe("Banque Ivoire");
+    expect(screen.getByTestId("kiosk-header-agency").textContent).toBe("Cocody Angré");
+    // Pastille brand avec l'initiale de la banque (texte, jamais d'image).
+    const badge = screen.getByTestId("kiosk-header-bank-badge");
+    expect(badge.textContent).toBe("B");
+    expect((badge as HTMLElement).style.backgroundColor).toBe("var(--brand)");
+    // Date + heure présentes (formats localisés).
+    expect(screen.getByTestId("kiosk-header-time").textContent).toMatch(/\d/);
+    expect(screen.getByTestId("kiosk-header-date").textContent).toMatch(/\d{4}/);
   });
 
-  it("KIOSK-003: CLOSED service → grayed card with schedule, not clickable", () => {
-    const closedService: ServiceItem = {
-      id: "svc-closed",
-      name: "Crédit",
-      icon: "credit",
-      estimatedMinutes: 20,
-      isOpen: false,
-      schedule: "Lu-Ve 09h-17h",
-    };
+  it("KIOSK-BORNE: clic tuile opération → navigation DIRECTE vers la confirmation (serviceId + operationId + libellé)", async () => {
+    renderScreen();
+    const tiles = await screen.findAllByTestId("operation-tile");
+    fireEvent.click(tiles[0]); // « Retrait espèces » (op-retrait-especes) de la famille Caisse.
 
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={[closedService]} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
-
-    const card = container.querySelector("[data-testid='service-card']") as HTMLElement;
-    expect(card).toBeInTheDocument();
-
-    // Card should be visually grayed out (opacity)
-    expect(card.style.opacity).toBe("0.4");
-
-    // Card should not be clickable (aria-disabled)
-    expect(card.getAttribute("aria-disabled")).toBe("true");
-
-    // Schedule text should be visible
-    expect(container.querySelector("[data-testid='service-schedule']")).toBeInTheDocument();
-  });
-
-  it("KIOSK-003: bouton accessibilité → text +20%, doubled inactivity delay (Vitest)", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
-
-    const a11yBtn = container.querySelector("[data-testid='accessibility-btn']");
-    expect(a11yBtn).toBeInTheDocument();
-
-    // Normal timeout is 30s
-    expect(useInactivityTimeout).toHaveBeenCalledWith(
-      expect.any(Function),
-      30000
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const target = mockPush.mock.calls[0][0] as string;
+    expect(target).toContain("/fr/confirmation?");
+    expect(target).toContain("serviceId=svc-caisse");
+    expect(target).toContain("operationId=op-retrait-especes");
+    expect(target).toContain("agencyId=agt-001");
+    expect(target).toContain(
+      new URLSearchParams({ operationLabel: "Retrait espèces" }).toString()
     );
   });
 
-  it("KIOSK-003: empty state → human message visible (Testing Library)", () => {
-    render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={[]} agencyId="agt-001" />
-      </NextIntlClientProvider>
+  it("KIOSK-BORNE: service SANS opération → tuile unique du service lui-même (confirmation sans operationId)", async () => {
+    server.use(
+      http.get("*/public/agencies/:agencyId/operations", () =>
+        HttpResponse.json({ data: [] }, { status: 200 })
+      )
     );
+    renderScreen([MOCK_SERVICES[0]]);
 
+    const tile = await screen.findByTestId("service-tile");
+    expect(tile).toBeInTheDocument();
+    expect(screen.queryAllByTestId("operation-tile").length).toBe(0);
+
+    fireEvent.click(tile);
+    const target = mockPush.mock.calls[0][0] as string;
+    expect(target).toContain("serviceId=svc-caisse");
+    expect(target).not.toContain("operationId=");
+    expect(target).toContain(`operationLabel=${encodeURIComponent("Caisse")}`);
+  });
+
+  it("KIOSK-BORNE: carte « Voir mon conseiller » en fin de page — style distinct + navigation /managers (FR/EN)", async () => {
+    for (const { locale, messages, label } of [
+      { locale: "fr", messages: frMessages, label: "Voir mon conseiller" },
+      { locale: "en", messages: enMessages, label: "See my advisor" },
+    ]) {
+      const { unmount } = renderScreen(MOCK_SERVICES, { locale, messages });
+      await screen.findAllByTestId("family-section");
+
+      const card = screen.getByTestId("advisor-access-card");
+      expect(card).toBeInTheDocument();
+      expect(screen.getByTestId("advisor-access-label").textContent).toBe(label);
+      // Style DISTINCT des tuiles d'opération : contour or, fond transparent.
+      expect((card as HTMLElement).style.backgroundColor).toBe("transparent");
+      expect((card as HTMLElement).style.border).toContain("var(--gold-soft)");
+      // Icône personne (SVG, zéro emoji) dans la pastille.
+      expect(
+        screen.getByTestId("advisor-access-icon").querySelector("svg")
+      ).toBeInTheDocument();
+      // La carte vient APRÈS les sections de familles dans le DOM.
+      const sections = screen.getAllByTestId("family-section");
+      const lastSection = sections[sections.length - 1];
+      expect(
+        lastSection.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+
+      // useParams est mocké sur « fr » : la navigation cible /fr/managers.
+      fireEvent.click(card);
+      expect(mockPush).toHaveBeenCalledWith("/fr/managers");
+
+      mockPush.mockClear();
+      unmount();
+    }
+  });
+
+  it("KIOSK-003: service FERMÉ → tuile grisée avec horaire, non cliquable", async () => {
+    renderScreen([CLOSED_SERVICE]);
+
+    const tile = await screen.findByTestId("service-tile");
+    expect(tile.getAttribute("aria-disabled")).toBe("true");
+    expect((tile as HTMLElement).style.opacity).toBe("0.4");
+    expect(screen.getByTestId("service-schedule").textContent).toContain("Lu-Ve 09h-17h");
+
+    fireEvent.click(tile);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("KIOSK-BORNE: état loading pendant le chargement parallèle des familles", () => {
+    renderScreen();
+    expect(screen.getByTestId("services-loading")).toBeInTheDocument();
+  });
+
+  it("KIOSK-BORNE: échec réseau TOTAL → état error + bandeau offline + bouton réessayer qui recharge", async () => {
+    server.use(
+      http.get("*/public/agencies/:agencyId/operations", () => HttpResponse.error())
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId("services-error")).toBeInTheDocument();
+    expect(screen.getByTestId("offline-banner")).toBeInTheDocument();
+
+    // Réessayer : le réseau revient → sections rendues.
+    server.resetHandlers();
+    fireEvent.click(screen.getByTestId("services-retry"));
+    expect(await screen.findAllByTestId("family-section")).toHaveLength(2);
+  });
+
+  it("KIOSK-003: aucune famille → empty state humain visible", () => {
+    renderScreen([]);
     expect(screen.getByText("Aucun service disponible")).toBeInTheDocument();
     expect(screen.getByText("Rendez-vous à l'accueil — un agent vous aidera.")).toBeInTheDocument();
   });
 
-  it("KIOSK-003: card contrast ≥ 7:1 on --surface-kiosk (CSS token assertion)", () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="fr" messages={frMessages}>
-        <ServicesScreen services={MOCK_SERVICES.slice(0, 2)} agencyId="agt-001" />
-      </NextIntlClientProvider>
-    );
+  it("KIOSK-003: bouton accessibilité présent + délai d'inactivité nominal 30 s (×2 en mode accessibilité)", async () => {
+    renderScreen();
+    await screen.findAllByTestId("family-section");
 
-    const cards = container.querySelectorAll("[data-testid='service-card']");
-    cards.forEach((card) => {
-      const cardEl = card as HTMLElement;
-      expect(cardEl.style.backgroundColor).toBe("var(--surface-1)");
+    expect(screen.getByTestId("accessibility-btn")).toBeInTheDocument();
+    expect(useInactivityTimeout).toHaveBeenCalledWith(expect.any(Function), 30000);
+  });
 
-      const label = card.querySelector("[data-testid='service-label']") as HTMLElement;
-      expect(label?.style.color).toBe("var(--action-label)");
+  it("KIOSK-003: contraste — tuiles sur --surface-1, libellés --action-label (tokens uniquement)", async () => {
+    renderScreen();
+    const tiles = await screen.findAllByTestId("operation-tile");
+    tiles.forEach((tile) => {
+      expect((tile as HTMLElement).style.backgroundColor).toBe("var(--surface-1)");
+    });
+    screen.getAllByTestId("operation-tile-label").forEach((label) => {
+      expect((label as HTMLElement).style.color).toBe("var(--action-label)");
     });
   });
 
-  // KIOSK-003: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)
+  it("KIOSK-BORNE: retour — le bouton back appelle router.back()", async () => {
+    renderScreen();
+    await screen.findAllByTestId("family-section");
+    fireEvent.click(screen.getByTestId("back-btn"));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
 });
 
 /**
@@ -292,20 +379,22 @@ describe("AUDIT-F7/F20: ServicesScreen — affordance de scroll + skeleton", () 
     });
   }
 
-  it("AUDIT-F7: la grille vit dans une région scrollable dédiée (le bouton accessibilité N'y est PAS)", () => {
+  it("AUDIT-F7: la grille vit dans une région scrollable dédiée (le bouton accessibilité N'y est PAS)", async () => {
     renderServices();
+    await screen.findAllByTestId("family-section");
     const region = screen.getByTestId("services-scroll-region");
     const a11yBtn = screen.getByTestId("accessibility-btn");
     // Le bouton accessibilité reste TOUJOURS visible pendant le scroll :
     // il vit hors de la région scrollable, épinglé en bas de l'écran.
     expect(region.contains(a11yBtn)).toBe(false);
-    // Les cartes, elles, vivent dans la région scrollable.
-    const firstCard = screen.getAllByTestId("service-card")[0];
-    expect(region.contains(firstCard)).toBe(true);
+    // Les tuiles, elles, vivent dans la région scrollable.
+    const firstTile = screen.getAllByTestId("operation-tile")[0];
+    expect(region.contains(firstTile)).toBe(true);
   });
 
-  it("AUDIT-F7: contenu sous le pli → dégradé + chevron + texte d'affordance visibles", () => {
+  it("AUDIT-F7: contenu sous le pli → dégradé + chevron + texte d'affordance visibles", async () => {
     renderServices();
+    await screen.findAllByTestId("family-section");
     const region = screen.getByTestId("services-scroll-region");
     expect(screen.queryByTestId("services-scroll-hint")).not.toBeInTheDocument();
 
@@ -325,8 +414,9 @@ describe("AUDIT-F7/F20: ServicesScreen — affordance de scroll + skeleton", () 
     expect((hint as HTMLElement).style.pointerEvents).toBe("none");
   });
 
-  it("AUDIT-F7: en fin de scroll, l'affordance disparaît", () => {
+  it("AUDIT-F7: en fin de scroll, l'affordance disparaît", async () => {
     renderServices();
+    await screen.findAllByTestId("family-section");
     const region = screen.getByTestId("services-scroll-region");
     setScrollMetrics(region, { scrollHeight: 1600, clientHeight: 700, scrollTop: 0 });
     act(() => {
@@ -349,11 +439,11 @@ describe("AUDIT-F7/F20: ServicesScreen — affordance de scroll + skeleton", () 
     // Tuiles squelettes (shimmer DS, reduced-motion géré par @sigfa/ui).
     expect(screen.getAllByTestId("skeleton-tile").length).toBeGreaterThanOrEqual(4);
     expect(document.querySelectorAll(".sig-skeleton").length).toBeGreaterThan(0);
-    // Pas de cartes réelles ni d'état vide pendant le chargement.
-    expect(screen.queryAllByTestId("service-card")).toHaveLength(0);
+    // Pas de tuiles réelles ni d'état vide pendant le chargement.
+    expect(screen.queryAllByTestId("operation-tile")).toHaveLength(0);
     expect(screen.queryByText("Aucun service disponible")).not.toBeInTheDocument();
     // Message localisé visible (texte porteur de sens).
-    expect(screen.getByText("Chargement des services...")).toBeInTheDocument();
+    expect(screen.getByText("Chargement des opérations...")).toBeInTheDocument();
   });
 
   it("AUDIT-F20: isLoading prime sur l'état vide (services encore inconnus)", () => {

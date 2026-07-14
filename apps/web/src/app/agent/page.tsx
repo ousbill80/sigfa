@@ -11,19 +11,15 @@ import { createSigfaClient } from "@sigfa/contracts";
 import { AgentConsole, type TransferOption } from "@/components/agent/agent-console";
 import { useAgentFlow } from "@/lib/use-agent-flow";
 import { OfflineBanner } from "@/components/ui/offline-banner";
-
-/** Mode temps réel (dérivé de l'env). */
-const REALTIME = process.env.NEXT_PUBLIC_REALTIME_MODE === "real";
+import { BROWSER_API_BASE } from "@/lib/browser-api";
 
 /**
- * Base API du client agent.
- * - mode `real` : proxy same-origin `/api/rt` — injecte le Bearer httpOnly côté
- *   serveur et relaie vers `/api/v1` (RT-003 ; token jamais exposé au JS client).
- * - mode `off`  : mock Prism canonique (RT-001, socket inactif).
+ * Base API du client agent : TOUJOURS le proxy same-origin `/api/rt`
+ * (lib/browser-api) — Bearer httpOnly injecté côté serveur (RT-003, token
+ * jamais exposé au JS client) ; en mode mock le proxy relaie vers Prism
+ * (RT-001b). Aucun appel navigateur cross-origin.
  */
-const API_BASE = REALTIME
-  ? "/api/rt"
-  : process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4010";
+const API_BASE = BROWSER_API_BASE;
 
 /** Counter operated by the signed-in agent (would come from the JWT claim). */
 const COUNTER_ID =

@@ -2,9 +2,11 @@
  * KIOSK-008 — useVoiceAnnouncement hook.
  *
  * Déclenche la lecture vocale (Web Speech API) du registre SIGFA dans la langue
- * de session. Applique la voix de la locale cible ou le repli FR, et la `rate`
- * ralentie (0.8) en mode accessibilité. Dégradation silencieuse si l'API est
- * absente (aucun log d'erreur côté client).
+ * de session. Délègue à `speakInLocale` (mécanique commune : voix explicite de
+ * la locale cible ou repli FR, attente `voiceschanged` si la liste de voix
+ * n'est pas encore chargée, `cancel` avant `speak`), avec la `rate` ralentie
+ * (0.8) en mode accessibilité. Dégradation silencieuse si l'API est absente
+ * (aucun log d'erreur côté client).
  *
  * @module hooks/useVoiceAnnouncement
  */
@@ -15,8 +17,7 @@ import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import {
   buildVoiceAnnouncement,
-  localeToBcp47,
-  pickVoiceForLocale,
+  speakInLocale,
   voiceRate,
   type VoiceAnnouncementInput,
 } from "@/lib/kiosk-voice";
@@ -43,19 +44,13 @@ export function useVoiceAnnouncement(
     (input: VoiceAnnouncementInput) => {
       if (typeof window === "undefined") return;
       if (!("speechSynthesis" in window) || !window.speechSynthesis) return;
-      if (typeof SpeechSynthesisUtterance === "undefined") return;
 
-      const text = buildVoiceAnnouncement(input, t);
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = localeToBcp47(locale);
-      utterance.rate = voiceRate(isAccessibilityMode);
-
-      // Sélection de voix avec repli FR (locale sans voix native).
-      const voices = window.speechSynthesis.getVoices?.() ?? [];
-      const voice = pickVoiceForLocale(locale, voices);
-      if (voice) utterance.voice = voice;
-
-      window.speechSynthesis.speak(utterance);
+      // Mécanique commune (voix explicite + attente voiceschanged + cancel).
+      speakInLocale(window.speechSynthesis, {
+        locale,
+        text: buildVoiceAnnouncement(input, t),
+        rate: voiceRate(isAccessibilityMode),
+      });
     },
     [t, locale, isAccessibilityMode]
   );

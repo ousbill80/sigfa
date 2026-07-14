@@ -64,11 +64,11 @@ describe("ADM-003b: /admin/kiosks — proxy authentifié + scope des claims", ()
     await expect(KiosksSupervisionPage()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("ADM-003b: mode mock → base mock + fixture agence + pas de token", async () => {
+  it("ADM-003b: mode mock → proxy /api/rt + fixture agence + pas de token", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await KiosksSupervisionPage();
     const client = findElementByType(tree, KiosksPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
     expect(client?.props.agencyId).toBe(MOCK_TENANT.agencyId);
     expect(client?.props.realtime).toBe(false);
     expect(client?.props.token).toBeUndefined();

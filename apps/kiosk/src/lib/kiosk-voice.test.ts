@@ -9,11 +9,12 @@
  *   - rate ralentie en mode accessibilité,
  *   - facteurs de font-size et de timeout en accessibilité.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildVoiceAnnouncement,
   localeToBcp47,
   pickVoiceForLocale,
+  speakInLocale,
   voiceRate,
   accessibilityFontSizePx,
   accessibilityTimeoutMs,
@@ -21,16 +22,22 @@ import {
   A11Y_BASE_FONT_PX,
   A11Y_LINE_HEIGHT,
   NOMINAL_TICKET_RETURN_MS,
+  NOMINAL_VOICE_RATE,
   A11Y_TICKET_RETURN_MS,
+  VOICES_LOAD_TIMEOUT_MS,
 } from "@/lib/kiosk-voice";
 
 /** Fabrique une voix minimale conforme à SpeechSynthesisVoice. */
-function makeVoice(lang: string, name = lang): SpeechSynthesisVoice {
+function makeVoice(
+  lang: string,
+  name = lang,
+  opts: { localService?: boolean; default?: boolean } = {}
+): SpeechSynthesisVoice {
   return {
     lang,
     name,
-    default: false,
-    localService: true,
+    default: opts.default ?? false,
+    localService: opts.localService ?? true,
     voiceURI: name,
   };
 }
@@ -100,6 +107,275 @@ describe("KIOSK-008: sélection de voix avec fallback FR", () => {
     const voices = [makeVoice("fr-CA")];
     const v = pickVoiceForLocale("fr", voices);
     expect(v?.lang).toBe("fr-CA");
+  });
+});
+
+describe("KIOSK-002: pickVoiceForLocale — scoring qualité (fix PO voix anglaise)", () => {
+  it("KIOSK-002: correspondance BCP-47 EXACTE avant préfixe (en-US bat en-GB listé avant)", () => {
+    const voices = [makeVoice("en-GB", "Serena"), makeVoice("en-US", "Alex")];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Alex");
+  });
+
+  it("KIOSK-002: correspondance BCP-47 EXACTE avant préfixe (fr-FR bat fr-CA listé avant)", () => {
+    const voices = [
+      makeVoice("fr-CA", "Chantal"),
+      makeVoice("fr-FR", "Nicolas"),
+    ];
+    const v = pickVoiceForLocale("fr", voices);
+    expect(v?.name).toBe("Nicolas");
+  });
+
+  it("KIOSK-002: voix réputée de qualité préférée à une ordinaire de même langue (Samantha > Alex)", () => {
+    const voices = [makeVoice("en-US", "Alex"), makeVoice("en-US", "Samantha")];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Samantha");
+  });
+
+  it("KIOSK-002: Google US English (réseau) bat une ordinaire locale — la qualité prime sur localService", () => {
+    const voices = [
+      makeVoice("en-US", "Alex"),
+      makeVoice("en-US", "Google US English", { localService: false }),
+    ];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Google US English");
+  });
+
+  it("KIOSK-002: voix réputée FR préférée (Amélie > Nicolas), insensible à la casse", () => {
+    const voices = [
+      makeVoice("fr-FR", "Nicolas"),
+      makeVoice("fr-FR", "AMÉLIE"),
+    ];
+    const v = pickVoiceForLocale("fr", voices);
+    expect(v?.name).toBe("AMÉLIE");
+  });
+
+  it("KIOSK-002: bonus « enhanced » — Samantha (Enhanced) bat Samantha", () => {
+    const voices = [
+      makeVoice("en-US", "Samantha"),
+      makeVoice("en-US", "Samantha (Enhanced)"),
+    ];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Samantha (Enhanced)");
+  });
+
+  it("KIOSK-002: malus novelty — Albert (robotique) perd contre une ordinaire de même langue", () => {
+    const voices = [makeVoice("en-US", "Albert"), makeVoice("en-US", "Alex")];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Alex");
+  });
+
+  it("KIOSK-002: malus FORT — une exacte novelty (Albert en-US) perd même contre une ordinaire en préfixe (en-GB)", () => {
+    const voices = [makeVoice("en-US", "Albert"), makeVoice("en-GB", "Serena")];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Serena");
+  });
+
+  it("KIOSK-002: malus « compact » — Samantha (Compact) perd contre Samantha", () => {
+    const voices = [
+      makeVoice("en-US", "Samantha (Compact)"),
+      makeVoice("en-US", "Samantha"),
+    ];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Samantha");
+  });
+
+  it("KIOSK-002: voix novelty retenue en dernier recours (seule voix de la langue)", () => {
+    const voices = [makeVoice("fr-FR", "Nicolas"), makeVoice("en-US", "Fred")];
+    const v = pickVoiceForLocale("en", voices);
+    // Mieux vaut une voix anglaise médiocre qu'une voix FR lisant l'anglais.
+    expect(v?.name).toBe("Fred");
+  });
+
+  it("KIOSK-002: à score égal, localService départage (pas de latence réseau)", () => {
+    const voices = [
+      makeVoice("en-US", "Voice A", { localService: false }),
+      makeVoice("en-US", "Voice B", { localService: true }),
+    ];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Voice B");
+  });
+
+  it("KIOSK-002: à score et localService égaux, default départage", () => {
+    const voices = [
+      makeVoice("en-US", "Voice A"),
+      makeVoice("en-US", "Voice B", { default: true }),
+    ];
+    const v = pickVoiceForLocale("en", voices);
+    expect(v?.name).toBe("Voice B");
+  });
+
+  it("KIOSK-002: repli FR documenté inchangé — meilleure voix FR pour une locale sans voix native", () => {
+    const voices = [
+      makeVoice("fr-FR", "Jester"),
+      makeVoice("fr-FR", "Thomas"),
+      makeVoice("en-US", "Samantha"),
+    ];
+    const v = pickVoiceForLocale("es", voices);
+    // Repli FR (aucune voix es) ET scoring appliqué au repli (Thomas > Jester).
+    expect(v?.name).toBe("Thomas");
+  });
+});
+
+describe("KIOSK-002: speakInLocale — voix explicite, voiceschanged, cancel", () => {
+  /** Double minimal de SpeechSynthesisUtterance (jsdom ne l'expose pas). */
+  class FakeUtterance {
+    text: string;
+    lang = "";
+    rate = 1;
+    voice: SpeechSynthesisVoice | null = null;
+    constructor(text: string) {
+      this.text = text;
+    }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("KIOSK-002: voix en-US disponible → posée sur l'utterance (pas de repli FR)", () => {
+    const speak = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => [makeVoice("fr-FR"), makeVoice("en-US")],
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "en", text: "English", rate: 1 });
+
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.text).toBe("English");
+    expect(utt.lang).toBe("en-US");
+    expect(utt.voice?.lang).toBe("en-US");
+  });
+
+  it("KIOSK-002: rate omis → débit NOMINAL (1.0) — annonce de langue de l'accueil", () => {
+    const speak = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => [makeVoice("en-US", "Samantha")],
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "en", text: "English" });
+
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.rate).toBe(NOMINAL_VOICE_RATE);
+    expect(utt.rate).toBe(1);
+  });
+
+  it("KIOSK-002: rate explicite conservé (0.8 annonce ticket / accessibilité)", () => {
+    const speak = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => [makeVoice("fr-FR", "Thomas")],
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "fr", text: "Ticket A007", rate: 0.8 });
+
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.rate).toBe(0.8);
+  });
+
+  it("KIOSK-002: cancel() appelé AVANT speak() (purge d'une annonce qui traîne)", () => {
+    const order: string[] = [];
+    const synth = {
+      speak: vi.fn(() => order.push("speak")),
+      cancel: vi.fn(() => order.push("cancel")),
+      getVoices: () => [makeVoice("fr-FR")],
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "fr", text: "Français", rate: 1 });
+
+    expect(order).toEqual(["cancel", "speak"]);
+  });
+
+  it("KIOSK-002: getVoices() vide au 1er appel → attend voiceschanged puis parle avec la voix en-US (pas de repli FR fautif)", () => {
+    let voices: SpeechSynthesisVoice[] = [];
+    let listener: (() => void) | undefined;
+    const speak = vi.fn();
+    const removeEventListener = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => voices,
+      addEventListener: (type: string, cb: () => void) => {
+        if (type === "voiceschanged") listener = cb;
+      },
+      removeEventListener,
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "en", text: "English", rate: 1 });
+
+    // Liste pas encore chargée : on ne parle PAS (sinon voix FR par défaut).
+    expect(speak).not.toHaveBeenCalled();
+    expect(listener).toBeDefined();
+
+    // Chargement asynchrone terminé → voiceschanged.
+    voices = [makeVoice("fr-FR"), makeVoice("en-US")];
+    listener?.();
+
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.voice?.lang).toBe("en-US");
+    expect(removeEventListener).toHaveBeenCalledWith("voiceschanged", listener);
+
+    // L'écouteur ne rejoue pas (garde `done`).
+    listener?.();
+    vi.advanceTimersByTime(VOICES_LOAD_TIMEOUT_MS);
+    expect(speak).toHaveBeenCalledTimes(1);
+  });
+
+  it("KIOSK-002: voiceschanged ne vient jamais → parle quand même après le délai borné (dégradation, lang seul)", () => {
+    const speak = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => [],
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "en", text: "English", rate: 1 });
+    expect(speak).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(VOICES_LOAD_TIMEOUT_MS);
+
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.lang).toBe("en-US");
+    expect(utt.voice).toBeNull();
+  });
+
+  it("KIOSK-002: API partielle (ni addEventListener ni cancel) → parle immédiatement sans erreur", () => {
+    const speak = vi.fn();
+    const synth = { speak, getVoices: () => [] } as unknown as SpeechSynthesis;
+
+    expect(() =>
+      speakInLocale(synth, { locale: "fr", text: "Français", rate: 1 })
+    ).not.toThrow();
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.voice).toBeNull();
+  });
+
+  it("KIOSK-002: SpeechSynthesisUtterance absent → dégradation silencieuse (aucun speak)", () => {
+    vi.unstubAllGlobals(); // retire le double d'utterance
+    const speak = vi.fn();
+    const synth = { speak, getVoices: () => [] } as unknown as SpeechSynthesis;
+
+    expect(() =>
+      speakInLocale(synth, { locale: "fr", text: "Français", rate: 1 })
+    ).not.toThrow();
+    expect(speak).not.toHaveBeenCalled();
   });
 });
 

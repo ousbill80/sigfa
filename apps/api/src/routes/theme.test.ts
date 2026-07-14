@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createApp } from "src/app.js";
-import { contrastRatio, MIN_CONTRAST_RATIO } from "src/lib/wcag-contrast.js";
+import { contrastRatio, MIN_CONTRAST_RATIO } from "@sigfa/schemas";
 import {
   startAdminHarness,
   stopAdminHarness,

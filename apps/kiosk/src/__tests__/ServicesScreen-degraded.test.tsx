@@ -1,9 +1,10 @@
 /**
- * KIOSK-007 — Tests TDD (phase rouge) : file longue + service fermé sur ServicesScreen.
+ * KIOSK-007 — File longue + service fermé sur l'écran « Prise de ticket »
+ * groupé par familles (refonte KIOSK-BORNE).
  * File longue → message affluence + champ téléphone mis en avant.
- * Service CLOSED → carte grisée avec horaire, non cliquable (snapshot ×4 langues).
+ * Service CLOSED → tuile grisée avec horaire, non cliquable (snapshot FR/EN).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 // KIOSK-007 : on étend `expect` avec les matchers jest-dom directement depuis
 // l'instance vitest du runner (via `import * as matchers` + `expect.extend`),
@@ -13,6 +14,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 // `toMatchSnapshot` de ce fichier (« The snapshot state ... is not found »).
 import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
 import { NextIntlClientProvider } from "next-intl";
+import { server } from "@/mocks/server";
 
 expect.extend(jestDomMatchers);
 
@@ -34,15 +36,20 @@ function makeMessages(services003: Record<string, string>, degraded007: Record<s
 
 const frMessages = makeMessages(
   {
-    title: "Quel service souhaitez-vous ?",
+    title: "Prise de ticket",
+    subtitle: "Touchez l'opération de votre choix",
     backButton: "Retour",
-    waitEstimate: "~{minutes} min",
-    seeMore: "Voir plus de services",
     closedService: "Fermé — {schedule}",
     accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
+    loadingMessage: "Chargement des opérations...",
+    errorTitle: "Opérations indisponibles",
+    errorMessage: "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
+    retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
+    advisorCard: "Voir mon conseiller",
+    advisorHint: "Rencontrer un chargé de clientèle",
   },
   {
     longQueueTitle: "Forte affluence — environ {estimate} min",
@@ -53,15 +60,20 @@ const frMessages = makeMessages(
 
 const enMessages = makeMessages(
   {
-    title: "Which service do you need?",
+    title: "Take a ticket",
+    subtitle: "Tap the operation of your choice",
     backButton: "Back",
-    waitEstimate: "~{minutes} min",
-    seeMore: "See more services",
     closedService: "Closed — {schedule}",
     accessibilityButton: "Priority access",
     emptyTitle: "No services available",
     emptyMessage: "Please go to reception — a staff member will assist you.",
+    loadingMessage: "Loading operations...",
+    errorTitle: "Operations unavailable",
+    errorMessage: "Unable to load operations. Retry or go to reception.",
+    retryButton: "Retry",
     offlineBanner: "Offline mode",
+    advisorCard: "See my advisor",
+    advisorHint: "Meet a relationship manager",
   },
   {
     longQueueTitle: "High volume — about {estimate} min",
@@ -78,7 +90,6 @@ const AGENCY_ID = "33333333-3333-4333-a333-333333333333";
 const openService: ServiceItem = {
   id: "svc-1",
   name: "Retrait / Dépôt",
-  icon: "deposit",
   estimatedMinutes: 45,
   isOpen: true,
 };
@@ -86,7 +97,6 @@ const openService: ServiceItem = {
 const closedService: ServiceItem = {
   id: "svc-2",
   name: "Virement international",
-  icon: "withdrawal",
   estimatedMinutes: 0,
   isOpen: false,
   schedule: "lundi 08h00",
@@ -99,36 +109,53 @@ function renderServices(
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <ServicesScreen services={services} agencyId={AGENCY_ID} />
+      <ServicesScreen
+        services={services}
+        agencyId={AGENCY_ID}
+        agencyName="Cocody Angré"
+        bankName="Banque Ivoire"
+      />
     </NextIntlClientProvider>
   );
 }
 
-describe("KIOSK-007: ServicesScreen file longue + service fermé", () => {
-  beforeEach(() => vi.clearAllMocks());
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
 
-  it("KIOSK-007: estimatedWaitMinutes ≥ seuil → message affluence + champ tel mis en avant (Testing Library)", () => {
+describe("KIOSK-007: ServicesScreen file longue + service fermé", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Horloge du bandeau figée pour des rendus déterministes (snapshots).
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-07-13T10:30:00"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    server.resetHandlers();
+  });
+
+  it("KIOSK-007: estimatedWaitMinutes ≥ seuil → message affluence + champ tel mis en avant (Testing Library)", async () => {
     renderServices([openService]);
-    const banner = screen.getByTestId("long-queue-banner");
+    const banner = await screen.findByTestId("long-queue-banner");
     expect(banner).toBeInTheDocument();
     expect(banner.textContent).toContain("affluence");
     // Champ téléphone mis en avant dans ce contexte.
     expect(screen.getByTestId("long-queue-phone-cta")).toBeInTheDocument();
   });
 
-  it("KIOSK-007 (audit F5): le CTA file longue PORTE le serviceId — jamais de POST invalide", () => {
+  it("KIOSK-007 (audit F5): le CTA file longue PORTE le serviceId — jamais de POST invalide", async () => {
     renderServices([openService]);
-    fireEvent.click(screen.getByTestId("long-queue-phone-cta"));
+    fireEvent.click(await screen.findByTestId("long-queue-phone-cta"));
     expect(mockPush).toHaveBeenCalledTimes(1);
     const url = mockPush.mock.calls[0][0] as string;
     // Le repli « ticket local 0 min » en pleine affluence venait d'une
-    // confirmation SANS serviceId (audit F5, ServicesScreen.tsx:373).
+    // confirmation SANS serviceId (audit F5).
     expect(url).toContain("/fr/confirmation");
     expect(url).toContain(`serviceId=${openService.id}`);
     expect(url).toContain(`agencyId=${AGENCY_ID}`);
   });
 
-  it("KIOSK-007 (audit F5): le CTA file longue vise le service OUVERT à la plus longue attente", () => {
+  it("KIOSK-007 (audit F5): le CTA file longue vise le service OUVERT à la plus longue attente", async () => {
     const busiest: ServiceItem = {
       id: "svc-9",
       name: "Crédit",
@@ -142,26 +169,26 @@ describe("KIOSK-007: ServicesScreen file longue + service fermé", () => {
       isOpen: false,
     };
     renderServices([openService, busiest, closedButLonger]);
-    fireEvent.click(screen.getByTestId("long-queue-phone-cta"));
+    fireEvent.click(await screen.findByTestId("long-queue-phone-cta"));
     const url = mockPush.mock.calls[0][0] as string;
     // Service fermé ignoré ; c'est la file la plus chargée OUVERTE qui porte le CTA.
     expect(url).toContain("serviceId=svc-9");
   });
 
-  it("KIOSK-007: attente sous le seuil → aucune bannière affluence", () => {
+  it("KIOSK-007: attente sous le seuil → aucune bannière affluence", async () => {
     renderServices([{ ...openService, estimatedMinutes: 10 }]);
+    await screen.findAllByTestId("family-section");
     expect(screen.queryByTestId("long-queue-banner")).not.toBeInTheDocument();
   });
 
-  it("KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable", () => {
+  it("KIOSK-007: service CLOSED → tuile grisée avec horaire, non cliquable", async () => {
     renderServices([closedService]);
-    const cards = screen.getAllByTestId("service-card");
-    const closedCard = cards[0]!;
-    expect(closedCard).toHaveAttribute("aria-disabled", "true");
-    expect(closedCard.style.opacity).toBe("0.4");
+    const closedTile = await screen.findByTestId("service-tile");
+    expect(closedTile).toHaveAttribute("aria-disabled", "true");
+    expect(closedTile.style.opacity).toBe("0.4");
     expect(screen.getByTestId("service-schedule").textContent).toContain("lundi 08h00");
     // Non cliquable : la sélection ne navigue pas.
-    fireEvent.click(closedCard);
+    fireEvent.click(closedTile);
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -169,9 +196,10 @@ describe("KIOSK-007: ServicesScreen file longue + service fermé", () => {
     { locale: "fr", messages: frMessages },
     { locale: "en", messages: enMessages },
   ])(
-    "KIOSK-007: service CLOSED → carte grisée avec horaire, non cliquable (snapshot $locale)",
-    ({ locale, messages }) => {
+    "KIOSK-007: service CLOSED → tuile grisée avec horaire, non cliquable (snapshot $locale)",
+    async ({ locale, messages }) => {
       const { container } = renderServices([closedService], messages, locale);
+      await screen.findByTestId("service-tile");
       expect(container.firstChild).toMatchSnapshot();
     }
   );

@@ -449,6 +449,18 @@ describe("CONTRACT-010 — core.yaml", () => {
     ).toBe("AUTHENTICATED");
   });
 
+  it("WEB-002-HDR: GET /agencies/{id} a x-required-role: AGENT (lecture de SA propre agence — bandeau session)", () => {
+    const pathItem = getPath("/agencies/{id}");
+    expect(pathItem, "/agencies/{id} doit exister").toBeDefined();
+    const op = (pathItem as Record<string, unknown>)?.["get"] as OperationObject | undefined;
+    expect(op, "GET /agencies/{id} doit exister").toBeDefined();
+    expect(
+      op?.["x-required-role"],
+      "GET /agencies/{id} doit avoir x-required-role: AGENT — tout connecté résout le nom de son agence de rattachement (scope agency inchangé : hors périmètre agencyIds → 403)",
+    ).toBe("AGENT");
+    expect(op?.["x-tenant-scope"], "GET /agencies/{id} garde le scope agency").toBe("agency");
+  });
+
   it("CONTRACT-010: DELETE /agencies/{id} 409 utilise AGENCY_HAS_OPEN_TICKETS (pas ACTIVE)", () => {
     const pathItem = getPath("/agencies/{id}");
     expect(pathItem, "/agencies/{id} doit exister").toBeDefined();

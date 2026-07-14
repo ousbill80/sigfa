@@ -23,6 +23,8 @@ import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { TvScreen } from "@/components/tv/tv-screen";
 import { useTvClock } from "@/lib/use-tv-clock";
+import { useTvMediaManifest } from "@/lib/use-tv-media";
+import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 import { useTvSimulation } from "@/lib/use-tv-simulation";
 import { useSocket } from "@/lib/socket-provider";
 import { autoCorrectedBrand } from "@/lib/theme";
@@ -38,6 +40,11 @@ export interface TvTenant {
   brand: string;
   /** Langue d'affichage. */
   locale: Locale;
+  /**
+   * URL du logo banque (convention lib/bank-branding, résolue côté serveur par
+   * la page). `null`/absent → pastille --brand + initiale.
+   */
+  logoUrl?: string | null;
 }
 
 /** Props de {@link TvDisplay}. */
@@ -72,6 +79,10 @@ export function formatTvDate(date: Date, locale: Locale): string {
 export function TvDisplay({ tenant }: TvDisplayProps): ReactElement {
   const clock = useTvClock();
   const socket = useSocket();
+  // Zone média gauche : playlist du manifeste public/tv-media (vide → repli
+  // promo texte) ; fondus désactivés si le spectateur préfère moins de motion.
+  const mediaItems = useTvMediaManifest();
+  const reducedMotion = usePrefersReducedMotion();
   const { state: simState, celebration } = useTvSimulation({
     seed: TV_SEED_STATE,
     locale: tenant.locale,
@@ -117,6 +128,9 @@ export function TvDisplay({ tenant }: TvDisplayProps): ReactElement {
         clock={clock}
         dateLabel={dateLabel}
         celebration={isRealtime ? false : celebration}
+        reducedMotion={reducedMotion}
+        mediaItems={mediaItems}
+        logoUrl={tenant.logoUrl ?? null}
       />
     </div>
   );

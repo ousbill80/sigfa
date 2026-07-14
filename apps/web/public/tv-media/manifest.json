@@ -1,0 +1,5 @@
+[
+  { "type": "image", "src": "/tv-media/promo-epargne.svg", "durationMs": 8000 },
+  { "type": "video", "src": "/tv-media/demo-clip.mp4" },
+  { "type": "image", "src": "/tv-media/promo-credit.svg", "durationMs": 8000 }
+]

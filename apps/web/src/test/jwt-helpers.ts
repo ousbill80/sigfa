@@ -25,6 +25,8 @@ export interface TestClaims {
   role?: string;
   bankId?: string;
   agencyIds?: string[];
+  /** Nom d'affichage (claim additif WEB-002-HDR). */
+  displayName?: string;
 }
 
 /**

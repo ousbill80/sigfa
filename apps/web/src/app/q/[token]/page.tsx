@@ -13,6 +13,7 @@ import type { ReactElement } from "react";
 import type { Metadata } from "next";
 import { PwaPageClient } from "@/app/q/[token]/pwa-page-client";
 import { PWA_LOCALES, type PwaLocale } from "@/lib/pwa/pwa-i18n";
+import { BROWSER_API_BASE } from "@/lib/browser-api";
 
 /** PWA metadata + manifest link (installable, never required). */
 export const metadata: Metadata = {
@@ -23,9 +24,14 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "default", title: "SIGFA" },
 };
 
-/** Resolves the public API base URL (mock in dev, real in prod). */
+/**
+ * Public API base for the browser: ALWAYS the same-origin `/api/rt` proxy
+ * (lib/browser-api). The public flow carries no cookie, so the proxy forwards
+ * without a Bearer in real mode — and rebases onto the Prism mock in mock
+ * mode. Direct cross-origin calls are forbidden (no CORS on the real API).
+ */
 function resolveBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4010";
+  return BROWSER_API_BASE;
 }
 
 /** Normalizes the optional `?lang=` query into a supported locale. */

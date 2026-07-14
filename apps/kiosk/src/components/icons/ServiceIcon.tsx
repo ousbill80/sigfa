@@ -26,6 +26,14 @@ export type ServiceIconName =
   | "savings"
   | "exchange"
   | "advisor"
+  | "card"
+  | "cheque"
+  | "statement"
+  | "opposition"
+  | "payment"
+  | "contract"
+  | "mail"
+  | "info"
   | "generic";
 
 export interface ServiceIconProps {
@@ -44,13 +52,24 @@ export interface ServiceIconProps {
  * Couvre FR + EN pour les services bancaires courants.
  */
 const KEYWORD_MAP: ReadonlyArray<readonly [readonly string[], ServiceIconName]> = [
+  // Les entrées SPÉCIFIQUES précèdent les génériques : « opposition carte »
+  // doit gagner sur « carte », « retrait chèque » sur « retrait », « dépôt de
+  // courriers » sur « dépôt », etc. (première correspondance retenue).
+  [["opposition", "blocage"], "opposition"],
+  [["cheque", "chequier", "check"], "cheque"],
+  [["releve", "statement", "solde"], "statement"],
+  [["courrier", "mail"], "mail"],
+  [["information", "renseignement"], "info"],
+  [["souscription", "subscription", "contrat", "contract"], "contract"],
+  [["paiement", "payment", "facture"], "payment"],
+  [["carte", "card", "prepay"], "card"],
   [["depot", "deposit", "versement"], "deposit"],
   [["retrait", "withdrawal", "cash", "especes"], "withdrawal"],
   [["virement", "transfer", "transfert"], "transfer"],
   [["reclamation", "complaint", "plainte", "litige"], "complaint"],
   [["compte", "account", "guichet"], "account"],
   [["credit", "loan", "pret", "financement"], "credit"],
-  [["epargne", "savings", "livret"], "savings"],
+  [["epargne", "savings", "livret", "pee", "pel"], "savings"],
   [["change", "exchange", "devise", "currency"], "exchange"],
   [["conseil", "advisor", "conseiller", "rendez", "rdv", "appointment"], "advisor"],
 ];
@@ -74,6 +93,14 @@ const ICON_NAMES: ReadonlySet<string> = new Set<ServiceIconName>([
   "savings",
   "exchange",
   "advisor",
+  "card",
+  "cheque",
+  "statement",
+  "opposition",
+  "payment",
+  "contract",
+  "mail",
+  "info",
   "generic",
 ]);
 
@@ -98,7 +125,12 @@ export function resolveServiceIcon(keyword: string): ServiceIconName {
   return "generic";
 }
 
-/** Clé métier du jeu → icône du set SIGFA duotone (@sigfa/ui). */
+/**
+ * Clé métier du jeu → icône du set SIGFA duotone (@sigfa/ui).
+ * KIOSK-BORNE : les clés des familles d'opérations (carte, chèque, relevé,
+ * opposition, paiement, souscription, courrier, info) sont mappées sur le set
+ * standard — plus aucun tracé SVG ad hoc (ICONS-001).
+ */
 const SIGFA_ICON_BY_SERVICE: Record<ServiceIconName, IconName> = {
   deposit: "depot",
   withdrawal: "retrait",
@@ -109,6 +141,14 @@ const SIGFA_ICON_BY_SERVICE: Record<ServiceIconName, IconName> = {
   savings: "epargne",
   exchange: "change-devises",
   advisor: "conseiller",
+  card: "carte-bancaire",
+  cheque: "chequier",
+  statement: "statistiques",
+  opposition: "alerte",
+  payment: "virement",
+  contract: "valider",
+  mail: "depot",
+  info: "information",
   generic: "guichet",
 };
 

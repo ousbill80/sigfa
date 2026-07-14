@@ -21,4 +21,14 @@ describe("RT-003: /tv/[agencyId] page", () => {
     expect(getByTestId("tv-root")).toBeTruthy();
     expect(getByTestId("tv-screen")).toBeTruthy();
   });
+
+  it("TV-LOGO: bandeau — repli pastille + initiale sans NEXT_PUBLIC_BANK_LOGO_URL", async () => {
+    const element = await TvAgencyPage({
+      params: Promise.resolve({ agencyId: "33333333-3333-4333-a333-333333333333" }),
+    });
+    const { getByTestId, queryByTestId } = render(element);
+    // Convention lib/bank-branding : sans logo provisionné, pastille + initiale.
+    expect(getByTestId("tv-brand-mark").textContent).toBe("B");
+    expect(queryByTestId("tv-brand-logo")).toBeNull();
+  });
 });

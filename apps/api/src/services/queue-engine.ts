@@ -62,6 +62,10 @@ export async function getAgentLanguages(
   counterId: string,
   tx: Tx
 ): Promise<string[]> {
+  // `u.languages` est du type enum `agent_language[]` en base réelle
+  // (migrations 0000/0011) : cast explicite en text[] sinon le COALESCE lève
+  // « COALESCE could not convert type text[] to agent_language[] » (42804)
+  // et TOUT call-next répond 500.
   const res = await tx.query(
     `SELECT COALESCE(u.languages, ARRAY[]::agent_language[])::text[] AS languages
        FROM counters c

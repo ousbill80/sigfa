@@ -59,6 +59,8 @@ export function TicketPageClient() {
     searchParams.get("networkLostBeforePrinterConfirm") === "true";
   // MODEL-KIOSK-B (finition) : nom conseiller (public, non-PII) pour le rappel.
   const managerName = searchParams.get("managerName") ?? undefined;
+  // KIOSK-BORNE : données publiques du ticket imprimé (jamais de PII en URL).
+  const trackingId = searchParams.get("trackingId") ?? undefined;
   // KIOSK-005b (audit F8) : opération choisie (URL prioritaire, store en repli).
   const serviceLabel =
     searchParams.get("serviceLabel") ?? storedOperationLabel ?? undefined;
@@ -92,6 +94,7 @@ export function TicketPageClient() {
       isOfflineTicket={isOfflineTicket}
       printerStatus={printerStatus}
       networkLostBeforePrinterConfirm={networkLostBeforePrinterConfirm}
+      trackingId={trackingId}
     />
   );
 }

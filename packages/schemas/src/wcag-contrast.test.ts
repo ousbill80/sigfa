@@ -16,7 +16,7 @@ import {
   contrastRatio,
   correctContrast,
   MIN_CONTRAST_RATIO,
-} from "src/lib/wcag-contrast.js";
+} from "./wcag-contrast.js";
 
 describe("API-009: WCAG contrast — primitives", () => {
   it("hexToRgb parse #RRGGBB (casse indifférente)", () => {

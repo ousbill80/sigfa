@@ -45,3 +45,23 @@ export function setAuthCookies(response: NextResponse, tokens: AuthTokens): Next
   });
   return response;
 }
+
+/**
+ * Purge les cookies httpOnly access/refresh (déconnexion — WEB-002-HDR).
+ * `maxAge: 0` + valeur vide : le navigateur supprime les deux cookies.
+ * @param response - Réponse à décorer.
+ * @returns La réponse décorée.
+ */
+export function clearAuthCookies(response: NextResponse): NextResponse {
+  const secure = process.env["NODE_ENV"] === "production";
+  for (const name of ["access_token", "refresh_token"] as const) {
+    response.cookies.set(name, "", {
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    });
+  }
+  return response;
+}

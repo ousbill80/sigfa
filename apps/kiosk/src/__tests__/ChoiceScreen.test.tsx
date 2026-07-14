@@ -27,6 +27,7 @@ const frMessages = {
   choiceModelB: {
     title: "Que souhaitez-vous ?",
     backButton: "Retour",
+    languageChosen: "Vous avez choisi Français",
     operationCard: "Une opération",
     operationHint: "Dépôt, retrait, virement…",
     managerCard: "Voir mon conseiller",
@@ -38,6 +39,7 @@ const enMessages = {
   choiceModelB: {
     title: "What would you like to do?",
     backButton: "Back",
+    languageChosen: "You have chosen English",
     operationCard: "An operation",
     operationHint: "Deposit, withdrawal, transfer…",
     managerCard: "See my advisor",
@@ -111,6 +113,19 @@ describe("MODEL-KIOSK-B: ChoiceScreen (point d'entrée 2 chemins)", () => {
     expect(back.querySelector("svg[data-icon='retour']")).toBeInTheDocument();
     fireEvent.click(back);
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it("MODEL-KIOSK-B: indique la langue choisie en phrase claire (FR/EN)", () => {
+    for (const { locale, messages, expected } of [
+      { locale: "fr", messages: frMessages, expected: "Vous avez choisi Français" },
+      { locale: "en", messages: enMessages, expected: "You have chosen English" },
+    ]) {
+      const { unmount } = renderScreen(locale, messages);
+      const note = screen.getByTestId("choice-language-note");
+      expect(note, `phrase langue ${locale}`).toHaveTextContent(expected);
+      expect(note.style.color).toBe("var(--ink-muted-inv)");
+      unmount();
+    }
   });
 
   it("MODEL-KIOSK-B: aucun emoji dans le rendu global", () => {

@@ -60,11 +60,11 @@ describe("S3: /dashboard/network — proxy authentifié + banque des claims", ()
     await expect(NetworkDashboardPage()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("mode mock → base mock + fixture banque", async () => {
+  it("mode mock → proxy /api/rt + fixture banque", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await NetworkDashboardPage();
     const client = findElementByType(tree, NetworkPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
     expect(client?.props.bankId).toBe(MOCK_TENANT.bankId);
   });
 });

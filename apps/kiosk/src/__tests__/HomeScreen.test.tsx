@@ -8,9 +8,23 @@
  * FR/EN), hiérarchie logo, Akwaba, langues, statut discret en bas.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Catalogues réels : le nom de langue annoncé doit venir de la clé i18n
+// `home002.languageName` (source unique, pas de chaîne dupliquée).
+// Même convention de chargement fs qu'i18n.test.ts (messages/ hors src/).
+const MESSAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../messages");
+function languageNameFromCatalog(locale: string): string {
+  const catalog = JSON.parse(
+    readFileSync(resolve(MESSAGES_DIR, `${locale}.json`), "utf-8")
+  ) as { home002: { languageName: string } };
+  return catalog.home002.languageName;
+}
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -53,6 +67,7 @@ vi.mock("@/hooks/useBankTheme", () => ({
 const frMessages = {
   home002: {
     title: "Akwaba — Bienvenue",
+    welcomeAgency: "à l'agence {agencyName}",
     chooseLanguage: "Choisissez votre langue",
     languageFr: "Français",
     languageEn: "English",
@@ -60,13 +75,13 @@ const frMessages = {
     queueUnavailable: "File d'attente non disponible",
     offlineBanner: "Mode hors connexion — vos tickets restent valables",
     loading: "Chargement...",
-    welcomeAgency: "à l'agence {agencyName}",
   },
 };
 
 const enMessages = {
   home002: {
     title: "Akwaba — Welcome",
+    welcomeAgency: "to {agencyName} branch",
     chooseLanguage: "Choose your language",
     languageFr: "Français",
     languageEn: "English",
@@ -74,7 +89,6 @@ const enMessages = {
     queueUnavailable: "Queue unavailable",
     offlineBanner: "Offline mode — your tickets remain valid",
     loading: "Loading...",
-    welcomeAgency: "to {agencyName} branch",
   },
 };
 
@@ -165,6 +179,25 @@ describe("KIOSK-002: HomeScreen", () => {
     const text = (container as HTMLElement).textContent ?? "";
     expect(/\p{Extended_Pictographic}/u.test(text)).toBe(false);
     expect(/[\u{1F1E6}-\u{1F1FF}]/u.test(text)).toBe(false);
+  });
+
+  it("KIOSK-002: ligne agence sous le titre — nom d'agence (repli, dédoublonné AUDIT-F18) en --ink-muted-inv", () => {
+    for (const { locale, messages, expected } of [
+      { locale: "fr", messages: frMessages, expected: "à l'agence Centrale" },
+      { locale: "en", messages: enMessages, expected: "to Centrale branch" },
+    ]) {
+      const { unmount, container } = render(
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+      const line = container.querySelector("[data-testid='agency-welcome']") as HTMLElement;
+      expect(line, `agency line for locale ${locale}`).toBeInTheDocument();
+      expect(line.textContent).toBe(expected);
+      // Hiérarchie : discrète sous le titre display.
+      expect(line.style.color).toBe("var(--ink-muted-inv)");
+      unmount();
+    }
   });
 
   it("KIOSK-HOME: repli monogramme — pastille --brand (initiales) + nom de banque, sans logo", () => {
@@ -374,6 +407,142 @@ describe("KIOSK-002: HomeScreen", () => {
     expect(cards.length).toBe(2);
     cards.forEach((card) => {
       expect((card as HTMLElement).getAttribute("aria-disabled")).not.toBe("true");
+    });
+  });
+
+  describe("annonce vocale de la langue choisie (Web Speech API)", () => {
+    /** Double minimal de SpeechSynthesisUtterance (jsdom ne l'expose pas). */
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+
+    function makeVoice(lang: string): SpeechSynthesisVoice {
+      return { lang, name: lang, default: false, localService: true, voiceURI: lang };
+    }
+
+    const speak = vi.fn();
+
+    beforeEach(() => {
+      speak.mockClear();
+      vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+      vi.stubGlobal("speechSynthesis", { speak, getVoices: () => [] });
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("KIOSK-002: carte FR → la voix dit UNIQUEMENT « Français » en fr-FR (pas la phrase affichée, pas le code « fr »)", () => {
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      const cards = container.querySelectorAll("[data-testid='language-card']");
+      fireEvent.click(cards[0]); // carte fr
+
+      expect(speak).toHaveBeenCalledTimes(1);
+      const utterance = speak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.text).toBe(languageNameFromCatalog("fr"));
+      expect(utterance.text).toBe("Français");
+      expect(utterance.lang).toBe("fr-FR");
+      expect(mockPush).toHaveBeenCalledWith("/fr/choice");
+    });
+
+    it("KIOSK-002: carte EN → la voix dit UNIQUEMENT « English » en en-US, même depuis un rendu fr", () => {
+      // L'écran est rendu dans la locale COURANTE (fr) : le nom doit malgré
+      // tout être dans la langue CHOISIE (en).
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      const cards = container.querySelectorAll("[data-testid='language-card']");
+      fireEvent.click(cards[1]); // carte en
+
+      expect(speak).toHaveBeenCalledTimes(1);
+      const utterance = speak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.text).toBe(languageNameFromCatalog("en"));
+      expect(utterance.text).toBe("English");
+      expect(utterance.lang).toBe("en-US");
+      expect(mockPush).toHaveBeenCalledWith("/en/choice");
+    });
+
+    it("KIOSK-002: carte EN + voix en-US disponible → la voix ANGLAISE est posée sur l'utterance et cancel précède speak", () => {
+      // Bug PO « la voix anglaise ne marche pas » : sans utterance.voice, le
+      // moteur lit « English » avec la voix par défaut (souvent FR).
+      const order: string[] = [];
+      const localSpeak = vi.fn((utterance: FakeUtterance) => {
+        void utterance;
+        order.push("speak");
+      });
+      const cancel = vi.fn(() => order.push("cancel"));
+      vi.stubGlobal("speechSynthesis", {
+        speak: localSpeak,
+        cancel,
+        getVoices: () => [makeVoice("fr-FR"), makeVoice("en-US")],
+      });
+
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      fireEvent.click(container.querySelectorAll("[data-testid='language-card']")[1]);
+
+      expect(localSpeak).toHaveBeenCalledTimes(1);
+      const utterance = localSpeak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.voice?.lang).toBe("en-US");
+      expect(utterance.lang).toBe("en-US");
+      // Purge de toute annonce précédente AVANT de parler.
+      expect(order).toEqual(["cancel", "speak"]);
+    });
+
+    it("KIOSK-002: liste de voix vide au clic (chargement asynchrone) → attend voiceschanged puis parle en-US, sans bloquer la navigation", () => {
+      let voices: SpeechSynthesisVoice[] = [];
+      let listener: (() => void) | undefined;
+      const localSpeak = vi.fn();
+      vi.stubGlobal("speechSynthesis", {
+        speak: localSpeak,
+        cancel: vi.fn(),
+        getVoices: () => voices,
+        addEventListener: (type: string, cb: () => void) => {
+          if (type === "voiceschanged") listener = cb;
+        },
+        removeEventListener: vi.fn(),
+      });
+
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      fireEvent.click(container.querySelectorAll("[data-testid='language-card']")[1]);
+
+      // Pas de lecture prématurée (elle sortirait avec la voix FR par défaut),
+      // mais la navigation n'attend pas la voix.
+      expect(localSpeak).not.toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith("/en/choice");
+
+      // Les voix finissent de charger → voiceschanged.
+      voices = [makeVoice("fr-FR"), makeVoice("en-US")];
+      listener?.();
+
+      expect(localSpeak).toHaveBeenCalledTimes(1);
+      const utterance = localSpeak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.text).toBe("English");
+      expect(utterance.lang).toBe("en-US");
+      expect(utterance.voice?.lang).toBe("en-US");
     });
   });
 

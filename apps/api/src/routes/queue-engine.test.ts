@@ -60,8 +60,10 @@ async function runMigrations(client: pg.Client): Promise<void> {
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='counter_status') THEN
         CREATE TYPE counter_status AS ENUM ('OPEN','PAUSED','CLOSED');
       END IF;
-      -- Type RÉEL de production (migration 0000 puis restriction FR/EN en 0011).
-      -- users.languages est un agent_language[] (enum array), PAS un text[].
+      -- Type RÉEL des migrations (0000_dry_nuke.sql restreint par 0011) :
+      -- users.languages est agent_language[] et tickets.required_language est
+      -- agent_language — PAS text. Le déclarer en TEXT ici masquait le bug
+      -- « COALESCE could not convert type text[] to agent_language[] ».
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='agent_language') THEN
         CREATE TYPE agent_language AS ENUM ('FR','EN');
       END IF;
@@ -116,7 +118,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       bank_id UUID REFERENCES banks(id),
       email TEXT NOT NULL UNIQUE,
-      languages agent_language[] NOT NULL DEFAULT '{}',
+      languages agent_language[] NOT NULL DEFAULT '{FR}',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
 );
   `);
@@ -370,6 +372,25 @@ describe("API-004: ordre VIP>PMR>SENIOR>PRIORITY>STANDARD puis FIFO — intégra
 describe("API-004: langue non parlée → sauté pour ce guichet, soft timeout → pris quand même", () => {
   it("API-004: ticket sans langue requise — agent FR → ticket sélectionné normalement", async () => {
     const t = await issue(); // sans requiredLanguage
+    const called = await post(`/counters/${ids.counterId}/call-next`, {});
+    expect(called.status).toBe(200);
+    expect((called.data as { id: string }).id).toBe(t.id as string);
+  });
+
+  it("API-004: call-next avec users.languages de type enum agent_language[] (schéma réel) → 200, pas de 500 COALESCE", async () => {
+    // Régression base réelle : `COALESCE(u.languages, ARRAY[]::text[])` levait
+    // « COALESCE could not convert type text[] to agent_language[] » (42804)
+    // et TOUT call-next répondait 500. Le trou : le schéma de test déclarait
+    // users.languages en TEXT[] au lieu du type enum des migrations.
+    // Garde-fou : le schéma de CE test doit porter le type réel.
+    const typ = await db.query(
+      `SELECT format_type(atttypid, atttypmod) AS type
+         FROM pg_attribute
+        WHERE attrelid = 'users'::regclass AND attname = 'languages'`
+    );
+    expect((typ.rows[0] as { type: string }).type).toBe("agent_language[]");
+
+    const t = await issue({ requiredLanguage: "FR" });
     const called = await post(`/counters/${ids.counterId}/call-next`, {});
     expect(called.status).toBe(200);
     expect((called.data as { id: string }).id).toBe(t.id as string);

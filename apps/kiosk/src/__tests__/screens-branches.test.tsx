@@ -15,7 +15,13 @@ beforeAll(() => {
       cancel: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
-      getVoices: () => [],
+      // Voix déjà chargées : `speakInLocale` parle immédiatement (une liste
+      // vide + addEventListener déclencherait l'attente `voiceschanged`).
+      getVoices: () =>
+        [
+          { lang: "fr-FR", name: "fr-FR", default: false, localService: true, voiceURI: "fr-FR" },
+          { lang: "en-US", name: "en-US", default: false, localService: true, voiceURI: "en-US" },
+        ] as SpeechSynthesisVoice[],
       speaking: false,
       pending: false,
       paused: false,
@@ -61,6 +67,7 @@ vi.mock("@/hooks/useQueueStatus", () => ({
 const homeMessages = {
   home002: {
     title: "Akwaba — Welcome",
+    welcomeAgency: "to {agencyName} branch",
     chooseLanguage: "Choose your language",
     languageFr: "Français",
     languageEn: "English",
@@ -68,7 +75,6 @@ const homeMessages = {
     queueUnavailable: "Queue unavailable",
     offlineBanner: "Offline mode — your tickets remain valid",
     loading: "Loading...",
-    welcomeAgency: "to {agencyName} branch",
   },
 };
 

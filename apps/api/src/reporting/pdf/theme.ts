@@ -3,7 +3,7 @@
  *
  * Chaque banque se brande sans effort : une couleur `brand` + un logo optionnel.
  * Le contraste texte/fond est corrigé automatiquement au niveau WCAG AA (≥ 4.5:1)
- * en RÉUTILISANT l'utilitaire `wcag-contrast` (API-009) — aucune duplication de
+ * en RÉUTILISANT l'utilitaire partagé `wcag-contrast` de @sigfa/schemas (API-009) — aucune duplication de
  * l'algorithme. Aucune valeur de marque n'est codée en dur dans les documents :
  * les couleurs effectives dérivent TOUJOURS d'ici (défauts si le tenant n'a rien
  * fourni). Module PUR (aucune I/O, aucune horloge) — entièrement testable.
@@ -15,7 +15,7 @@ import {
   correctContrast,
   contrastRatio,
   MIN_CONTRAST_RATIO,
-} from "src/lib/wcag-contrast.js";
+} from "@sigfa/schemas";
 
 /** Couleur de marque par défaut (bleu SIGFA neutre) si le tenant n'en fournit pas. */
 export const DEFAULT_BRAND_COLOR = "#1d4ed8";

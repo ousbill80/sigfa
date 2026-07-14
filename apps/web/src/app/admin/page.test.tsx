@@ -64,11 +64,11 @@ describe("S3: /admin — proxy authentifié + tenant des claims", () => {
     await expect(AdminPage()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("mode mock → base mock + fixtures tenant (bascule d'env inchangée)", async () => {
+  it("mode mock → proxy /api/rt + fixtures tenant (bascule d'env inchangée)", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await AdminPage();
     const client = findElementByType(tree, AdminPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
     expect(client?.props.bankId).toBe(MOCK_TENANT.bankId);
     expect(client?.props.agencyId).toBe(MOCK_TENANT.agencyId);
     expect(client?.props.role).toBe(MOCK_TENANT.role);

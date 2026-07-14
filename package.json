@@ -14,6 +14,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "assets:tenants": "node scripts/sync-tenant-assets.mjs",
     "prepare": "lefthook install"
   },
   "pnpm": {

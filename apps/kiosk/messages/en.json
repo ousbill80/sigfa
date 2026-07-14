@@ -21,31 +21,39 @@
   },
   "home002": {
     "title": "Akwaba — Welcome",
+    "welcomeAgency": "to {agencyName} branch",
     "chooseLanguage": "Choose your language",
     "languageFr": "Français",
     "languageEn": "English",
+    "languageName": "English",
     "queueStatus": "Queue: {count} people — estimated wait: {minutes} min",
     "queueUnavailable": "Queue unavailable",
     "offlineBanner": "Offline mode — your tickets remain valid",
-    "loading": "Loading...",
-    "welcomeAgency": "to {agencyName} branch"
+    "loading": "Loading..."
   },
   "services003": {
-    "title": "Which service do you need?",
+    "title": "Take a ticket",
+    "subtitle": "Tap the operation of your choice",
     "backButton": "Back",
-    "waitEstimate": "~{minutes} min",
-    "seeMore": "See more services",
     "closedService": "Closed — {schedule}",
     "accessibilityButton": "Priority access",
     "emptyTitle": "No services available",
     "emptyMessage": "Please go to reception — a staff member will assist you.",
+    "loadingMessage": "Loading operations...",
+    "errorTitle": "Operations unavailable",
+    "errorMessage": "Unable to load operations. Retry or go to reception.",
+    "retryButton": "Retry",
     "offlineBanner": "Offline mode",
-    "loadingMessage": "Loading services...",
-    "scrollHint": "More services below"
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "See more services",
+    "scrollHint": "More services below",
+    "advisorCard": "See my advisor",
+    "advisorHint": "Meet a relationship manager"
   },
   "choiceModelB": {
     "title": "What would you like to do?",
     "backButton": "Back",
+    "languageChosen": "You have chosen English",
     "operationCard": "An operation",
     "operationHint": "Deposit, withdrawal, transfer…",
     "managerCard": "See my advisor",
@@ -111,6 +119,15 @@
   },
   "voice008": {
     "playLabel": "Listen"
+  },
+  "print": {
+    "welcome": "Welcome to the {agency} branch",
+    "yourNumber": "Your queue number",
+    "peopleAhead": "People ahead of you: {count}",
+    "estimatedWait": "Estimated wait: ~{minutes} min",
+    "trackingLabel": "Tracking code: {code}",
+    "smsNotice": "You will be notified by SMS before your turn.",
+    "courtesy": "Thank you for waiting, we will be with you shortly."
   },
   "feedback009": {
     "title": "How was your visit?",

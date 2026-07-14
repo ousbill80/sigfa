@@ -16,6 +16,7 @@
  */
 import { contextBridge, ipcRenderer } from "electron";
 import { KIOSK_SESSION_CREATE_CHANNEL } from "./kiosk-session-ipc";
+import { KIOSK_PRINT_TICKET_CHANNEL } from "./kiosk-print-ipc";
 
 /** DTO session renvoyé au renderer — strictement sans secret. */
 export interface KioskSessionBridgeDto {
@@ -37,4 +38,18 @@ export function exposeKioskAuthBridge(): void {
   });
 }
 
+/**
+ * KIOSK-BORNE — Expose `window.kioskPrint` au monde isolé du renderer.
+ * `printTicket()` délègue l'impression SILENCIEUSE du ticket au main process
+ * (canal `kiosk:print-ticket`). La présence de ce pont sert aussi de détection
+ * Electron propre côté renderer (repli `window.print()` en navigateur nu).
+ */
+export function exposeKioskPrintBridge(): void {
+  contextBridge.exposeInMainWorld("kioskPrint", {
+    printTicket: (): Promise<boolean> =>
+      ipcRenderer.invoke(KIOSK_PRINT_TICKET_CHANNEL) as Promise<boolean>,
+  });
+}
+
 exposeKioskAuthBridge();
+exposeKioskPrintBridge();

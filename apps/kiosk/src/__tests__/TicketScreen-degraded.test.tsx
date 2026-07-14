@@ -15,7 +15,12 @@ beforeAll(() => {
     cancel: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
-    getVoices: () => [],
+    // Voix déjà chargées : `speakInLocale` parle immédiatement (une liste vide
+    // + addEventListener déclencherait l'attente `voiceschanged`).
+    getVoices: () =>
+      [
+        { lang: "fr-FR", name: "fr-FR", default: false, localService: true, voiceURI: "fr-FR" },
+      ] as SpeechSynthesisVoice[],
     speaking: false,
     pending: false,
     paused: false,
@@ -56,6 +61,15 @@ const frMessages = {
   degraded007: {
     photographNumber: "Photographiez votre numéro ou recevez-le par SMS",
     photographNumberShort: "Photographiez votre numéro",
+  },
+  print: {
+    welcome: "Bienvenue à l'agence {agency}",
+    yourNumber: "Votre numéro de passage",
+    peopleAhead: "Personnes avant vous : {count}",
+    estimatedWait: "Attente estimée : ~{minutes} min",
+    trackingLabel: "Code de suivi : {code}",
+    smsNotice: "Vous serez prévenu par SMS avant votre passage.",
+    courtesy: "Merci de patienter, nous allons vous recevoir.",
   },
 };
 

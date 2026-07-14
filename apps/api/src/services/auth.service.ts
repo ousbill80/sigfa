@@ -51,6 +51,8 @@ interface RefreshTokenData {
   bankId: string | null;
   role: string;
   agencyIds: string[];
+  /** Nom d'affichage (additif WEB-002-HDR — absent des tokens historiques). */
+  displayName?: string | null;
 }
 
 /** Payload du JWT access token */
@@ -59,6 +61,8 @@ export interface JwtAccessPayload extends JWTPayload {
   bankId: string | null;
   role: string;
   agencyIds: string[];
+  /** Nom d'affichage (claim additif WEB-002-HDR — absent des tokens historiques). */
+  displayName?: string | null;
 }
 
 /** Résultat d'une opération de login/refresh */
@@ -92,6 +96,7 @@ async function getUserByEmail(
     `SELECT u.id, u.email, u.password_hash, u.role, u.bank_id,
             u.failed_login_attempts, u.locked_until,
             u.is_active, u.deleted_at,
+            u.first_name, u.last_name, u.display_name,
             array_agg(DISTINCT au.agency_id) FILTER (WHERE au.agency_id IS NOT NULL) AS agency_ids
      FROM users u
      LEFT JOIN agency_users au ON au.user_id = u.id
@@ -103,22 +108,42 @@ async function getUserByEmail(
 }
 
 /**
+ * Résout le nom d'affichage d'un utilisateur (WEB-002-HDR) :
+ * `display_name` (conseillers) sinon « Prénom Nom », sinon null.
+ *
+ * @param user - Ligne utilisateur (snake_case)
+ * @returns Le nom d'affichage, ou null si aucun champ nom n'est renseigné
+ */
+function resolveDisplayName(user: Record<string, unknown>): string | null {
+  const displayName = user["display_name"];
+  if (typeof displayName === "string" && displayName.trim().length > 0) {
+    return displayName.trim();
+  }
+  const first = typeof user["first_name"] === "string" ? (user["first_name"] as string) : "";
+  const last = typeof user["last_name"] === "string" ? (user["last_name"] as string) : "";
+  const full = `${first} ${last}`.trim();
+  return full.length > 0 ? full : null;
+}
+
+/**
  * Signe un JWT access token avec les claims requis.
  *
- * @param secret     - Secret JWT (Uint8Array)
- * @param userId     - Identifiant de l'utilisateur
- * @param bankId     - Identifiant de la banque (null pour SUPER_ADMIN)
- * @param role       - Rôle de l'utilisateur
- * @param agencyIds  - Identifiants des agences
+ * @param secret      - Secret JWT (Uint8Array)
+ * @param userId      - Identifiant de l'utilisateur
+ * @param bankId      - Identifiant de la banque (null pour SUPER_ADMIN)
+ * @param role        - Rôle de l'utilisateur
+ * @param agencyIds   - Identifiants des agences
+ * @param displayName - Nom d'affichage (claim additif WEB-002-HDR — null si inconnu)
  */
 async function signAccessToken(
   secret: Uint8Array,
   userId: string,
   bankId: string | null,
   role: string,
-  agencyIds: string[]
+  agencyIds: string[],
+  displayName: string | null = null
 ): Promise<string> {
-  return new SignJWT({ bankId, role, agencyIds })
+  return new SignJWT({ bankId, role, agencyIds, displayName })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuedAt()
@@ -260,6 +285,9 @@ export async function login(
   const bankId = (user["bank_id"] as string | null) ?? null;
   const role = user["role"] as string;
   const agencyIds = (user["agency_ids"] as string[] | null) ?? [];
+  // WEB-002-HDR : nom d'affichage embarqué dans le JWT (display_name sinon
+  // "Prénom Nom") — consommé par les consoles web SANS appel API supplémentaire.
+  const displayName = resolveDisplayName(user);
 
   const jtiSecret = nanoid();
   const familyId = nanoid();
@@ -269,7 +297,8 @@ export async function login(
     userId,
     bankId,
     role,
-    agencyIds
+    agencyIds,
+    displayName
   );
 
   await storeRefreshToken(redis, jtiSecret, {
@@ -278,6 +307,7 @@ export async function login(
     bankId,
     role,
     agencyIds,
+    displayName,
   });
 
   // Pointer la famille vers le token courant
@@ -342,6 +372,8 @@ export async function refresh(
 
   const data = JSON.parse(raw) as RefreshTokenData;
   const { userId, familyId, bankId, role, agencyIds } = data;
+  // WEB-002-HDR : claim additif — absent (undefined) sur les tokens historiques.
+  const displayName = data.displayName ?? null;
 
   // Vérifier que la famille est toujours valide
   const familyCurrentToken = await redis.get(`${FAMILY_KEY_PREFIX}${familyId}`);
@@ -374,11 +406,11 @@ export async function refresh(
   const newJti = nanoid();
 
   const [accessToken] = await Promise.all([
-    signAccessToken(secret, userId, bankId, role, agencyIds),
+    signAccessToken(secret, userId, bankId, role, agencyIds, displayName),
     // Marquer l'ancien token comme consommé (pour détection de vol)
     markTokenConsumed(redis, refreshToken, familyId),
     // Stocker le nouveau token actif
-    storeRefreshToken(redis, newJti, { userId, familyId, bankId, role, agencyIds }),
+    storeRefreshToken(redis, newJti, { userId, familyId, bankId, role, agencyIds, displayName }),
     // Mettre à jour le pointeur de famille
     redis.setex(
       `${FAMILY_KEY_PREFIX}${familyId}`,

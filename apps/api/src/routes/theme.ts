@@ -39,7 +39,7 @@ import {
   requireBankId,
 } from "src/lib/admin-helpers.js";
 import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
-import { correctContrast } from "src/lib/wcag-contrast.js";
+import { correctContrast } from "@sigfa/schemas";
 import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 import {
   getR2Config,

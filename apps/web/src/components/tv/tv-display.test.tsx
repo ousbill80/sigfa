@@ -3,8 +3,8 @@
  * réel INCHANGÉE (simulation F4 sans provider socket), date complète FR/EN.
  * @module components/tv/tv-display.test
  */
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import { TvDisplay, formatTvDate, type TvTenant } from "./tv-display";
 import { TV_SEED_STATE } from "@/lib/tv-fixtures";
 
@@ -37,6 +37,53 @@ describe("TvDisplay — TV-V3 split permanent", () => {
     render(<TvDisplay tenant={TENANT} />);
     expect(screen.getByTestId("tv-root")).toHaveAttribute("data-realtime", "off");
     expect(screen.getByTestId("tv-screen")).toHaveAttribute("data-state", "nominal");
+  });
+});
+
+describe("TvDisplay — zone média (manifeste public/tv-media)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("TV-MEDIA: manifeste chargé — la zone gauche bascule sur les médias dynamiques", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify([
+            { type: "image", src: "/tv-media/promo-epargne.svg" },
+            { type: "video", src: "/tv-media/demo-clip.mp4" },
+          ]),
+          { status: 200 }
+        )
+      )
+    );
+    render(<TvDisplay tenant={TENANT} />);
+    await waitFor(() => expect(screen.getByTestId("tv-media-zone")).toBeInTheDocument());
+    // L'appel courant reste affiché dans la colonne — jamais masqué.
+    expect(screen.getByTestId("tv-hero-number")).toHaveTextContent(
+      TV_SEED_STATE.hero!.displayNumber,
+    );
+  });
+
+  it("TV-MEDIA: REPLI — manifeste absent (404) → promo texte actuelle, zéro régression", async () => {
+    const mock = vi.fn(async () => new Response("not found", { status: 404 }));
+    vi.stubGlobal("fetch", mock);
+    render(<TvDisplay tenant={TENANT} />);
+    await waitFor(() => expect(mock).toHaveBeenCalled());
+    expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
+    expect(screen.queryByTestId("tv-media-zone")).toBeNull();
+  });
+
+  it("TV-LOGO: tenant.logoUrl transmis au bandeau (repli pastille sans logo)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("[]", { status: 200 })));
+    const { unmount } = render(
+      <TvDisplay tenant={{ ...TENANT, logoUrl: "/tenants/bdc/logo.svg" }} />
+    );
+    expect(screen.getByTestId("tv-brand-logo")).toHaveAttribute("src", "/tenants/bdc/logo.svg");
+    unmount();
+    render(<TvDisplay tenant={TENANT} />);
+    expect(screen.getByTestId("tv-brand-mark")).toHaveTextContent("B");
   });
 });
 

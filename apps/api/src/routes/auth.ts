@@ -161,6 +161,10 @@ export function createAuthRouter(): Hono<AuthEnv> {
         role: payload.role,
         bankId: payload.bankId,
         agencyId: (payload.agencyIds as string[])[0] ?? undefined,
+        // WEB-002-HDR : claim additif displayName (UserProfile.displayName, contrat).
+        ...(typeof payload.displayName === "string" && payload.displayName.length > 0
+          ? { displayName: payload.displayName }
+          : {}),
       };
       return c.json(profile, 200);
     } catch (err) {

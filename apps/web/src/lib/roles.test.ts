@@ -175,8 +175,8 @@ describe("WEB-001: RBAC", () => {
       expect(getDefaultDashboard("MANAGER")).toBe("/dashboard/manager");
     });
 
-    it("returns /dashboard/agent for AGENT", () => {
-      expect(getDefaultDashboard("AGENT")).toBe("/dashboard/agent");
+    it("returns /agent (console guichet WEB-002) for AGENT", () => {
+      expect(getDefaultDashboard("AGENT")).toBe("/agent");
     });
 
     it("returns /audit for AUDITOR", () => {

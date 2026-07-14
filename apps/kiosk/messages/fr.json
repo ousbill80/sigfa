@@ -21,31 +21,39 @@
   },
   "home002": {
     "title": "Akwaba — Bienvenue",
+    "welcomeAgency": "à l'agence {agencyName}",
     "chooseLanguage": "Choisissez votre langue",
     "languageFr": "Français",
     "languageEn": "English",
+    "languageName": "Français",
     "queueStatus": "File d'attente : {count} personnes — attente estimée : {minutes} min",
     "queueUnavailable": "File d'attente non disponible",
     "offlineBanner": "Mode hors connexion — vos tickets restent valables",
-    "loading": "Chargement...",
-    "welcomeAgency": "à l'agence {agencyName}"
+    "loading": "Chargement..."
   },
   "services003": {
-    "title": "Quel service souhaitez-vous ?",
+    "title": "Prise de ticket",
+    "subtitle": "Touchez l'opération de votre choix",
     "backButton": "Retour",
-    "waitEstimate": "~{minutes} min",
-    "seeMore": "Voir plus de services",
     "closedService": "Fermé — {schedule}",
     "accessibilityButton": "Accès prioritaire",
     "emptyTitle": "Aucun service disponible",
     "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
+    "loadingMessage": "Chargement des opérations...",
+    "errorTitle": "Opérations indisponibles",
+    "errorMessage": "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
+    "retryButton": "Réessayer",
     "offlineBanner": "Mode hors connexion",
-    "loadingMessage": "Chargement des services...",
-    "scrollHint": "Plus de services en bas"
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "Voir plus de services",
+    "scrollHint": "Plus de services en bas",
+    "advisorCard": "Voir mon conseiller",
+    "advisorHint": "Rencontrer un chargé de clientèle"
   },
   "choiceModelB": {
     "title": "Que souhaitez-vous ?",
     "backButton": "Retour",
+    "languageChosen": "Vous avez choisi Français",
     "operationCard": "Une opération",
     "operationHint": "Dépôt, retrait, virement…",
     "managerCard": "Voir mon conseiller",
@@ -111,6 +119,15 @@
   },
   "voice008": {
     "playLabel": "Écouter"
+  },
+  "print": {
+    "welcome": "Bienvenue à l'agence {agency}",
+    "yourNumber": "Votre numéro de passage",
+    "peopleAhead": "Personnes avant vous : {count}",
+    "estimatedWait": "Attente estimée : ~{minutes} min",
+    "trackingLabel": "Code de suivi : {code}",
+    "smsNotice": "Vous serez prévenu par SMS avant votre passage.",
+    "courtesy": "Merci de patienter, nous allons vous recevoir."
   },
   "feedback009": {
     "title": "Comment s'est passé votre passage ?",

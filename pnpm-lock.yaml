@@ -468,6 +468,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@sigfa/schemas':
+        specifier: workspace:*
+        version: link:../schemas
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3

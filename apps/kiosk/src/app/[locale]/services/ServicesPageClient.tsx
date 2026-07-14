@@ -26,27 +26,15 @@ const DEFAULT_AGENCY_ID = "agt-001";
 
 // Services de démo par défaut pour l'export statique.
 // En production, ils seront récupérés depuis l'API.
-// AUDIT-F7 : le catalogue de démo est calqué sur une borne réelle (BNI) —
-// assez de services pour que le défilement (et son affordance de
-// continuation) soit visible en revue visuelle, à 1024×768 comme à 1920×1080.
+// KIOSK-BORNE / AUDIT-F7 : catalogue de démo calqué sur une borne réelle
+// (BNI) — 3 FAMILLES dont les opérations distinctes sont servies par les
+// mocks MSW (DEMO_OPERATIONS_BY_SERVICE, filtrage par serviceId) ; assez de
+// tuiles pour que le défilement (et son affordance de continuation) soit
+// visible en revue visuelle, à 1024×768 comme à 1920×1080.
 const DEFAULT_SERVICES: ServiceItem[] = [
-  { id: "svc-1", name: "Dépôt", code: "deposit", estimatedMinutes: 5, isOpen: true },
-  { id: "svc-2", name: "Retrait", code: "withdrawal", estimatedMinutes: 8, isOpen: true },
-  { id: "svc-3", name: "Virement", code: "transfer", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-4", name: "Réclamation", code: "complaint", estimatedMinutes: 15, isOpen: true },
-  { id: "svc-5", name: "Change", code: "exchange", estimatedMinutes: 10, isOpen: true },
-  { id: "svc-6", name: "Transfert MoneyGram", code: "transfer", estimatedMinutes: 12, isOpen: true },
-  { id: "svc-7", name: "Demande de relevé", code: "account", estimatedMinutes: 6, isOpen: true },
-  { id: "svc-8", name: "Carte prépayée", code: "account", estimatedMinutes: 9, isOpen: true },
-  { id: "svc-9", name: "Remise chèque/effet", code: "deposit", estimatedMinutes: 7, isOpen: true },
-  {
-    id: "svc-10",
-    name: "Crédit",
-    code: "credit",
-    estimatedMinutes: 20,
-    isOpen: false,
-    schedule: "Lu-Ve 09h-17h",
-  },
+  { id: "svc-caisse", name: "Caisse", code: "cash", estimatedMinutes: 8, isOpen: true },
+  { id: "svc-moyens-paiement", name: "Moyen de paiement", code: "card", estimatedMinutes: 10, isOpen: true },
+  { id: "svc-conseiller", name: "Accueil / Conseiller client", code: "advisor", estimatedMinutes: 15, isOpen: true },
 ];
 
 export function ServicesPageClient() {

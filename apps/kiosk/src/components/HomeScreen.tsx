@@ -13,6 +13,11 @@
  *    statut file discret en bas. Une décision par écran.
  *  - theming banque sans effort : la couleur primaire appliquée du tenant
  *    alimente BankThemeProvider (--brand + contraste WCAG auto).
+ *
+ * KIOSK-BORNE (préservé au merge) :
+ *  - ligne agence discrète sous le titre (provisionnement borne, non-PII) ;
+ *  - annonce vocale du nom de la langue CHOISIE au clic (« Français » /
+ *    « English »), mécanique `speakInLocale` (voix de qualité, cancel→speak).
  */
 "use client";
 
@@ -22,6 +27,7 @@ import { BankThemeProvider } from "@sigfa/ui";
 import { useQueueStatus } from "@/hooks/useQueueStatus";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
+import { NOMINAL_VOICE_RATE, speakInLocale } from "@/lib/kiosk-voice";
 import { useBankTheme } from "@/hooks/useBankTheme";
 import {
   agencyWelcomeName,
@@ -29,6 +35,13 @@ import {
   kioskBankName,
 } from "@/lib/bank-brand";
 import { BankBrandMark } from "@/components/BankBrandMark";
+// Catalogues i18n importés en direct : l'annonce vocale doit être dite dans la
+// langue CHOISIE (pas la locale courante de rendu) — source unique = clé
+// `home002.languageName`, même racine `messages/` qu'i18n/request.ts.
+/* eslint-disable no-restricted-imports, import/no-relative-parent-imports -- catalogues i18n hors src/ (cf. commentaire ci-dessus), même parade que lib/contracts-realtime.ts */
+import frMessages from "../../messages/fr.json";
+import enMessages from "../../messages/en.json";
+/* eslint-enable no-restricted-imports, import/no-relative-parent-imports */
 
 interface HomeScreenProps {
   /** Override for offline state (useful for testing) */
@@ -48,6 +61,13 @@ const LANGUAGE_CARDS: LanguageCard[] = [
   { locale: "fr", labelKey: "languageFr", tag: "FR" },
   { locale: "en", labelKey: "languageEn", tag: "EN" },
 ];
+
+/** Nom parlé de la langue par locale (ajustement PO : la voix dit UNIQUEMENT
+ * « Français » / « English », pas la phrase complète affichée à l'écran). */
+const LANGUAGE_NAME_ANNOUNCEMENT: Record<string, string> = {
+  fr: frMessages.home002.languageName,
+  en: enMessages.home002.languageName,
+};
 
 export function HomeScreen({
   isOffline: isOfflineProp,
@@ -70,11 +90,27 @@ export function HomeScreen({
   }, timeoutMs);
 
   const handleLanguageSelect = (locale: string) => {
-    // Web Speech API voice announcement
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(locale);
-      utterance.lang = locale === "fr" ? "fr-FR" : "en-US";
-      window.speechSynthesis.speak(utterance);
+    // Annonce vocale (Web Speech API) : UNIQUEMENT le nom de la langue choisie
+    // (« Français » / « English »), jamais le code de locale brut ni la phrase
+    // complète affichée à l'écran (ajustement PO). Repli FR par cohérence
+    // avec kiosk-voice si une locale inconnue arrivait ici.
+    // Mécanique commune `speakInLocale` (fix PO « la voix anglaise ne marche
+    // pas ») : voix de QUALITÉ de la langue cible explicitement posée sur
+    // l'utterance (scoring anti-voix robotiques), attente `voiceschanged` si
+    // la liste n'est pas encore chargée, `cancel` avant `speak`.
+    // Rate NOMINAL (1.0) même en accessibilité : un mot isolé ralenti sonne
+    // artificiel (retour PO) — l'annonce complète du ticket, elle, conserve
+    // `voiceRate` (0.8 en accessibilité) via useVoiceAnnouncement.
+    if (
+      typeof window !== "undefined" &&
+      "speechSynthesis" in window &&
+      window.speechSynthesis
+    ) {
+      speakInLocale(window.speechSynthesis, {
+        locale,
+        text: LANGUAGE_NAME_ANNOUNCEMENT[locale] ?? LANGUAGE_NAME_ANNOUNCEMENT.fr,
+        rate: NOMINAL_VOICE_RATE,
+      });
     }
     // MODEL-KIOSK-B : après la langue, la borne offre DEUX chemins clairs
     // (« Une opération » / « Voir mon conseiller ») via l'écran de choix.
@@ -168,8 +204,9 @@ export function HomeScreen({
           >
             {t("title")}
           </h1>
-          {/* AUDIT-F18 : ligne agence SANS doublon — le préfixe « Agence » du
-              nom provisionné est retiré avant injection dans « à l'agence {x} »
+          {/* KIOSK-BORNE / AUDIT-F18 : ligne agence discrète (provisionnement,
+              non-PII) SANS doublon — le préfixe « Agence » du nom provisionné
+              est retiré avant injection dans « à l'agence {x} »
               (« Agence Centrale » → « à l'agence Centrale »). */}
           <p
             data-testid="agency-welcome"

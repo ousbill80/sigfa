@@ -71,7 +71,9 @@ export function getDefaultDashboard(role: Role): string {
     case "MANAGER":
       return "/dashboard/manager";
     case "AGENT":
-      return "/dashboard/agent";
+      // La console guichet opérationnelle (WEB-002) vit sur /agent —
+      // /dashboard/agent n'est qu'un gabarit visuel sans données.
+      return "/agent";
     case "AUDITOR":
       return "/audit";
     default:
