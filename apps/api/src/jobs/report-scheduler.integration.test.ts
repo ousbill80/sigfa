@@ -29,6 +29,8 @@ import {
   Wait,
 } from "testcontainers";
 import type { QueryFn as DbQueryFn } from "@sigfa/database";
+import { applyMigrations } from "@sigfa/database/test-support";
+import type { PostgresHarness } from "@sigfa/testing/tenant-isolation";
 import type { QueryFn as ReportQueryFn } from "src/reporting/aggregate-service.js";
 import {
   startReportScheduler,
@@ -124,61 +126,30 @@ const recipientsQuery: DbQueryFn = (async (sql: string) => {
   return { rows: res.rows as Array<Record<string, unknown>> };
 }) as DbQueryFn;
 
+/**
+ * Applique les VRAIES migrations SQL de `packages/database/migrations/` — schéma
+ * FIDÈLE à la production (LA LOI T5, aucune DDL inline dérivée). Le harnais
+ * inlinait auparavant un sous-schéma reporting (`users.role TEXT` hors enum,
+ * `daily_agency_stats` sans RLS FORCE, `agent_available_seconds` fictive) —
+ * source de faux-verts. `applyMigrations` exécute les enums réels (`role`,
+ * `agent_language`, …), les contraintes, les policies RLS et la migration 0016
+ * qui matérialise `daily_agency_stats.agent_available_seconds` : reporting
+ * pleinement couvert, sans skip. Le client owner `sigfa` contourne la RLS FORCE
+ * comme la connexion superuser en test (policies restent vérifiables).
+ */
 async function runMigrations(client: pg.Client): Promise<void> {
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-  await client.query(
-    `CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE);`
-  );
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID NOT NULL REFERENCES banks(id),
-      email TEXT,
-      role TEXT NOT NULL,
-      is_active BOOLEAN NOT NULL DEFAULT true,
-      deleted_at TIMESTAMPTZ
-    );`);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS agencies (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID NOT NULL REFERENCES banks(id),
-      name TEXT NOT NULL,
-      deleted_at TIMESTAMPTZ
-    );`);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS agency_users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID NOT NULL REFERENCES banks(id),
-      agency_id UUID NOT NULL REFERENCES agencies(id),
-      user_id UUID NOT NULL REFERENCES users(id)
-    );`);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS daily_agency_stats (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID NOT NULL REFERENCES banks(id),
-      agency_id UUID NOT NULL REFERENCES agencies(id),
-      service_id UUID,
-      day DATE NOT NULL,
-      tickets_issued INT NOT NULL DEFAULT 0,
-      tickets_served INT NOT NULL DEFAULT 0,
-      tickets_abandoned INT NOT NULL DEFAULT 0,
-      tickets_no_show INT NOT NULL DEFAULT 0,
-      total_wait_seconds INT NOT NULL DEFAULT 0,
-      total_service_seconds INT NOT NULL DEFAULT 0,
-      sla_met_count INT NOT NULL DEFAULT 0,
-      sla_total_count INT NOT NULL DEFAULT 0,
-      feedback_count INT NOT NULL DEFAULT 0,
-      feedback_sum INT NOT NULL DEFAULT 0,
-      nps_promoters INT NOT NULL DEFAULT 0,
-      nps_passives INT NOT NULL DEFAULT 0,
-      nps_detractors INT NOT NULL DEFAULT 0,
-      agent_active_seconds INT,
-      agent_available_seconds INT,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );`);
-  await client.query(
-    `CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_agency ON daily_agency_stats (bank_id, agency_id, day) WHERE service_id IS NULL;`
-  );
+  const harness: PostgresHarness = {
+    connectionString: "",
+    query: async (sql: string, values?: unknown[]) => {
+      const res =
+        values !== undefined
+          ? await client.query(sql, values)
+          : await client.query(sql);
+      return { rows: res.rows as Array<Record<string, unknown>> };
+    },
+    stop: async () => {},
+  };
+  await applyMigrations(harness);
 }
 
 /** Insère une agence + un directeur AGENCY_DIRECTOR abonné, retourne agencyId. */
@@ -192,7 +163,9 @@ async function seedAgencyWithDirector(
   );
   const agencyId = (ag.rows[0] as { id: string }).id;
   const u = await db.query(
-    `INSERT INTO users (bank_id, email, role) VALUES ($1, $2, 'AGENCY_DIRECTOR') RETURNING id`,
+    // Schéma FIDÈLE : password_hash/first_name/last_name NOT NULL sans défaut.
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role)
+       VALUES ($1, $2, 'x', 'Dir', 'Test', 'AGENCY_DIRECTOR') RETURNING id`,
     [bankId, email]
   );
   const userId = (u.rows[0] as { id: string }).id;
@@ -310,11 +283,12 @@ afterAll(async () => {
 }, 40_000);
 
 beforeEach(async () => {
-  await db.query(`DELETE FROM agency_users`);
-  await db.query(`DELETE FROM daily_agency_stats`);
-  await db.query(`DELETE FROM users`);
-  await db.query(`DELETE FROM agencies`);
-  await db.query(`DELETE FROM banks`);
+  // Schéma FIDÈLE : `audit_log` (0003) est IMMUABLE (triggers `audit_log_no_*`
+  // FOR EACH ROW) et référence `banks` (audit_log_bank_id_fkey) — un `DELETE FROM
+  // banks` échouerait sur la FK, et un `DELETE FROM audit_log` sur le trigger. On
+  // purge donc l'arbre complet via `TRUNCATE ... CASCADE` : TRUNCATE ne déclenche
+  // pas les triggers FOR EACH ROW et casse le cycle de dépendances en un pas.
+  await db.query(`TRUNCATE banks CASCADE`);
   await redis.flushall();
   const a = await db.query(
     `INSERT INTO banks (name, slug) VALUES ('A','a') RETURNING id`
