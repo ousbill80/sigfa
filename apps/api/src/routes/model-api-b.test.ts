@@ -70,7 +70,8 @@ async function seed(): Promise<Fixtures> {
   await db.query(`INSERT INTO queues (bank_id, agency_id, service_id) VALUES ($1,$2,$3)`, [bankId, agencyId, serviceId]);
 
   const dir = await db.query(
-    `INSERT INTO users (bank_id, email, role) VALUES ($1,'dir-mab@t.ci','AGENCY_DIRECTOR') RETURNING id`,
+    // Schéma FIDÈLE : password_hash/first_name/last_name NOT NULL sans défaut.
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role) VALUES ($1,'dir-mab@t.ci','x','Dir','Test','AGENCY_DIRECTOR') RETURNING id`,
     [bankId]
   );
   const directorId = (dir.rows[0] as { id: string }).id;
@@ -78,8 +79,8 @@ async function seed(): Promise<Fixtures> {
 
   // Conseiller actif de l'agence (avec display_name + photo).
   const mgr = await db.query(
-    `INSERT INTO users (bank_id, email, role, is_relationship_manager, display_name, photo_url, phone_encrypted)
-     VALUES ($1,'mgr-mab@t.ci','AGENT',true,'Kofi A.','https://cdn.sigfa.ci/rm/kofi.jpg','SECRET_PHONE') RETURNING id`,
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role, is_relationship_manager, display_name, photo_url, phone_encrypted)
+     VALUES ($1,'mgr-mab@t.ci','x','Kofi','A','AGENT',true,'Kofi A.','https://cdn.sigfa.ci/rm/kofi.jpg','SECRET_PHONE') RETURNING id`,
     [bankId]
   );
   const managerId = (mgr.rows[0] as { id: string }).id;
@@ -87,8 +88,8 @@ async function seed(): Promise<Fixtures> {
 
   // Conseiller d'une AUTRE agence (piège d'isolation).
   const mgrB = await db.query(
-    `INSERT INTO users (bank_id, email, role, is_relationship_manager, display_name)
-     VALUES ($1,'mgrb-mab@t.ci','AGENT',true,'Awa D.') RETURNING id`,
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role, is_relationship_manager, display_name)
+     VALUES ($1,'mgrb-mab@t.ci','x','Awa','D','AGENT',true,'Awa D.') RETURNING id`,
     [bankId]
   );
   const managerBId = (mgrB.rows[0] as { id: string }).id;
@@ -96,7 +97,7 @@ async function seed(): Promise<Fixtures> {
 
   // Agent NON conseiller de l'agence (ne doit PAS apparaître).
   const plain = await db.query(
-    `INSERT INTO users (bank_id, email, role, is_relationship_manager) VALUES ($1,'plain-mab@t.ci','AGENT',false) RETURNING id`,
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role, is_relationship_manager) VALUES ($1,'plain-mab@t.ci','x','Plain','Agent','AGENT',false) RETURNING id`,
     [bankId]
   );
   const agentPlainId = (plain.rows[0] as { id: string }).id;
@@ -104,8 +105,8 @@ async function seed(): Promise<Fixtures> {
 
   // Conseiller inactif (deleted) de l'agence (ne doit PAS apparaître).
   const inactive = await db.query(
-    `INSERT INTO users (bank_id, email, role, is_relationship_manager, display_name, is_active, deleted_at)
-     VALUES ($1,'gone-mab@t.ci','AGENT',true,'Ancien C.',false,NOW()) RETURNING id`,
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role, is_relationship_manager, display_name, is_active, deleted_at)
+     VALUES ($1,'gone-mab@t.ci','x','Ancien','C','AGENT',true,'Ancien C.',false,NOW()) RETURNING id`,
     [bankId]
   );
   await db.query(`INSERT INTO agency_users (bank_id, agency_id, user_id) VALUES ($1,$2,$3)`, [bankId, agencyId, (inactive.rows[0] as { id: string }).id]);
@@ -170,7 +171,10 @@ afterAll(async () => {
 beforeEach(async () => {
   await redis.flushall();
   await db.query(`DELETE FROM tickets`);
-  await db.query(`DELETE FROM audit_log`);
+  // Schéma FIDÈLE : `audit_log` est IMMUABLE (triggers `audit_log_no_delete`/
+  // `audit_log_no_update`, migration 0003) — un `DELETE` est rejeté même par
+  // l'owner. On purge via `TRUNCATE` (ne déclenche pas les triggers FOR EACH ROW).
+  await db.query(`TRUNCATE audit_log`);
 });
 
 describe("MODEL-API-B: liste publique nominative des conseillers (D5)", () => {
