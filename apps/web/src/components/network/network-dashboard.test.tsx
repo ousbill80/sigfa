@@ -50,7 +50,8 @@ describe("WEB-004: classement + badges", () => {
     expect(within(rows[2]!).getByTestId("rank-badge").getAttribute("style")).toContain("var(--success)");
     // ICONS-001 : le n°1 porte l'étoile or du set SIGFA (plus de glyphe unicode).
     expect(rows[0]!.querySelector('svg[data-icon="etoile"]')).toBeInTheDocument();
-    expect(rows[0]!.textContent).not.toContain("★");
+    // U+2605 en échappement : la source elle-même reste sans pictogramme (sigfa/no-emoji).
+    expect(rows[0]!.textContent).not.toContain("\u2605");
   });
 
   it("WEB-004: --danger uniquement si TMA > 2×SLA — zéro usage décoratif", () => {

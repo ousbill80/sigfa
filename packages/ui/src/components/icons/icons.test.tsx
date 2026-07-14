@@ -13,6 +13,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   SigfaIcon,
@@ -140,7 +141,7 @@ describe("ICONS-001: rendu SVG duotone", () => {
   });
 
   it("aucune couleur en dur dans les sources du set (fill/stroke littéraux)", () => {
-    const dir = path.dirname(new URL(import.meta.url).pathname);
+    const dir = path.dirname(fileURLToPath(import.meta.url));
     const sources = fs
       .readdirSync(dir)
       .filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f));

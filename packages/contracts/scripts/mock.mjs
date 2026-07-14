@@ -42,7 +42,7 @@ const MODULE_PORTS = {
 };
 
 if (!existsSync(PRISM_BIN)) {
-  console.error(`❌ Prism CLI introuvable : ${PRISM_BIN}`);
+  console.error(`[ERREUR] Prism CLI introuvable : ${PRISM_BIN}`);
   console.error("   Lancez 'pnpm install' d'abord.");
   process.exit(1);
 }
@@ -55,7 +55,7 @@ for (const [module, port] of Object.entries(MODULE_PORTS)) {
   const bundlePath = resolve(BUNDLED_DIR, `${module}.yaml`);
 
   if (!existsSync(bundlePath)) {
-    console.error(`❌ Bundle manquant : ${bundlePath}`);
+    console.error(`[ERREUR] Bundle manquant : ${bundlePath}`);
     console.error("   Lancez 'pnpm --filter @sigfa/contracts bundle' d'abord.");
     process.exit(1);
   }
@@ -91,7 +91,7 @@ for (const [module, port] of Object.entries(MODULE_PORTS)) {
   processes.push({ module, port, proc });
 }
 
-console.log(`\n✅ ${processes.length} instances Prism démarrées.`);
+console.log(`\n[OK] ${processes.length} instances Prism démarrées.`);
 console.log("   Ctrl+C ou 'pnpm --filter @sigfa/contracts mock:stop' pour arrêter.\n");
 
 // Arrêt propre sur SIGINT / SIGTERM
@@ -100,7 +100,7 @@ function shutdown(signal) {
   for (const { module, proc } of processes) {
     try {
       proc.kill("SIGTERM");
-      console.log(`  ✔ prism:${module} arrêté`);
+      console.log(`  [OK] prism:${module} arrêté`);
     } catch {
       // Peut déjà être terminé
     }

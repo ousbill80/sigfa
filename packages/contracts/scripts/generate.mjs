@@ -44,7 +44,7 @@ try {
     const outputPath = resolve(TYPES_DIR, `${module}.ts`);
 
     if (!existsSync(inputPath)) {
-      console.error(`❌ Bundle manquant : generated/bundled/${module}.yaml — lancez 'bundle' d'abord`);
+      console.error(`[ERREUR] Bundle manquant : generated/bundled/${module}.yaml — lancez 'bundle' d'abord`);
       hasError = true;
       continue;
     }
@@ -70,9 +70,9 @@ try {
           },
         }
       );
-      console.log(`✔ types ${module} → generated/types/${module}.ts`);
+      console.log(`[OK] types ${module} → generated/types/${module}.ts`);
     } catch (err) {
-      console.error(`❌ Erreur lors de la génération des types de ${module}:`);
+      console.error(`[ERREUR] Erreur lors de la génération des types de ${module}:`);
       if (err.stdout) console.error(err.stdout.toString());
       if (err.stderr) console.error(err.stderr.toString());
       hasError = true;
@@ -86,5 +86,5 @@ try {
 if (hasError) {
   process.exit(1);
 } else {
-  console.log(`\n✅ Génération terminée : ${MODULES.length} modules → generated/types/`);
+  console.log(`\n[OK] Génération terminée : ${MODULES.length} modules → generated/types/`);
 }
