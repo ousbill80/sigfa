@@ -5,12 +5,16 @@
  *
  * ## Périmètre
  * 1. Jours fériés ivoiriens (table `public_holidays`, hors-tenant) — via connexion migrateur
- * 2. Tenant de démonstration complet (flag `SEED_DEMO=1`) — via connexion migrateur (BYPASSRLS)
+ * 2. Tenants de démonstration PARAMÉTRABLES — via connexion migrateur (BYPASSRLS)
+ *    - Sélection : `SEED_TENANTS=demo,bicici` (slugs du registre `./tenants/`)
+ *    - Rétro-compatibilité : `SEED_DEMO=1` ⇒ tenant `demo`
+ *    - Moteur générique : `seedTenant(config)` (voir `./tenant-seed.ts`) —
+ *      AUCUNE donnée de banque en dur hors des fichiers de config `./tenants/*.ts`
  *
  * ## DB-009 : Sécurité renforcée
- * - Mots de passe de démo générés via `crypto.randomBytes` (aléatoires, uniques par exécution)
+ * - Mots de passe de seed générés via `crypto.randomBytes` (aléatoires, uniques par exécution)
  * - Hash bcrypt réel cost 12 (jamais de hash simulé)
- * - Garde `NODE_ENV !== 'production'` — le seed de démo lève une erreur en production
+ * - Garde `NODE_ENV !== 'production'` — le seed de tenant lève une erreur en production
  * - Affichage des mots de passe UNE SEULE FOIS à la console
  *
  * ## Idempotence
@@ -25,18 +29,25 @@
  * @module
  */
 
-import { randomBytes, createHash } from "node:crypto";
-import bcrypt from "bcryptjs";
-import { DEFAULT_SERVICES } from "./default-services.js";
-import { PERSISTABLE_ROLES } from "./rbac-matrix.js";
+import { seedTenant, type QueryFn } from "./tenant-seed.js";
+import { TENANT_SEED_CONFIGS } from "./tenants/index.js";
 
-/** Fonction de requête SQL compatible avec `DualConnectionHarness.query`. */
-export type QueryFn = (sql: string) => Promise<{ rows: Array<Record<string, unknown>> }>;
+export type { QueryFn, TenantSeedConfig } from "./tenant-seed.js";
+export { seedTenant } from "./tenant-seed.js";
+export { TENANT_SEED_CONFIGS } from "./tenants/index.js";
 
 /** Options du seed. */
 export interface SeedOptions {
-  /** Active le seed de démo (tenant complet). NE PAS utiliser en production. */
-  seedDemo: boolean;
+  /**
+   * Rétro-compatibilité `SEED_DEMO=1` : seed le tenant `demo`.
+   * NE PAS utiliser en production.
+   */
+  seedDemo?: boolean;
+  /**
+   * Slugs des tenants à seeder (`SEED_TENANTS=demo,bicici`).
+   * Doivent exister dans le registre `TENANT_SEED_CONFIGS`.
+   */
+  tenants?: readonly string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -226,401 +237,38 @@ async function seedPublicHolidays(query: QueryFn): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seed démo : génération des mots de passe (DB-009)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** UUIDs déterministes de démo (stable entre exécutions). */
-const DEMO_BANK_ID = "d0000000-1111-4000-8000-000000000001";
-const DEMO_AGENCY_1_ID = "d0000001-1111-4000-8000-000000000001";
-const DEMO_AGENCY_2_ID = "d0000001-1111-4000-8000-000000000002";
-const DEMO_COUNTER_1_ID = "d0000002-1111-4000-8000-000000000001";
-const DEMO_COUNTER_2_ID = "d0000002-1111-4000-8000-000000000002";
-const DEMO_KIOSK_1_ID = "d0000003-1111-4000-8000-000000000001";
-
-/**
- * Génère un mot de passe aléatoire de démo via `crypto.randomBytes`.
- * DB-009 : aucun mot de passe fixe — chaque exécution produit des mots de passe uniques.
- * Affiché UNE SEULE FOIS à la console (voir `runSeed`).
- *
- * @returns Mot de passe aléatoire (16 octets en hex = 32 caractères)
- */
-function generateDemoPassword(): string {
-  return randomBytes(16).toString("hex");
-}
-
-/**
- * Hash bcrypt réel cost 12 (DB-009 — plus aucun hash simulé de type demo).
- *
- * @param password - Mot de passe en clair
- * @returns Hash bcrypt (format $2b$12$...)
- */
-async function hashDemoPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
-}
-
-/**
- * Génère un email de démo déterministe par rôle.
- *
- * @param role - Rôle SIGFA
- * @returns Email de démo
- */
-function demoEmail(role: string): string {
-  return `demo.${role.toLowerCase().replace(/_/g, ".")}@sigfa-demo.ci`;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Seed démo : fixtures structurelles
+// Sélection des tenants à seeder
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Insère la banque et les agences de démo (idempotent).
+ * Résout la liste ordonnée et dédupliquée des slugs de tenants à seeder.
+ * Rétro-compatibilité : `seedDemo: true` ajoute le tenant `demo`.
  *
- * @param query - Connexion migrateur (BYPASSRLS)
+ * @param options - Options du seed (`tenants` + `seedDemo`)
+ * @returns Slugs valides du registre `TENANT_SEED_CONFIGS`
+ * @throws Si un slug demandé est inconnu du registre
  */
-async function seedDemoBank(query: QueryFn): Promise<void> {
-  await query(`
-    INSERT INTO banks (id, name, slug)
-    VALUES ('${DEMO_BANK_ID}', 'Banque de Démonstration SIGFA', 'demo-sigfa')
-    ON CONFLICT (id) DO NOTHING
-  `);
-  await query(`
-    INSERT INTO agencies (id, bank_id, name, city)
-    VALUES
-      ('${DEMO_AGENCY_1_ID}', '${DEMO_BANK_ID}', 'Agence Centre - Démo', 'Abidjan'),
-      ('${DEMO_AGENCY_2_ID}', '${DEMO_BANK_ID}', 'Agence Plateau - Démo', 'Abidjan')
-    ON CONFLICT (id) DO NOTHING
-  `);
-}
-
-/**
- * Insère les services du catalogue par défaut pour une agence de démo.
- *
- * @param query    - Connexion migrateur (BYPASSRLS)
- * @param agencyId - UUID de l'agence cible
- */
-async function seedDemoServices(query: QueryFn, agencyId: string): Promise<void> {
-  for (const service of DEFAULT_SERVICES) {
-    const serviceId = generateDemoServiceId(agencyId, service.code);
-    await query(`
-      INSERT INTO services (id, bank_id, agency_id, code, name, sla_minutes, display_order)
-      VALUES (
-        '${serviceId}', '${DEMO_BANK_ID}', '${agencyId}',
-        '${service.code}', '${service.name.replace(/'/g, "''")}',
-        ${service.slaMinutes}, ${service.displayOrder}
-      )
-      ON CONFLICT (agency_id, code) DO NOTHING
-    `);
+export function resolveTenantSlugs(options: SeedOptions): string[] {
+  const slugs: string[] = [];
+  const push = (slug: string): void => {
+    if (!slugs.includes(slug)) slugs.push(slug);
+  };
+  for (const slug of options.tenants ?? []) {
+    push(slug);
   }
-}
-
-/**
- * Catalogue d'opérations de démo (MODEL-DB-A) — démontre le modèle 2 niveaux
- * Service → Opération. `serviceCode` cible le service parent (par agence).
- * `slaMinutes = null` → hérite du SLA du service (D4). Codes conformes `^[A-Z0-9]{2,6}$`,
- * uniques par service. ≥2 opérations sous ≥1 service (ici : OC et OA).
- */
-const DEMO_OPERATIONS: ReadonlyArray<{
-  serviceCode: string;
-  code: string;
-  name: string;
-  slaMinutes: number | null;
-  displayOrder: number;
-}> = [
-  // Service OC (Opérations courantes) — 3 opérations (démontre la granularité fine)
-  { serviceCode: "OC", code: "OCDEP", name: "Dépôt d'espèces", slaMinutes: null, displayOrder: 0 },
-  { serviceCode: "OC", code: "OCRET", name: "Retrait d'espèces", slaMinutes: 5, displayOrder: 1 },
-  { serviceCode: "OC", code: "OCVIR", name: "Virement", slaMinutes: null, displayOrder: 2 },
-  // Service OA (Ouverture de compte) — 2 opérations
-  { serviceCode: "OA", code: "OAPART", name: "Compte particulier", slaMinutes: null, displayOrder: 0 },
-  { serviceCode: "OA", code: "OAPRO", name: "Compte professionnel", slaMinutes: 40, displayOrder: 1 },
-] as const;
-
-/**
- * Génère un UUID déterministe pour une opération de démo.
- *
- * @param agencyId - UUID de l'agence
- * @param code     - Code de l'opération
- */
-function generateDemoOperationId(agencyId: string, code: string): string {
-  const hash = createHash("sha256")
-    .update(`demo-operation-${agencyId}-${code}`)
-    .digest("hex");
-  return hexToUuid(hash);
-}
-
-/**
- * Insère les opérations de démo sous les services d'une agence (idempotent).
- * Démontre le modèle 2 niveaux (MODEL-DB-A). `sla_minutes` NULL → hérite du service.
- *
- * @param query    - Connexion migrateur (BYPASSRLS)
- * @param agencyId - UUID de l'agence cible
- */
-async function seedDemoOperations(query: QueryFn, agencyId: string): Promise<void> {
-  for (const op of DEMO_OPERATIONS) {
-    const serviceId = generateDemoServiceId(agencyId, op.serviceCode);
-    const operationId = generateDemoOperationId(agencyId, op.code);
-    const sla = op.slaMinutes === null ? "NULL" : String(op.slaMinutes);
-    await query(`
-      INSERT INTO operations (id, bank_id, agency_id, service_id, code, name, sla_minutes, display_order)
-      VALUES (
-        '${operationId}', '${DEMO_BANK_ID}', '${agencyId}', '${serviceId}',
-        '${op.code}', '${op.name.replace(/'/g, "''")}',
-        ${sla}, ${op.displayOrder}
-      )
-      ON CONFLICT (service_id, code) DO NOTHING
-    `);
+  if (options.seedDemo) {
+    push("demo");
   }
-}
-
-/**
- * Insère les guichets et le kiosque de démo (idempotent).
- *
- * @param query - Connexion migrateur (BYPASSRLS)
- */
-async function seedDemoCountersAndKiosk(query: QueryFn): Promise<void> {
-  await query(`
-    INSERT INTO counters (id, bank_id, agency_id, number, label)
-    VALUES
-      ('${DEMO_COUNTER_1_ID}', '${DEMO_BANK_ID}', '${DEMO_AGENCY_1_ID}', 1, 'Guichet 1'),
-      ('${DEMO_COUNTER_2_ID}', '${DEMO_BANK_ID}', '${DEMO_AGENCY_1_ID}', 2, 'Guichet 2')
-    ON CONFLICT (id) DO NOTHING
-  `);
-  await query(`
-    INSERT INTO kiosks (id, bank_id, agency_id, label, credentials_hash)
-    VALUES (
-      '${DEMO_KIOSK_1_ID}', '${DEMO_BANK_ID}', '${DEMO_AGENCY_1_ID}',
-      'Borne Accueil - Démo', '$2b$12$placeholder_kiosk_hash_value'
-    )
-    ON CONFLICT (id) DO NOTHING
-  `);
-}
-
-/**
- * Conseillers de démo (MODEL-DB-B, D5) : ≥2 agents seed marqués `is_relationship_manager`.
- * Clé = rôle démo persistable, valeur = attributs publics (display_name + photo_url).
- * Démontre la liste publique nominative (zéro PII : ni email, ni rôle exposés).
- */
-const DEMO_RELATIONSHIP_MANAGERS: Record<string, { displayName: string; photoUrl: string }> = {
-  AGENT: {
-    displayName: "Awa Koné",
-    photoUrl: "https://cdn.sigfa-demo.ci/managers/awa-kone.jpg",
-  },
-  MANAGER: {
-    displayName: "Kouadio N'Guessan",
-    photoUrl: "https://cdn.sigfa-demo.ci/managers/kouadio-nguessan.jpg",
-  },
-};
-
-/**
- * Insère un utilisateur de démo pour un rôle donné.
- * MODEL-DB-B : marque les rôles de `DEMO_RELATIONSHIP_MANAGERS` comme conseillers
- * (`is_relationship_manager=true` + `display_name` + `photo_url`).
- *
- * @param query    - Connexion migrateur (BYPASSRLS)
- * @param role     - Rôle SIGFA à créer
- * @param passwords - Map role → password (pour affichage unique)
- */
-async function seedDemoUser(
-  query: QueryFn,
-  role: string,
-  passwords: Map<string, string>
-): Promise<void> {
-  const password = generateDemoPassword();
-  passwords.set(role, password);
-  const hash = await hashDemoPassword(password);
-  const userId = generateDemoUserId(role);
-  const email = demoEmail(role);
-  const manager = DEMO_RELATIONSHIP_MANAGERS[role];
-  const isRm = manager !== undefined;
-  const displayName = manager ? `'${manager.displayName.replace(/'/g, "''")}'` : "NULL";
-  const photoUrl = manager ? `'${manager.photoUrl.replace(/'/g, "''")}'` : "NULL";
-  await query(`
-    INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role,
-                       is_relationship_manager, display_name, photo_url)
-    VALUES (
-      '${userId}', '${DEMO_BANK_ID}', '${email}',
-      '${hash}', 'Demo', '${role}', '${role}',
-      ${isRm}, ${displayName}, ${photoUrl}
-    )
-    ON CONFLICT (email) DO NOTHING
-  `);
-}
-
-/**
- * Insère un template de notification SMS FR par défaut.
- *
- * @param query  - Connexion migrateur (BYPASSRLS)
- * @param bankId - UUID de la banque cible
- * @param type   - Type de notification
- * @param body   - Corps du message (avec variables {{...}})
- */
-async function insertNotificationTemplate(
-  query: QueryFn,
-  bankId: string,
-  type: string,
-  body: string
-): Promise<void> {
-  await query(`
-    INSERT INTO notification_templates (id, bank_id, type, channel, lang, body)
-    VALUES (
-      gen_random_uuid(), '${bankId}', '${type}', 'SMS', 'FR',
-      '${body.replace(/'/g, "''")}'
-    )
-    ON CONFLICT (bank_id, type, channel, lang) DO NOTHING
-  `);
-}
-
-/**
- * Templates de notification FR par défaut pour les 4 NotificationType (DB-005).
- * Seed idempotent : ON CONFLICT (bank_id, type, channel, lang) DO NOTHING.
- *
- * @param query  - Connexion migrateur (BYPASSRLS)
- * @param bankId - UUID de la banque cible
- */
-async function seedDefaultNotificationTemplates(
-  query: QueryFn,
-  bankId: string
-): Promise<void> {
-  const templates = [
-    {
-      type: "TICKET_CONFIRMATION",
-      body: "Votre ticket {{number}} a été enregistré. Vous êtes en position {{position}} dans la file. Estimation : {{estimate}} min.",
-    },
-    {
-      type: "POSITION_UPDATE",
-      body: "Mise à jour : vous êtes maintenant en position {{position}} dans la file. Estimation : {{estimate}} min.",
-    },
-    {
-      type: "YOUR_TURN",
-      body: "C'est bientôt votre tour ! Ticket {{number}} — préparez vos documents. Estimation : {{estimate}} min.",
-    },
-    {
-      type: "DAILY_REPORT",
-      body: "Rapport journalier de votre agence : {{number}} tickets traités aujourd'hui.",
-    },
-  ];
-  for (const tpl of templates) {
-    await insertNotificationTemplate(query, bankId, tpl.type, tpl.body);
+  const known = Object.keys(TENANT_SEED_CONFIGS);
+  for (const slug of slugs) {
+    if (!(slug in TENANT_SEED_CONFIGS)) {
+      throw new Error(
+        `[SIGFA SEED] Tenant de seed inconnu : '${slug}'. ` +
+        `Tenants disponibles : ${known.join(", ")} (voir src/seed/tenants/).`
+      );
+    }
   }
-}
-
-/**
- * Insère la config WhatsApp Business de la banque de démo (DB-NOTIF, idempotent).
- * Fournit ≥1 `whatsapp_config` + un mapping menu de démonstration (mot-clé « 1 » →
- * service OC de l'agence 1). Secret de démo local — jamais un vrai secret de prod.
- *
- * @param query - Connexion migrateur (BYPASSRLS)
- */
-async function seedDemoWhatsAppConfig(query: QueryFn): Promise<void> {
-  await query(`
-    INSERT INTO whatsapp_config (bank_id, business_number, webhook_secret, default_agency_id, enabled)
-    VALUES (
-      '${DEMO_BANK_ID}', '+2250700000000', 'demo-whatsapp-webhook-secret',
-      '${DEMO_AGENCY_1_ID}', true
-    )
-    ON CONFLICT (bank_id) DO NOTHING
-  `);
-  const serviceOcId = generateDemoServiceId(DEMO_AGENCY_1_ID, "OC");
-  await query(`
-    INSERT INTO whatsapp_menu_mapping (bank_id, keyword, service_id)
-    VALUES ('${DEMO_BANK_ID}', '1', '${serviceOcId}')
-    ON CONFLICT (bank_id, keyword) DO NOTHING
-  `);
-}
-
-/**
- * Convertit un hash hex en UUID v4-like déterministe.
- *
- * @param hash - Hash hex de 64 caractères (SHA256)
- * @returns UUID déterministe (format xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx)
- */
-function hexToUuid(hash: string): string {
-  return [
-    hash.substring(0, 8),
-    hash.substring(8, 12),
-    "4" + hash.substring(13, 16),
-    "8" + hash.substring(17, 20),
-    hash.substring(20, 32),
-  ].join("-");
-}
-
-/**
- * Génère un UUID déterministe pour un service de démo.
- *
- * @param agencyId - UUID de l'agence
- * @param code     - Code du service
- */
-function generateDemoServiceId(agencyId: string, code: string): string {
-  const hash = createHash("sha256")
-    .update(`demo-service-${agencyId}-${code}`)
-    .digest("hex");
-  return hexToUuid(hash);
-}
-
-/**
- * Génère un UUID déterministe pour un utilisateur de démo.
- *
- * @param role - Rôle de l'utilisateur
- */
-function generateDemoUserId(role: string): string {
-  const hash = createHash("sha256").update(`demo-user-${role}`).digest("hex");
-  return hexToUuid(hash);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Seed démo : point d'entrée principal
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Affiche les mots de passe de démo à la console (UNE SEULE FOIS).
- *
- * @param passwords - Map role → password généré
- */
-function printDemoPasswords(passwords: Map<string, string>): void {
-  if (passwords.size === 0) return;
-  console.log("\n╔══════════════════════════════════════════════════════╗");
-  console.log("║  SIGFA DEMO — Comptes créés (affichés UNE SEULE FOIS) ║");
-  console.log("╠══════════════════════════════════════════════════════╣");
-  for (const [role, password] of passwords) {
-    const email = demoEmail(role);
-    console.log(`║  ${role.padEnd(18)} │ ${email.padEnd(32)} │ ${password}`);
-  }
-  console.log("╚══════════════════════════════════════════════════════╝\n");
-}
-
-/**
- * Insère le tenant de démonstration complet.
- * DB-009 : garde `NODE_ENV !== 'production'` — lève une erreur en production.
- * Idempotent : ON CONFLICT DO NOTHING partout.
- *
- * @param query - Connexion migrateur (BYPASSRLS)
- */
-async function seedDemoTenant(query: QueryFn): Promise<void> {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "[SIGFA SEED] Le seed de démo est interdit en production (NODE_ENV=production). " +
-      "Retirer SEED_DEMO=1 ou utiliser NODE_ENV=development."
-    );
-  }
-
-  await seedDemoBank(query);
-
-  for (const agencyId of [DEMO_AGENCY_1_ID, DEMO_AGENCY_2_ID]) {
-    await seedDemoServices(query, agencyId);
-    await seedDemoOperations(query, agencyId);
-  }
-
-  await seedDemoCountersAndKiosk(query);
-
-  const passwords = new Map<string, string>();
-  for (const role of PERSISTABLE_ROLES) {
-    if (role === "SUPER_ADMIN") continue;
-    await seedDemoUser(query, role, passwords);
-  }
-
-  await seedDefaultNotificationTemplates(query, DEMO_BANK_ID);
-  await seedDemoWhatsAppConfig(query);
-  printDemoPasswords(passwords);
+  return slugs;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -628,24 +276,29 @@ async function seedDemoTenant(query: QueryFn): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Exécute le seed complet (idempotent).
+ * Exécute le seed complet (idempotent) : fériés + tenants sélectionnés.
  *
- * @param query   - Connexion migrateur (BYPASSRLS) — pour les tables hors-tenant et démo
- * @param options - Options du seed (`{ seedDemo: boolean }`)
+ * @param query   - Connexion migrateur (BYPASSRLS) — pour les tables hors-tenant et tenants
+ * @param options - Options du seed (`{ seedDemo?, tenants? }`)
  */
 export async function runSeed(
   query: QueryFn,
-  options: SeedOptions = { seedDemo: false }
+  options: SeedOptions = {}
 ): Promise<void> {
   await checkHolidayWarning(MAX_MOBILE_YEAR);
   await seedPublicHolidays(query);
-  if (options.seedDemo) {
-    await seedDemoTenant(query);
+  for (const slug of resolveTenantSlugs(options)) {
+    const config = TENANT_SEED_CONFIGS[slug];
+    /* v8 ignore next — resolveTenantSlugs garantit l'existence du slug */
+    if (!config) continue;
+    await seedTenant(query, config);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Entrypoint CLI : `pnpm --filter @sigfa/database seed`
+//   SEED_TENANTS=demo,bicici  — sélection des tenants (registre ./tenants/)
+//   SEED_DEMO=1               — rétro-compatibilité (équivaut à SEED_TENANTS=demo)
 // ─────────────────────────────────────────────────────────────────────────────
 
 if (import.meta.url === new URL(process.argv[1]!, "file://").href) {
@@ -663,10 +316,17 @@ if (import.meta.url === new URL(process.argv[1]!, "file://").href) {
   };
 
   const seedDemo = process.env["SEED_DEMO"] === "1";
+  const tenants = (process.env["SEED_TENANTS"] ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
 
   try {
-    console.log(`[SIGFA SEED] Démarrage (SEED_DEMO=${seedDemo ? "1" : "0"})...`);
-    await runSeed(queryFn, { seedDemo });
+    console.log(
+      `[SIGFA SEED] Démarrage (SEED_DEMO=${seedDemo ? "1" : "0"}, ` +
+      `SEED_TENANTS=${tenants.join(",") || "∅"})...`
+    );
+    await runSeed(queryFn, { seedDemo, tenants });
     console.log("[SIGFA SEED] Terminé avec succès.");
   } finally {
     await client.end();

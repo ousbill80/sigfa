@@ -48,3 +48,9 @@ export const errorSchema = z.object({
 
 /** Type inféré de errorSchema */
 export type ErrorSchema = z.infer<typeof errorSchema>;
+
+/**
+ * Utilitaires de contraste WCAG partagés (theming banque, seed de tenant).
+ * Voir ./wcag-contrast.ts — une seule implémentation pour tout le monorepo.
+ */
+export * from "./wcag-contrast.js";

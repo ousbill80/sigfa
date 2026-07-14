@@ -286,8 +286,9 @@ describe("DB-009: seed démo — passwords crypto.randomBytes, garde production,
       await runSeed(mockQuery, { seedDemo: true }).catch(() => undefined);
       vi.resetModules();
 
-      // Le test structurel : vérifier que le module importe crypto.randomBytes
-      const seedSource = readFileSync(join(SRC_DIR, "seed", "index.ts"), "utf8");
+      // Le test structurel : vérifier que le moteur de seed de tenant importe
+      // crypto.randomBytes (extraction paramétrable : seed/tenant-seed.ts)
+      const seedSource = readFileSync(join(SRC_DIR, "seed", "tenant-seed.ts"), "utf8");
       expect(seedSource).toMatch(/randomBytes/);
       expect(seedSource).not.toMatch(/`Demo\$\{role\}/); // pas de mdp fixe en template literal
     }
@@ -297,7 +298,8 @@ describe("DB-009: seed démo — passwords crypto.randomBytes, garde production,
     "DB-009: hash bcrypt réel (cost 12) dans seed démo — pattern $2b$12$ détecté",
     async () => {
       // Le seed doit utiliser un vrai bcrypt cost 12, pas un hash simulé $demo$
-      const seedSource = readFileSync(join(SRC_DIR, "seed", "index.ts"), "utf8");
+      // (moteur paramétrable : seed/tenant-seed.ts)
+      const seedSource = readFileSync(join(SRC_DIR, "seed", "tenant-seed.ts"), "utf8");
       // Doit importer bcrypt ou bcryptjs
       expect(seedSource).toMatch(/bcrypt/i);
       // Ne doit plus contenir $demo$ (hash simulé de l'ancienne implémentation)

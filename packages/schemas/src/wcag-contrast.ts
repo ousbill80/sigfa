@@ -1,6 +1,10 @@
 /**
  * Correction de contraste WCAG 2.x (API-009, admin.yaml theming).
  *
+ * Module PARTAGÉ (@sigfa/schemas) — consommé par l'API (routes theming,
+ * gabarits PDF) ET par le seed de tenant (@sigfa/database) : une seule
+ * implémentation de l'algorithme, jamais de duplication.
+ *
  * Le theming banque fournit des couleurs `requestedColors` (primary/secondary/
  * background). Les `appliedColors` en dérivent en garantissant un ratio de
  * contraste ≥ 4.5:1 (WCAG AA texte normal) entre chaque couleur de premier plan

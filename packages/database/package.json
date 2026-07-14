@@ -18,6 +18,7 @@
     "seed": "node --experimental-vm-modules dist/seed/index.js"
   },
   "dependencies": {
+    "@sigfa/schemas": "workspace:*",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.36.4",
     "pg": "^8.13.0"
