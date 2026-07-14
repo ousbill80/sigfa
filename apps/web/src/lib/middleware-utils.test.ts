@@ -47,6 +47,12 @@ describe("WEB-001: middleware auth", () => {
       expect(isPublicRoute("/design-preview")).toBe(true);
       expect(checkAccess("/design-preview", null).action).toBe("allow");
     });
+
+    it("NOTIF-005-B: allows /q/[token] without authentication (public QR ticket PWA)", () => {
+      expect(isPublicRoute("/q")).toBe(true);
+      expect(isPublicRoute("/q/v1.payload.sig")).toBe(true);
+      expect(checkAccess("/q/v1.payload.sig", null).action).toBe("allow");
+    });
   });
 
   describe("RBAC enforcement in middleware", () => {

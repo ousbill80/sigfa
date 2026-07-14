@@ -9,10 +9,13 @@ import { canAccess, getDefaultDashboard } from "./roles";
 /**
  * Public routes that don't require auth.
  * `/tv` is a public per-agency read-only display (TV-001, RBAC public).
+ * `/q` is the public ticket PWA reached via the agency QR (NOTIF-005-B) — no
+ * cookie/JWT: the signed agency token in the path is resolved client-side and
+ * drives the public API. Gating it behind auth would make the QR unreachable.
  * `/design-preview` is the static design-system gallery (@sigfa/ui) — public,
  * read-only, no tenant data.
  */
-export const PUBLIC_ROUTES = ["/login", "/tv", "/design-preview", "/api/auth/login", "/api/auth/refresh", "/_next", "/favicon.ico"];
+export const PUBLIC_ROUTES = ["/login", "/tv", "/q", "/design-preview", "/api/auth/login", "/api/auth/refresh", "/_next", "/favicon.ico"];
 
 /**
  * Determines if a pathname is a public route.
