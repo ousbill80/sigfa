@@ -10,9 +10,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { TvScreen } from "./tv-screen";
+import { TvScreen, heroNumberFontSize } from "./tv-screen";
 import { initialTvState, type TvState, type TvCall } from "@/lib/tv-state";
 import { SUPPORTED_LOCALES, t } from "@/lib/i18n";
+import type { TvMediaItem } from "@/lib/tv-media";
 
 function call(displayNumber: string, counterLabel: string, calledAt: string): TvCall {
   return { ticketNumber: displayNumber, displayNumber, counterLabel, calledAt };
@@ -91,6 +92,79 @@ describe("TvScreen — TV-V3 split permanent", () => {
   });
 });
 
+describe("TvScreen — numéro appelé sur UNE ligne (nowrap + taille adaptative)", () => {
+  it("TV-NOWRAP: le numéro porte white-space nowrap — « OC-001 » ne casse jamais", () => {
+    render(<TvScreen state={nominal} />);
+    const number = screen.getByTestId("tv-hero-number");
+    const style = number.getAttribute("style") ?? "";
+    expect(style).toContain("white-space: nowrap");
+  });
+
+  it("TV-NOWRAP: taille adaptative en cqw, bornée par --display-tv-counter (container carte)", () => {
+    render(<TvScreen state={nominal} />);
+    const style = screen.getByTestId("tv-hero-number").getAttribute("style") ?? "";
+    expect(style).toContain("min(var(--display-tv-counter)");
+    expect(style).toContain("cqw");
+    // La carte est le container CSS de référence du numéro.
+    const hero = screen.getByTestId("tv-hero");
+    expect(hero.getAttribute("style")).toContain("container-type: inline-size");
+  });
+
+  it("TV-NOWRAP: formats plus longs — la taille par caractère décroît (OC-123, P010, etc.)", () => {
+    const size = (n: string): number => {
+      const match = /(\d+)cqw/.exec(heroNumberFontSize(n));
+      return Number(match?.[1]);
+    };
+    expect(size("P010")).toBeGreaterThan(size("OC-001"));
+    expect(size("OC-001")).toBe(size("OC-123"));
+    expect(size("OC-001")).toBeGreaterThan(size("OC-12345"));
+    // Toujours borné par le token d'affichage TV.
+    expect(heroNumberFontSize("OC-001")).toContain("var(--display-tv-counter)");
+  });
+
+  it("TV-NOWRAP: derniers appelés — numéros aussi sur UNE ligne (nowrap + cqw borné --display-tv)", () => {
+    render(<TvScreen state={nominal} />);
+    for (const card of screen.getAllByTestId("tv-previous-card")) {
+      expect(card.getAttribute("style")).toContain("container-type: inline-size");
+      const number = card.firstElementChild as HTMLElement;
+      const style = number.getAttribute("style") ?? "";
+      expect(style).toContain("white-space: nowrap");
+      expect(style).toContain("min(var(--display-tv)");
+      expect(style).toContain("cqw");
+    }
+  });
+});
+
+describe("TvScreen — zone média dynamique (manifeste) et repli promo texte", () => {
+  const media: readonly TvMediaItem[] = [
+    { type: "image", src: "/tv-media/promo-epargne.svg" },
+    { type: "video", src: "/tv-media/demo-clip.mp4" },
+  ];
+
+  it("TV-MEDIA: playlist fournie — la zone gauche joue les médias (pas la promo texte)", () => {
+    render(<TvScreen state={nominal} mediaItems={media} />);
+    expect(screen.getByTestId("tv-media-zone")).toBeInTheDocument();
+    expect(screen.queryByTestId("tv-adzone")).toBeNull();
+  });
+
+  it("TV-MEDIA: REPLI sans manifeste/playlist vide — promo texte actuelle inchangée", () => {
+    render(<TvScreen state={nominal} mediaItems={[]} />);
+    expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
+    expect(screen.queryByTestId("tv-media-zone")).toBeNull();
+  });
+
+  it("TV-MEDIA: l'appel reste prioritaire — colonne « MAINTENANT SERVI » jamais masquée par les médias", () => {
+    render(<TvScreen state={nominal} mediaItems={media} celebration />);
+    // La zone média vit dans la cellule GAUCHE de la grille split ; la colonne
+    // d'appels reste rendue et le flash de célébration actif.
+    expect(screen.getByTestId("tv-call-column")).toBeInTheDocument();
+    expect(screen.getByTestId("tv-hero")).toHaveAttribute("data-celebration", "on");
+    expect(screen.getByTestId("tv-hero-number")).toHaveTextContent("OC-047");
+    // Aucun z-index élevé côté média (elle ne peut pas recouvrir la colonne).
+    expect(screen.getByTestId("tv-media-zone").getAttribute("style")).not.toContain("z-index");
+  });
+});
+
 describe("TvScreen — TV-V3 bandeau haut", () => {
   it("TV-V3: bandeau sur fond --brand, texte inverse, hauteur --tv-header-height", () => {
     render(<TvScreen state={nominal} tenantName="Banque du Commerce" />);
@@ -106,6 +180,32 @@ describe("TvScreen — TV-V3 bandeau haut", () => {
     const header = screen.getByTestId("tv-header");
     const mark = within(header).getByTestId("tv-brand-mark");
     expect(mark.getAttribute("style")).toContain("var(--brand-contrast)");
+    expect(within(header).getByText("Banque du Commerce")).toBeInTheDocument();
+  });
+
+  it("TV-LOGO: repli sans logo — pastille bien visible (~48px) avec l'initiale de la banque", () => {
+    render(<TvScreen state={nominal} tenantName="Banque du Commerce" />);
+    const mark = screen.getByTestId("tv-brand-mark");
+    expect(mark).toHaveTextContent("B");
+    const style = mark.getAttribute("style") ?? "";
+    // Dimensionnée sur le bandeau (--tv-header-height − --space-4 ≈ 48px).
+    expect(style).toContain("var(--tv-header-height)");
+    expect(screen.queryByTestId("tv-brand-logo")).toBeNull();
+  });
+
+  it("TV-LOGO: logoUrl provisionné (NEXT_PUBLIC_BANK_LOGO_URL) — logo affiché à gauche du bandeau", () => {
+    render(
+      <TvScreen state={nominal} tenantName="Banque du Commerce" logoUrl="/tenants/bdc/logo.svg" />
+    );
+    const header = screen.getByTestId("tv-header");
+    const logo = within(header).getByTestId("tv-brand-logo");
+    expect(logo).toHaveAttribute("src", "/tenants/bdc/logo.svg");
+    const style = logo.getAttribute("style") ?? "";
+    // Hauteur pilotée par le bandeau (~48px dans un bandeau de 64px).
+    expect(style).toContain("var(--tv-header-height)");
+    expect(style).toContain("object-fit: contain");
+    // Plus de pastille quand le logo est là ; le nom reste affiché à côté.
+    expect(within(header).queryByTestId("tv-brand-mark")).toBeNull();
     expect(within(header).getByText("Banque du Commerce")).toBeInTheDocument();
   });
 

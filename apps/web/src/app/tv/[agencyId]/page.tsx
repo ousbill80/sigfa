@@ -12,16 +12,20 @@
  */
 import type { ReactElement } from "react";
 import { TvDisplay, type TvTenant } from "@/components/tv/tv-display";
+import { bankLogoUrl } from "@/lib/bank-branding";
 
 /**
  * Theming démo de l'agence. Le token DISPLAY et le socket ne portent aucune PII
  * ni nom de tenant : le nom/couleur affichés relèvent d'un habillage (theming
- * banque), résolu ici en dur pour la démo (surchargeable ultérieurement).
+ * banque), résolu ici en dur pour la démo (surchargeable ultérieurement). Le
+ * logo suit la convention lib/bank-branding (`NEXT_PUBLIC_BANK_LOGO_URL`),
+ * résolue côté serveur — repli pastille --brand + initiale sans logo.
  */
 const DEMO_TENANT: TvTenant = {
   name: "Banque du Commerce",
   brand: "#c25a16",
   locale: "fr",
+  logoUrl: bankLogoUrl(),
 };
 
 export default async function TvAgencyPage({

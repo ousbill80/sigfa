@@ -25,7 +25,10 @@ import { t, type Locale } from "@/lib/i18n";
 import type { TvState, TvCall } from "@/lib/tv-state";
 import { TV_PREVIOUS_COUNT } from "@/lib/tv-state";
 import { AdZone } from "./ad-zone";
+import { TvMediaZone } from "./tv-media-zone";
 import type { AdSlide } from "@/lib/ad-slides";
+import type { TvMediaItem } from "@/lib/tv-media";
+import { bankInitial } from "@/lib/bank-branding";
 
 /** Visible lifecycle state of the TV screen. */
 export type TvViewState = "nominal" | "loading" | "empty";
@@ -50,6 +53,17 @@ export interface TvScreenProps {
   reducedMotion?: boolean;
   /** Configurable ad slides for the permanent AdZone (defaults to demo slides). */
   adSlides?: readonly AdSlide[];
+  /**
+   * Dynamic media playlist (manifest `public/tv-media/manifest.json`). When
+   * non-empty, the left pane plays these media (images/videos); otherwise the
+   * text AdZone remains — zero regression without provisioning.
+   */
+  mediaItems?: readonly TvMediaItem[];
+  /**
+   * Bank logo URL (convention lib/bank-branding — `NEXT_PUBLIC_BANK_LOGO_URL`).
+   * `null` → pastille --brand-contrast + initiale de la banque.
+   */
+  logoUrl?: string | null;
 }
 
 /**
@@ -90,6 +104,8 @@ const columnStyle: CSSProperties = {
 /**
  * Renders a single previous-call card (numéro + guichet, en retrait).
  * Recent calls are in retreat: --ink-inverse-soft, tabular --font-display digits.
+ * Le numéro tient sur UNE ligne (nowrap + taille adaptative en cqw, ~2/3 de la
+ * rangée pour le numéro, le reste au libellé guichet) — jamais de « OC- »/« 001 ».
  * @param call - The previous call to render.
  * @returns The card element.
  */
@@ -107,11 +123,13 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
         fontSize: "var(--display-tv)",
         lineHeight: "var(--leading-tight)",
         color: "var(--ink-inverse-soft)",
+        containerType: "inline-size",
       }}
     >
       <span
         style={{
-          fontSize: "var(--display-tv)",
+          whiteSpace: "nowrap",
+          fontSize: tvNumberFontSize(call.displayNumber, 100, "--display-tv"),
           fontFamily: "var(--font-display)",
           fontVariantNumeric: "tabular-nums",
           letterSpacing: "var(--tracking-numeric)",
@@ -120,9 +138,51 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
       >
         {call.displayNumber}
       </span>
-      <span style={{ fontSize: "var(--text-lg)", color: "var(--ink-inverse-soft)" }}>{call.counterLabel}</span>
+      <span
+        style={{
+          fontSize: "var(--text-lg)",
+          color: "var(--ink-inverse-soft)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {call.counterLabel}
+      </span>
     </div>
   );
+}
+
+/**
+ * Taille du numéro appelé : JAMAIS de retour à la ligne (« OC-001 » cassé en
+ * « OC- » / « 001 » interdit). La carte est un container CSS (inline-size) et
+ * la taille de police est bornée par la largeur disponible PAR CARACTÈRE
+ * (~0,62 em/caractère en chiffres tabulaires + tracking) : des formats plus
+ * longs (« OC-123 », « P010 », voire plus) tiennent sur UNE ligne à toutes les
+ * résolutions TV (1920×1080 comme ~1366×768), plafonnée à --display-tv-counter.
+ * @param displayNumber - Le numéro affiché (ex. « OC-001 »).
+ * @returns La taille de police CSS adaptative.
+ */
+export function heroNumberFontSize(displayNumber: string): string {
+  return tvNumberFontSize(displayNumber, 145, "--display-tv-counter");
+}
+
+/**
+ * Taille adaptative générique d'un numéro TV sur UNE ligne : budget de largeur
+ * container (cqw) réparti par caractère, plafonné par un token d'affichage.
+ * @param displayNumber - Le numéro affiché.
+ * @param budgetCqw - Largeur container allouée au numéro (en cqw).
+ * @param capToken - Token CSS plafonnant la taille (ex. --display-tv).
+ * @returns La taille de police CSS adaptative.
+ */
+export function tvNumberFontSize(
+  displayNumber: string,
+  budgetCqw: number,
+  capToken: string
+): string {
+  const chars = Math.max(displayNumber.length, 1);
+  const perCharCqw = Math.floor(budgetCqw / chars);
+  return `min(var(${capToken}), ${perCharCqw}cqw)`;
 }
 
 /**
@@ -164,6 +224,9 @@ function CurrentCallCard({
           ? "none"
           : "background-color var(--duration-celebration) linear, box-shadow var(--tv-slide-duration) var(--tv-slide-ease)",
         flexShrink: 0,
+        /* Container CSS : le numéro se dimensionne en cqw sur la largeur
+           réelle de la carte (colonne ~25 % — 1920 comme 1366). */
+        containerType: "inline-size",
       }}
     >
       {hero === null ? (
@@ -196,7 +259,10 @@ function CurrentCallCard({
           <div
             data-testid="tv-hero-number"
             style={{
-              fontSize: "var(--display-tv-counter)",
+              /* UNE ligne, toujours : nowrap + taille adaptative (cqw) bornée
+                 par --display-tv-counter — « OC-001 » ne casse jamais. */
+              whiteSpace: "nowrap",
+              fontSize: heroNumberFontSize(hero.displayNumber),
               fontFamily: "var(--font-display)",
               fontWeight: 600,
               lineHeight: "var(--leading-tight)",
@@ -231,8 +297,16 @@ export function TvScreen({
   celebration = false,
   reducedMotion = false,
   adSlides,
+  mediaItems,
+  logoUrl = null,
 }: TvScreenProps): ReactElement {
   const isEmpty = state.hero === null;
+
+  /* Repli promo texte : rendu tel quel sans manifeste/médias, et réutilisé par
+     TvMediaZone si tous les médias échouent au chargement (zéro régression). */
+  const promoFallback = (
+    <AdZone slides={adSlides} locale={locale} active reducedMotion={reducedMotion} />
+  );
 
   return (
     <div
@@ -241,7 +315,7 @@ export function TvScreen({
       data-state={loading ? "loading" : isEmpty ? "empty" : "nominal"}
       style={screenStyle}
     >
-      <TvHeader tenantName={tenantName} dateLabel={dateLabel} clock={clock} />
+      <TvHeader tenantName={tenantName} dateLabel={dateLabel} clock={clock} logoUrl={logoUrl} />
 
       {loading ? (
         /* Skeleton adapté au split : volet pub + colonne d'appels squelettés. */
@@ -279,9 +353,19 @@ export function TvScreen({
         </main>
       ) : (
         <main data-testid="tv-split" style={splitStyle}>
-          {/* Zone gauche ~75 % — carrousel pub actif EN PERMANENCE. */}
-          <section style={{ minWidth: 0, minHeight: 0, display: "flex" }}>
-            <AdZone slides={adSlides} locale={locale} active reducedMotion={reducedMotion} />
+          {/* Zone gauche ~75 % — médias dynamiques (manifeste) si provisionnés,
+              sinon carrousel promo texte. Cellule de grille SANS z-index : la
+              colonne d'appels (« MAINTENANT SERVI ») n'est jamais masquée. */}
+          <section style={{ minWidth: 0, minHeight: 0, display: "flex", position: "relative" }}>
+            {mediaItems !== undefined && mediaItems.length > 0 ? (
+              <TvMediaZone
+                items={mediaItems}
+                reducedMotion={reducedMotion}
+                fallback={promoFallback}
+              />
+            ) : (
+              promoFallback
+            )}
           </section>
 
           {/* Colonne droite ~25 % — appel courant + derniers appelés + file. */}
@@ -371,18 +455,27 @@ export function TvScreen({
 }
 
 /**
- * Bandeau haut — fond --brand, texte inverse : pastille logo + nom banque à
- * gauche, date complète au centre, horloge en bloc contrasté à droite.
+ * Bandeau haut — fond --brand, texte inverse : logo banque (ou pastille
+ * --brand-contrast + initiale sans logo provisionné) + nom à gauche, date
+ * complète au centre, horloge en bloc contrasté à droite.
+ *
+ * Convention lib/bank-branding (`NEXT_PUBLIC_BANK_LOGO_URL`), composée
+ * LOCALEMENT : l'écran TV est public, aucune dépendance à session-header /
+ * tenant-mark (chantier branding parallèle).
  */
 function TvHeader({
   tenantName,
   dateLabel,
   clock,
+  logoUrl,
 }: {
   tenantName: string;
   dateLabel: string;
   clock: string;
+  logoUrl: string | null;
 }): ReactElement {
+  /* Logo bien visible : ~48px dans le bandeau de 64px (marge --space-4). */
+  const markSize = "calc(var(--tv-header-height) - var(--space-4))";
   return (
     <header
       data-testid="tv-header"
@@ -400,19 +493,49 @@ function TvHeader({
       }}
     >
       <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", minWidth: 0 }}>
-        {/* Pastille logo — lisible sur le bandeau brand (theming banque). */}
-        <span
-          data-testid="tv-brand-mark"
-          aria-hidden="true"
-          style={{
-            width: "var(--space-6)",
-            height: "var(--space-6)",
-            borderRadius: "var(--r-full)",
-            backgroundColor: "var(--brand-contrast)",
-            boxShadow: "var(--shadow-1)",
-            flexShrink: 0,
-          }}
-        />
+        {logoUrl !== null ? (
+          /* Logo banque provisionné (NEXT_PUBLIC_BANK_LOGO_URL) — bien
+             visible, ~48px de haut dans le bandeau. Décoratif : le nom de la
+             banque est affiché juste à côté. */
+          // eslint-disable-next-line @next/next/no-img-element -- logo banque provisionné (theming), hors pipeline next/image
+          <img
+            data-testid="tv-brand-logo"
+            src={logoUrl}
+            alt=""
+            aria-hidden="true"
+            style={{
+              height: markSize,
+              width: "auto",
+              maxWidth: "calc(var(--tv-header-height) * 4)",
+              objectFit: "contain",
+              flexShrink: 0,
+            }}
+          />
+        ) : (
+          /* Repli sans logo : pastille lisible sur le bandeau brand, avec
+             l'initiale de la banque (jamais d'image réseau requise). */
+          <span
+            data-testid="tv-brand-mark"
+            aria-hidden="true"
+            style={{
+              width: markSize,
+              height: markSize,
+              borderRadius: "var(--r-full)",
+              backgroundColor: "var(--brand-contrast)",
+              boxShadow: "var(--shadow-1)",
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--brand)",
+              fontFamily: "var(--font-display)",
+              fontWeight: 700,
+              fontSize: "var(--text-2xl)",
+            }}
+          >
+            {bankInitial(tenantName)}
+          </span>
+        )}
         <span
           style={{
             fontWeight: 600,
