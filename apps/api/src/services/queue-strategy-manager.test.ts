@@ -49,6 +49,10 @@ async function runMigrations(client: pg.Client): Promise<void> {
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='counter_status') THEN
         CREATE TYPE counter_status AS ENUM ('OPEN','PAUSED','CLOSED');
       END IF;
+      -- Type RÉEL (migrations 0000/0011) : users.languages agent_language[], tickets.required_language agent_language.
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='agent_language') THEN
+        CREATE TYPE agent_language AS ENUM ('FR','EN');
+      END IF;
     END $$;
   `);
   await client.query(`
@@ -79,7 +83,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       bank_id UUID REFERENCES banks(id),
       email TEXT NOT NULL UNIQUE,
-      languages TEXT[] NOT NULL DEFAULT '{}',
+      languages agent_language[] NOT NULL DEFAULT '{}',
       is_relationship_manager BOOLEAN NOT NULL DEFAULT false,
       display_name TEXT, photo_url TEXT,
       is_active BOOLEAN NOT NULL DEFAULT true,
@@ -101,7 +105,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       target_manager_id UUID REFERENCES users(id),
       number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE,
       channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
-      priority ticket_priority NOT NULL DEFAULT 'STANDARD', required_language TEXT,
+      priority ticket_priority NOT NULL DEFAULT 'STANDARD', required_language agent_language,
       issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
@@ -124,7 +128,7 @@ async function insertFixtures(client: pg.Client): Promise<Fixtures> {
   const queueId = (q.rows[0] as { id: string }).id;
   const mgr = await client.query(
     `INSERT INTO users (bank_id, email, languages, is_relationship_manager, display_name)
-     VALUES ($1,'mgr@t.ci',ARRAY['FR'],true,'Kofi A.') RETURNING id`,
+     VALUES ($1,'mgr@t.ci',ARRAY['FR']::agent_language[],true,'Kofi A.') RETURNING id`,
     [bankId]
   );
   const managerId = (mgr.rows[0] as { id: string }).id;

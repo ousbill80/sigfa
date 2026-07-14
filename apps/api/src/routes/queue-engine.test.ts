@@ -60,6 +60,11 @@ async function runMigrations(client: pg.Client): Promise<void> {
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='counter_status') THEN
         CREATE TYPE counter_status AS ENUM ('OPEN','PAUSED','CLOSED');
       END IF;
+      -- Type RÉEL de production (migration 0000 puis restriction FR/EN en 0011).
+      -- users.languages est un agent_language[] (enum array), PAS un text[].
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='agent_language') THEN
+        CREATE TYPE agent_language AS ENUM ('FR','EN');
+      END IF;
     END $$;
   `);
   await client.query(`
@@ -111,7 +116,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       bank_id UUID REFERENCES banks(id),
       email TEXT NOT NULL UNIQUE,
-      languages TEXT[] NOT NULL DEFAULT '{}',
+      languages agent_language[] NOT NULL DEFAULT '{}',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
 );
   `);
@@ -131,7 +136,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
       priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT,
       sms_consent BOOLEAN NOT NULL DEFAULT false,
-      required_language TEXT,
+      required_language agent_language,
       issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ,
       closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER,
       issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED,
@@ -200,7 +205,7 @@ async function insertFixtures(client: pg.Client) {
   // Agent FR (parle français)
   const userId = "99999999-9999-4999-a999-999999999999";
   await client.query(
-    `INSERT INTO users (id, bank_id, email, languages) VALUES ($1,$2,'agent@test.com',ARRAY['FR'])`,
+    `INSERT INTO users (id, bank_id, email, languages) VALUES ($1,$2,'agent@test.com',ARRAY['FR']::agent_language[])`,
     [userId, bankId]
   );
   // Lier agent au guichet
@@ -399,6 +404,32 @@ describe("API-004: langue non parlée → sauté pour ce guichet, soft timeout �
     const called = await post(`/counters/${ids.counterId}/call-next`, {});
     // Soft-timeout dépassé → le ticket est pris même par un agent FR
     expect(called.status).toBe(200);
+  });
+});
+
+// ── Régression FIX-QUEUE-CALLNEXT-AGENTLANG ──────────────────────────────────
+// `users.languages` est un `agent_language[]` (enum array) en production. Un
+// COALESCE(u.languages, ARRAY[]::text[]) échoue PG 42846 (impossible de convertir
+// text[] → agent_language[]) → tout call-next d'un agent AYANT une langue déclarée
+// renvoie 500. Ce cas exerce précisément le chemin cassé (l'agent fixture parle FR)
+// sur le VRAI type enum, et vérifie qu'aucune 500 n'est renvoyée.
+describe("API-004: call-next d'un agent AYANT une langue déclarée ne casse pas (enum agent_language[])", () => {
+  it("API-004: agent FR déclaré → call-next sur ticket sans exigence renvoie 200 (pas de 500 42846)", async () => {
+    // L'agent de la fixture a languages = ARRAY['FR'] (agentLangs.length > 0 → branche filtrée).
+    const t = await issue(); // ticket sans requiredLanguage
+    const called = await post(`/counters/${ids.counterId}/call-next`, {});
+    expect(called.status).not.toBe(500);
+    expect(called.status).toBe(200);
+    expect((called.data as { id: string }).id).toBe(t.id as string);
+  });
+
+  it("API-004: agent FR déclaré → call-next sur ticket FR requis renvoie 200 (filtre langue enum ok)", async () => {
+    // Exerce la comparaison required_language::text = ANY($2::text[]) contre les vrais enums.
+    const t = await issue({ requiredLanguage: "FR" });
+    const called = await post(`/counters/${ids.counterId}/call-next`, {});
+    expect(called.status).not.toBe(500);
+    expect(called.status).toBe(200);
+    expect((called.data as { id: string }).id).toBe(t.id as string);
   });
 });
 

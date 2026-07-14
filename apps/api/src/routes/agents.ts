@@ -251,7 +251,7 @@ async function loadAgentProfile(
 ): Promise<Record<string, unknown>> {
   const res = await db.query(
     `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.bank_id,
-            u.languages, u.work_schedule, u.is_relationship_manager, u.display_name,
+            u.languages::text[] AS languages, u.work_schedule, u.is_relationship_manager, u.display_name,
             u.photo_url, u.created_at
        FROM users u
       WHERE u.id = $1 AND u.bank_id = $2`,
@@ -389,7 +389,7 @@ async function applyProfileUpdate(
   if (input.languages !== undefined || input.workSchedule !== undefined) {
     await db.query(
       `UPDATE users
-          SET languages = COALESCE($3::text[], languages),
+          SET languages = COALESCE($3::agent_language[], languages),
               work_schedule = COALESCE($4::jsonb, work_schedule),
               updated_at = NOW()
         WHERE id=$1 AND bank_id=$2`,
