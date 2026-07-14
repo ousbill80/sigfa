@@ -11,10 +11,15 @@
 import { test, expect } from "@playwright/test";
 import { readState, type E2eState } from "../support/state";
 import { takeTicketAtKiosk } from "../support/journey";
+import { resetQueueState } from "../support/reset";
 
 let state: E2eState;
-test.beforeAll(() => {
+// Isolation d'état (E2E-STATE-ISOLATION) : purge la file partagée AVANT ce
+// parcours (deux tickets émis ici, t1/t2) afin que les deux `call-next`
+// successifs servent t1 puis t2, jamais un ticket WAITING résiduel (dérive FIFO).
+test.beforeAll(async () => {
   state = readState();
+  await resetQueueState(state);
 });
 
 async function loginAsAgent(context: import("@playwright/test").BrowserContext): Promise<void> {

@@ -15,10 +15,15 @@
 import { test, expect } from "@playwright/test";
 import { readState, type E2eState } from "../support/state";
 import { takeTicketAtKiosk, submitFeedback, trackTicket } from "../support/journey";
+import { resetQueueState } from "../support/reset";
 
 let state: E2eState;
-test.beforeAll(() => {
+// Isolation d'état (E2E-STATE-ISOLATION) : purge la file de l'agence partagée
+// AVANT ce parcours pour que `call-next` serve LE ticket émis ici, jamais un
+// ticket WAITING laissé par un spec antérieur (dérive FIFO ordre-dépendante).
+test.beforeAll(async () => {
   state = readState();
+  await resetQueueState(state);
 });
 
 /** Pose le cookie httpOnly agent (le proxy /api/rt injecte le Bearer). */

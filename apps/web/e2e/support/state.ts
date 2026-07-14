@@ -22,6 +22,16 @@ export interface E2eState {
   apiOrigin: string;
   /** Base REST /api/v1. */
   apiBase: string;
+  /**
+   * URL de connexion PostgreSQL (rôle owner/superuser du conteneur E2E).
+   *
+   * Exposée aux specs pour l'ISOLATION D'ÉTAT (`reset.ts`) : le backend réel est
+   * UNIQUE et partagé, sa base est MUTABLE. Les specs qui pilotent la file
+   * (émission → `call-next` FIFO) ou dépendent d'une fraîcheur de borne remettent
+   * l'état à zéro avant de s'exécuter, sinon l'ordre d'exécution fait dériver le
+   * résultat. Ce reset est CIBLÉ (tables mutables), jamais une re-migration.
+   */
+  dbUrl: string;
   /** JWT agent (scope agence). */
   agentToken: string;
   /** JWT BANK_ADMIN (scope banque) — console theming ADM-001b. */
