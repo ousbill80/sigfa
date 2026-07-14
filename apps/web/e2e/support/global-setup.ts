@@ -14,7 +14,7 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { startHarness, type E2eResources } from "./harness";
+import { startHarness, E2E_JWT_SECRET, type E2eResources } from "./harness";
 import { writeState } from "./state";
 
 const WEB_ROOT = join(__dirname, "..", "..");
@@ -66,6 +66,12 @@ export default async function globalSetup(): Promise<void> {
         NEXT_PUBLIC_API_URL: backend.apiBase,
         NEXT_PUBLIC_REALTIME_MODE: "real",
         NEXT_PUBLIC_AGENT_COUNTER_ID: backend.counterId,
+        // Le middleware web (S1) et le proxy /api/rt VÉRIFIENT le cookie
+        // `access_token` avec `JWT_SECRET` : il DOIT être identique au secret qui
+        // a forgé les tokens agent/admin (harness), sinon toute route authentifiée
+        // (agent, admin/theming) est redirigée vers /login et les cookies posés
+        // par les specs sont rejetés.
+        JWT_SECRET: E2E_JWT_SECRET,
         PORT: String(WEB_PORT),
       },
       stdio: ["ignore", "inherit", "inherit"],
@@ -79,6 +85,7 @@ export default async function globalSetup(): Promise<void> {
     apiOrigin: backend.apiOrigin,
     apiBase: backend.apiBase,
     agentToken: backend.agentToken,
+    adminToken: backend.adminToken,
     bankId: backend.bankId,
     agencyId: backend.agencyId,
     serviceId: backend.serviceId,

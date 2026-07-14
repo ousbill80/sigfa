@@ -24,6 +24,8 @@ export interface E2eState {
   apiBase: string;
   /** JWT agent (scope agence). */
   agentToken: string;
+  /** JWT BANK_ADMIN (scope banque) — console theming ADM-001b. */
+  adminToken: string;
   bankId: string;
   agencyId: string;
   serviceId: string;

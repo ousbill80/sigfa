@@ -39,6 +39,7 @@ export interface E2eFixtures {
   queueId: string;
   counterId: string;
   agentId: string;
+  adminId: string;
   kioskId: string;
   kioskSecret: string;
 }
@@ -51,6 +52,8 @@ export interface E2eBackend extends E2eFixtures {
   apiBase: string;
   /** JWT agent (scope agence) pour l'authentification web. */
   agentToken: string;
+  /** JWT BANK_ADMIN (scope banque) pour la console theming (ADM-001b). */
+  adminToken: string;
 }
 
 /** Poignée interne des ressources à nettoyer. */
@@ -61,9 +64,44 @@ export interface E2eResources {
   backend: E2eBackend;
 }
 
+/**
+ * Crée la table `audit_log` (parité `ensureAuditLogSchema` de l'API, SEC-001a).
+ * Idempotent. L'enum `role` est créé par {@link applySchema} juste après ; on le
+ * garantit ici aussi pour rester autonome. Colonnes alignées sur `insertAuditEntry`.
+ */
+async function ensureAuditLogTable(db: pg.Client): Promise<void> {
+  await db.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='role') THEN
+        CREATE TYPE role AS ENUM ('SUPER_ADMIN','BANK_ADMIN','AGENCY_DIRECTOR','MANAGER','AGENT','AUDITOR');
+      END IF;
+    END $$;
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      bank_id UUID NOT NULL,
+      actor_id UUID,
+      actor_role role,
+      actor_email TEXT,
+      action VARCHAR(500) NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id UUID,
+      occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ip INET,
+      diff JSONB
+    );
+  `);
+}
+
 /** Applique le schéma ticket/kiosk (parité harnais intégration API-003). */
 async function applySchema(db: pg.Client): Promise<void> {
   await db.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+  // SEC-001a : les mutations applicatives (émission ticket, transitions, feedback,
+  // theming) écrivent une entrée `audit_log` DANS la même transaction (append-only,
+  // pas de best-effort). Sans cette table, la mutation échoue (500). Créée ici pour
+  // que le serveur réel puisse armer ses écritures auditées.
+  await ensureAuditLogTable(db);
   await db.query(`
     DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='role') THEN
@@ -89,6 +127,8 @@ async function applySchema(db: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
       no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3, queue_critical_threshold INTEGER NOT NULL DEFAULT 50,
       agent_inactivity_minutes INTEGER NOT NULL DEFAULT 15,
+      theme JSONB NOT NULL DEFAULT '{}'::jsonb, deleted_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
   await db.query(`
@@ -115,6 +155,12 @@ async function applySchema(db: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID REFERENCES banks(id),
       email TEXT NOT NULL UNIQUE, languages TEXT[] NOT NULL DEFAULT '{}',
       role role NOT NULL DEFAULT 'AGENT', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agency_users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
+      agency_id UUID NOT NULL REFERENCES agencies(id), user_id UUID NOT NULL REFERENCES users(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(agency_id, user_id));
   `);
   await db.query(`
     CREATE TABLE IF NOT EXISTS counters (
@@ -148,6 +194,7 @@ async function applySchema(db: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
       agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id),
       service_id UUID NOT NULL REFERENCES services(id), counter_id UUID, agent_id UUID,
+      operation_id UUID, target_manager_id UUID,
       number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE,
       channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
       priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT,
@@ -190,8 +237,15 @@ async function applySchema(db: pg.Client): Promise<void> {
 
 /** Seede bank/agency/service/queue/counter/agent/kiosk et retourne les ids. */
 async function seed(db: pg.Client): Promise<E2eFixtures> {
+  // Thème initial valide (requestedColors + welcomeMessages) → `GET /banks/:id/theme`
+  // renvoie une console prête (état `ready`) pour le parcours theming ADM-001b.
+  const initialTheme = JSON.stringify({
+    requestedColors: { primary: "#003f7f", secondary: "#e8a000", background: "#ffffff" },
+    welcomeMessages: { fr: "Bienvenue", en: "Welcome" },
+  });
   const bank = await db.query(
-    `INSERT INTO banks (name, slug) VALUES ('Banque du Commerce','oc') RETURNING id`
+    `INSERT INTO banks (name, slug, theme) VALUES ('Banque du Commerce','oc',$1::jsonb) RETURNING id`,
+    [initialTheme]
   );
   const bankId = (bank.rows[0] as { id: string }).id;
   const agency = await db.query(
@@ -214,6 +268,18 @@ async function seed(db: pg.Client): Promise<E2eFixtures> {
     [bankId]
   );
   const agentId = (agent.rows[0] as { id: string }).id;
+  // Administrateur banque (scope banque) pour la console theming (ADM-001b).
+  const admin = await db.query(
+    `INSERT INTO users (bank_id, email, role) VALUES ($1,'admin@oc.ci','BANK_ADMIN') RETURNING id`,
+    [bankId]
+  );
+  const adminId = (admin.rows[0] as { id: string }).id;
+  // Affectation d'agence (agency_users) — requise par le nettoyage socket
+  // (`forceOffline` sur déconnexion agent) et le scope agence.
+  await db.query(
+    `INSERT INTO agency_users (bank_id, agency_id, user_id) VALUES ($1,$2,$3),($1,$2,$4)`,
+    [bankId, agencyId, agentId, adminId]
+  );
   // Guichet affecté à l'agent + statut OPEN → call-next opérationnel.
   const ctr = await db.query(
     `INSERT INTO counters (bank_id, agency_id, number, label, status, agent_id) VALUES ($1,$2,1,'Guichet 3','OPEN',$3) RETURNING id`,
@@ -241,7 +307,7 @@ async function seed(db: pg.Client): Promise<E2eFixtures> {
     [bankId, agencyId]
   );
   const kioskId = (kiosk.rows[0] as { id: string }).id;
-  return { bankId, agencyId, serviceId, queueId, counterId, agentId, kioskId, kioskSecret };
+  return { bankId, agencyId, serviceId, queueId, counterId, agentId, adminId, kioskId, kioskSecret };
 }
 
 /** Forge un JWT agent (scope agence) signé avec le secret E2E. */
@@ -250,6 +316,17 @@ async function forgeAgentToken(fx: E2eFixtures): Promise<string> {
   return new SignJWT({ role: "AGENT", bankId: fx.bankId, agencyIds: [fx.agencyId] })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(fx.agentId)
+    .setIssuedAt()
+    .setExpirationTime("2h")
+    .sign(secret);
+}
+
+/** Forge un JWT BANK_ADMIN (scope banque) signé avec le secret E2E. */
+async function forgeAdminToken(fx: E2eFixtures): Promise<string> {
+  const secret = new TextEncoder().encode(E2E_JWT_SECRET);
+  return new SignJWT({ role: "BANK_ADMIN", bankId: fx.bankId, agencyIds: [fx.agencyId] })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(fx.adminId)
     .setIssuedAt()
     .setExpirationTime("2h")
     .sign(secret);
@@ -328,11 +405,13 @@ export async function startHarness(apiPort: number): Promise<E2eResources> {
   await waitForHttp(`${apiOrigin}/api/v1/health`, 60_000);
 
   const agentToken = await forgeAgentToken(fx);
+  const adminToken = await forgeAdminToken(fx);
   const backend: E2eBackend = {
     ...fx,
     apiOrigin,
     apiBase: `${apiOrigin}/api/v1`,
     agentToken,
+    adminToken,
   };
   return { pg: pgContainer, redis: redisContainer, api, backend };
 }
