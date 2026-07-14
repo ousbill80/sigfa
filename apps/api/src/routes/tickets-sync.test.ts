@@ -21,7 +21,7 @@ import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { SignJWT } from "jose";
 import { createApp } from "src/app.js";
-import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
+import { applyRealMigrations } from "src/routes/tickets-test-migrations.js";
 import { createCaptureBus, type CaptureBus } from "src/services/realtime.js";
 
 let pgContainer: StartedTestContainer;
@@ -53,32 +53,6 @@ interface Fixtures {
   otherBankId: string;
   otherAgencyId: string;
   otherServiceId: string;
-}
-
-/** Crée le schéma minimal (avec local_uuid unique — couture DB DB-001). */
-async function runMigrations(client: pg.Client): Promise<void> {
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_status') THEN
-        CREATE TYPE ticket_status AS ENUM ('WAITING','CALLED','SERVING','DONE','NO_SHOW','ABANDONED','TRANSFERRED'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_priority') THEN
-        CREATE TYPE ticket_priority AS ENUM ('STANDARD','PRIORITY','VIP','PMR','SENIOR'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_channel') THEN
-        CREATE TYPE ticket_channel AS ENUM ('KIOSK','QR','MOBILE','WHATSAPP'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='queue_status') THEN
-        CREATE TYPE queue_status AS ENUM ('OPEN','PAUSED','CLOSED'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='counter_status') THEN
-        CREATE TYPE counter_status AS ENUM ('OPEN','PAUSED','CLOSED'); END IF;
-    END $$;
-  `);
-  await client.query(`CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3, queue_critical_threshold INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS agencies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS services (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS operations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER, display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(service_id, code));`);
-  await client.query(`CREATE TABLE IF NOT EXISTS queues (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), current_ticket_number INTEGER NOT NULL DEFAULT 0, is_open BOOLEAN NOT NULL DEFAULT true, status queue_status NOT NULL DEFAULT 'OPEN', open_at TEXT, close_at TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, local_uuid UUID UNIQUE, channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, required_language TEXT, issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ, closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER, issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (queue_id, number, issued_day), target_manager_id UUID
-);`);
 }
 
 /** Insère deux banques/agences/services distinctes pour l'isolation tenant. */
@@ -132,8 +106,7 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test` });
   await db.connect();
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
-  await runMigrations(db);
-  await ensureAuditLogSchema(db);
+  await applyRealMigrations(db);
   ids = await insertFixtures(db);
   bus = createCaptureBus();
   app = createApp({ db, redis, jwtSecret: jwtSecretBytes, bus });
