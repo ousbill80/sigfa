@@ -40,6 +40,36 @@ export function kioskBankId(env?: NodeJS.ProcessEnv): string | null {
   return id !== "" ? id : null;
 }
 
+/** Repli du nom d'agence (démo locale, borne non provisionnée). */
+export const DEFAULT_AGENCY_NAME = "Agence Centrale";
+
+/**
+ * Nom public de l'agence de la borne (donnée d'enseigne, non-PII).
+ * Même contrainte d'inlining Next.js que `kioskBankName` (accès direct à
+ * `process.env.NEXT_PUBLIC_AGENCY_NAME`).
+ */
+export function kioskAgencyName(env?: NodeJS.ProcessEnv): string {
+  const name = env
+    ? env["NEXT_PUBLIC_AGENCY_NAME"]
+    : process.env.NEXT_PUBLIC_AGENCY_NAME;
+  return name || DEFAULT_AGENCY_NAME;
+}
+
+/**
+ * Nom d'agence prêt pour la phrase « à l'agence {nom} » (AUDIT-F18).
+ *
+ * Beaucoup d'enseignes nomment leurs agences « Agence Centrale », « Agence
+ * Plateau »… : injecté tel quel dans la phrase, cela produisait le doublon
+ * « à l'agence Agence Centrale ». On retire le mot « Agence » UNIQUEMENT
+ * quand il est le premier mot ENTIER du nom, sans jamais vider le nom
+ * (« Agence » seul reste « Agence », « Agencement Nord » reste intact).
+ */
+export function agencyWelcomeName(agencyName: string): string {
+  const trimmed = agencyName.trim();
+  const stripped = trimmed.replace(/^agence\s+/i, "").trim();
+  return stripped !== "" ? stripped : trimmed;
+}
+
 /**
  * Monogramme de la banque pour la pastille de marque (texte, jamais d'image
  * réseau) : initiales des deux premiers mots du nom, en capitales. Repli « S »

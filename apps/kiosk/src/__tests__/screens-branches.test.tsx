@@ -68,6 +68,7 @@ const homeMessages = {
     queueUnavailable: "Queue unavailable",
     offlineBanner: "Offline mode — your tickets remain valid",
     loading: "Loading...",
+    welcomeAgency: "to {agencyName} branch",
   },
 };
 
@@ -102,11 +103,23 @@ describe("KIOSK-002: HomeScreen queue null branch", () => {
     vi.clearAllMocks();
   });
 
-  it("KIOSK-002: shows queueUnavailable text when count and estimatedMinutes are null", () => {
-    // useQueueStatus is mocked at module-level to return null count/minutes
+  it("AUDIT-F19: hides the queue line when count and estimatedMinutes are null (online nominal)", () => {
+    // useQueueStatus is mocked at module-level to return null count/minutes.
+    // Audit F19 : sans donnée ET sans dégradation, AUCUN message négatif permanent.
     render(
       <NextIntlClientProvider locale="en" messages={homeMessages}>
         <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    expect(screen.queryByTestId("queue-status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Queue unavailable")).not.toBeInTheDocument();
+  });
+
+  it("AUDIT-F19: shows queueUnavailable on REAL degradation (offline) when data is null", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={homeMessages}>
+        <HomeScreen isOffline={true} />
       </NextIntlClientProvider>
     );
 

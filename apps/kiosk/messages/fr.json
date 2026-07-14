@@ -27,7 +27,8 @@
     "queueStatus": "File d'attente : {count} personnes — attente estimée : {minutes} min",
     "queueUnavailable": "File d'attente non disponible",
     "offlineBanner": "Mode hors connexion — vos tickets restent valables",
-    "loading": "Chargement..."
+    "loading": "Chargement...",
+    "welcomeAgency": "à l'agence {agencyName}"
   },
   "services003": {
     "title": "Quel service souhaitez-vous ?",
@@ -113,7 +114,10 @@
     "commentPlaceholder": "Ajoutez un commentaire (facultatif)",
     "micLabel": "Dicter un commentaire",
     "submitButton": "Envoyer mon avis",
-    "thankYou": "Merci pour votre avis !"
+    "thankYou": "Merci pour votre avis !",
+    "laterButton": "Plus tard",
+    "finishButton": "Terminer",
+    "returning": "Retour automatique dans {seconds} s"
   },
   "degraded007": {
     "photographNumber": "Photographiez votre numéro ou recevez-le par SMS",
