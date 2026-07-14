@@ -15,6 +15,16 @@
  * n'ajoute QUE la logique de données/connexion + l'horodatage (horloge + date
  * complète FR/EN). La logique temps réel est INCHANGÉE.
  *
+ * Mode public (demandes PO écran TV) :
+ * - **Plein écran natif** : bouton discret dans le coin du bandeau (la
+ *   Fullscreen API exige un geste utilisateur — pas d'auto-fullscreen
+ *   possible) ; en exploitation définitive, lancer le navigateur en kiosque :
+ *   `chrome --kiosk --autoplay-policy=no-user-gesture-required <url>`.
+ * - **Curseur masqué** après inactivité (écran public).
+ * - **Takeover appel** : au `ticket:called`, le numéro passe en grand au
+ *   centre (overlay ~7 s, file sans chevauchement) avec annonce vocale
+ *   « Ticket {numéro épelé}, {guichet} » — coupable via `?muted=1`.
+ *
  * @module components/tv/tv-display
  */
 "use client";
@@ -22,6 +32,13 @@
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { TvScreen } from "@/components/tv/tv-screen";
+import { TvCallOverlay } from "@/components/tv/tv-call-overlay";
+import { useTvCallOverlay, parseTvMuted } from "@/components/tv/use-tv-call-overlay";
+import {
+  TvFullscreenButton,
+  useTvFullscreen,
+  useTvIdleCursor,
+} from "@/components/tv/tv-fullscreen";
 import { useTvClock } from "@/lib/use-tv-clock";
 import { useTvMediaManifest } from "@/lib/use-tv-media";
 import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
@@ -107,17 +124,36 @@ export function TvDisplay({ tenant }: TvDisplayProps): ReactElement {
     [clock, tenant.locale],
   );
 
+  // Réglage d'exploitation `?muted=1` — lu côté client uniquement (pas de
+  // useSearchParams : évite la contrainte Suspense, aucun mismatch : le son
+  // n'a pas de rendu serveur).
+  const muted = useTvMuted();
+
+  // Takeover « numéro appelé plein centre » + annonce vocale (file, ~7 s).
+  const { overlay, closing } = useTvCallOverlay({
+    state,
+    locale: tenant.locale,
+    muted,
+  });
+
+  // Plein écran natif (geste requis) + curseur masqué après inactivité.
+  const { isFullscreen, toggle } = useTvFullscreen();
+  const idle = useTvIdleCursor();
+
   const brand = autoCorrectedBrand(tenant.brand);
 
   return (
     <div
       data-testid="tv-root"
       data-realtime={isRealtime ? "on" : "off"}
+      data-idle={idle ? "on" : "off"}
       style={
         {
           "--brand": brand,
           backgroundColor: "var(--night-2, var(--surface-screen))",
           minHeight: "100vh",
+          /* Écran public : le curseur disparaît après inactivité. */
+          cursor: idle ? "none" : undefined,
         } as React.CSSProperties
       }
     >
@@ -127,13 +163,44 @@ export function TvDisplay({ tenant }: TvDisplayProps): ReactElement {
         tenantName={tenant.name}
         clock={clock}
         dateLabel={dateLabel}
-        celebration={isRealtime ? false : celebration}
+        /* La carte « MAINTENANT SERVI » flashe pendant le takeover (real) —
+           mécanique celebration simulée inchangée en mode off. */
+        celebration={overlay !== null || (!isRealtime && celebration)}
         reducedMotion={reducedMotion}
         mediaItems={mediaItems}
         logoUrl={tenant.logoUrl ?? null}
+        headerAction={
+          <TvFullscreenButton
+            isFullscreen={isFullscreen}
+            hidden={idle}
+            onToggle={toggle}
+            locale={tenant.locale}
+          />
+        }
       />
+      {overlay !== null && (
+        <TvCallOverlay
+          call={overlay}
+          locale={tenant.locale}
+          closing={closing}
+          reducedMotion={reducedMotion}
+        />
+      )}
     </div>
   );
+}
+
+/**
+ * Lit `?muted=1` (coupe l'annonce vocale) depuis l'URL, côté client
+ * uniquement — réglage d'exploitation de l'écran public.
+ * @returns `true` si le son est coupé.
+ */
+function useTvMuted(): boolean {
+  const [muted, setMuted] = useState(false);
+  useEffect(() => {
+    setMuted(parseTvMuted(window.location.search));
+  }, []);
+  return muted;
 }
 
 /**

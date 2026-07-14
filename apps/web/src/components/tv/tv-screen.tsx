@@ -27,7 +27,7 @@
  */
 "use client";
 
-import type { CSSProperties, ReactElement } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { t, type Locale } from "@/lib/i18n";
 import type { TvState, TvCall } from "@/lib/tv-state";
 import { TV_PREVIOUS_COUNT } from "@/lib/tv-state";
@@ -71,6 +71,11 @@ export interface TvScreenProps {
    * `null` → pastille --brand-contrast + initiale de la banque.
    */
   logoUrl?: string | null;
+  /**
+   * Contrôle discret rendu dans le coin droit du bandeau, après l'horloge
+   * (bouton « Plein écran » de l'écran public — voir tv-fullscreen).
+   */
+  headerAction?: ReactNode;
 }
 
 /**
@@ -294,6 +299,7 @@ export function TvScreen({
   adSlides,
   mediaItems,
   logoUrl = null,
+  headerAction = null,
 }: TvScreenProps): ReactElement {
   const isEmpty = state.hero === null;
 
@@ -310,7 +316,13 @@ export function TvScreen({
       data-state={loading ? "loading" : isEmpty ? "empty" : "nominal"}
       style={screenStyle}
     >
-      <TvHeader tenantName={tenantName} dateLabel={dateLabel} clock={clock} logoUrl={logoUrl} />
+      <TvHeader
+        tenantName={tenantName}
+        dateLabel={dateLabel}
+        clock={clock}
+        logoUrl={logoUrl}
+        action={headerAction}
+      />
 
       {loading ? (
         /* Skeleton adapté au split : volet pub + colonne d'appels squelettés. */
@@ -485,11 +497,13 @@ function TvHeader({
   dateLabel,
   clock,
   logoUrl,
+  action,
 }: {
   tenantName: string;
   dateLabel: string;
   clock: string;
   logoUrl: string | null;
+  action: ReactNode;
 }): ReactElement {
   /* Logo bien visible : ~48px dans le bandeau de 64px (marge --space-4). */
   const markSize = "calc(var(--tv-header-height) - var(--space-4))";
@@ -582,24 +596,28 @@ function TvHeader({
         {dateLabel}
       </span>
 
-      {/* Horloge — bloc contrasté, grande, chiffres tabulaires. */}
-      <span
-        data-testid="tv-clock"
-        aria-hidden={clock === ""}
-        style={{
-          backgroundColor: "var(--night-2, var(--surface-screen))",
-          color: "var(--ink-inverse)",
-          fontFamily: "var(--font-display)",
-          fontSize: "var(--text-2xl)",
-          fontWeight: 600,
-          fontVariantNumeric: "tabular-nums",
-          letterSpacing: "var(--tracking-numeric)",
-          padding: "var(--space-1) var(--space-4)",
-          borderRadius: "var(--r-md)",
-          flexShrink: 0,
-        }}
-      >
-        {clock}
+      {/* Horloge (bloc contrasté, chiffres tabulaires) + contrôle discret
+          du coin du bandeau (plein écran) groupés à droite. */}
+      <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexShrink: 0 }}>
+        <span
+          data-testid="tv-clock"
+          aria-hidden={clock === ""}
+          style={{
+            backgroundColor: "var(--night-2, var(--surface-screen))",
+            color: "var(--ink-inverse)",
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--text-2xl)",
+            fontWeight: 600,
+            fontVariantNumeric: "tabular-nums",
+            letterSpacing: "var(--tracking-numeric)",
+            padding: "var(--space-1) var(--space-4)",
+            borderRadius: "var(--r-md)",
+            flexShrink: 0,
+          }}
+        >
+          {clock}
+        </span>
+        {action}
       </span>
     </header>
   );

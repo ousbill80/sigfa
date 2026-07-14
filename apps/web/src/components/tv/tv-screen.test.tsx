@@ -430,3 +430,26 @@ describe("TvScreen — tokens & i18n", () => {
     expect(screen.getByTestId("tv-hero")).toHaveAttribute("aria-live", "polite");
   });
 });
+
+describe("TvScreen — contrôle discret du bandeau (headerAction)", () => {
+  it("TV-PUB: headerAction rendu DANS le bandeau, à côté de l'horloge", () => {
+    render(
+      <TvScreen
+        state={nominal}
+        clock="09:30"
+        headerAction={<button data-testid="header-action-probe" type="button" />}
+      />
+    );
+    const header = screen.getByTestId("tv-header");
+    const probe = screen.getByTestId("header-action-probe");
+    expect(header.contains(probe)).toBe(true);
+    // Groupé à droite avec l'horloge (même parent direct).
+    expect(probe.parentElement?.contains(screen.getByTestId("tv-clock"))).toBe(true);
+  });
+
+  it("TV-PUB: sans headerAction — bandeau inchangé (aucune régression)", () => {
+    render(<TvScreen state={nominal} clock="09:30" />);
+    expect(screen.getByTestId("tv-clock")).toHaveTextContent("09:30");
+    expect(screen.queryByTestId("header-action-probe")).toBeNull();
+  });
+});
