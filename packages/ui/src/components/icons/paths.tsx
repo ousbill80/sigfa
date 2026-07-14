@@ -36,6 +36,13 @@ const ALERT_OUTLINE =
 /** Onde wifi (secteur plein pour la couche duo de hors-ligne). */
 const WIFI_WEDGE = "M4.5 9.8a10.6 10.6 0 0 1 15 0L12 18.3Z";
 
+/** Coin plein du chevron directionnel (couche duo). */
+const CHEVRON_OUTLINE = "m9.2 5.8 6.2 6.2-6.2 6.2Z";
+
+/** Combiné téléphonique (partagé entre couche duo et trait). */
+const HANDSET_OUTLINE =
+  "M6.2 3.5h3.1a1 1 0 0 1 .95.68l1.15 3.4a1 1 0 0 1-.36 1.12l-2.1 1.55a12.6 12.6 0 0 0 5.3 5.3l1.55-2.1a1 1 0 0 1 1.12-.36l3.4 1.15a1 1 0 0 1 .68.95v3.1a1.8 1.8 0 0 1-1.8 1.8A15.9 15.9 0 0 1 4.4 5.3a1.8 1.8 0 0 1 1.8-1.8Z";
+
 /** Barres du graphique statistiques (gauche, milieu, droite). */
 const BAR_1 =
   "M6 20.5v-6.3a1.1 1.1 0 0 1 1.1-1.1h1.2a1.1 1.1 0 0 1 1.1 1.1v6.3";
@@ -51,8 +58,8 @@ const BAR_3 =
  * depot, retrait, virement, change-devises, credit, epargne, compte,
  * carte-bancaire, chequier, entreprise, international.
  * UI : imprimer, audio, langue, accessibilite, hors-ligne, valider, retour,
- * information, alerte, horloge, statistiques, parametres. Bonus : etoile
- * (jalon or, feedback 5 etoiles du design system).
+ * information, alerte, horloge, statistiques, parametres, micro, chevron,
+ * telephone. Bonus : etoile (jalon or, feedback 5 etoiles du design system).
  */
 export const ICON_ARTWORK = {
   /* ── Métier banque / file d'attente ─────────────────────────────────── */
@@ -448,6 +455,32 @@ export const ICON_ARTWORK = {
         <circle cx="7.5" cy="17" r="2.2" />
       </>
     ),
+  },
+
+  // Micro : capsule du microphone, arceau et pied — « Dicter » un feedback.
+  micro: {
+    duo: <rect x="9" y="2.5" width="6" height="11" rx="3" />,
+    line: (
+      <>
+        <rect x="9" y="2.5" width="6" height="11" rx="3" />
+        <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" />
+        <path d="M12 18v3.5" />
+        <path d="M8.5 21.5h7" />
+      </>
+    ),
+  },
+
+  // Chevron : directionnel, pointe à DROITE par convention du set — la
+  // rotation (bas/haut/gauche) reste au consommateur (transform CSS).
+  chevron: {
+    duo: <path d={CHEVRON_OUTLINE} />,
+    line: <path d="m9.2 5.8 6.2 6.2-6.2 6.2" />,
+  },
+
+  // Téléphone : combiné classique (CTA « recevoir un SMS »).
+  telephone: {
+    duo: <path d={HANDSET_OUTLINE} />,
+    line: <path d={HANDSET_OUTLINE} />,
   },
 
   // Étoile : jalon or / feedback 5 etoiles (design system).

@@ -1,11 +1,10 @@
 /**
  * UiIcons — petites icônes d'interface pour les écrans borne.
  *
- * Migration ICONS-001 : accessibilité, personne (conseiller) et opération
- * (guichet) sont rendues par le set SIGFA duotone (`SigfaIcon` de @sigfa/ui).
- * Le chevron d'action et le téléphone (CTA SMS) n'ont pas d'équivalent dans
- * le set : ils restent des icônes line/stroke locales (`currentColor`).
- * AUCUN emoji.
+ * Migration ICONS-001/002 : TOUTES les icônes d'interface sont rendues par le
+ * set SIGFA duotone (`SigfaIcon` de @sigfa/ui) — accessibilité, personne
+ * (conseiller), opération (guichet), chevron d'action et téléphone (CTA SMS).
+ * AUCUN emoji, aucune icône line ad hoc locale.
  */
 import type { CSSProperties } from "react";
 
@@ -17,37 +16,32 @@ interface UiIconProps {
   "data-testid"?: string;
 }
 
-function baseProps(size: number, dataTestid?: string) {
-  return {
-    "data-testid": dataTestid,
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true,
-    focusable: "false" as const,
-  };
-}
-
-/** Chevron « › » signifiant l'action/navigation. */
+/**
+ * Chevron d'action/navigation — icône SIGFA « chevron » (duotone, pointe à
+ * droite ; la rotation éventuelle reste au consommateur via `style`).
+ */
 export function ChevronIcon({ size = 28, style, "data-testid": id }: UiIconProps) {
   return (
-    <svg {...baseProps(size, id)} style={style}>
-      <path d="M9 6l6 6-6 6" />
-    </svg>
+    <SigfaIcon
+      name="chevron"
+      size={size}
+      style={style}
+      stroke="currentColor"
+      data-testid={id}
+    />
   );
 }
 
-/** Combiné téléphone — CTA « recevoir un SMS ». */
+/** Combiné téléphone (CTA « recevoir un SMS ») — icône SIGFA « telephone ». */
 export function PhoneIcon({ size = 28, style, "data-testid": id }: UiIconProps) {
   return (
-    <svg {...baseProps(size, id)} style={style}>
-      <path d="M6 3h4l2 5-3 2a12 12 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z" />
-    </svg>
+    <SigfaIcon
+      name="telephone"
+      size={size}
+      style={style}
+      stroke="currentColor"
+      data-testid={id}
+    />
   );
 }
 

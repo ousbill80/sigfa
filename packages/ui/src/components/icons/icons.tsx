@@ -68,3 +68,6 @@ export const IconHorloge = makeIcon("horloge", "IconHorloge");
 export const IconStatistiques = makeIcon("statistiques", "IconStatistiques");
 export const IconParametres = makeIcon("parametres", "IconParametres");
 export const IconEtoile = makeIcon("etoile", "IconEtoile");
+export const IconMicro = makeIcon("micro", "IconMicro");
+export const IconChevron = makeIcon("chevron", "IconChevron");
+export const IconTelephone = makeIcon("telephone", "IconTelephone");

@@ -479,8 +479,8 @@ describe("KIOSK-009: commentaire vocal (SpeechRecognition)", () => {
     );
     const micBtn = screen.getByTestId("feedback-mic");
     expect(micBtn).toBeInTheDocument();
-    // ICONS-001 : icône SIGFA « audio » appariée au label (plus d'emoji micro).
-    expect(micBtn.querySelector("svg[data-icon='audio']")).toBeInTheDocument();
+    // ICONS-002 : icône SIGFA « micro » appariée au label « Dicter ».
+    expect(micBtn.querySelector("svg[data-icon='micro']")).toBeInTheDocument();
     fireEvent.click(micBtn);
     expect(lastInstance).not.toBeNull();
     expect(lastInstance!.start).toHaveBeenCalled();
