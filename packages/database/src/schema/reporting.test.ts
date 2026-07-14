@@ -56,6 +56,8 @@ describe("DB-006: modèle daily_agency_stats (structure)", () => {
     expect(names).toContain("nps_passives");
     expect(names).toContain("nps_detractors");
     expect(names).toContain("agent_active_seconds");
+    // Colonne matérialisée par aggregate-service.ts (décision D2) — réconciliation code↔schéma.
+    expect(names).toContain("agent_available_seconds");
   });
 
   it("DB-006: daily_agency_stats — aucun champ personnel (conformité AnonymizedNetworkAggregate)", () => {
