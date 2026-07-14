@@ -2,6 +2,11 @@
  * EmptyState — SIGFA v2. Never a bare "no data" — a calm illustration slot,
  * a title, a description and an optional action. All text from props.
  *
+ * On dark surfaces (`--night` / `--night-2`), use `tone="inverse"`: the default
+ * `--ink` title is invisible on night (1.02:1 — audit borne 2026-07-14, F1).
+ * The inverse variant swaps to `--ink-inverse` / `--ink-inverse-soft`
+ * (17.4:1 / 8.3:1 on `--night` — kiosk threshold ≥ 7:1).
+ *
  * @module components/EmptyState
  */
 import { type HTMLAttributes, type ReactNode } from "react";
@@ -16,6 +21,12 @@ export interface EmptyStateProps extends HTMLAttributes<HTMLDivElement> {
   description?: string;
   /** Optional call to action (e.g. a Button). */
   action?: ReactNode;
+  /**
+   * Colour tone. `"inverse"` for dark backgrounds (kiosk / TV night surfaces):
+   * title and description switch to the inverse ink ramp (≥ 7:1 on --night).
+   * Defaults to `"default"` (light surfaces).
+   */
+  tone?: "default" | "inverse";
 }
 
 export function EmptyState({
@@ -24,10 +35,18 @@ export function EmptyState({
   description,
   action,
   className,
+  tone = "default",
   ...rest
 }: EmptyStateProps): ReactNode {
   return (
-    <div className={clsx("sig-empty", className)} {...rest}>
+    <div
+      className={clsx(
+        "sig-empty",
+        tone === "inverse" && "sig-empty--inverse",
+        className,
+      )}
+      {...rest}
+    >
       {icon != null && (
         <div className="sig-empty__icon" aria-hidden="true">
           {icon}

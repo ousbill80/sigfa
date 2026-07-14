@@ -28,10 +28,16 @@ export const surfaces = {
   inkInverseSoft: "#B8AB98",
 } as const;
 
-/** SIGFA brand — « Or & Forêt » (premium Ivorian identity). */
+/** SIGFA brand — « Or & Forêt » (premium Ivorian identity).
+ *
+ * Audit borne 2026-07-14 (F10) : `brand` assombri (#C25A16 → #B85513) pour que
+ * le blanc tienne 4.83:1 mesuré (le DS revendique ≥ 4.5:1 « vérifié »).
+ * `brandStrong` = résolution du `color-mix(brand 70%, #000)` de tokens.css :
+ * 8.1:1 mesuré sur --surface-1 (seuil kiosque ≥ 7:1 ; l'ancien #9C400C était
+ * à 6.66:1 alors que le code kiosque revendiquait 18:1). */
 export const brand = {
-  brand: "#C25A16",
-  brandStrong: "#9C400C",
+  brand: "#B85513",
+  brandStrong: "#813B0D",
   brandSoft: "#F7E7D6",
   brandContrast: "#FFFFFF",
   forest: "#0F6B4A",
@@ -50,6 +56,12 @@ export const semantic = {
   dangerSoft: "#F7DED9",
   info: "#2C6E9B",
   infoSoft: "#DCEAF3",
+  /* Inverses pour fond sombre (--night/--night-2) — audit 2026-07-14, F6.
+     Mesurés sur --night : 10.6 / 9.9 / 9.6 / 9.7 (:1) — seuil kiosque ≥ 7:1. */
+  successInv: "#7FD4A8",
+  warningInv: "#E8B45E",
+  dangerInv: "#F2A69B",
+  infoInv: "#8FC1E3",
 } as const;
 
 /** All colour tokens, flattened, keyed by CSS custom-property name. */
@@ -81,6 +93,10 @@ export const color = {
   "--danger-soft": semantic.dangerSoft,
   "--info": semantic.info,
   "--info-soft": semantic.infoSoft,
+  "--success-inv": semantic.successInv,
+  "--warning-inv": semantic.warningInv,
+  "--danger-inv": semantic.dangerInv,
+  "--info-inv": semantic.infoInv,
 } as const;
 
 /**
@@ -113,7 +129,7 @@ export const shadow = {
   "1": "0 1px 2px rgba(26,19,12,.06), 0 1px 3px rgba(26,19,12,.05)",
   "2": "0 4px 12px rgba(26,19,12,.08), 0 2px 4px rgba(26,19,12,.05)",
   "3": "0 12px 32px rgba(26,19,12,.12), 0 4px 8px rgba(26,19,12,.06)",
-  brand: "0 8px 24px rgba(194,90,22,.28)",
+  brand: "0 8px 24px rgba(184,85,19,.28)",
   gold: "0 0 48px rgba(199,154,58,.35)",
 } as const;
 

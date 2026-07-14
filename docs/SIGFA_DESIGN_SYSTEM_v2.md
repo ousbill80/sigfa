@@ -40,10 +40,12 @@ SOMBRE (kiosque plein soleil + écran d'appel TV)
 
 ### Marque SIGFA — « Or & Forêt » (identité ivoirienne premium)
 ```
---brand           #C25A16   TERRACOTTA/AMBRE brûlé — chaleur, terre, énergie (primaire produit)
---brand-strong    #9C400C   Pressé / hover
---brand-soft      #F7E7D6   Fonds de badge, surbrillance douce
---brand-contrast  #FFFFFF   Texte sur brand (ratio ≥ 4.5:1 vérifié)
+--brand           #B85513   TERRACOTTA/AMBRE brûlé — chaleur, terre, énergie (primaire produit)
+                            (assombri de #C25A16 — audit borne 2026-07-14 F10 : blanc dessus 4.83:1 mesuré)
+--brand-strong    #813B0D   Pressé / hover + libellés d'action kiosque — 8.1:1 mesuré sur --surface-1
+                            (dérivé color-mix(brand 70%, noir) ; l'ancien #9C400C était à 6.66:1, pas 18:1)
+--brand-soft      #F6EBE3   Fonds de badge, surbrillance douce (color-mix(brand 12%, blanc))
+--brand-contrast  #FFFFFF   Texte sur brand (ratio ≥ 4.5:1 vérifié — 4.83:1 mesuré sur le défaut)
 
 --forest          #0F6B4A   VERT FORÊT profond — confiance, positif, « ouvert »/« servi »
 --forest-soft     #DBEFE6
@@ -58,6 +60,14 @@ SOMBRE (kiosque plein soleil + écran d'appel TV)
 --warning  #C77D0A   file chargée, SLA approche (ambre, pas orange criard)
 --danger   #C0362C   SLA dépassé, erreur (rouge terre, jamais fluo — pictogramme SEULEMENT, jamais un fond)
 --info     #2C6E9B   information neutre, offline (bleu ardoise doux, pas #2E90FA fluo)
+
+INVERSES — texte sémantique sur fond sombre (--night/--night-2). Audit borne
+2026-07-14 (F6) : les sémantiques directs tombent à 3.4-3.5:1 sur nuit ;
+seuil kiosque ≥ 7:1. Sur fond sombre, TOUJOURS ces variantes :
+--success-inv  #7FD4A8   10.6:1 sur --night — consignes positives (Moment Ticket)
+--warning-inv  #E8B45E    9.9:1 sur --night — affluence, SLA approche
+--danger-inv   #F2A69B    9.6:1 sur --night — erreurs (pictogramme/texte, jamais fond)
+--info-inv     #8FC1E3    9.7:1 sur --night — offline, information neutre
 ```
 
 ## 2. Typographie — du caractère, lisible en plein soleil

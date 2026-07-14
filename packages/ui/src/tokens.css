@@ -28,10 +28,15 @@
      Les dérivés sont recalculés en JS (WCAG-safe) par le provider ; les
      `color-mix` ci-dessous ne servent que de repli si `--tenant-brand` est
      posé sans le provider. `--forest`/`--gold`/sémantiques restent FIXES. */
-  --brand: var(--tenant-brand, #c25a16); /* terracotta/ambre brûlé — surchargeable */
-  --brand-strong: color-mix(in srgb, var(--brand) 85%, #000000); /* pressé / hover */
+  /* Terracotta/ambre brûlé — surchargeable. Assombri #C25A16 → #B85513 (audit
+     borne 2026-07-14, F10) : blanc dessus = 4.83:1 mesuré (seuil ≥ 4.5:1). */
+  --brand: var(--tenant-brand, #b85513);
+  /* Pressé / hover + libellés d'action kiosque (--action-label) sur carte
+     claire. Mix 70% (F10) : résout #813B0D par défaut = 8.1:1 mesuré sur
+     --surface-1 (seuil kiosque ≥ 7:1 ; l'ancien mix 85% donnait 5.7:1). */
+  --brand-strong: color-mix(in srgb, var(--brand) 70%, #000000);
   --brand-soft: color-mix(in srgb, var(--brand) 12%, #ffffff); /* fonds de badge, surbrillance douce */
-  --brand-contrast: #ffffff; /* texte sur brand — recalculé WCAG par le provider */
+  --brand-contrast: #ffffff; /* texte sur brand — 4.83:1 mesuré (défaut), recalculé WCAG par le provider */
 
   --forest: #0f6b4a; /* vert forêt profond — confiance, positif */
   --forest-soft: #dbefe6;
@@ -47,6 +52,14 @@
   --danger-soft: #f7ded9;
   --info: #2c6e9b; /* information neutre, offline (bleu ardoise) */
   --info-soft: #dceaf3;
+
+  /* ---- Sémantiques inverses — texte sur fond sombre (--night / --night-2).
+     Audit borne 2026-07-14 (F6/F10) : les sémantiques directs tombent à
+     3.4–3.5:1 sur nuit. Ratios mesurés sur --night (seuil kiosque ≥ 7:1) : */
+  --success-inv: #7fd4a8; /* 10.6:1 — consignes positives (« Récupérez votre ticket ») */
+  --warning-inv: #e8b45e; /* 9.9:1 — affluence, SLA approche */
+  --danger-inv: #f2a69b; /* 9.6:1 — erreurs (pictogramme/texte, jamais fond) */
+  --info-inv: #8fc1e3; /* 9.7:1 — offline, information neutre */
 
   /* ---- Typographie ---- */
   /* Polices swappables : surcharger ces deux tokens suffit à changer la fonte. */
@@ -85,7 +98,7 @@
   --shadow-1: 0 1px 2px rgba(26, 19, 12, 0.06), 0 1px 3px rgba(26, 19, 12, 0.05);
   --shadow-2: 0 4px 12px rgba(26, 19, 12, 0.08), 0 2px 4px rgba(26, 19, 12, 0.05);
   --shadow-3: 0 12px 32px rgba(26, 19, 12, 0.12), 0 4px 8px rgba(26, 19, 12, 0.06);
-  --shadow-brand: 0 8px 24px rgba(194, 90, 22, 0.28); /* bouton primaire = présence */
+  --shadow-brand: 0 8px 24px rgba(184, 85, 19, 0.28); /* bouton primaire = présence */
   --shadow-gold: 0 0 48px rgba(199, 154, 58, 0.35); /* halo Moment Ticket */
 
   /* ---- Espacement (base 4, généreux) ---- */
