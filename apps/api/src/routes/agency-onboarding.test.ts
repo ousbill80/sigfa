@@ -76,7 +76,8 @@ async function seedSourceConfig(): Promise<void> {
     [bankA.bankId, sourceAgencyId, (svc1.rows[0] as { id: string }).id]
   );
   await h.db.query(
-    `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, phone_encrypted) VALUES ($1,$2,$3,$4,1,'ENC_PHONE')`,
+    // Schéma FIDÈLE : `tickets.tracking_id` (char(21) UNIQUE) et `channel` NOT NULL sans défaut.
+    `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, phone_encrypted, tracking_id, channel) VALUES ($1,$2,$3,$4,1,'ENC_PHONE','trkAgencyOnbOpen00001','KIOSK')`,
     [bankA.bankId, sourceAgencyId, (q.rows[0] as { id: string }).id, (svc1.rows[0] as { id: string }).id]
   );
 }

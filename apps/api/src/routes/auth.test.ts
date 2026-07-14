@@ -18,6 +18,8 @@ import pg from "pg";
 import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { jwtVerify } from "jose";
+import { applyMigrations } from "@sigfa/database/test-support";
+import type { PostgresHarness } from "@sigfa/testing/tenant-isolation";
 import { createApp } from "src/app.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,100 +35,26 @@ let app: ReturnType<typeof createApp>;
 const JWT_SECRET = "test-jwt-secret-at-least-32-chars-long!!";
 const jwtSecretBytes = new TextEncoder().encode(JWT_SECRET);
 
-/** Exécute les migrations sur le PG de test */
+/**
+ * Applique les VRAIES migrations SQL (`packages/database/migrations/`) sur le PG
+ * de test — FIDÉLITÉ au schéma de production (types enum réels `role` /
+ * `agent_language`, contraintes, RLS). Aucune DDL inline dérivée : le schéma
+ * exécuté ici est celui déployé (LA LOI T5). `applyMigrations` attend un
+ * `PostgresHarness` : on adapte le `pg.Client` de test.
+ */
 async function runMigrations(client: pg.Client): Promise<void> {
-  // Créer les rôles (sigfa_app pour RLS — simplifié pour tests)
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigfa_app') THEN
-        CREATE ROLE sigfa_app WITH LOGIN PASSWORD 'sigfa_app_test' NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-      END IF;
-    END $$;
-  `);
-
-  // Extensions
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-
-  // Enums
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role_enum') THEN
-        CREATE TYPE role_enum AS ENUM (
-          'SUPER_ADMIN', 'BANK_ADMIN', 'AGENCY_MANAGER', 'AGENT', 'KIOSK', 'VIEWER'
-        );
-      END IF;
-    END $$;
-  `);
-
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'agent_language_enum') THEN
-        CREATE TYPE agent_language_enum AS ENUM ('FR', 'EN', 'DI', 'BA');
-      END IF;
-    END $$;
-  `);
-
-  // Table banks (minimale)
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS banks (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE,
-      active BOOLEAN NOT NULL DEFAULT true,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  // Table agencies (minimale)
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS agencies (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID NOT NULL REFERENCES banks(id) ON DELETE RESTRICT,
-      name TEXT NOT NULL,
-      city TEXT NOT NULL DEFAULT '',
-      active BOOLEAN NOT NULL DEFAULT true,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  // Table users
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID REFERENCES banks(id) ON DELETE RESTRICT,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      role role_enum NOT NULL,
-      languages agent_language_enum[] NOT NULL DEFAULT '{FR}',
-      failed_login_attempts INTEGER NOT NULL DEFAULT 0,
-      locked_until TIMESTAMPTZ,
-      phone_encrypted TEXT,
-      phone_hash TEXT,
-      is_active BOOLEAN NOT NULL DEFAULT true,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      deleted_at TIMESTAMPTZ,
-      CONSTRAINT users_super_admin_bank_id_check CHECK (
-        (role = 'SUPER_ADMIN') = (bank_id IS NULL)
-      ), is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
-);
-  `);
-
-  // Table agency_users (pour agencyIds dans les claims)
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS agency_users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID NOT NULL REFERENCES banks(id) ON DELETE RESTRICT,
-      agency_id UUID NOT NULL REFERENCES agencies(id) ON DELETE RESTRICT,
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (agency_id, user_id)
-    );
-  `);
+  const harness: PostgresHarness = {
+    connectionString: "",
+    query: async (sql: string, values?: unknown[]) => {
+      const res =
+        values !== undefined
+          ? await client.query(sql, values)
+          : await client.query(sql);
+      return { rows: res.rows as Array<Record<string, unknown>> };
+    },
+    stop: async () => {},
+  };
+  await applyMigrations(harness);
 }
 
 /** Insère les fixtures de test */
