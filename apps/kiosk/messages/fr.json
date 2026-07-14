@@ -62,7 +62,11 @@
     "errorMessage": "Impossible de charger les conseillers. Réessayez ou adressez-vous à l'accueil.",
     "retryButton": "Réessayer",
     "offlineBanner": "Mode hors connexion",
-    "avatarAlt": "Photo de {name}"
+    "avatarAlt": "Photo de {name}",
+    "availablePill": "Présent",
+    "absentPill": "Absent aujourd'hui",
+    "absentHint": "De retour bientôt — choisissez un autre conseiller ou continuez sans rendez-vous.",
+    "continueWithout": "Continuer sans conseiller"
   },
   "operationsModelA": {
     "title": "Quelle opération souhaitez-vous ?",

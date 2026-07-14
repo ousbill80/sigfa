@@ -90,3 +90,36 @@ export function OperationIcon({ size = 28, style, "data-testid": id }: UiIconPro
     />
   );
 }
+
+/**
+ * CONTRACT-014 (audit F14) — « coche » : icône SIGFA « valider » (duotone),
+ * appariée au texte « Présent » de la pill de disponibilité conseiller.
+ */
+export function CheckIcon({ size = 28, style, "data-testid": id }: UiIconProps) {
+  return (
+    <SigfaIcon
+      name="valider"
+      size={size}
+      style={style}
+      stroke="currentColor"
+      data-testid={id}
+    />
+  );
+}
+
+/**
+ * CONTRACT-014 (audit F14) — « horloge » : icône SIGFA « horloge » (duotone),
+ * appariée au texte « Absent aujourd'hui » (de retour bientôt — information
+ * calme, jamais une alerte).
+ */
+export function ClockIcon({ size = 28, style, "data-testid": id }: UiIconProps) {
+  return (
+    <SigfaIcon
+      name="horloge"
+      size={size}
+      style={style}
+      stroke="currentColor"
+      data-testid={id}
+    />
+  );
+}

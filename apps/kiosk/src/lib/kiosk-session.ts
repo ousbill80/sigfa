@@ -16,6 +16,12 @@ export interface KioskSession {
   expiresIn: number;
   kioskId: string;
   agencyId: string;
+  /**
+   * CONTRACT-014 : identifiant PUBLIC de la banque de la borne (donnée
+   * d'enseigne, zéro PII). Alimente le theming (--brand, logo) depuis la
+   * session — remplace NEXT_PUBLIC_BANK_ID quand la session est présente.
+   */
+  bankId: string;
   /** Timestamp (ms) de création de la session */
   createdAt: number;
 }
@@ -47,6 +53,7 @@ export async function createKioskSession(
     expiresIn: data.expiresIn,
     kioskId: data.kioskId,
     agencyId: data.agencyId,
+    bankId: data.bankId,
     createdAt: Date.now(),
   };
 }
