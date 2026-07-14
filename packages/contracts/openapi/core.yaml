@@ -1,7 +1,7 @@
 openapi: "3.1.0"
 info:
   title: SIGFA Core API
-  version: "1.0.0"
+  version: "1.1.0"
   description: |
     Contrat cœur SIGFA : tenants (banks), agences, services, guichets,
     files d'attente et tickets. Servi sous /api/v1.
@@ -513,9 +513,13 @@ paths:
     get:
       tags: [Agencies]
       summary: Obtenir une agence
-      description: Retourne le détail d'une agence. Scope **agency** — AGENCY_DIRECTOR minimum.
+      description: |
+        Retourne le détail d'une agence. Scope **agency** — AGENT minimum :
+        tout utilisateur connecté lit le détail (nom) de SA propre agence de
+        rattachement (bandeau session web). Le scope agence reste strict :
+        lecture hors périmètre `agencyIds` → 403.
       x-tenant-scope: agency
-      x-required-role: AGENCY_DIRECTOR
+      x-required-role: AGENT
       parameters:
         - $ref: "#/components/parameters/IdParam"
       responses:

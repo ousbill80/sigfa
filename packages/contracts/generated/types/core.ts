@@ -636,7 +636,10 @@ export interface paths {
         };
         /**
          * Obtenir une agence
-         * @description Retourne le détail d'une agence. Scope **agency** — AGENCY_DIRECTOR minimum.
+         * @description Retourne le détail d'une agence. Scope **agency** — AGENT minimum :
+         *     tout utilisateur connecté lit le détail (nom) de SA propre agence de
+         *     rattachement (bandeau session web). Le scope agence reste strict :
+         *     lecture hors périmètre `agencyIds` → 403.
          */
         get: {
             parameters: {
