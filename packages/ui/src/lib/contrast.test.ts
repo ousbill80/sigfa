@@ -60,15 +60,16 @@ describe("meetsWcag — text/background token proofs", () => {
     ).toBe(true);
   });
 
-  it("brand-contrast on brand does NOT meet AA for normal text (documented)", () => {
-    // White on #C25A16 is 4.40:1 — below the 4.5 normal-text threshold.
-    // Primary buttons therefore use large-text weight (≥16px/600).
+  it("brand-contrast on brand meets AA for normal text (F10, audit 2026-07-14)", () => {
+    // White on the former default #C25A16 was 4.40:1, below the 4.5 threshold
+    // the DS claims as « vérifié ». The default brand is darkened (#B85513,
+    // 4.83:1 measured) so the claim is actually true.
     expect(
       meetsWcag(brand.brandContrast, brand.brand, {
         level: "AA",
         size: "normal",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 

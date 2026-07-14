@@ -50,8 +50,11 @@ describe("deriveBankTheme — shape & format", () => {
     expect(() => deriveBankTheme("#12")).toThrow();
   });
 
-  it("exports the SIGFA default brand (terracotta)", () => {
-    expect(SIGFA_DEFAULT_BRAND).toBe("#c25a16");
+  it("exports the SIGFA default brand (terracotta, ≥ 4.5:1 under white)", () => {
+    expect(SIGFA_DEFAULT_BRAND).toBe("#b85513");
+    // F10 (audit borne 2026-07-14) : le DS revendique ≥ 4.5:1 « vérifié » pour
+    // --brand-contrast (blanc) sur --brand — la valeur par défaut doit le tenir.
+    expect(contrastRatio("#ffffff", SIGFA_DEFAULT_BRAND)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
@@ -63,6 +66,18 @@ describe("deriveBankTheme — brandStrong is darker, same hue", () => {
       expect(contrastRatio(brandStrong, "#ffffff")).toBeGreaterThanOrEqual(
         contrastRatio(brand, "#ffffff") - 1e-9,
       );
+    });
+  }
+});
+
+describe("deriveBankTheme — brandStrong holds the kiosk action-label threshold", () => {
+  // F10 (audit borne 2026-07-14) : le kiosque affiche les libellés d'action en
+  // --brand-strong sur carte claire (--surface-1). Seuil DS kiosque : ≥ 7:1.
+  // La dérivation doit le garantir pour TOUT brand tenant, pas juste le défaut.
+  for (const [name, hex] of [...BANKS, ...EDGE_CASES]) {
+    it(`${name}: brandStrong ≥ 7:1 on --surface-1 (white)`, () => {
+      const { brandStrong } = deriveBankTheme(hex);
+      expect(contrastRatio(brandStrong, "#ffffff")).toBeGreaterThanOrEqual(7);
     });
   }
 });

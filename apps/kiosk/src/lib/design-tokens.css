@@ -27,11 +27,26 @@
   --ink-muted-inv: var(--ink-inverse-soft); /* secondaire sur sombre */
   /* --ink-soft : hérité de @sigfa/ui (taupe chaud, texte sur clair). */
 
-  /* Libellé d'action sur carte claire (contraste 18:1 sur --surface-1). */
+  /* Libellé d'action sur carte claire. Contraste MESURÉ : 8.1:1 sur
+     --surface-1 avec le brand par défaut (seuil kiosque ≥ 7:1, garanti pour
+     tout tenant par deriveBankTheme). L'ancien commentaire revendiquait 18:1 —
+     c'était la valeur de --ink sur --surface-1 (18.4:1), jamais celle-ci
+     (audit borne 2026-07-14, F10 : 6.66:1 réel à l'époque). */
   --action-label: var(--brand-strong);
 
   /* ─── Marque : héritée de @sigfa/ui (terracotta/ambre + or & forêt). ──────── */
   /* Le theming banque surcharge --brand en amont ; --forest/--gold restent. */
 
   /* ─── États sémantiques : hérités de @sigfa/ui (harmonisés palette chaude). ── */
+  /* Sur fond nuit, TOUJOURS les variantes inverses (--success-inv, etc.) :
+     les sémantiques directs tombent à 3.4–3.5:1 sur --night (F6/F10). */
+
+  /* ─── États vides (audit 2026-07-14, F1) ──────────────────────────────────── */
+  /* La borne rend TOUS ses états vides sur --night : l'EmptyState @sigfa/ui
+     est routé vers l'encre inverse via ses points d'entrée CSS. Titre 17.4:1,
+     description 8.3:1 sur --night (seuil ≥ 7:1). La description passe au
+     plancher borne : --text-xl = 25px (règle « texte ≥ 24px »). */
+  --sig-empty-title: var(--ink-inverse);
+  --sig-empty-desc: var(--ink-inverse-soft);
+  --sig-empty-desc-size: var(--text-xl);
 }

@@ -40,4 +40,22 @@ describe("EmptyState", () => {
     expect(container.querySelector(".sig-empty__actions")).toBeNull();
     expect(container.querySelector(".sig-empty__icon")).toBeNull();
   });
+
+  // Audit UX borne 2026-07-14 — F1 : sur fond --night, le titre forcé à
+  // --ink rendait l'état vide invisible (1.02:1). La variante inverse doit
+  // exister et être opt-in (le défaut reste l'encre sur fond clair).
+  it("F1: tone='inverse' adds the on-night modifier class", () => {
+    const { container } = render(
+      <EmptyState title="t" description="d" tone="inverse" />,
+    );
+    const root = container.querySelector(".sig-empty");
+    expect(root).not.toBeNull();
+    expect(root!.classList.contains("sig-empty--inverse")).toBe(true);
+  });
+
+  it("F1: default tone does NOT carry the inverse modifier", () => {
+    const { container } = render(<EmptyState title="t" />);
+    const root = container.querySelector(".sig-empty");
+    expect(root!.classList.contains("sig-empty--inverse")).toBe(false);
+  });
 });

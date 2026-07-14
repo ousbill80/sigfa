@@ -10,7 +10,10 @@
  * server (SSR), in the client provider and in unit tests.
  *
  * Derivation:
- *  - `brandStrong`  : the brand darkened by ~15% lightness (hover / pressed).
+ *  - `brandStrong`  : the brand darkened by ~15% lightness (hover / pressed),
+ *                     then darkened further until it clears 7:1 on white — the
+ *                     kiosk uses it as `--action-label` text on `--surface-1`
+ *                     (audit borne 2026-07-14, F10 : seuil kiosque ≥ 7:1).
  *  - `brandSoft`    : the same hue at ~92% lightness (badge / highlight fills).
  *  - `brandContrast`: black or white — whichever clears WCAG AA (≥ 4.5:1) as
  *                     text on `brand`, using the WCAG 2.1 relative-luminance
@@ -23,8 +26,10 @@
  * @module theme/bank-theme
  */
 
-/** The SIGFA default brand (terracotta) — used when a tenant supplies none. */
-export const SIGFA_DEFAULT_BRAND = "#c25a16";
+/** The SIGFA default brand (terracotta) — used when a tenant supplies none.
+ * Darkened from #c25a16 (audit 2026-07-14, F10): white on it is 4.83:1,
+ * honouring the DS claim of ≥ 4.5:1 for `--brand-contrast`. */
+export const SIGFA_DEFAULT_BRAND = "#b85513";
 
 /** The four brand tokens a bank theme injects, as normalised hex strings. */
 export interface BankTheme {
@@ -166,8 +171,17 @@ export function deriveBankTheme(brandHex: string): BankTheme {
   const brand = toHex(rgb);
   const hsl = rgbToHsl(rgb);
 
-  // Hover / pressed: same hue & saturation, ~15% darker lightness.
-  const brandStrong = toHex(hslToRgb({ ...hsl, l: clamp01(hsl.l - 0.15) }));
+  // Hover / pressed + kiosk `--action-label` text on `--surface-1`: same hue
+  // & saturation, ~15% darker lightness — then keep darkening until the WCAG
+  // ratio on white clears the kiosk threshold (≥ 7:1). Terminates: l = 0 is
+  // black (21:1). Audit borne 2026-07-14 (F10).
+  let strongL = clamp01(hsl.l - 0.15);
+  let strongRgb = hslToRgb({ ...hsl, l: strongL });
+  while (ratio(WHITE, strongRgb) < 7 && strongL > 0) {
+    strongL = clamp01(strongL - 0.02);
+    strongRgb = hslToRgb({ ...hsl, l: strongL });
+  }
+  const brandStrong = toHex(strongRgb);
 
   // Soft fill: same hue, gently desaturated, very light (~92% lightness) so it
   // reads as a tint and carries dark `--ink` text.
