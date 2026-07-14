@@ -3,6 +3,23 @@
  * Saisie du numéro de téléphone + émission de ticket — refonte v2.
  * Clavier numérique natif (pas de clavier OS) sur --night, cibles ≥ 72px.
  * Tokens @sigfa/ui uniquement, aucune valeur hex en dur.
+ *
+ * AUDIT-BORNE 2026-07-14 (F2/F3/F13/F15/F17/F23 + piste A) — recomposition
+ * « au-dessus du pli » :
+ * - F2 : main verrouillé à 100dvh (zéro scroll — une borne ne scrolle pas),
+ *   deux colonnes paysage (décision à gauche, pavé à droite), rangées du pavé
+ *   en minmax(72px, 1fr) → tout le contenu décisionnel tient à 1920×1080 ET
+ *   1024×768, y compris « Passer » (chemin majoritaire) et l'erreur système.
+ * - F3 : bouton Retour commun (IconRetour + texte, ≥ 72px) → router.back().
+ * - F13 (partiel) : bascule honnête « Texte plus grand » (icône appariée,
+ *   aria-pressed, fond --gold + badge « Activé »), le texte grandit vraiment
+ *   et le timeout d'inactivité est doublé (30 s → 60 s).
+ * - F15 : la VALEUR du SMS est annoncée AVANT le clavier (sous-titre
+ *   permanent) et le consentement est visible dès le départ (désactivé tant
+ *   que le numéro est vide).
+ * - F17 : le champ hérite la police kiosque (fin du monospace navigateur).
+ * - F23 : touche « * » morte retirée — 11 touches utiles, « 0 » élargi.
+ * - Piste A : erreur téléphone en --danger-inv (≥ 7:1 sur --night).
  */
 "use client";
 
@@ -10,8 +27,11 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
-import { IconAlerte } from "@sigfa/ui";
+import { IconAlerte, IconRetour } from "@sigfa/ui";
+import { AccessibilityIcon } from "@/components/icons/UiIcons";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
+import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
+import { accessibilityTimeoutMs } from "@/lib/kiosk-voice";
 import { useOfflineTicket } from "@/hooks/useOfflineTicket";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { storeTicketMomentPii, purgeTicketMomentPii } from "@/lib/ticket-moment-store";
@@ -63,11 +83,13 @@ const MAX_TICKET_ATTEMPTS = 2;
 // Validate CI phone number: 10 digits starting with 0
 const CI_PHONE_REGEX = /^0[0-9]{9}$/;
 
+// AUDIT-F23 : la touche « * » (morte, source de confusion) est retirée —
+// 11 touches utiles, le « 0 » s'élargit sur 2 colonnes (grille 3×4 sans trou).
 const KEYPAD_ROWS = [
   ["1", "2", "3"],
   ["4", "5", "6"],
   ["7", "8", "9"],
-  ["*", "0", "⌫"],
+  ["0", "⌫"],
 ];
 
 export function ConfirmationScreen({
@@ -85,6 +107,9 @@ export function ConfirmationScreen({
   const params = useParams();
   const currentLocale = (params?.locale as string) ?? "fr";
   const { createOfflineTicket, syncPendingTickets } = useOfflineTicket();
+  // AUDIT-F13 : bascule « Texte plus grand » (état persistant de session,
+  // même comportement que services/opérations/conseillers).
+  const { isAccessibilityMode, toggleAccessibilityMode } = useAccessibilityMode();
 
   const [phoneDigits, setPhoneDigits] = useState("");
   const [smsConsent, setSmsConsent] = useState(false);
@@ -94,9 +119,16 @@ export function ConfirmationScreen({
   // KIOSK-007 : erreur système (500 ×2) → message humain, pas de bascule offline.
   const [isSystemError, setIsSystemError] = useState(false);
 
+  // AUDIT-F13 : timeout doublé en mode accessibilité (30 s → 60 s).
   useInactivityTimeout(() => {
     router.push(`/${currentLocale}`);
-  }, 30000);
+  }, accessibilityTimeoutMs(30000, isAccessibilityMode));
+
+  // AUDIT-F13 : « Texte plus grand » est un libellé HONNÊTE — les corps de
+  // texte passent réellement de 24 px à 30 px (actions 28 px → 34 px).
+  const bodyFontPx = isAccessibilityMode ? "30px" : "24px";
+  const actionFontPx = isAccessibilityMode ? "34px" : "28px";
+  const titleFontPx = isAccessibilityMode ? "31px" : "25px";
 
   // KIOSK-006 : au retour réseau, déclenche automatiquement la synchronisation
   // des tickets offline en attente (POST /tickets/sync via @sigfa/contracts).
@@ -114,8 +146,6 @@ export function ConfirmationScreen({
     if (key === "⌫") {
       setPhoneDigits((prev) => prev.slice(0, -1));
       setPhoneError("");
-    } else if (key === "*") {
-      // Star key: not used for phone input
     } else if (phoneDigits.length < 10) {
       setPhoneDigits((prev) => prev + key);
       setPhoneError("");
@@ -275,229 +305,391 @@ export function ConfirmationScreen({
     }
   };
 
-  const showSmsConsent = phoneDigits.length > 0;
+  // AUDIT-F15 : le consentement est visible dès le départ — la case ne devient
+  // activable qu'une fois un numéro commencé (jamais de consentement à vide).
+  const smsConsentDisabled = phoneDigits.length === 0;
 
   return (
     <main
       role="main"
       style={{
         backgroundColor: "var(--surface-kiosk)",
-        minHeight: "100vh",
+        // AUDIT-F2 : hauteur verrouillée à l'écran — une borne ne scrolle pas.
+        // border-box : le padding vit DANS les 100dvh/100% (sinon 1088×800 à
+        // 1024×768, pavé et « Passer » coupés — bug constaté à la capture).
+        boxSizing: "border-box",
+        height: "100dvh",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        padding: "var(--space-8)",
-        gap: "var(--space-6)",
-        maxWidth: "760px",
-        marginInline: "auto",
+        padding: "var(--space-4) var(--space-8)",
+        gap: "var(--space-4)",
         width: "100%",
       }}
     >
       {/* KIOSK-006 : bandeau offline discret (--info, non bloquant), fondu 250 ms au retour réseau */}
       <OfflineBanner isOffline={isOffline} />
 
-      {/* KIOSK-007 — Erreur système (500 ×2). Message humain, registre SIGFA.
-          Token --danger sur le PICTOGRAMME UNIQUEMENT, jamais le fond. */}
-      {isSystemError && (
-        <section
-          data-testid="system-error"
-          role="alert"
-          style={{
-            backgroundColor: "var(--surface-1)",
-            borderRadius: "var(--r-lg)",
-            boxShadow: "var(--shadow-2)",
-            padding: "var(--space-6)",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-4)",
-          }}
-        >
-          <span
-            data-testid="system-error-pictogram"
-            aria-hidden="true"
-            style={{ color: "var(--danger)", lineHeight: 1 }}
-          >
-            <IconAlerte size={40} />
-          </span>
-          <span style={{ fontSize: "24px", color: "var(--ink-strong)" }}>
-            {tDeg("systemError")}
-          </span>
-        </section>
-      )}
-
-      {/* Title */}
-      <h1
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "24px",
-          color: "var(--ink-inverse)",
-          fontWeight: 600,
-          textAlign: "center",
-          margin: 0,
-        }}
-      >
-        {t("title")}
-      </h1>
-
-      {/* MODEL-KIOSK-B (finition) — Rappel discret du conseiller choisi
-          (réassurance). Chemin conseiller UNIQUEMENT (targetManagerId + nom) ;
-          le chemin opération reste inchangé. Tokens uniquement, zéro emoji. */}
-      {targetManagerId && managerName && (
-        <p
-          data-testid="manager-reminder"
-          style={{
-            fontSize: "20px",
-            color: "var(--ink-muted-inv)",
-            textAlign: "center",
-            margin: 0,
-          }}
-        >
-          {t("managerReminder", { name: managerName })}
-        </p>
-      )}
-
-      {/* Phone display */}
-      <div
+      {/* AUDIT-F3/F13 — En-tête : Retour (patron commun des écrans) à gauche,
+          bascule « Texte plus grand » à droite. Cibles ≥ 72 px. */}
+      <header
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "var(--space-2)",
-          backgroundColor: "var(--surface-1)",
-          borderRadius: "var(--r-md)",
-          boxShadow: "var(--shadow-1)",
-          padding: "var(--space-4) var(--space-6)",
+          gap: "var(--space-4)",
+          width: "100%",
+          maxWidth: "1240px",
+          marginInline: "auto",
         }}
       >
-        <span style={{ fontSize: "24px", color: "var(--ink-soft)" }}>
-          {t("phonePrefix")}
-        </span>
-        <input
-          data-testid="phone-input"
-          type="text"
-          readOnly
-          value={phoneDigits}
-          placeholder={t("phonePlaceholder")}
+        <button
+          data-testid="confirmation-back-btn"
+          onClick={() => router.back()}
           style={{
-            flex: 1,
-            fontSize: "24px",
-            color: "var(--ink-strong)",
+            fontSize: bodyFontPx,
+            color: "var(--ink-inverse)",
             background: "none",
             border: "none",
-            outline: "none",
-          }}
-        />
-      </div>
-
-      {/* Phone error */}
-      {phoneError && (
-        <div
-          data-testid="phone-error"
-          style={{
-            color: "var(--danger)",
-            fontSize: "20px",
-            textAlign: "center",
-          }}
-        >
-          {phoneError}
-        </div>
-      )}
-
-      {/* SMS Consent */}
-      {showSmsConsent && (
-        <label
-          data-testid="sms-consent"
-          style={{
+            cursor: "pointer",
+            padding: "var(--space-2)",
+            minWidth: "72px",
+            minHeight: "72px",
             display: "flex",
             alignItems: "center",
-            gap: "var(--space-3)",
-            fontSize: "20px",
-            color: "var(--ink-inverse)",
-            cursor: "pointer",
+            gap: "var(--space-2)",
           }}
         >
-          <input
-            type="checkbox"
-            checked={smsConsent}
-            onChange={(e) => setSmsConsent(e.target.checked)}
-            style={{ width: "24px", height: "24px", accentColor: "var(--brand)" }}
-          />
-          {t("smsConsent")}
-        </label>
-      )}
+          <IconRetour size={28} style={{ verticalAlign: "middle" }} />
+          {t("backButton")}
+        </button>
 
-      {/* Numeric Keypad */}
+        {/* AUDIT-F13 — bascule honnête : libellé « Texte plus grand » (pas de
+            fausse « priorité »), état pressé NON ambigu (fond --gold ≥ 7:1 sur
+            --night + badge « Activé ») et aria-pressed pour les lecteurs. */}
+        <button
+          data-testid="accessibility-toggle"
+          aria-pressed={isAccessibilityMode}
+          onClick={toggleAccessibilityMode}
+          style={{
+            marginLeft: "auto",
+            fontSize: bodyFontPx,
+            fontWeight: isAccessibilityMode ? 600 : 400,
+            color: isAccessibilityMode ? "var(--night)" : "var(--ink-inverse)",
+            backgroundColor: isAccessibilityMode ? "var(--gold)" : "transparent",
+            border: isAccessibilityMode
+              ? "2px solid var(--gold)"
+              : "2px solid var(--ink-inverse-soft)",
+            borderRadius: "var(--r-md)",
+            cursor: "pointer",
+            padding: "var(--space-2) var(--space-4)",
+            minHeight: "72px",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+          }}
+        >
+          <AccessibilityIcon size={28} />
+          {t("largerTextButton")}
+          {isAccessibilityMode && (
+            <span
+              data-testid="accessibility-toggle-state"
+              style={{
+                backgroundColor: "var(--night)",
+                color: "var(--gold)",
+                borderRadius: "var(--r-full)",
+                padding: "var(--space-1) var(--space-3)",
+                fontSize: bodyFontPx,
+                fontWeight: 700,
+              }}
+            >
+              {t("largerTextOn")}
+            </span>
+          )}
+        </button>
+      </header>
+
+      {/* AUDIT-F2 — Deux colonnes paysage : la DÉCISION à gauche (titre, valeur
+          SMS, champ, messages, actions), le pavé à droite. Tout tient au-dessus
+          du pli à 1024×768 comme à 1920×1080 ; le bloc se centre en écran haut. */}
       <div
-        data-testid="keypad"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "var(--space-4)",
-          flex: 1,
+          flex: "1 1 0%",
+          minHeight: 0,
+          maxHeight: "660px",
+          marginBlock: "auto",
+          display: "flex",
+          gap: "var(--space-8)",
+          width: "100%",
+          maxWidth: "1240px",
+          marginInline: "auto",
+          alignItems: "stretch",
         }}
       >
-        {KEYPAD_ROWS.flat().map((key, idx) => (
-          <button
-            key={idx}
-            data-testid="keypad-key"
-            onClick={() => handleKey(key)}
-            disabled={isLoading}
+        {/* Colonne décision */}
+        <section
+          style={{
+            flex: "1 1 0%",
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-4)",
+          }}
+        >
+          {/* Title */}
+          <h1
             style={{
-              minWidth: "72px",
-              minHeight: "72px",
-              fontSize: "28px",
+              fontFamily: "var(--font-display)",
+              fontSize: titleFontPx,
+              lineHeight: 1.15,
+              color: "var(--ink-inverse)",
               fontWeight: 600,
-              color: "var(--ink-strong)",
-              backgroundColor: "var(--surface-1)",
-              border: "1px solid var(--hairline)",
-              boxShadow: "var(--shadow-1)",
-              borderRadius: "var(--r-md)",
-              cursor: isLoading ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              margin: 0,
             }}
           >
-            {key}
-          </button>
-        ))}
+            {t("title")}
+          </h1>
+
+          {/* AUDIT-F15 — Le POURQUOI du SMS, AVANT le clavier : sous-titre
+              permanent (≥ 24 px, encre inverse ≥ 7:1 sur --night). */}
+          <p
+            data-testid="sms-value"
+            style={{
+              fontSize: bodyFontPx,
+              lineHeight: 1.55,
+              color: "var(--ink-inverse)",
+              margin: 0,
+            }}
+          >
+            {t("smsValue")}
+          </p>
+
+          {/* MODEL-KIOSK-B (finition) — Rappel discret du conseiller choisi
+              (réassurance). Chemin conseiller UNIQUEMENT (targetManagerId + nom) ;
+              le chemin opération reste inchangé. Tokens uniquement, zéro emoji. */}
+          {targetManagerId && managerName && (
+            <p
+              data-testid="manager-reminder"
+              style={{
+                fontSize: bodyFontPx,
+                color: "var(--ink-muted-inv)",
+                margin: 0,
+              }}
+            >
+              {t("managerReminder", { name: managerName })}
+            </p>
+          )}
+
+          {/* KIOSK-007 — Erreur système (500 ×2). Message humain, registre SIGFA.
+              Token --danger sur le PICTOGRAMME UNIQUEMENT, jamais le fond.
+              AUDIT-F2 : la carte vit DANS la colonne décision — jamais tronquée. */}
+          {isSystemError && (
+            <section
+              data-testid="system-error"
+              role="alert"
+              style={{
+                backgroundColor: "var(--surface-1)",
+                borderRadius: "var(--r-lg)",
+                boxShadow: "var(--shadow-2)",
+                padding: "var(--space-4)",
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-4)",
+              }}
+            >
+              <span
+                data-testid="system-error-pictogram"
+                aria-hidden="true"
+                style={{ color: "var(--danger)", lineHeight: 1, flexShrink: 0 }}
+              >
+                <IconAlerte size={32} />
+              </span>
+              <span style={{ fontSize: bodyFontPx, color: "var(--ink-strong)" }}>
+                {tDeg("systemError")}
+              </span>
+            </section>
+          )}
+
+          {/* Phone display */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-2)",
+              backgroundColor: "var(--surface-1)",
+              borderRadius: "var(--r-md)",
+              boxShadow: "var(--shadow-1)",
+              padding: "var(--space-3) var(--space-4)",
+            }}
+          >
+            <span style={{ fontSize: bodyFontPx, color: "var(--ink-soft)" }}>
+              {t("phonePrefix")}
+            </span>
+            <input
+              data-testid="phone-input"
+              type="text"
+              readOnly
+              value={phoneDigits}
+              placeholder={t("phonePlaceholder")}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontSize: bodyFontPx,
+                // AUDIT-F17 : hérite la police kiosque (fin du monospace).
+                fontFamily: "inherit",
+                color: "var(--ink-strong)",
+                background: "none",
+                border: "none",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Phone error — inline sous le champ. AUDIT piste A : --danger-inv
+              (≥ 7:1 sur --night), le pictogramme hérite la même encre. */}
+          {phoneError && (
+            <div
+              data-testid="phone-error"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-2)",
+                color: "var(--danger-inv)",
+                fontSize: bodyFontPx,
+              }}
+            >
+              <span aria-hidden="true" style={{ lineHeight: 1, flexShrink: 0 }}>
+                <IconAlerte size={28} />
+              </span>
+              {phoneError}
+            </div>
+          )}
+
+          {/* SMS Consent — AUDIT-F15 : visible dès le départ, activable dès le
+              premier chiffre (consentement AVANT l'engagement, jamais à vide). */}
+          <label
+            data-testid="sms-consent"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-3)",
+              fontSize: bodyFontPx,
+              color: smsConsentDisabled
+                ? "var(--ink-muted-inv)"
+                : "var(--ink-inverse)",
+              cursor: smsConsentDisabled ? "default" : "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={smsConsent}
+              disabled={smsConsentDisabled}
+              onChange={(e) => setSmsConsent(e.target.checked)}
+              style={{
+                width: "28px",
+                height: "28px",
+                flexShrink: 0,
+                accentColor: "var(--brand)",
+              }}
+            />
+            {t("smsConsent")}
+          </label>
+
+          {/* AUDIT-F2 — LE choix de l'écran, toujours visible : CTA + Passer
+              (chemin majoritaire) ancrés en bas de la colonne décision. */}
+          <div
+            data-testid="decision-actions"
+            style={{
+              marginTop: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-3)",
+            }}
+          >
+            {/* CTA Button */}
+            <button
+              data-testid="cta-btn"
+              onClick={() => { void handleSubmit(false); }}
+              disabled={isLoading}
+              style={{
+                minHeight: "88px",
+                backgroundColor: "var(--brand)",
+                color: "var(--brand-contrast)",
+                fontSize: actionFontPx,
+                fontWeight: 600,
+                border: "none",
+                boxShadow: "var(--shadow-brand)",
+                borderRadius: "var(--r-lg)",
+                cursor: isLoading ? "not-allowed" : "pointer",
+              }}
+            >
+              {isLoading ? t("loadingMessage") : t("ctaButton")}
+            </button>
+
+            {/* Skip Button */}
+            <button
+              data-testid="skip-btn"
+              onClick={() => { void handleSubmit(true); }}
+              disabled={isLoading}
+              style={{
+                minHeight: "72px",
+                backgroundColor: "transparent",
+                color: "var(--ink-inverse)",
+                fontSize: actionFontPx,
+                border: "2px solid var(--ink-inverse)",
+                borderRadius: "var(--r-lg)",
+                cursor: isLoading ? "not-allowed" : "pointer",
+              }}
+            >
+              {t("skipButton")}
+            </button>
+          </div>
+        </section>
+
+        {/* Numeric Keypad — AUDIT-F2 : rangées minmax(72px, 1fr), le pavé
+            s'adapte à la hauteur restante sans jamais pousser le contenu
+            décisionnel sous le pli. AUDIT-F23 : 11 touches, « 0 » élargi. */}
+        <div
+          data-testid="keypad"
+          style={{
+            flex: "1 1 0%",
+            minWidth: 0,
+            minHeight: "0px",
+            maxWidth: "560px",
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateRows: "repeat(4, minmax(72px, 1fr))",
+            gap: "var(--space-3)",
+          }}
+        >
+          {KEYPAD_ROWS.flat().map((key, idx) => (
+            <button
+              key={idx}
+              data-testid="keypad-key"
+              onClick={() => handleKey(key)}
+              disabled={isLoading}
+              style={{
+                minWidth: "72px",
+                minHeight: "72px",
+                fontSize: actionFontPx,
+                fontWeight: 600,
+                color: "var(--ink-strong)",
+                backgroundColor: "var(--surface-1)",
+                border: "1px solid var(--hairline)",
+                boxShadow: "var(--shadow-1)",
+                borderRadius: "var(--r-md)",
+                cursor: isLoading ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                // AUDIT-F23 : « 0 » élargi sur 2 colonnes (grille sans trou).
+                ...(key === "0" ? { gridColumn: "span 2" } : {}),
+              }}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
       </div>
-
-      {/* CTA Button */}
-      <button
-        data-testid="cta-btn"
-        onClick={() => { void handleSubmit(false); }}
-        disabled={isLoading}
-        style={{
-          minHeight: "88px",
-          backgroundColor: "var(--brand)",
-          color: "var(--brand-contrast)",
-          fontSize: "28px",
-          fontWeight: 600,
-          border: "none",
-          boxShadow: "var(--shadow-brand)",
-          borderRadius: "var(--r-lg)",
-          cursor: isLoading ? "not-allowed" : "pointer",
-        }}
-      >
-        {isLoading ? t("loadingMessage") : t("ctaButton")}
-      </button>
-
-      {/* Skip Button */}
-      <button
-        data-testid="skip-btn"
-        onClick={() => { void handleSubmit(true); }}
-        disabled={isLoading}
-        style={{
-          minHeight: "72px",
-          backgroundColor: "transparent",
-          color: "var(--ink-inverse)",
-          fontSize: "28px",
-          border: "2px solid var(--ink-inverse)",
-          borderRadius: "var(--r-lg)",
-          cursor: isLoading ? "not-allowed" : "pointer",
-        }}
-      >
-        {t("skipButton")}
-      </button>
     </main>
   );
 }

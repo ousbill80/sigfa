@@ -99,7 +99,11 @@
     "errorPhone": "Phone number missing — or tap Skip",
     "loadingMessage": "Issuing your ticket...",
     "offlineBanner": "Offline mode — local ticket generated",
-    "managerReminder": "You'll see: {name}"
+    "managerReminder": "You'll see: {name}",
+    "smsValue": "Get your queue position by SMS — follow the line without standing in it",
+    "backButton": "Back",
+    "largerTextButton": "Larger text",
+    "largerTextOn": "On"
   },
   "ticket005": {
     "eyebrow": "Your ticket",

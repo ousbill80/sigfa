@@ -99,7 +99,11 @@
     "errorPhone": "Il manque votre numéro — ou touchez Passer",
     "loadingMessage": "Émission de votre ticket...",
     "offlineBanner": "Mode hors connexion — ticket local généré",
-    "managerReminder": "Vous verrez : {name}"
+    "managerReminder": "Vous verrez : {name}",
+    "smsValue": "Recevez votre position par SMS — suivez la file sans rester debout",
+    "backButton": "Retour",
+    "largerTextButton": "Texte plus grand",
+    "largerTextOn": "Activé"
   },
   "ticket005": {
     "eyebrow": "Votre ticket",

@@ -86,9 +86,9 @@ describe("KIOSK-004: ConfirmationScreen", () => {
       </NextIntlClientProvider>
     );
 
-    // 12 keypad keys: 1-9, *, 0, #
+    // 11 keypad keys: 1-9, 0, ⌫ — la touche « * » morte est retirée (audit F23)
     const keys = container.querySelectorAll("[data-testid='keypad-key']");
-    expect(keys.length).toBe(12);
+    expect(keys.length).toBe(11);
 
     keys.forEach((key) => {
       const keyEl = key as HTMLElement;
@@ -114,16 +114,21 @@ describe("KIOSK-004: ConfirmationScreen", () => {
     expect(skipBtn).not.toBeDisabled();
   });
 
-  it("KIOSK-004: smsConsent absent if phoneNumber empty (payload verification)", () => {
+  it("KIOSK-004 (audit F15): smsConsent visible dès le départ mais DÉSACTIVÉ tant que le numéro est vide", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <ConfirmationScreen serviceId="svc-1" agencyId="agt-001" />
       </NextIntlClientProvider>
     );
 
-    // SMS consent checkbox should not be visible when phone is empty
+    // Audit F15 : le consentement est visible d'emblée (la valeur du SMS est
+    // annoncée avant le clavier), la case reste désactivée numéro vide.
     const consent = container.querySelector("[data-testid='sms-consent']");
-    expect(consent).not.toBeInTheDocument();
+    expect(consent).toBeInTheDocument();
+    const checkbox = consent!.querySelector(
+      "input[type='checkbox']"
+    ) as HTMLInputElement;
+    expect(checkbox.disabled).toBe(true);
   });
 
   it("KIOSK-004: X-Idempotency-Key UUID v4 generated and included in each POST /public/tickets", async () => {

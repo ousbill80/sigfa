@@ -134,4 +134,15 @@ describe("MODEL-KIOSK-B: ChoiceScreen (point d'entrée 2 chemins)", () => {
     const emojiRegex = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
     expect(emojiRegex.test(container.textContent ?? "")).toBe(false);
   });
+
+  // AUDIT-F23 : /choice était le SEUL écran sans identité banque — la marque
+  // (BankBrandMark, repli monogramme sans logo provisionné) l'habille désormais.
+  it("AUDIT-F23: la marque banque (BankBrandMark) est rendue sur l'écran de choix", () => {
+    renderScreen();
+    expect(screen.getByTestId("bank-brand")).toBeInTheDocument();
+    // Le nom du tenant accompagne toujours la marque (repli démo : SIGFA).
+    expect(screen.getByTestId("bank-name").textContent).toBe("SIGFA");
+    // Sans logo provisionné → repli monogramme --brand (jamais d'image cassée).
+    expect(screen.getByTestId("bank-monogram")).toBeInTheDocument();
+  });
 });
