@@ -143,6 +143,15 @@ export const dailyAgencyStats = pgTable(
      * Null si aucune entrée d'historique pour la journée.
      */
     agentActiveSeconds: integer("agent_active_seconds"),
+    /**
+     * Secondes de disponibilité agent (KPI taux d'occupation, décision D2).
+     * SOURCE : agrégation d'`agent_status_history` (DB-001).
+     * Somme des intervalles où `to_status IN ('AVAILABLE', 'SERVING')` et `seconds > 0`.
+     * Matérialisée par le service d'agrégation (apps/api/reporting/aggregate-service.ts),
+     * non stockée par DB-006 d'origine.
+     * Null si aucune entrée d'historique pour la journée.
+     */
+    agentAvailableSeconds: integer("agent_available_seconds"),
     /** Horodatage de création de la ligne. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Horodatage de dernière mise à jour (recalcul par upsertDailyStats). */

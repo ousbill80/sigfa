@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, integer, boolean, timestamp, index, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, integer, boolean, text, timestamp, index, check } from "drizzle-orm/pg-core";
 import { banks } from "./banks.js";
 import { agencies } from "./agencies.js";
 import { services } from "./services.js";
@@ -43,6 +43,18 @@ export const queues = pgTable(
     isOpen: boolean("is_open").notNull().default(true),
     /** Statut de la file (LA LOI `QueueStatus`). */
     status: queueStatusEnum("status").notNull().default("OPEN"),
+    /**
+     * Heure d'ouverture de la file au format `HH:MM` (heure locale).
+     * NULL = pas d'horaire défini. Contrat OpenAPI : `openAt`
+     * (pattern `^[0-2][0-9]:[0-5][0-9]$`, ex. `08:00`).
+     */
+    openAt: text("open_at"),
+    /**
+     * Heure de fermeture de la file au format `HH:MM` (heure locale).
+     * NULL = pas d'horaire défini. Contrat OpenAPI : `closeAt`
+     * (pattern `^[0-2][0-9]:[0-5][0-9]$`, ex. `17:00`).
+     */
+    closeAt: text("close_at"),
     /** Horodatage de création. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Horodatage de dernière mise à jour. */
