@@ -92,7 +92,7 @@ describe("WEB-001: middleware auth", () => {
       const result = checkAccess("/admin", "AGENT");
       expect(result.action).toBe("forbidden");
       if (result.action === "forbidden") {
-        expect(result.dashboardUrl).toBe("/dashboard/agent");
+        expect(result.dashboardUrl).toBe("/agent");
       }
     });
   });
