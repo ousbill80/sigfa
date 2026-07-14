@@ -9,9 +9,12 @@
  *   contrasté à droite (grande, tabular-nums).
  * - **Zone gauche ~75 %** : {@link AdZone} (carrousel banque) active EN
  *   PERMANENCE — la pub n'est JAMAIS interrompue par un appel.
- * - **Colonne droite ~25 %** (fond --night-2) : carte appel courant (flash
- *   --brand + halo pendant la fenêtre de célébration TV-002), derniers appelés
- *   en retrait, longueur de file en bas.
+ * - **Colonne droite ~25 %** (fond --paper, demande PO lisibilité publique
+ *   2026-07-14) : carte appel courant --surface-1 (flash --brand-strong + halo
+ *   pendant la fenêtre de célébration TV-002 — assombri pour rester dramatique
+ *   ET lisible sur colonne claire), derniers appelés en encre, longueur de
+ *   file en accent forêt. Frontière nette avec la zone média sombre : simple
+ *   hairline (le contraste nuit/papier fait la séparation élégante).
  *
  * TV-V3-FIX (retour visuel PO sur capture réelle 16:9) : le numéro courant
  * tient sur UNE ligne (clamp sur la largeur de colonne, bornes en tokens),
@@ -39,6 +42,19 @@ import { bankInitial } from "@/lib/bank-branding";
 
 /** Visible lifecycle state of the TV screen. */
 export type TvViewState = "nominal" | "loading" | "empty";
+
+/**
+ * Encres dérivées de la colonne d'appels CLAIRE (fond --paper) — mix de tokens
+ * UNIQUEMENT, aucun hex (contrat tokens.css). Seuil TV public : WCAG ≥ 7:1.
+ * - `inkSectionOnLight` — titres de section, « MAINTENANT SERVI », guichets :
+ *   --ink-soft seul mesure 6.0:1 sur --paper (< 7:1) → renforcé vers --ink :
+ *   8.5:1 mesuré sur --paper, 9.0:1 sur --surface-1.
+ * - `queueAccentOnLight` — compteur « En attente » : --gold (2.6:1) et
+ *   --forest (6.5:1) sont sous le seuil sur fond clair → forêt renforcée vers
+ *   --ink : 7.3:1 mesuré sur --paper.
+ */
+const inkSectionOnLight = "color-mix(in srgb, var(--ink-soft) 70%, var(--ink))";
+const queueAccentOnLight = "color-mix(in srgb, var(--forest) 85%, var(--ink))";
 
 /** Props for {@link TvScreen}. */
 export interface TvScreenProps {
@@ -102,15 +118,18 @@ const splitStyle: CSSProperties = {
 };
 
 /**
- * Colonne d'appels — fond sombre dédié + séparateur token.
+ * Colonne d'appels — fond BLANC design system (--paper, demande PO lisibilité
+ * publique) + hairline côté zone média : le contraste nuit/papier trace la
+ * frontière, le hairline chaud la rend nette sans brutalité.
  * TV-V3-FIX : conteneur de taille (`container-type: inline-size`) — le numéro
  * courant se clampe sur la largeur RÉELLE de la colonne (unités cqw), donc une
  * seule ligne à 720p comme en 4K. `overflow: hidden` : la colonne ne scrolle
  * jamais, rien ne peut déborder de l'écran.
  */
 const columnStyle: CSSProperties = {
-  backgroundColor: "var(--night-2, var(--surface-screen))",
-  borderLeft: "1px solid var(--tv-separator)",
+  backgroundColor: "var(--paper)",
+  color: "var(--ink)",
+  borderLeft: "1px solid var(--hairline)",
   display: "flex",
   flexDirection: "column",
   minHeight: 0,
@@ -122,9 +141,9 @@ const columnStyle: CSSProperties = {
 
 /**
  * Renders a single previous-call entry — DISCRÈTE (retour visuel PO, réf. BNI) :
- * une seule ligne « OC-046 · Guichet 1 », numéro en --text-2xl max, guichet en
- * --text-md, le tout en retrait (--ink-inverse-soft). L'appel courant reste le
- * seul élément dominant de la colonne.
+ * une seule ligne « OC-046 · Guichet 1 », numéro en --text-2xl max (encre
+ * normale --ink), guichet en --text-md (encre renforcée ≥ 7:1 sur --paper).
+ * L'appel courant reste le seul élément dominant de la colonne.
  * @param call - The previous call to render.
  * @returns The card element.
  */
@@ -134,9 +153,9 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
       data-testid="tv-previous-card"
       style={{
         padding: "var(--space-2) 0",
-        borderBottom: "1px solid var(--tv-separator)",
+        borderBottom: "1px solid var(--hairline)",
         lineHeight: "var(--leading-tight)",
-        color: "var(--ink-inverse-soft)",
+        color: "var(--ink)",
         whiteSpace: "nowrap",
         overflow: "hidden",
         textOverflow: "ellipsis",
@@ -151,15 +170,15 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
           fontWeight: 600,
           fontVariantNumeric: "tabular-nums",
           letterSpacing: "var(--tracking-numeric)",
-          color: "var(--ink-inverse-soft)",
+          color: "var(--ink)",
         }}
       >
         {call.displayNumber}
       </span>
-      <span aria-hidden="true" style={{ color: "var(--ink-inverse-soft)" }}>
+      <span aria-hidden="true" style={{ color: inkSectionOnLight }}>
         {" · "}
       </span>
-      <span data-testid="tv-previous-counter" style={{ fontSize: "var(--text-md)", color: "var(--ink-inverse-soft)" }}>
+      <span data-testid="tv-previous-counter" style={{ fontSize: "var(--text-md)", color: inkSectionOnLight }}>
         {call.counterLabel}
       </span>
     </div>
@@ -185,9 +204,12 @@ export function heroNumberFontSize(displayNumber: string): string {
 }
 
 /**
- * Carte « appel courant » en tête de colonne. Au nouvel appel (celebration),
- * la carte passe sur fond --brand avec halo or (mécanique TV-002 conservée),
- * puis revient au repos — la pub à gauche n'est jamais interrompue.
+ * Carte « appel courant » en tête de colonne — carte --surface-1 élevée sur la
+ * colonne --paper. Au nouvel appel (celebration), la carte passe sur fond
+ * --brand-strong avec halo or (mécanique TV-002 conservée ; le flash --brand
+ * était pensé pour la colonne sombre — assombri ici pour rester spectaculaire
+ * sur fond clair ET tenir 7.6:1 avec l'encre inverse), puis revient au repos —
+ * la pub à gauche n'est jamais interrompue.
  * @param props - Hero call (or null), locale, celebration and motion flags.
  * @returns The current-call card element.
  */
@@ -216,9 +238,9 @@ function CurrentCallCard({
         gap: "var(--space-2)",
         padding: "var(--space-6) var(--space-4)",
         borderRadius: "var(--r-xl)",
-        border: "1px solid var(--tv-separator)",
-        backgroundColor: celebration ? "var(--brand)" : "var(--surface-screen)",
-        boxShadow: celebration ? "var(--shadow-gold)" : "none",
+        border: "1px solid var(--hairline)",
+        backgroundColor: celebration ? "var(--brand-strong)" : "var(--surface-1)",
+        boxShadow: celebration ? "var(--shadow-gold)" : "var(--shadow-1)",
         transition: reducedMotion
           ? "none"
           : "background-color var(--duration-celebration) linear, box-shadow var(--tv-slide-duration) var(--tv-slide-ease)",
@@ -234,7 +256,7 @@ function CurrentCallCard({
           style={{
             fontSize: "var(--text-3xl)",
             lineHeight: "var(--leading-tight)",
-            color: "var(--ink-inverse-soft)",
+            color: inkSectionOnLight,
             fontFamily: "var(--font-display)",
             padding: "var(--space-6) 0",
           }}
@@ -250,7 +272,8 @@ function CurrentCallCard({
               fontWeight: 600,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: celebration ? "var(--ink-inverse)" : "var(--gold)",
+              /* --gold mesure 2.6:1 sur --surface-1 : encre renforcée au repos. */
+              color: celebration ? "var(--ink-inverse)" : inkSectionOnLight,
             }}
           >
             {hero.counterLabel}
@@ -268,12 +291,14 @@ function CurrentCallCard({
               lineHeight: "var(--leading-tight)",
               fontVariantNumeric: "tabular-nums",
               letterSpacing: "var(--tracking-numeric)",
-              color: celebration ? "var(--ink-inverse)" : "var(--brand)",
+              /* La star de la colonne : --brand-strong = 8.2:1 sur --surface-1
+                 (--brand seul = 4.8:1, sous le seuil TV public ≥ 7:1). */
+              color: celebration ? "var(--ink-inverse)" : "var(--brand-strong)",
             }}
           >
             {hero.displayNumber}
           </div>
-          <div style={{ fontSize: "var(--text-lg)", color: celebration ? "var(--ink-inverse)" : "var(--ink-inverse-soft)" }}>
+          <div style={{ fontSize: "var(--text-lg)", color: celebration ? "var(--ink-inverse)" : inkSectionOnLight }}>
             {t("tv.now_serving", locale)}
           </div>
         </>
@@ -336,11 +361,13 @@ export function TvScreen({
             }}
           />
           <div style={columnStyle}>
+            {/* Colonne claire : blocs squelettés sur --hairline (le séparateur
+                blanc-alpha TV serait invisible sur --paper). */}
             <div
               data-testid="tv-skeleton-hero"
               style={{
                 height: "var(--display-tv-counter)",
-                backgroundColor: "var(--tv-separator)",
+                backgroundColor: "var(--hairline)",
                 borderRadius: "var(--r-xl)",
                 flexShrink: 0,
               }}
@@ -350,7 +377,7 @@ export function TvScreen({
                 key={i}
                 style={{
                   height: "var(--display-tv)",
-                  backgroundColor: "var(--tv-separator)",
+                  backgroundColor: "var(--hairline)",
                   borderRadius: "var(--r-lg)",
                   flexShrink: 0,
                 }}
@@ -406,7 +433,7 @@ export function TvScreen({
                   fontSize: "var(--text-md)",
                   letterSpacing: "0.14em",
                   textTransform: "uppercase",
-                  color: "var(--ink-inverse-soft)",
+                  color: inkSectionOnLight,
                   marginBottom: "var(--space-3)",
                   flexShrink: 0,
                 }}
@@ -428,14 +455,14 @@ export function TvScreen({
             <section
               data-testid="tv-queue"
               aria-label={t("tv.waiting", locale)}
-              style={{ flexShrink: 0, borderTop: "1px solid var(--tv-separator)", paddingTop: "var(--space-4)" }}
+              style={{ flexShrink: 0, borderTop: "1px solid var(--hairline)", paddingTop: "var(--space-4)" }}
             >
               <div
                 style={{
                   fontSize: "var(--text-md)",
                   letterSpacing: "0.14em",
                   textTransform: "uppercase",
-                  color: "var(--ink-inverse-soft)",
+                  color: inkSectionOnLight,
                 }}
               >
                 {t("tv.waiting", locale)}
@@ -450,7 +477,9 @@ export function TvScreen({
                   lineHeight: "var(--leading-tight)",
                   fontVariantNumeric: "tabular-nums",
                   letterSpacing: "var(--tracking-numeric)",
-                  color: "var(--gold)",
+                  /* Accent « En attente » : --gold (2.6:1 sur clair) remplacé
+                     par la forêt renforcée — 7.3:1 mesuré sur --paper. */
+                  color: queueAccentOnLight,
                 }}
               >
                 {state.queue.length}

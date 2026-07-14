@@ -4,8 +4,10 @@
  *
  * Layout : bandeau haut --brand (pastille + banque · date · horloge) ; zone
  * gauche ~75 % = AdZone permanente ; colonne droite ~25 % = carte appel courant
- * (flash --brand à l'appel) + derniers appelés + longueur de file.
- * 5 états : nominal · loading · empty · error · offline.
+ * (flash --brand-strong à l'appel) + derniers appelés + longueur de file.
+ * Colonne CLAIRE (--paper, demande PO lisibilité publique 2026-07-14) : encres
+ * sombres ≥ 7:1, numéro courant --brand-strong, frontière --hairline avec la
+ * zone média sombre. 5 états : nominal · loading · empty · error · offline.
  *
  * TV-V3-FIX (retour visuel PO, capture écran 16:9 réel) : numéro courant sur
  * UNE ligne (clamp sur la largeur colonne), historique DISCRET (--text-2xl /
@@ -56,12 +58,15 @@ describe("TvScreen — TV-V3 split permanent", () => {
     expect(screen.getByTestId("tv-adzone")).toHaveAttribute("data-active", "on");
   });
 
-  it("TV-V3: colonne d'appels — fond sombre --night-2 + séparateur token", () => {
+  it("TV-BLANC: colonne d'appels — fond blanc design system (--paper) + frontière --hairline avec la zone média", () => {
     render(<TvScreen state={nominal} />);
     const column = screen.getByTestId("tv-call-column");
     const style = column.getAttribute("style") ?? "";
-    expect(style).toContain("var(--night-2");
-    expect(style).toContain("var(--tv-separator)");
+    expect(style).toContain("var(--paper)");
+    expect(style).toContain("var(--hairline)");
+    // Plus aucune surface sombre ni séparateur blanc-alpha dans la colonne.
+    expect(style).not.toContain("var(--night-2");
+    expect(style).not.toContain("var(--tv-separator)");
   });
 
   it("TV-V3: carte appel courant — libellé guichet + numéro en --display-tv-counter", () => {
@@ -74,15 +79,20 @@ describe("TvScreen — TV-V3 split permanent", () => {
     expect(style).toContain("var(--display-tv-counter)");
     expect(style).toContain("var(--font-display)");
     expect(style).toContain("tabular-nums");
+    // TV-BLANC : la star de la colonne claire — --brand-strong (8.2:1 sur
+    // --surface-1 ; --brand seul mesure 4.8:1, sous le seuil public ≥ 7:1).
+    expect(style).toContain("var(--brand-strong)");
   });
 
-  it("TV-V3: derniers appelés dans la colonne — style PreviousCard en retrait", () => {
+  it("TV-BLANC: derniers appelés dans la colonne — encre normale (--ink) sur fond clair", () => {
     render(<TvScreen state={nominal} />);
     const column = screen.getByTestId("tv-call-column");
     const cards = within(column).getAllByTestId("tv-previous-card");
     expect(cards).toHaveLength(3);
     for (const c of cards) {
-      expect(c.getAttribute("style")).toContain("var(--ink-inverse-soft)");
+      expect(c.getAttribute("style")).toContain("var(--ink)");
+      // Plus d'encre inverse : la colonne est claire.
+      expect(c.getAttribute("style")).not.toContain("var(--ink-inverse-soft)");
     }
   });
 
@@ -94,6 +104,11 @@ describe("TvScreen — TV-V3 split permanent", () => {
     const count = within(queue).getByTestId("tv-queue-count");
     expect(count).toHaveTextContent(String(nominal.queue.length));
     expect(count.getAttribute("style")).toContain("var(--display-tv)");
+    // TV-BLANC : accent forêt renforcé (7.3:1 sur --paper) — --gold (2.6:1)
+    // est illisible sur la colonne claire.
+    const countStyle = count.getAttribute("style") ?? "";
+    expect(countStyle).toContain("var(--forest)");
+    expect(countStyle).not.toContain("var(--gold)");
   });
 });
 
@@ -372,23 +387,24 @@ describe("TvScreen — 5 états", () => {
 });
 
 describe("TvScreen — TV-002 flash conservé (option « flash dans la colonne »)", () => {
-  it("TV-002: célébration — la carte passe sur fond --brand avec halo, pub non interrompue", () => {
+  it("TV-002: célébration — la carte passe sur fond --brand-strong (flash adapté au fond clair) avec halo, pub non interrompue", () => {
     render(<TvScreen state={nominal} celebration />);
     const hero = screen.getByTestId("tv-hero");
     expect(hero).toHaveAttribute("data-celebration", "on");
     const style = hero.getAttribute("style") ?? "";
-    expect(style).toContain("var(--brand)");
+    // Assombri (7.6:1 avec --ink-inverse) : le flash reste dramatique sur --paper.
+    expect(style).toContain("var(--brand-strong)");
     expect(style).toContain("var(--shadow-gold)");
     // La pub n'est JAMAIS interrompue par l'appel.
     expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
   });
 
-  it("TV-002: sans célébration — la carte revient au repos (surface sombre, sans halo)", () => {
+  it("TV-002: sans célébration — la carte revient au repos (carte claire --surface-1, sans halo or)", () => {
     render(<TvScreen state={nominal} celebration={false} />);
     const hero = screen.getByTestId("tv-hero");
     expect(hero).toHaveAttribute("data-celebration", "off");
     const style = hero.getAttribute("style") ?? "";
-    expect(style).toContain("var(--surface-screen)");
+    expect(style).toContain("var(--surface-1)");
     expect(style).not.toContain("var(--shadow-gold)");
   });
 
