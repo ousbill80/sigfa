@@ -61,6 +61,7 @@ const server = setupServer(
         expiresIn: 43200,
         kioskId: ENV_OK.KIOSK_ID,
         agencyId: ENV_OK.AGENCY_ID,
+        bankId: "22222222-2222-4222-a222-222222222222",
       },
       { status: 201 }
     )
@@ -99,6 +100,9 @@ describe("KIOSK-001/S5: provisionnement session borne — main process Electron"
     expect(session).not.toBeNull();
     expect(session?.accessToken).toBe("jwt-main-process");
     expect(session?.expiresIn).toBe(43200);
+    // CONTRACT-014 : le bankId de la session traverse l'IPC vers le renderer
+    // (donnée d'enseigne publique — theming sans NEXT_PUBLIC_BANK_ID).
+    expect(session?.bankId).toBe("22222222-2222-4222-a222-222222222222");
     // Le secret ne traverse JAMAIS l'IPC vers le renderer.
     expect(Object.keys(session!)).not.toContain("kioskSecret");
     expect(JSON.stringify(session)).not.toContain("s3cr3t-kiosk-k3y");

@@ -21,6 +21,8 @@ export interface KioskSessionDto {
   expiresIn: number;
   kioskId: string;
   agencyId: string;
+  /** CONTRACT-014 : bankId public de la borne (theming session, zéro PII). */
+  bankId: string;
 }
 
 /** API exposée au renderer par `electron/preload.ts` via contextBridge. */
@@ -40,6 +42,27 @@ export type KioskSessionProvisioner = () => Promise<KioskSession | null>;
 
 let currentSession: KioskSession | null = null;
 let currentProvisioner: KioskSessionProvisioner | null = null;
+
+/**
+ * CONTRACT-014 : abonnés au cycle de vie de la session (theming réactif —
+ * le bankId de session arrive APRÈS le premier rendu de l'accueil).
+ */
+const sessionListeners = new Set<() => void>();
+
+function notifySessionListeners(): void {
+  for (const listener of sessionListeners) listener();
+}
+
+/**
+ * S'abonne aux changements de session borne (création/échec). Renvoie la
+ * fonction de désabonnement — signature compatible `useSyncExternalStore`.
+ */
+export function subscribeKioskSession(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
 
 /**
  * Enregistre le provisionneur utilisé pour (re)créer la session borne.
@@ -65,6 +88,15 @@ export function getKioskSessionToken(): string | null {
 }
 
 /**
+ * CONTRACT-014 : bankId public de la session borne courante, ou null
+ * (absente/expirée — jamais de bankId périmé). Le theming retombe alors sur
+ * le repli env `NEXT_PUBLIC_BANK_ID` (DEV/démo) via `useBankTheme`.
+ */
+export function getKioskSessionBankId(): string | null {
+  return getKioskSession()?.bankId ?? null;
+}
+
+/**
  * Garantit une session borne valide : réutilise la session en cours, ou la
  * RE-CRÉE via le provisionneur si elle est absente/expirée (12 h non
  * renouvelable). En échec : null — la borne reste utilisable en mode dégradé.
@@ -82,6 +114,8 @@ export async function ensureKioskSession(): Promise<KioskSession | null> {
     // Échec réseau/provisionnement : borne dégradée, jamais de crash.
     currentSession = null;
   }
+  // CONTRACT-014 : notifie les abonnés (theming --brand/logo réactif).
+  notifySessionListeners();
   return currentSession;
 }
 
@@ -104,4 +138,5 @@ export function resolveKioskSessionProvisioner(): KioskSessionProvisioner | null
 export function __resetKioskSessionForTests(): void {
   currentSession = null;
   currentProvisioner = null;
+  sessionListeners.clear();
 }

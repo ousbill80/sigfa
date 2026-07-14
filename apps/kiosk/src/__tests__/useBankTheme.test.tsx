@@ -4,16 +4,38 @@
  * GET /public/banks/{id}/theme (CONTRACT-013, route publique, zero PII).
  * Ecrits AVANT l'implementation (phase rouge).
  */
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { server } from "@/mocks/server";
 import { useBankTheme } from "@/hooks/useBankTheme";
+import {
+  registerKioskSessionProvisioner,
+  ensureKioskSession,
+  __resetKioskSessionForTests,
+} from "@/lib/kiosk-session-store";
+import type { KioskSession } from "@/lib/kiosk-session";
 
 const BANK_ID = "11111111-1111-4111-a111-111111111111";
+const SESSION_BANK_ID = "22222222-2222-4222-a222-222222222222";
+
+function makeSession(): KioskSession {
+  return {
+    accessToken: "jwt-theme",
+    expiresIn: 43200,
+    kioskId: "k1",
+    agencyId: "a1",
+    bankId: SESSION_BANK_ID,
+    createdAt: Date.now(),
+  };
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  __resetKioskSessionForTests();
+  vi.unstubAllEnvs();
+});
 afterAll(() => server.close());
 
 describe("KIOSK-HOME: useBankTheme", () => {
@@ -73,5 +95,99 @@ describe("KIOSK-HOME: useBankTheme", () => {
       expect(result.current.brandColor).toBe("#0f6b4a");
     });
     expect(result.current.logoUrl).toBeNull();
+  });
+});
+
+// ── CONTRACT-014 : bankId de la SESSION borne prioritaire sur l'env ──────────
+describe("CONTRACT-014: useBankTheme — bankId depuis la session borne", () => {
+  it("session présente → le thème est chargé avec le bankId de session (l'env est ignoré)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_BANK_ID", BANK_ID);
+    registerKioskSessionProvisioner(async () => makeSession());
+    await ensureKioskSession();
+
+    let requestedId: string | undefined;
+    server.use(
+      http.get("*/public/banks/:id/theme", ({ params }) => {
+        requestedId = String(params.id);
+        return HttpResponse.json(
+          {
+            logoUrl: "/mock/bank/logo.svg",
+            appliedColors: { primary: "#003f7f", secondary: "#c79a3a", background: "#ffffff" },
+            welcomeMessages: { fr: "Bienvenue" },
+          },
+          { status: 200 }
+        );
+      })
+    );
+
+    const { result } = renderHook(() => useBankTheme());
+    await waitFor(() => {
+      expect(result.current.logoUrl).toBe("/mock/bank/logo.svg");
+    });
+    expect(requestedId).toBe(SESSION_BANK_ID);
+  });
+
+  it("session créée APRÈS le montage → le thème se recharge avec le bankId de session (réactif)", async () => {
+    let requestedId: string | undefined;
+    server.use(
+      http.get("*/public/banks/:id/theme", ({ params }) => {
+        requestedId = String(params.id);
+        return HttpResponse.json(
+          {
+            logoUrl: "/mock/bank/logo.svg",
+            appliedColors: { primary: "#003f7f", secondary: "#c79a3a", background: "#ffffff" },
+            welcomeMessages: { fr: "Bienvenue" },
+          },
+          { status: 200 }
+        );
+      })
+    );
+
+    // Montage AVANT session (ni env, ni session → aucun fetch).
+    const { result } = renderHook(() => useBankTheme());
+    expect(result.current.logoUrl).toBeNull();
+
+    // La session borne arrive (provisionnement Electron asynchrone).
+    registerKioskSessionProvisioner(async () => makeSession());
+    await act(async () => {
+      await ensureKioskSession();
+    });
+
+    await waitFor(() => {
+      expect(result.current.logoUrl).toBe("/mock/bank/logo.svg");
+    });
+    expect(requestedId).toBe(SESSION_BANK_ID);
+  });
+
+  it("sans session → repli env NEXT_PUBLIC_BANK_ID (DEV/démo documenté)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_BANK_ID", BANK_ID);
+
+    let requestedId: string | undefined;
+    server.use(
+      http.get("*/public/banks/:id/theme", ({ params }) => {
+        requestedId = String(params.id);
+        return HttpResponse.json(
+          {
+            logoUrl: "/mock/bank/logo.svg",
+            appliedColors: { primary: "#003f7f", secondary: "#c79a3a", background: "#ffffff" },
+            welcomeMessages: { fr: "Bienvenue" },
+          },
+          { status: 200 }
+        );
+      })
+    );
+
+    const { result } = renderHook(() => useBankTheme());
+    await waitFor(() => {
+      expect(result.current.logoUrl).toBe("/mock/bank/logo.svg");
+    });
+    expect(requestedId).toBe(BANK_ID);
+  });
+
+  it("ni session ni env → aucun fetch, repli monogramme", () => {
+    // onUnhandledRequest: "error" — toute requête émise ferait échouer le test.
+    const { result } = renderHook(() => useBankTheme());
+    expect(result.current.logoUrl).toBeNull();
+    expect(result.current.brandColor).toBeNull();
   });
 });
