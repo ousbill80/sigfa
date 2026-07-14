@@ -86,7 +86,8 @@ describe("API-009: tenant-isolation — refus cross-bank sur clone/kiosk/theme/p
       [bankA.bankId, bankA.agencyId, (svc.rows[0] as { id: string }).id]
     );
     await h.db.query(
-      `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, phone_hash) VALUES ($1,$2,$3,$4,1,'hash-a')`,
+      // Schéma FIDÈLE : `tickets.tracking_id` (char(21) UNIQUE) et `channel` NOT NULL sans défaut.
+      `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, phone_hash, tracking_id, channel) VALUES ($1,$2,$3,$4,1,'hash-a','trkTenantIsoOpen00001','KIOSK')`,
       [bankA.bankId, bankA.agencyId, (q.rows[0] as { id: string }).id, (svc.rows[0] as { id: string }).id]
     );
     const res = await req("POST", "/data/purge-phone", tokenB, { phone: "+2250700000099" }, "iso-purge-1");

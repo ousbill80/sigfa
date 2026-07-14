@@ -13,6 +13,8 @@ import {
   ensureKioskSession,
   getKioskSession,
   getKioskSessionToken,
+  getKioskSessionBankId,
+  subscribeKioskSession,
   resolveKioskSessionProvisioner,
   __resetKioskSessionForTests,
 } from "@/lib/kiosk-session-store";
@@ -24,6 +26,7 @@ function makeSession(overrides: Partial<KioskSession> = {}): KioskSession {
     expiresIn: 43200,
     kioskId: "14141414-1414-4141-a141-141414141414",
     agencyId: "33333333-3333-4333-a333-333333333333",
+    bankId: "22222222-2222-4222-a222-222222222222",
     createdAt: Date.now(),
     ...overrides,
   };
@@ -117,6 +120,7 @@ describe("KIOSK-001/S5: kiosk-session-store — session borne en mémoire", () =
       expiresIn: 43200,
       kioskId: "k1",
       agencyId: "a1",
+      bankId: "22222222-2222-4222-a222-222222222222",
     }));
     window.kioskAuth = { createSession };
 
@@ -127,8 +131,48 @@ describe("KIOSK-001/S5: kiosk-session-store — session borne en mémoire", () =
       expect(createSession).toHaveBeenCalledTimes(1);
       expect(session?.accessToken).toBe("jwt-via-ipc");
       expect(session?.createdAt).toBeTypeOf("number");
+      // CONTRACT-014 : le bankId du DTO IPC transite dans la session mémoire.
+      expect(session?.bankId).toBe("22222222-2222-4222-a222-222222222222");
     } finally {
       delete window.kioskAuth;
     }
+  });
+
+  // ── CONTRACT-014 : bankId de la session (theming borne) ────────────────────
+
+  it("CONTRACT-014: getKioskSessionBankId → bankId de la session valide, null sans session", async () => {
+    expect(getKioskSessionBankId()).toBeNull();
+
+    registerKioskSessionProvisioner(async () => makeSession());
+    await ensureKioskSession();
+
+    expect(getKioskSessionBankId()).toBe("22222222-2222-4222-a222-222222222222");
+  });
+
+  it("CONTRACT-014: getKioskSessionBankId → null quand la session est expirée (jamais de bankId périmé)", async () => {
+    vi.useFakeTimers();
+    registerKioskSessionProvisioner(async () => makeSession());
+    await ensureKioskSession();
+    expect(getKioskSessionBankId()).toBe("22222222-2222-4222-a222-222222222222");
+
+    vi.advanceTimersByTime(43_260 * 1000);
+    expect(getKioskSessionBankId()).toBeNull();
+  });
+
+  it("CONTRACT-014: subscribeKioskSession notifie à la création de session (theming réactif)", async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeKioskSession(listener);
+
+    registerKioskSessionProvisioner(async () => makeSession());
+    await ensureKioskSession();
+    expect(listener).toHaveBeenCalled();
+
+    // Désabonnement : plus aucune notification.
+    listener.mockClear();
+    unsubscribe();
+    __resetKioskSessionForTests();
+    registerKioskSessionProvisioner(async () => makeSession());
+    await ensureKioskSession();
+    expect(listener).not.toHaveBeenCalled();
   });
 });

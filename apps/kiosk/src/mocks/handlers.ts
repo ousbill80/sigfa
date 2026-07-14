@@ -70,6 +70,9 @@ export const handlers = [
         expiresIn: 43200,
         kioskId: "14141414-1414-4141-a141-141414141414",
         agencyId: "33333333-3333-4333-a333-333333333333",
+        // CONTRACT-014 : bankId requis — theming (--brand, logo) depuis la
+        // session, sans NEXT_PUBLIC_BANK_ID (l'env reste le repli DEV/démo).
+        bankId: "22222222-2222-4222-a222-222222222222",
       },
       { status: 201 }
     );
@@ -92,13 +95,25 @@ export const handlers = [
   // chemin « voir mon conseiller ». Démo : 3 conseillers réalistes — 2 avec une
   // photo LOCALE (aucune image réseau externe), 1 sans photo (rendu en initiales
   // côté écran). Le wildcard `:agencyId` matche l'agence transmise par l'écran.
+  // CONTRACT-014 (audit F14) : `available` requis — Awa est ABSENTE aujourd'hui
+  // pour que le parcours démo montre les DEUX états (pill + carte désactivée).
   http.get("*/public/agencies/:agencyId/relationship-managers", () => {
     return HttpResponse.json(
       {
         data: [
-          { id: "rm-kofi", displayName: "Kofi Aké", photoUrl: "/mock/rm/kofi.svg" },
-          { id: "rm-awa", displayName: "Awa Diallo" },
-          { id: "rm-yao", displayName: "Yao Kouassi", photoUrl: "/mock/rm/yao.svg" },
+          {
+            id: "rm-kofi",
+            displayName: "Kofi Aké",
+            photoUrl: "/mock/rm/kofi.svg",
+            available: true,
+          },
+          { id: "rm-awa", displayName: "Awa Diallo", available: false },
+          {
+            id: "rm-yao",
+            displayName: "Yao Kouassi",
+            photoUrl: "/mock/rm/yao.svg",
+            available: true,
+          },
         ],
       },
       { status: 200 }

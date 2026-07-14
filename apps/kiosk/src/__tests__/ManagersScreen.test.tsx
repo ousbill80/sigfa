@@ -50,6 +50,11 @@ const frMessages = {
     retryButton: "Réessayer",
     offlineBanner: "Mode hors connexion",
     avatarAlt: "Photo de {name}",
+    availablePill: "Présent",
+    absentPill: "Absent aujourd'hui",
+    absentHint:
+      "De retour bientôt — choisissez un autre conseiller ou continuez sans rendez-vous.",
+    continueWithout: "Continuer sans conseiller",
   },
 };
 
@@ -66,6 +71,11 @@ const enMessages = {
     retryButton: "Retry",
     offlineBanner: "Offline mode",
     avatarAlt: "Photo of {name}",
+    availablePill: "Present",
+    absentPill: "Away today",
+    absentHint:
+      "Back soon — choose another advisor or continue without an appointment.",
+    continueWithout: "Continue without an advisor",
   },
 };
 
@@ -78,10 +88,12 @@ import {
 const AGENCY_ID = "agt-001";
 
 function managersResponse(count: number) {
+  // CONTRACT-014 : `available` requis sur PublicRelationshipManager —
+  // Awa (rm-2) est ABSENTE aujourd'hui (audit F14 : les deux états visibles).
   const managers = [
-    { id: "rm-1", displayName: "Kofi A.", photoUrl: "/rm/kofi.jpg" },
-    { id: "rm-2", displayName: "Awa Diallo" },
-    { id: "rm-3", displayName: "Yao Kouassi", photoUrl: "/rm/yao.jpg" },
+    { id: "rm-1", displayName: "Kofi A.", photoUrl: "/rm/kofi.jpg", available: true },
+    { id: "rm-2", displayName: "Awa Diallo", available: false },
+    { id: "rm-3", displayName: "Yao Kouassi", photoUrl: "/rm/yao.jpg", available: true },
   ];
   return { data: managers.slice(0, count) };
 }
@@ -344,5 +356,116 @@ describe("MODEL-KIOSK-B: ManagersScreen", () => {
     });
     const emojiRegex = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
     expect(emojiRegex.test(container.textContent ?? "")).toBe(false);
+  });
+
+  // ── CONTRACT-014 / AUDIT-F14 : disponibilité des conseillers ────────────────
+
+  it("CONTRACT-014 (audit F14): conseiller disponible → pill « Présent » icône+texte, ton succès inverse ≥ 7:1", async () => {
+    mockManagers(3);
+    const { container } = renderScreen();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("manager-card").length).toBe(3);
+    });
+    const pills = container.querySelectorAll("[data-testid='manager-available-pill']");
+    // Kofi + Yao présents → 2 pills « Présent ».
+    expect(pills.length).toBe(2);
+    pills.forEach((pill) => {
+      const el = pill as HTMLElement;
+      expect(el.textContent).toContain("Présent");
+      // Icône SIGFA appariée au texte (jamais de couleur seule).
+      expect(el.querySelector("svg[data-icon='valider']")).toBeInTheDocument();
+      // Ton succès inverse (audit F6/F14) : --success-inv sur --night = 10.6:1.
+      expect(el.style.color).toBe("var(--success-inv)");
+      expect(el.style.backgroundColor).toBe("var(--night)");
+      // Texte porteur de sens ≥ 24px (règle kiosque).
+      expect(parseInt(el.style.fontSize, 10)).toBeGreaterThanOrEqual(24);
+    });
+  });
+
+  it("CONTRACT-014 (audit F14): conseiller absent → pill « Absent aujourd'hui » en encre douce, icône+texte", async () => {
+    mockManagers(3);
+    const { container } = renderScreen();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("manager-card").length).toBe(3);
+    });
+    const pills = container.querySelectorAll("[data-testid='manager-absent-pill']");
+    // Awa absente → 1 pill « Absent aujourd'hui ».
+    expect(pills.length).toBe(1);
+    const pill = pills[0] as HTMLElement;
+    expect(pill.textContent).toContain("Absent aujourd'hui");
+    expect(pill.querySelector("svg[data-icon='horloge']")).toBeInTheDocument();
+    // Encre douce — l'absence est une information calme, jamais une alerte.
+    expect(pill.style.color).toBe("var(--ink-soft)");
+    expect(parseInt(pill.style.fontSize, 10)).toBeGreaterThanOrEqual(24);
+  });
+
+  it("CONTRACT-014 (audit F14): conseiller absent → carte NON sélectionnable, jamais de file morte", async () => {
+    mockManagers(3);
+    renderScreen();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("manager-card").length).toBe(3);
+    });
+    // Awa (rm-2) est absente : sa carte est désactivée.
+    const awaCard = screen.getAllByTestId("manager-card")[1] as HTMLButtonElement;
+    expect(awaCard).toBeDisabled();
+    expect(awaCard).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(awaCard);
+    // Aucune navigation : le client n'est JAMAIS envoyé dans une file morte.
+    expect(mockPush).not.toHaveBeenCalled();
+    // Explication courte à hauteur de client (jamais un cul-de-sac muet).
+    expect(
+      screen.getByText(
+        "De retour bientôt — choisissez un autre conseiller ou continuez sans rendez-vous."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("CONTRACT-014 (audit F14): chemin « continuer sans conseiller » évident → /services, cible ≥ 72px", async () => {
+    mockManagers(3);
+    renderScreen();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("manager-card").length).toBe(3);
+    });
+    const cta = screen.getByTestId("managers-continue-without") as HTMLButtonElement;
+    expect(cta.textContent).toContain("Continuer sans conseiller");
+    expect(parseInt(cta.style.minHeight, 10)).toBeGreaterThanOrEqual(72);
+    fireEvent.click(cta);
+    expect(mockPush).toHaveBeenCalledWith("/fr/services");
+  });
+
+  it("CONTRACT-014 (audit F14): EN — Present / Away today + hint localisés", async () => {
+    mockManagers(3);
+    renderScreen("en", enMessages);
+    await waitFor(() => {
+      expect(screen.getAllByTestId("manager-card").length).toBe(3);
+    });
+    expect(screen.getAllByText("Present").length).toBe(2);
+    expect(screen.getByText("Away today")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Back soon — choose another advisor or continue without an appointment."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("CONTRACT-014: rétrocompat — réponse sans champ available → conseiller traité PRÉSENT (jamais bloqué à tort)", async () => {
+    server.use(
+      http.get("*/public/agencies/:agencyId/relationship-managers", () =>
+        HttpResponse.json(
+          { data: [{ id: "rm-legacy", displayName: "Kofi A." }] },
+          { status: 200 }
+        )
+      )
+    );
+    renderScreen();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("manager-card").length).toBe(1);
+    });
+    const card = screen.getByTestId("manager-card") as HTMLButtonElement;
+    expect(card).not.toBeDisabled();
+    card.click();
+    expect(mockPush).toHaveBeenCalledWith(
+      `/fr/confirmation?targetManagerId=rm-legacy&agencyId=${AGENCY_ID}&managerName=${encodeURIComponent("Kofi A.")}`
+    );
   });
 });

@@ -89,8 +89,12 @@ describe("API-008: banques CRUD + RBAC + audit", () => {
     expect(res.status).toBe(201);
     const bank = (await res.json()) as { id: string; slug: string; active: boolean };
     expect(bank.slug).toBe("baci");
+    // Schéma FIDÈLE (migrations réelles) : le trigger DB `audit_change` sur `banks`
+    // (0003) journalise AUSSI la mutation (`INSERT banks`). On cible donc PRÉCISÉMENT
+    // l'entrée APPLICATIVE (`POST /banks`, entity_type `bank`), défense-en-profondeur.
     const audit = await h.db.query(
-      `SELECT action, entity_type, diff FROM audit_log WHERE entity_id = $1`,
+      `SELECT action, entity_type, diff FROM audit_log
+         WHERE entity_id = $1 AND action = 'POST /banks'`,
       [bank.id]
     );
     expect(audit.rows).toHaveLength(1);

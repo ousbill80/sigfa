@@ -70,7 +70,11 @@
     "errorMessage": "Unable to load advisors. Retry or go to reception.",
     "retryButton": "Retry",
     "offlineBanner": "Offline mode",
-    "avatarAlt": "Photo of {name}"
+    "avatarAlt": "Photo of {name}",
+    "availablePill": "Present",
+    "absentPill": "Away today",
+    "absentHint": "Back soon — choose another advisor or continue without an appointment.",
+    "continueWithout": "Continue without an advisor"
   },
   "operationsModelA": {
     "title": "Which operation do you need?",

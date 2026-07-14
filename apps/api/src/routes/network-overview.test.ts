@@ -59,7 +59,8 @@ async function seedKiosk(fx: BankFixture, lastSeenSql: string): Promise<void> {
 /** Insère un ticket (avec PII : phone/display_number) pour vérifier l'anonymisation. */
 async function seedTicket(fx: BankFixture): Promise<void> {
   const svc = await h.db.query(
-    `INSERT INTO services (bank_id, agency_id, code, name) VALUES ($1,$2,'S1','Service') RETURNING id`,
+    // Schéma FIDÈLE : `services.code` contraint `^[A-Z]{2,4}$` (services_code_format).
+    `INSERT INTO services (bank_id, agency_id, code, name) VALUES ($1,$2,'SVC','Service') RETURNING id`,
     [fx.bankId, fx.agencyId]
   );
   const serviceId = (svc.rows[0] as { id: string }).id;
@@ -69,8 +70,9 @@ async function seedTicket(fx: BankFixture): Promise<void> {
   );
   const queueId = (q.rows[0] as { id: string }).id;
   await h.db.query(
-    `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, display_number, status, phone_encrypted, issued_at)
-     VALUES ($1,$2,$3,$4, 1, 'A-001', 'WAITING', 'CIPHER', NOW())`,
+    // Schéma FIDÈLE : `tickets.tracking_id` (char(21) UNIQUE) et `channel` NOT NULL sans défaut.
+    `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, display_number, status, phone_encrypted, issued_at, tracking_id, channel)
+     VALUES ($1,$2,$3,$4, 1, 'A-001', 'WAITING', 'CIPHER', NOW(), 'trkNetOverview0000001', 'KIOSK')`,
     [fx.bankId, fx.agencyId, queueId, serviceId]
   );
 }
@@ -87,7 +89,7 @@ beforeAll(async () => {
   await seedKiosk(bankB, "now()");
   // SUPER_ADMIN plateforme (bank_id NULL) — id UUID réel pour l'attribution d'audit.
   const su = await h.db.query(
-    `INSERT INTO users (bank_id, email, role) VALUES (NULL, 'net001-super@sigfa.ci', 'SUPER_ADMIN') RETURNING id`
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role) VALUES (NULL, 'net001-super@sigfa.ci', 'x', 'Super', 'Admin', 'SUPER_ADMIN') RETURNING id`
   );
   const superAdminId = (su.rows[0] as { id: string }).id;
   superAdminToken = await forgeToken(h.jwtSecretBytes, "SUPER_ADMIN", superAdminId, null, []);
@@ -207,7 +209,13 @@ describe("NET-001: LECTURE SEULE — mutation platform → 403 PLATFORM_READ_ONL
 
 describe("NET-001: audit cross-tenant — chaque lecture écrit PLATFORM_READ immuable (scope CROSS_TENANT)", () => {
   it("NET-001: une lecture écrit une entrée PLATFORM_READ par banque lue, attribuée au SUPER_ADMIN, scope CROSS_TENANT", async () => {
-    await h.db.query(`DELETE FROM audit_log WHERE action = 'PLATFORM_READ'`);
+    // Schéma FIDÈLE : `audit_log` est IMMUABLE (trigger `audit_log_no_delete`, 0003) —
+    // impossible de purger avant lecture. On mesure donc le DELTA de la requête : au
+    // moins une entrée PLATFORM_READ par banque lue (A + B) est ajoutée par CE GET.
+    const before = await h.db.query(
+      `SELECT COUNT(*)::int AS n FROM audit_log WHERE action = 'PLATFORM_READ'`
+    );
+    const beforeCount = (before.rows[0] as { n: number }).n;
     const res = await fetch(`${baseUrl}/admin/network-overview`, {
       headers: { Authorization: `Bearer ${superAdminToken}`, "x-forwarded-for": "41.0.0.9" },
     });
@@ -215,7 +223,8 @@ describe("NET-001: audit cross-tenant — chaque lecture écrit PLATFORM_READ im
     const rows = await h.db.query(
       `SELECT bank_id, actor_role, action, entity_type, diff FROM audit_log WHERE action = 'PLATFORM_READ' ORDER BY bank_id`
     );
-    // Au moins une entrée par banque lue (A + B).
+    // Au moins une entrée par banque lue (A + B) ajoutée par cette requête.
+    expect(rows.rows.length - beforeCount).toBeGreaterThanOrEqual(2);
     expect(rows.rows.length).toBeGreaterThanOrEqual(2);
     const first = rows.rows[0] as {
       actor_role: string;

@@ -12,6 +12,8 @@ const mockSessionResponse = {
   expiresIn: 43200,
   kioskId: "14141414-1414-4141-a141-141414141414",
   agencyId: "33333333-3333-4333-a333-333333333333",
+  // CONTRACT-014 : bankId requis dans KioskSessionResponse (theming session).
+  bankId: "22222222-2222-4222-a222-222222222222",
 };
 
 const server = setupServer(
@@ -43,6 +45,9 @@ describe("KIOSK-001: kiosk-session", () => {
       "eyJhbGciOiJIUzI1NiJ9.kioskPayload.sig"
     );
     expect(result?.expiresIn).toBe(43200);
+    // CONTRACT-014 : le bankId de la session transite jusqu'au client
+    // (theming --brand/logo sans NEXT_PUBLIC_BANK_ID).
+    expect(result?.bankId).toBe("22222222-2222-4222-a222-222222222222");
   });
 
   it("KIOSK-001: session expirée → écran erreur + retry silencieux (test d'horloge Vitest)", async () => {

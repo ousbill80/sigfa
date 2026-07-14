@@ -16,6 +16,14 @@
  * personnelle du conseiller — MODEL-API-B/D6). Le « Moment Ticket » indiquera le
  * conseiller choisi.
  *
+ * CONTRACT-014 (audit F14) — disponibilité : chaque carte affiche l'état
+ * `available` du conseiller (pill « Présent » en succès inverse ≥ 7:1 vs
+ * « Absent aujourd'hui » en encre douce, icône+texte appariés). DÉCISION
+ * QUALITÉ DE SERVICE : un conseiller absent N'EST PAS sélectionnable — le
+ * choisir enverrait le client dans une file morte. La carte est désactivée
+ * avec une explication courte, et le chemin « Continuer sans conseiller »
+ * (→ /services) reste évident sous la grille.
+ *
  * 5 états : loading, liste (nominal), empty (« aucun conseiller disponible »),
  * error (500 + réessayer), offline (bandeau sur erreur réseau). « ← Retour »,
  * FR/EN, contraste ≥ 7:1, tokens uniquement.
@@ -29,7 +37,13 @@ import { createSigfaClient } from "@sigfa/contracts";
 import { EmptyState, IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
-import { AccessibilityIcon, ChevronIcon, PersonIcon } from "@/components/icons/UiIcons";
+import {
+  AccessibilityIcon,
+  CheckIcon,
+  ChevronIcon,
+  ClockIcon,
+  PersonIcon,
+} from "@/components/icons/UiIcons";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { SelectionSkeletonGrid } from "@/components/SelectionSkeletonGrid";
 import { purgeTicketOperationLabel } from "@/lib/ticket-operation-store";
@@ -39,6 +53,13 @@ export interface RelationshipManagerItem {
   id: string;
   displayName: string;
   photoUrl?: string | null;
+  /**
+   * CONTRACT-014 (audit F14) : présence du conseiller AUJOURD'HUI, dérivée
+   * serveur du statut temps réel (jamais d'horaire personnel exposé).
+   * Optionnel côté client par ROBUSTESSE : une réponse sans le champ traite
+   * le conseiller comme présent — jamais bloqué à tort.
+   */
+  available?: boolean;
 }
 
 interface ManagersScreenProps {
@@ -380,18 +401,27 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
           }}
         >
           {managers.map((manager) => {
+            // CONTRACT-014 : robustesse — sans champ `available`, le
+            // conseiller est traité PRÉSENT (jamais bloqué à tort).
+            const isAvailable = manager.available !== false;
             return (
               <button
                 key={manager.id}
                 data-testid="manager-card"
-                onClick={() => goToConfirmation(manager.id, manager.displayName)}
+                disabled={!isAvailable}
+                aria-disabled={!isAvailable}
+                onClick={
+                  isAvailable
+                    ? () => goToConfirmation(manager.id, manager.displayName)
+                    : undefined
+                }
                 style={{
                   minHeight: "96px",
-                  backgroundColor: "var(--surface-1)",
+                  backgroundColor: isAvailable ? "var(--surface-1)" : "var(--surface-2)",
                   borderRadius: "var(--r-lg)",
                   border: "1px solid var(--hairline)",
-                  boxShadow: "var(--shadow-2)",
-                  cursor: "pointer",
+                  boxShadow: isAvailable ? "var(--shadow-2)" : "none",
+                  cursor: isAvailable ? "pointer" : "default",
                   display: "flex",
                   alignItems: "center",
                   padding: "var(--space-4) var(--space-6)",
@@ -419,17 +449,102 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
                     style={{
                       fontSize: "28px",
                       fontWeight: 600,
-                      color: "var(--action-label)",
+                      color: isAvailable ? "var(--action-label)" : "var(--ink-soft)",
                     }}
                   >
                     {manager.displayName}
                   </span>
+                  {/* CONTRACT-014 (audit F14) : pill de disponibilité —
+                      icône+texte appariés, jamais la couleur seule. */}
+                  {isAvailable ? (
+                    <span
+                      data-testid="manager-available-pill"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "var(--space-2)",
+                        fontSize: "24px",
+                        fontWeight: 600,
+                        lineHeight: 1,
+                        padding: "var(--space-2) var(--space-4)",
+                        borderRadius: "var(--r-full)",
+                        // Succès inverse sur nuit (audit F6) : 10.6:1 mesuré.
+                        backgroundColor: "var(--night)",
+                        color: "var(--success-inv)",
+                      }}
+                    >
+                      <CheckIcon size={24} />
+                      {t("availablePill")}
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="manager-absent-pill"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "var(--space-2)",
+                        fontSize: "24px",
+                        fontWeight: 600,
+                        lineHeight: 1,
+                        padding: "var(--space-2) var(--space-4)",
+                        borderRadius: "var(--r-full)",
+                        // Encre douce : une information calme, pas une alerte.
+                        backgroundColor: "var(--surface-1)",
+                        color: "var(--ink-soft)",
+                        border: "1px solid var(--hairline)",
+                      }}
+                    >
+                      <ClockIcon size={24} />
+                      {t("absentPill")}
+                    </span>
+                  )}
+                  {/* Explication courte : jamais un cul-de-sac muet. */}
+                  {!isAvailable && (
+                    <span
+                      data-testid="manager-absent-hint"
+                      // Encre pleine : l'explication doit rester lisible plein
+                      // soleil même sur une carte désactivée (≥ 7:1).
+                      style={{ fontSize: "24px", color: "var(--ink)" }}
+                    >
+                      {t("absentHint")}
+                    </span>
+                  )}
                 </div>
-                <ChevronIcon size={28} style={{ flexShrink: 0, color: "var(--ink-soft)" }} />
+                {isAvailable && (
+                  <ChevronIcon size={28} style={{ flexShrink: 0, color: "var(--ink-soft)" }} />
+                )}
               </button>
             );
           })}
         </div>
+
+        {/* CONTRACT-014 (audit F14) : le chemin « continuer sans conseiller »
+            reste ÉVIDENT — jamais de client piégé face à des absents. */}
+        <button
+          data-testid="managers-continue-without"
+          onClick={() => {
+            purgeTicketOperationLabel();
+            router.push(`/${currentLocale}/services`);
+          }}
+          style={{
+            minHeight: "72px",
+            alignSelf: "center",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-3)",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "var(--ink-inverse)",
+            backgroundColor: "transparent",
+            border: "2px solid var(--gold)",
+            borderRadius: "var(--r-md)",
+            padding: "var(--space-3) var(--space-8)",
+            cursor: "pointer",
+          }}
+        >
+          <ChevronIcon size={24} />
+          {t("continueWithout")}
+        </button>
       </div>
 
       <button

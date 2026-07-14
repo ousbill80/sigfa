@@ -31,6 +31,7 @@ function makeSession(overrides: Partial<KioskSession> = {}): KioskSession {
     expiresIn: 43200,
     kioskId: "k1",
     agencyId: "a1",
+    bankId: "22222222-2222-4222-a222-222222222222",
     createdAt: Date.now(),
     ...overrides,
   };

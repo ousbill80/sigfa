@@ -133,8 +133,12 @@ describe("API-008: agences CRUD + soft-delete + RBAC + audit", () => {
     const del = await h.db.query(`INSERT INTO agencies (bank_id, name) VALUES ($1,'Del1') RETURNING id`, [bankA.bankId]);
     const agencyId = (del.rows[0] as { id: string }).id;
     const { serviceId, queueId } = await seedService(bankA.bankId, agencyId);
+    // Schéma FIDÈLE (migrations réelles) : `tickets.tracking_id` (char(21) UNIQUE)
+    // et `tickets.channel` (ticket_channel) sont NOT NULL sans défaut — on les
+    // fournit explicitement (le test cible la garde « ticket ouvert », pas l'émission).
     await h.db.query(
-      `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, status) VALUES ($1,$2,$3,$4,1,'WAITING')`,
+      `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, status, tracking_id, channel)
+         VALUES ($1,$2,$3,$4,1,'WAITING','trkAgencyOpen00000001','KIOSK')`,
       [bankA.bankId, agencyId, queueId, serviceId]
     );
     const res = await req("DELETE", `/agencies/${agencyId}`, adminToken);

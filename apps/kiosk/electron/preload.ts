@@ -24,6 +24,8 @@ export interface KioskSessionBridgeDto {
   expiresIn: number;
   kioskId: string;
   agencyId: string;
+  /** CONTRACT-014 : bankId public de la borne (theming session, zéro PII). */
+  bankId: string;
 }
 
 /** Expose `window.kioskAuth` au monde isolé du renderer. */
