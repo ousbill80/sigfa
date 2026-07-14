@@ -27,3 +27,10 @@ packages/database/migrations/*
 
 # ─── Code généré automatiquement ─────────────────────────────────────────────
 packages/contracts/generated/*
+
+# ─── Scaffolding harnais E2E Playwright ──────────────────────────────────────
+# Le support/ E2E (démarrage Testcontainers, application des migrations, seed,
+# lancement API/web, état partagé) est de l'INFRASTRUCTURE DE TEST, exercée de
+# bout en bout par les specs `e2e/specs/*.spec.ts` (elles-mêmes les tests). Il
+# n'a pas de test unitaire dédié — au même titre que global-setup/teardown.
+apps/web/e2e/support/*
