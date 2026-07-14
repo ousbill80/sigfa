@@ -1,10 +1,11 @@
 /**
  * KIOSK-007 — Tests TDD (phase rouge) : états dégradés imprimante sur TicketScreen.
- * Bascule transparente (aucune mention de panne au client), affichage 8 s,
- * « Photographiez votre numéro ». Réseau coupé après 201.
+ * Bascule transparente (aucune mention de panne au client), affichage prolongé
+ * (20 s depuis l'audit F9 — 10 s nominal ×2), « Photographiez votre numéro ».
+ * Réseau coupé après 201.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 
@@ -37,12 +38,18 @@ vi.mock("next/navigation", () => ({
 
 const frMessages = {
   ticket005: {
+    eyebrow: "Votre ticket",
     position: "Position dans la file : {position}e",
     waitEstimate: "Attente estimée : {minutes} minutes",
     printing: "Votre ticket s'imprime...",
     smsSent: "SMS envoyé au {maskedPhone}",
     returning: "Retour automatique dans {seconds} s",
+    finishButton: "Terminer",
     voiceAnnounce: "Votre numéro est {displayNumber}.",
+    voiceAnnounceOffline: "Votre numéro est {displayNumber}. Position et attente estimées dès la reconnexion.",
+    offlineBanner: "Mode hors connexion — ticket temporaire",
+    offlineInfo: "Ticket local — synchronisation dès reconnexion",
+    offlineEstimate: "Position et attente : estimation à la reconnexion",
     printerError: "Imprimante indisponible",
   },
   voice008: { playLabel: "Écouter" },
@@ -73,7 +80,7 @@ describe("KIOSK-007: TicketScreen états dégradés", () => {
     vi.useRealTimers();
   });
 
-  it("KIOSK-007: printerStatus PAPER_LOW → affichage prolongé 8 s, message 'Photographiez' visible", () => {
+  it("KIOSK-007: printerStatus PAPER_LOW → affichage prolongé 20 s, message 'Photographiez' visible", () => {
     renderTicket({ printerStatus: "PAPER_LOW" });
 
     // Message « Photographiez votre numéro ou recevez-le par SMS » visible.
@@ -83,21 +90,27 @@ describe("KIOSK-007: TicketScreen états dégradés", () => {
     // Aucune mention de panne côté client.
     expect(screen.queryByText(/panne|indisponible|erreur|imprimante/i)).not.toBeInTheDocument();
 
-    // Retour auto NON déclenché avant 8 s.
-    vi.advanceTimersByTime(4000);
+    // Retour auto NON déclenché avant 20 s (audit F9 : 10 s nominal ×2 dégradé).
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 
-  it("KIOSK-007: printerStatus OK → affichage normal 4 s, aucun message dégradé", () => {
+  it("KIOSK-007: printerStatus OK → affichage normal 10 s, aucun message dégradé", () => {
     renderTicket({ printerStatus: "OK" });
     expect(screen.queryByTestId("degraded-photo-message")).not.toBeInTheDocument();
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 
-  it("KIOSK-007: printerStatus ERROR et OFFLINE → même bascule transparente 8 s", () => {
+  it("KIOSK-007: printerStatus ERROR et OFFLINE → même bascule transparente 20 s", () => {
     const { unmount } = renderTicket({ printerStatus: "ERROR" });
     expect(screen.getByTestId("degraded-photo-message")).toBeInTheDocument();
     // Toujours pas de mot « panne » à l'écran.
@@ -108,13 +121,17 @@ describe("KIOSK-007: TicketScreen états dégradés", () => {
     expect(screen.getByTestId("degraded-photo-message")).toBeInTheDocument();
   });
 
-  it("KIOSK-007: réseau coupé après 201 avant confirmation imprimante → numéro affiché 8 s + 'Photographiez votre numéro'", () => {
+  it("KIOSK-007: réseau coupé après 201 avant confirmation imprimante → numéro affiché 20 s + 'Photographiez votre numéro'", () => {
     renderTicket({ networkLostBeforePrinterConfirm: true });
     expect(screen.getByTestId("degraded-photo-message")).toBeInTheDocument();
     expect(screen.getByText("A007")).toBeInTheDocument();
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 });

@@ -31,17 +31,28 @@ vi.mock("next/navigation", () => ({
 
 import { TicketScreen } from "@/components/TicketScreen";
 import { useOfflineTicket } from "@/hooks/useOfflineTicket";
-import { getOfflineDb, __resetOfflineDbForTests } from "@/lib/offline-db";
+import {
+  getOfflineDb,
+  isLocalDisplayNumber,
+  __resetOfflineDbForTests,
+} from "@/lib/offline-db";
 import { renderHook } from "@testing-library/react";
 
 const messages = {
   ticket005: {
+    eyebrow: "Votre ticket",
     position: "Position dans la file : {position}e",
     waitEstimate: "Attente estimée : {minutes} minutes",
     printing: "Votre ticket s'imprime...",
     smsSent: "SMS envoyé au {maskedPhone}",
     returning: "Retour automatique dans {seconds} s",
+    finishButton: "Terminer",
     voiceAnnounce: "Votre numéro est {displayNumber}.",
+    voiceAnnounceOffline:
+      "Votre numéro est {displayNumber}. Position et attente estimées dès la reconnexion.",
+    offlineBanner: "Mode hors connexion — ticket temporaire",
+    offlineInfo: "Ticket local — synchronisation dès reconnexion",
+    offlineEstimate: "Position et attente : estimation à la reconnexion",
     printerError: "Imprimante indisponible",
   },
   voice008: { playLabel: "Écouter" },
@@ -91,6 +102,8 @@ describe("KIOSK-006: parcours online == offline", () => {
     online.unmount();
 
     // Offline : le hook émet un ticket local, on le rend dans le MÊME écran.
+    // NOTE (audit F5) : le MÊME composant sert les deux chemins — la structure
+    // reste identique tant que le mode honnête (isOfflineTicket) n'est pas levé.
     const { result } = renderHook(() => useOfflineTicket());
     const offlineTicket = await result.current.createOfflineTicket({ serviceId: "svc-1" });
     expect(offlineTicket.isOffline).toBe(true);
@@ -101,5 +114,40 @@ describe("KIOSK-006: parcours online == offline", () => {
 
     // Structure DOM identique → parcours client inchangé.
     expect(offlineStructure).toBe(onlineStructure);
+  });
+
+  it("KIOSK-005b (audit F5): ticket émis hors-ligne → Moment Ticket HONNÊTE (bandeau + estimation à la reconnexion)", async () => {
+    // Le hook émet un ticket LOCAL (position/attente non fiables par nature).
+    const { result } = renderHook(() => useOfflineTicket());
+    const offlineTicket = await result.current.createOfflineTicket({ serviceId: "svc-1" });
+    expect(offlineTicket.isOffline).toBe(true);
+    expect(offlineTicket.displayNumber).toMatch(/^H\d{3}$/);
+    // Le numéro local est reconnu par le détecteur du chemin offline.
+    expect(isLocalDisplayNumber(offlineTicket.displayNumber)).toBe(true);
+
+    // Rendu HONNÊTE : le chemin offline lève isOfflineTicket.
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={messages}>
+        <TicketScreen
+          displayNumber={offlineTicket.displayNumber}
+          position={offlineTicket.position}
+          estimatedWaitMinutes={offlineTicket.estimatedWaitMinutes}
+          isOfflineTicket={true}
+        />
+      </NextIntlClientProvider>
+    );
+
+    // Bandeau « Mode hors connexion — ticket temporaire » VISIBLE (clés câblées).
+    const banner = container.querySelector("[data-testid='offline-banner']");
+    expect(banner?.textContent).toContain("ticket temporaire");
+    // Plus jamais « Position : 1e — Attente : 0 minutes » mensongers.
+    expect(container.textContent).not.toContain("Position dans la file");
+    expect(container.textContent).not.toContain("Attente estimée");
+    expect(container.textContent).toContain("estimation à la reconnexion");
+    expect(container.textContent).toContain("synchronisation dès reconnexion");
+    // Le numéro reste le héros (le client garde sa preuve de passage).
+    expect(
+      container.querySelector("[data-testid='ticket-number']")?.textContent
+    ).toBe(offlineTicket.displayNumber);
   });
 });

@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   OfflineTicketDatabase,
   formatLocalNumber,
+  isLocalDisplayNumber,
   nextLocalSequence,
   TICKET_COUNTER_ID,
   LOCAL_NUMBER_PREFIX,
@@ -67,5 +68,17 @@ describe("KIOSK-006: offline-db Dexie", () => {
   it("KIOSK-006: formatLocalNumber → préfixe H + 3 chiffres", () => {
     expect(formatLocalNumber(7)).toBe("H007");
     expect(formatLocalNumber(123)).toBe("H123");
+  });
+
+  it("KIOSK-005b (audit F5): isLocalDisplayNumber reconnaît les numéros locaux H###", () => {
+    expect(isLocalDisplayNumber(formatLocalNumber(1))).toBe(true);
+    expect(isLocalDisplayNumber("H007")).toBe(true);
+    expect(isLocalDisplayNumber("H1234")).toBe(true);
+    // Numéros serveur → jamais considérés locaux.
+    expect(isLocalDisplayNumber("A007")).toBe(false);
+    expect(isLocalDisplayNumber("B-042")).toBe(false);
+    expect(isLocalDisplayNumber("H")).toBe(false);
+    expect(isLocalDisplayNumber("HX01")).toBe(false);
+    expect(isLocalDisplayNumber("")).toBe(false);
   });
 });

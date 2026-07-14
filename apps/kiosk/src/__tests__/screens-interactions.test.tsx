@@ -4,7 +4,7 @@
  * Interactions : sélection langue, sélection service, saisie téléphone, états error/offline/empty.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { server } from "@/mocks/server";
@@ -705,7 +705,7 @@ describe("KIOSK-005: TicketScreen additional branches", () => {
     expect(smsEl.textContent).toContain("7");
   });
 
-  it("KIOSK-005: isAccessibilityMode=false → auto-return after 4s", () => {
+  it("KIOSK-005: isAccessibilityMode=false → auto-return after 10s (audit F9)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={ticketMessages}>
         <TicketScreen
@@ -717,7 +717,9 @@ describe("KIOSK-005: TicketScreen additional branches", () => {
       </NextIntlClientProvider>
     );
 
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 

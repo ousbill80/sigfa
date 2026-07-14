@@ -3,7 +3,7 @@
  * Écrits AVANT l'implémentation (phase rouge).
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 
@@ -62,14 +62,18 @@ vi.mock("@/hooks/useAccessibilityMode", () => ({
 
 const frMessages = {
   ticket005: {
+    eyebrow: "Votre ticket",
     position: "Position dans la file : {position}e",
     waitEstimate: "Attente estimée : {minutes} minutes",
     printing: "Votre ticket s'imprime...",
     smsSent: "SMS envoyé au {maskedPhone}",
     returning: "Retour automatique dans {seconds} s",
+    finishButton: "Terminer",
     voiceAnnounce: "Votre numéro est {displayNumber}. Vous êtes en position {position}. Attente estimée : {minutes} minutes.",
+    voiceAnnounceOffline: "Votre numéro est {displayNumber}. Position et attente estimées dès la reconnexion.",
     offlineBanner: "Mode hors connexion — ticket temporaire",
     offlineInfo: "Ticket local — synchronisation dès reconnexion",
+    offlineEstimate: "Position et attente : estimation à la reconnexion",
     printerError: "Imprimante indisponible — un agent vous remettra votre ticket",
     managerReminder: "Vous verrez : {name}",
   },
@@ -81,14 +85,18 @@ const frMessages = {
 
 const enMessages = {
   ticket005: {
+    eyebrow: "Your ticket",
     position: "Position in queue: {position}",
     waitEstimate: "Estimated wait: {minutes} minutes",
     printing: "Your ticket is printing...",
     smsSent: "SMS sent to {maskedPhone}",
     returning: "Returning automatically in {seconds} s",
+    finishButton: "Done",
     voiceAnnounce: "Your number is {displayNumber}. You are in position {position}. Estimated wait: {minutes} minutes.",
+    voiceAnnounceOffline: "Your number is {displayNumber}. Position and wait will be estimated on reconnection.",
     offlineBanner: "Offline mode — temporary ticket",
     offlineInfo: "Local ticket — sync on reconnection",
+    offlineEstimate: "Position and wait: estimated on reconnection",
     printerError: "Printer unavailable — a staff member will give you your ticket",
     managerReminder: "You'll see: {name}",
   },
@@ -205,7 +213,7 @@ describe("KIOSK-005: TicketScreen", () => {
     );
   });
 
-  it("KIOSK-005: printerStatus OK → print message visible with --success", () => {
+  it("KIOSK-005: printerStatus OK → print message visible, token on-night ≥ 7:1 (audit F6)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <TicketScreen {...defaultProps} printerStatus="OK" />
@@ -214,7 +222,20 @@ describe("KIOSK-005: TicketScreen", () => {
 
     const printMsg = screen.getByText("Votre ticket s'imprime...");
     expect(printMsg).toBeInTheDocument();
-    expect((printMsg as HTMLElement).style.color).toBe("var(--success)");
+    // La consigne la plus importante du parcours : --success ne fait que
+    // 3.49:1 sur --night (audit F6) → variante on-night --success-inv
+    // (10.6:1 mesuré sur --night, cf. tokens @sigfa/ui).
+    expect((printMsg as HTMLElement).style.color).toBe("var(--success-inv)");
+  });
+
+  it("KIOSK-005: SMS envoyé → même variante on-night --success-inv (audit F6)", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} phoneNumber="0707474747" smsConsent={true} />
+      </NextIntlClientProvider>
+    );
+    const smsEl = screen.getByTestId("sms-sent");
+    expect(smsEl.style.color).toBe("var(--success-inv)");
   });
 
   it("KIOSK-005: phoneNumber entered + smsConsent → masked number visible", () => {
@@ -230,7 +251,7 @@ describe("KIOSK-005: TicketScreen", () => {
     expect(smsEl.textContent).toContain("47");
   });
 
-  it("KIOSK-005: return to home at 4 s (Vitest fake-timer)", () => {
+  it("KIOSK-005b (audit F9): return to home at 10 s nominal (Vitest fake-timer)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <TicketScreen {...defaultProps} />
@@ -240,31 +261,92 @@ describe("KIOSK-005: TicketScreen", () => {
     // Navigate should not have been called yet
     expect(mockPush).not.toHaveBeenCalled();
 
-    // After 4 seconds
-    vi.advanceTimersByTime(4000);
+    // L'ancien délai de 4 s ne suffit plus (audit F9 : lecture + annonce ~8 s).
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 
-  it("KIOSK-005: return to home at 8 s in accessibility mode (Vitest fake-timer)", () => {
-    vi.doMock("@/hooks/useAccessibilityMode", () => ({
-      useAccessibilityMode: () => ({
-        isAccessibilityMode: true,
-        toggleAccessibilityMode: vi.fn(),
-      }),
-    }));
-
+  it("KIOSK-005b (audit F9): return to home at 20 s in accessibility mode (Vitest fake-timer)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <TicketScreen {...defaultProps} isAccessibilityMode={true} />
       </NextIntlClientProvider>
     );
 
-    // Should NOT navigate after 4s
-    vi.advanceTimersByTime(4000);
+    // Should NOT navigate after 10s (délai doublé en accessibilité)
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).not.toHaveBeenCalled();
 
-    // Should navigate after 8s
-    vi.advanceTimersByTime(4000);
+    // Should navigate after 20s
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
+    expect(mockPush).toHaveBeenCalledWith("/fr");
+  });
+
+  it("KIOSK-005b (audit F9): compte à rebours VISIBLE, décrémenté chaque seconde", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} />
+      </NextIntlClientProvider>
+    );
+
+    const countdown = screen.getByTestId("ticket-returning");
+    expect(countdown.textContent).toContain("10 s");
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.getByTestId("ticket-returning").textContent).toContain("7 s");
+  });
+
+  it("KIOSK-005b (audit F9): bouton « Terminer » (≥72px) → retour accueil immédiat", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} />
+      </NextIntlClientProvider>
+    );
+
+    const finishBtn = screen.getByTestId("ticket-finish-btn");
+    expect(finishBtn.textContent).toContain("Terminer");
+    // Cible tactile kiosque ≥ 72 px.
+    expect(parseInt(finishBtn.style.minHeight, 10)).toBeGreaterThanOrEqual(72);
+
+    fireEvent.click(finishBtn);
+    expect(mockPush).toHaveBeenCalledWith("/fr");
+  });
+
+  it("KIOSK-005b (audit F9): synthèse vocale en cours → le décompte ATTEND la fin de la voix", () => {
+    // La voix parle pendant les 6 premières secondes.
+    (window.speechSynthesis as unknown as { speaking: boolean }).speaking = true;
+
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} />
+      </NextIntlClientProvider>
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    // Décompte suspendu tant que la voix parle : toujours 10 s, aucun retour.
+    expect(screen.getByTestId("ticket-returning").textContent).toContain("10 s");
+    expect(mockPush).not.toHaveBeenCalled();
+
+    // Fin de la synthèse vocale → le décompte reprend.
+    (window.speechSynthesis as unknown as { speaking: boolean }).speaking = false;
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 
@@ -319,4 +401,118 @@ describe("KIOSK-005: TicketScreen", () => {
   });
 
   // KIOSK-005: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)
+});
+
+describe("KIOSK-005b (audit F8): dédupliquer position/attente + afficher l'opération", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function renderTicket(props: Record<string, unknown> = {}) {
+    return render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} {...props} />
+      </NextIntlClientProvider>
+    );
+  }
+
+  it("KIOSK-005b: la position n'apparaît qu'UNE fois à l'écran (fini le doublon carte + texte)", () => {
+    const { container } = renderTicket();
+    const occurrences = (container.textContent?.match(/Position dans la file/g) ?? []).length;
+    expect(occurrences).toBe(1);
+    // Et elle reste portée par le texte a11y (KIOSK-008 : data-a11y-text).
+    const pos = screen.getByTestId("ticket-position");
+    expect(pos.getAttribute("data-a11y-text")).toBe("true");
+  });
+
+  it("KIOSK-005b: l'attente estimée n'apparaît qu'UNE fois à l'écran", () => {
+    const { container } = renderTicket();
+    const occurrences = (container.textContent?.match(/Attente estimée/g) ?? []).length;
+    expect(occurrences).toBe(1);
+  });
+
+  it("KIOSK-005b: l'OPÉRATION choisie est affichée en eyebrow de la carte (vérification d'un coup d'œil)", () => {
+    const { container } = renderTicket({ serviceLabel: "Retrait espèces" });
+    const eyebrow = container.querySelector(".sig-ticket__eyebrow");
+    expect(eyebrow?.textContent).toBe("Retrait espèces");
+  });
+
+  it("KIOSK-005b: sans opération connue → eyebrow neutre « Votre ticket » (jamais de doublon position)", () => {
+    const { container } = renderTicket();
+    const eyebrow = container.querySelector(".sig-ticket__eyebrow");
+    expect(eyebrow?.textContent).toBe("Votre ticket");
+  });
+});
+
+describe("KIOSK-005b (audit F5): honnêteté du ticket hors-ligne", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function renderOffline(props: Record<string, unknown> = {}) {
+    return render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen
+          displayNumber="H001"
+          position={1}
+          estimatedWaitMinutes={0}
+          isOfflineTicket={true}
+          {...props}
+        />
+      </NextIntlClientProvider>
+    );
+  }
+
+  it("KIOSK-005b: ticket offline → bandeau « Mode hors connexion — ticket temporaire » VISIBLE", () => {
+    renderOffline();
+    const banner = screen.getByTestId("offline-banner");
+    expect(banner).toBeInTheDocument();
+    expect(banner.textContent).toContain("Mode hors connexion — ticket temporaire");
+  });
+
+  it("KIOSK-005b: ticket offline → AUCUNE fausse position ni fausse attente (« 1e / 0 minutes » banni)", () => {
+    const { container } = renderOffline();
+    expect(container.textContent).not.toContain("Position dans la file");
+    expect(container.textContent).not.toContain("Attente estimée");
+    expect(screen.queryByTestId("ticket-position")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-wait")).not.toBeInTheDocument();
+  });
+
+  it("KIOSK-005b: ticket offline → estimation honnête « à la reconnexion » + info synchronisation", () => {
+    const { container } = renderOffline();
+    expect(container.textContent).toContain("Position et attente : estimation à la reconnexion");
+    const info = screen.getByTestId("ticket-offline-info");
+    expect(info.textContent).toContain("synchronisation dès reconnexion");
+    // Texte porté par le facteur d'accessibilité (KIOSK-008 préservé).
+    expect(info.getAttribute("data-a11y-text")).toBe("true");
+  });
+
+  it("KIOSK-005b: ticket offline → annonce vocale honnête (numéro seul, jamais position/attente)", () => {
+    renderOffline();
+    expect(window.speechSynthesis.speak).toHaveBeenCalledTimes(1);
+    const utt = (window.speechSynthesis.speak as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as SpeechSynthesisUtterance;
+    expect(utt.text).toContain("H001");
+    expect(utt.text).toContain("reconnexion");
+    expect(utt.text).not.toContain("position 1");
+    expect(utt.text).not.toContain("0 minutes");
+  });
+
+  it("KIOSK-005b: ticket ONLINE → aucun bandeau offline, position/attente réelles affichées", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ticket-position").textContent).toContain("4");
+  });
 });

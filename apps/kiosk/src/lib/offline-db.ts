@@ -98,6 +98,17 @@ export function formatLocalNumber(sequence: number): string {
 }
 
 /**
+ * Vrai si un numéro affiché est un numéro LOCAL (émis hors connexion par
+ * `formatLocalNumber` : préfixe H + chiffres). Sert au Moment Ticket (audit
+ * F5) pour basculer sur l'affichage HONNÊTE — bandeau « ticket temporaire »,
+ * jamais de fausse position/attente. Les numéros serveur (A007, B-042…) ne
+ * matchent jamais.
+ */
+export function isLocalDisplayNumber(displayNumber: string): boolean {
+  return new RegExp(`^${LOCAL_NUMBER_PREFIX}\\d{3,}$`).test(displayNumber);
+}
+
+/**
  * Incrémente et renvoie le prochain numéro séquentiel local, de manière
  * atomique (transaction Dexie readwrite) — jamais de doublon même en
  * concurrence d'onglets/appels rapprochés.

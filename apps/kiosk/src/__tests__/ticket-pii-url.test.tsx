@@ -36,6 +36,11 @@ import {
   storeTicketMomentPii,
   purgeTicketMomentPii,
 } from "@/lib/ticket-moment-store";
+import {
+  storeTicketOperationLabel,
+  readTicketOperationLabel,
+  purgeTicketOperationLabel,
+} from "@/lib/ticket-operation-store";
 
 const PHONE = "0707474747";
 
@@ -52,12 +57,19 @@ const messages = {
     offlineBanner: "Mode hors connexion — ticket local généré",
   },
   ticket005: {
+    eyebrow: "Votre ticket",
     position: "Position dans la file : {position}e",
     waitEstimate: "Attente estimée : {minutes} minutes",
     printing: "Votre ticket s'imprime...",
     smsSent: "SMS envoyé au {maskedPhone}",
     returning: "Retour automatique dans {seconds} s",
+    finishButton: "Terminer",
     voiceAnnounce: "Votre numéro est {displayNumber}.",
+    voiceAnnounceOffline:
+      "Votre numéro est {displayNumber}. Position et attente estimées dès la reconnexion.",
+    offlineBanner: "Mode hors connexion — ticket temporaire",
+    offlineInfo: "Ticket local — synchronisation dès reconnexion",
+    offlineEstimate: "Position et attente : estimation à la reconnexion",
     printerError: "Imprimante indisponible",
   },
   voice008: { playLabel: "Écouter" },
@@ -216,5 +228,90 @@ describe("KIOSK-005/S6: TicketPageClient — PII depuis le store, dégradation p
 
     expect(mockReplace).toHaveBeenCalledWith("/fr");
     expect(screen.queryByTestId("ticket-number")).not.toBeInTheDocument();
+  });
+});
+
+describe("KIOSK-005b (audit F5/F8): TicketPageClient — honnêteté offline + opération affichée", () => {
+  it("F5: numéro LOCAL (H###) dans l'URL → Moment Ticket HONNÊTE (bandeau offline, zéro fausse position)", () => {
+    currentSearchParams = new URLSearchParams({
+      trackingId: "9d3a2f30-6b1c-4c8e-9f4a-1b2c3d4e5f60",
+      displayNumber: "H001",
+      position: "1",
+      estimatedWaitMinutes: "0",
+    });
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={messages}>
+        <TicketPageClient />
+      </NextIntlClientProvider>
+    );
+
+    expect(screen.getByTestId("ticket-number")).toHaveTextContent("H001");
+    // Bandeau « ticket temporaire » câblé (clés i18n existantes enfin rendues).
+    expect(screen.getByTestId("offline-banner").textContent).toContain("ticket temporaire");
+    // Plus jamais « Position : 1e — 0 minutes » sur un ticket hors-ligne.
+    expect(container.textContent).not.toContain("Position dans la file");
+    expect(container.textContent).not.toContain("Attente estimée");
+    expect(container.textContent).toContain("estimation à la reconnexion");
+  });
+
+  it("F5: numéro SERVEUR → aucun bandeau offline, position/attente réelles", () => {
+    currentSearchParams = new URLSearchParams({
+      trackingId: "TRK-00001",
+      displayNumber: "A007",
+      position: "4",
+      estimatedWaitMinutes: "12",
+    });
+
+    render(
+      <NextIntlClientProvider locale="fr" messages={messages}>
+        <TicketPageClient />
+      </NextIntlClientProvider>
+    );
+
+    expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ticket-position").textContent).toContain("4");
+  });
+
+  it("F8: libellé d'opération stocké → affiché en eyebrow du Moment Ticket, puis purgé au départ", () => {
+    currentSearchParams = new URLSearchParams({
+      trackingId: "TRK-00001",
+      displayNumber: "A007",
+      position: "4",
+      estimatedWaitMinutes: "12",
+    });
+    storeTicketOperationLabel("Retrait espèces");
+
+    const { container, unmount } = render(
+      <NextIntlClientProvider locale="fr" messages={messages}>
+        <TicketPageClient />
+      </NextIntlClientProvider>
+    );
+
+    expect(container.querySelector(".sig-ticket__eyebrow")?.textContent).toBe(
+      "Retrait espèces"
+    );
+
+    // Départ de l'écran → libellé purgé (jamais réaffiché au client suivant).
+    unmount();
+    expect(readTicketOperationLabel()).toBeNull();
+  });
+
+  it("F8: store vide (rechargement) → eyebrow neutre, zéro crash", () => {
+    currentSearchParams = new URLSearchParams({
+      trackingId: "TRK-00001",
+      displayNumber: "A007",
+      position: "4",
+      estimatedWaitMinutes: "12",
+    });
+    purgeTicketOperationLabel();
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={messages}>
+        <TicketPageClient />
+      </NextIntlClientProvider>
+    );
+
+    expect(container.querySelector(".sig-ticket__eyebrow")?.textContent).toBe("Votre ticket");
   });
 });
