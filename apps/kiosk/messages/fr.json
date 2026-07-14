@@ -38,7 +38,9 @@
     "accessibilityButton": "Accès prioritaire",
     "emptyTitle": "Aucun service disponible",
     "emptyMessage": "Rendez-vous à l'accueil — un agent vous aidera.",
-    "offlineBanner": "Mode hors connexion"
+    "offlineBanner": "Mode hors connexion",
+    "loadingMessage": "Chargement des services...",
+    "scrollHint": "Plus de services en bas"
   },
   "choiceModelB": {
     "title": "Que souhaitez-vous ?",

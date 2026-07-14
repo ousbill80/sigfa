@@ -38,7 +38,9 @@
     "accessibilityButton": "Priority access",
     "emptyTitle": "No services available",
     "emptyMessage": "Please go to reception — a staff member will assist you.",
-    "offlineBanner": "Offline mode"
+    "offlineBanner": "Offline mode",
+    "loadingMessage": "Loading services...",
+    "scrollHint": "More services below"
   },
   "choiceModelB": {
     "title": "What would you like to do?",

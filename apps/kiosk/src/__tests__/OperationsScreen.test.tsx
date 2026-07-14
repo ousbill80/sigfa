@@ -118,6 +118,19 @@ describe("MODEL-KIOSK-A: OperationsScreen", () => {
     expect(screen.getByTestId("operations-loading")).toBeInTheDocument();
   });
 
+  it("AUDIT-F20: loading → skeleton de tuiles animé (plus d'icône statique figée)", () => {
+    mockOperations(3);
+    renderScreen();
+    const loading = screen.getByTestId("operations-loading");
+    expect(loading).toHaveAttribute("role", "status");
+    // Tuiles squelettes en grille (shimmer DS .sig-skeleton, reduced-motion
+    // géré par @sigfa/ui) — la borne ne paraît plus figée.
+    expect(screen.getAllByTestId("skeleton-tile").length).toBeGreaterThanOrEqual(4);
+    expect(document.querySelectorAll(".sig-skeleton").length).toBeGreaterThan(0);
+    // Message localisé toujours visible (texte porteur de sens).
+    expect(screen.getByText("Chargement des opérations...")).toBeInTheDocument();
+  });
+
   it("MODEL-KIOSK-A: nominal → grille d'opérations (cartes ≥ 96 px, icône SVG, SLA en pill) FR/EN", async () => {
     for (const { locale, messages } of [
       { locale: "fr", messages: frMessages },
