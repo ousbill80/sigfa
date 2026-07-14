@@ -37,9 +37,10 @@ describe("BankThemeProvider", () => {
     expect(wrapper.style.getPropertyValue("--brand-contrast")).toBe(
       theme.brandContrast,
     );
+    expect(wrapper.style.getPropertyValue("--brand-inv")).toBe(theme.brandInv);
   });
 
-  it("without a brandColor injects NO brand overrides (default terracotta kept)", () => {
+  it("without a brandColor injects NO brand overrides (default deep blue kept)", () => {
     render(
       <BankThemeProvider>
         <span data-testid="child">hi</span>

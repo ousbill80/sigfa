@@ -24,12 +24,13 @@ const EDGE_CASES: ReadonlyArray<[string, string]> = [
 const HEX6 = /^#[0-9a-f]{6}$/;
 
 describe("deriveBankTheme — shape & format", () => {
-  it("returns four normalised 6-digit lowercase hex tokens", () => {
+  it("returns five normalised 6-digit lowercase hex tokens", () => {
     const theme = deriveBankTheme("#1E5AA8");
     expect(theme.brand).toMatch(HEX6);
     expect(theme.brandStrong).toMatch(HEX6);
     expect(theme.brandSoft).toMatch(HEX6);
     expect(theme.brandContrast).toMatch(HEX6);
+    expect(theme.brandInv).toMatch(HEX6);
   });
 
   it("normalises the input brand to lowercase 6-digit hex", () => {
@@ -50,10 +51,10 @@ describe("deriveBankTheme — shape & format", () => {
     expect(() => deriveBankTheme("#12")).toThrow();
   });
 
-  it("exports the SIGFA default brand (terracotta, ≥ 4.5:1 under white)", () => {
-    expect(SIGFA_DEFAULT_BRAND).toBe("#b85513");
-    // F10 (audit borne 2026-07-14) : le DS revendique ≥ 4.5:1 « vérifié » pour
-    // --brand-contrast (blanc) sur --brand — la valeur par défaut doit le tenir.
+  it("exports the SIGFA default brand (deep blue v3, ≥ 4.5:1 under white)", () => {
+    expect(SIGFA_DEFAULT_BRAND).toBe("#1d4ed8");
+    // Le DS revendique ≥ 4.5:1 « vérifié » pour --brand-contrast (blanc) sur
+    // --brand — la valeur par défaut doit le tenir (6.70:1 mesuré).
     expect(contrastRatio("#ffffff", SIGFA_DEFAULT_BRAND)).toBeGreaterThanOrEqual(4.5);
   });
 });
@@ -86,8 +87,8 @@ describe("deriveBankTheme — brandSoft is a very light tint", () => {
   for (const [name, hex] of [...BANKS, ...EDGE_CASES]) {
     it(`${name}: brandSoft is light enough to carry dark text`, () => {
       const { brandSoft } = deriveBankTheme(hex);
-      // Soft tints back badges/highlights -> must read with --ink (#1A130C).
-      expect(meetsWcag("#1a130c", brandSoft, { level: "AA", size: "normal" })).toBe(
+      // Soft tints back badges/highlights -> must read with --ink (#0A0A0A).
+      expect(meetsWcag("#0a0a0a", brandSoft, { level: "AA", size: "normal" })).toBe(
         true,
       );
     });
@@ -109,5 +110,60 @@ describe("deriveBankTheme — brandContrast meets WCAG AA ≥ 4.5:1 on brand", (
   it("picks black contrast on a light brand, white on a dark brand", () => {
     expect(deriveBankTheme("#F2D024").brandContrast).toBe("#000000");
     expect(deriveBankTheme("#1E5AA8").brandContrast).toBe("#ffffff");
+  });
+});
+
+describe("deriveBankTheme — brandInv holds ≥ 7:1 on the dark surfaces", () => {
+  // v3 : le numéro de ticket TV/kiosk s'affiche en --brand-inv sur --night /
+  // --night-2. La dérivation (éclaircissement itératif, luminance relative
+  // WCAG) doit le garantir pour TOUT brand tenant. --night (#0a0a0a) est la
+  // plus CLAIRE des deux surfaces sombres : ≥ 7:1 dessus implique ≥ 7:1 sur
+  // --night-2 (#050505) — les deux sont vérifiées explicitement.
+  const NIGHT = "#0a0a0a";
+  const NIGHT_2 = "#050505";
+
+  for (const [name, hex] of [...BANKS, ...EDGE_CASES]) {
+    it(`${name}: brandInv ≥ 7:1 on --night AND --night-2`, () => {
+      const { brandInv } = deriveBankTheme(hex);
+      expect(contrastRatio(brandInv, NIGHT)).toBeGreaterThanOrEqual(7);
+      expect(contrastRatio(brandInv, NIGHT_2)).toBeGreaterThanOrEqual(7);
+      expect(
+        meetsWcag(brandInv, NIGHT, { level: "AAA", size: "normal" }),
+      ).toBe(true);
+    });
+  }
+
+  it("very dark brand (near-black): lightened far enough to clear 7:1", () => {
+    const { brandInv } = deriveBankTheme("#101010");
+    expect(contrastRatio(brandInv, NIGHT)).toBeGreaterThanOrEqual(7);
+    // It had to move: the input itself is nowhere near the threshold.
+    expect(contrastRatio("#101010", NIGHT)).toBeLessThan(7);
+    expect(brandInv).not.toBe("#101010");
+  });
+
+  it("very light brand (near-white): already compliant, kept unchanged", () => {
+    const { brandInv } = deriveBankTheme("#F4F4F4");
+    expect(contrastRatio("#f4f4f4", NIGHT)).toBeGreaterThanOrEqual(7);
+    expect(brandInv).toBe("#f4f4f4");
+  });
+
+  it("saturated brands (vivid red / deep blue): lightened, hue preserved", () => {
+    for (const hex of ["#E01E1E", "#1d4ed8"]) {
+      const { brandInv } = deriveBankTheme(hex);
+      expect(contrastRatio(brandInv, NIGHT)).toBeGreaterThanOrEqual(7);
+      // Lighter than the input: higher contrast on the dark surface.
+      expect(contrastRatio(brandInv, NIGHT)).toBeGreaterThan(
+        contrastRatio(hex, NIGHT),
+      );
+    }
+  });
+
+  it("is monotonic vs the source: brandInv is never darker than brand", () => {
+    for (const [, hex] of [...BANKS, ...EDGE_CASES]) {
+      const { brand, brandInv } = deriveBankTheme(hex);
+      expect(contrastRatio(brandInv, NIGHT)).toBeGreaterThanOrEqual(
+        contrastRatio(brand, NIGHT) - 1e-9,
+      );
+    }
   });
 });

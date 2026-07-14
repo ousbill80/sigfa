@@ -16,13 +16,13 @@ import {
 } from "./index.js";
 
 describe("@sigfa/ui public entry", () => {
-  it("exposes the v2 version", () => {
-    expect(UI_VERSION).toBe("2.0.0");
+  it("exposes the v3 version", () => {
+    expect(UI_VERSION).toBe("3.0.0");
   });
 
   it("re-exports the token bundle with the brand hex", () => {
     expect(tokens.color).toBe(color);
-    expect(color["--brand"]).toBe("#B85513");
+    expect(color["--brand"]).toBe("#1D4ED8");
   });
 
   it("re-exports components and utilities", () => {

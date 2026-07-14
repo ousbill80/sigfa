@@ -1,5 +1,5 @@
 /**
- * @sigfa/ui — SIGFA Design System v2 « Sérénité Premium ».
+ * @sigfa/ui — SIGFA Design System v3 « Neutre Premium ».
  *
  * Public entry: token values, the WCAG contrast utilities and every canonical
  * component. Import the token / font stylesheets separately:
@@ -8,7 +8,7 @@
  *
  * @module index
  */
-export const UI_VERSION = "2.0.0";
+export const UI_VERSION = "3.0.0";
 
 // Tokens (JS mirror of tokens.css) — for tests + future mobile RN theme.
 export * from "./tokens";

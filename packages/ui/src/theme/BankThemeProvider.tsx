@@ -2,12 +2,13 @@
  * BankThemeProvider — effortless per-bank branding for SIGFA (multi-tenant).
  *
  * Wrap any subtree in this provider and pass the tenant's brand colour: every
- * `var(--brand*)` inside re-themes, with the WCAG-safe `--brand-contrast`
- * computed in JS (via `deriveBankTheme`). The SIGFA structure and the fixed
- * functional palette (`--forest` / `--gold` / semantics) are untouched.
+ * `var(--brand*)` inside re-themes, with the WCAG-safe `--brand-contrast` and
+ * `--brand-inv` computed in JS (via `deriveBankTheme`). The SIGFA neutral
+ * chassis and the fixed semantic palette are untouched: the brand is the ONLY
+ * chromatic accent (v3 « Neutre Premium »).
  *
  * Additive by design: with NO `brandColor`, the provider injects nothing, so
- * the default SIGFA terracotta identity is preserved pixel-for-pixel.
+ * the default SIGFA deep-blue fallback identity is preserved pixel-for-pixel.
  *
  * The optional `logoUrl` is exposed through context (`useBankLogo`) so a header
  * can render the tenant's mark without prop-drilling.
@@ -34,7 +35,7 @@ export function useBankLogo(): string | undefined {
 
 export interface BankThemeProviderProps
   extends Omit<HTMLAttributes<HTMLDivElement>, "color"> {
-  /** Tenant brand hex. Omit to keep the default SIGFA terracotta identity. */
+  /** Tenant brand hex. Omit to keep the default SIGFA deep-blue fallback. */
   brandColor?: string;
   /** Optional tenant logo URL, exposed via `useBankLogo`. */
   logoUrl?: string;
@@ -61,6 +62,7 @@ export function BankThemeProvider({
       "--brand-strong": theme.brandStrong,
       "--brand-soft": theme.brandSoft,
       "--brand-contrast": theme.brandContrast,
+      "--brand-inv": theme.brandInv,
     };
   }, [brandColor]);
 

@@ -44,6 +44,7 @@ describe("meetsWcag — text/background token proofs", () => {
     ["danger on paper", semantic.danger, surfaces.paper, "AA"],
     ["info on paper", semantic.info, surfaces.paper, "AA"],
     ["success on paper", semantic.success, surfaces.paper, "AA"],
+    ["warning on paper", semantic.warning, surfaces.paper, "AA"],
   ];
   for (const [name, fg, bg, level] of cases) {
     it(`${name} meets WCAG ${level} for normal text`, () => {
@@ -60,10 +61,9 @@ describe("meetsWcag — text/background token proofs", () => {
     ).toBe(true);
   });
 
-  it("brand-contrast on brand meets AA for normal text (F10, audit 2026-07-14)", () => {
-    // White on the former default #C25A16 was 4.40:1, below the 4.5 threshold
-    // the DS claims as « vérifié ». The default brand is darkened (#B85513,
-    // 4.83:1 measured) so the claim is actually true.
+  it("brand-contrast on brand meets AA for normal text (claimed by the DS)", () => {
+    // v3 « Neutre Premium » : white on the default deep blue #1D4ED8 measures
+    // 6.70:1, comfortably above the 4.5 threshold the DS claims as « vérifié ».
     expect(
       meetsWcag(brand.brandContrast, brand.brand, {
         level: "AA",
@@ -77,7 +77,8 @@ describe("meetsWcag — kiosk contrast ≥ 7:1", () => {
   const kiosk: Array<[string, string, string]> = [
     ["ink-inverse on night", surfaces.inkInverse, surfaces.night],
     ["ink-inverse-soft on night", surfaces.inkInverseSoft, surfaces.night],
-    ["gold on night", brand.gold, surfaces.night],
+    ["brand-inv (ticket number) on night", brand.brandInv, surfaces.night],
+    ["brand-inv on night-2 (TV)", brand.brandInv, surfaces.night2],
     ["ink-inverse on night-2 (TV)", surfaces.inkInverse, surfaces.night2],
   ];
   for (const [name, fg, bg] of kiosk) {

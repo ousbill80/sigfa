@@ -1,10 +1,11 @@
 /**
- * SIGFA Design System v2 — « Sérénité Premium » — token values (JS/TS).
+ * SIGFA Design System v3 — « Neutre Premium » — token values (JS/TS).
  *
  * This module is the JavaScript-side source of the design tokens. It mirrors
- * `tokens.css` exactly and exists so the values can be consumed where CSS
- * custom properties are not available: unit tests (WCAG contrast proofs),
- * and a future React Native (mobile) theme.
+ * `tokens.css` exactly (the `color-mix()` fallbacks are mirrored as their
+ * resolved default-brand values) and exists so the values can be consumed
+ * where CSS custom properties are not available: unit tests (WCAG contrast
+ * proofs), and a future React Native (mobile) theme.
  *
  * RULE: raw hex literals live ONLY in the token layer (`tokens.css` +
  * this file). Components must reference CSS variables (`var(--brand)`), never
@@ -13,55 +14,59 @@
  * @module tokens
  */
 
-/** Warm ink & surface ramp (light). Never clinical grey. */
+/** Pure neutral ink & surface ramp (light + dark). No warm/beige tint. */
 export const surfaces = {
-  paper: "#FBF8F3",
+  paper: "#FAFAFA",
   surface1: "#FFFFFF",
-  surface2: "#F4EEE4",
-  ink: "#1A130C",
-  inkSoft: "#6B5D4F",
-  inkFaint: "#A99C8B",
-  hairline: "#ECE3D6",
-  night: "#16110B",
-  night2: "#0E0A06",
-  inkInverse: "#FBF6EE",
-  inkInverseSoft: "#B8AB98",
+  surface2: "#F5F5F5",
+  ink: "#0A0A0A",
+  inkSoft: "#525252",
+  inkFaint: "#A3A3A3",
+  hairline: "#E5E5E5",
+  night: "#0A0A0A",
+  night2: "#050505",
+  inkInverse: "#FAFAFA",
+  inkInverseSoft: "#A3A3A3",
 } as const;
 
-/** SIGFA brand — « Or & Forêt » (premium Ivorian identity).
+/** Brand — the ONLY chromatic accent, tenant-overridable.
  *
- * Audit borne 2026-07-14 (F10) : `brand` assombri (#C25A16 → #B85513) pour que
- * le blanc tienne 4.83:1 mesuré (le DS revendique ≥ 4.5:1 « vérifié »).
- * `brandStrong` = résolution du `color-mix(brand 70%, #000)` de tokens.css :
- * 8.1:1 mesuré sur --surface-1 (seuil kiosque ≥ 7:1 ; l'ancien #9C400C était
- * à 6.66:1 alors que le code kiosque revendiquait 18:1). */
+ * Defaults below are the resolved values of the `color-mix()` fallbacks in
+ * `tokens.css` for the default brand #1D4ED8 (deep blue — product fallback,
+ * every bank replaces it). Measured ratios: white on brand 6.70:1 (>= 4.5),
+ * brandStrong on white 10.38:1 (>= 7), brandInv 8.38:1 on night / 8.63:1 on
+ * night-2 (>= 7). `deriveBankTheme()` recomputes them WCAG-safe per tenant. */
 export const brand = {
-  brand: "#B85513",
-  brandStrong: "#813B0D",
-  brandSoft: "#F7E7D6",
+  brand: "#1D4ED8",
+  brandStrong: "#143797",
+  brandSoft: "#E8EDFB",
   brandContrast: "#FFFFFF",
-  forest: "#0F6B4A",
-  forestSoft: "#DBEFE6",
-  gold: "#C79A3A",
-  goldSoft: "#F6ECD2",
+  brandInv: "#8EA7EC",
+  /* DEPRECATED v3 — à supprimer après migration des surfaces. Alias of the
+     v3 equivalents (`--forest` -> success, `--gold` -> brand-inv). */
+  forest: "#15803D",
+  forestSoft: "#DCFCE7",
+  gold: "#8EA7EC",
+  goldSoft: "#E8EDFB",
 } as const;
 
-/** Functional semantics, harmonised to the warm palette. */
+/** Functional semantics — sober, standard hues on the neutral chassis. */
 export const semantic = {
-  success: "#0F7A4D",
-  successSoft: "#DBEFE6",
-  warning: "#C77D0A",
-  warningSoft: "#F9EBD1",
-  danger: "#C0362C",
-  dangerSoft: "#F7DED9",
-  info: "#2C6E9B",
-  infoSoft: "#DCEAF3",
-  /* Inverses pour fond sombre (--night/--night-2) — audit 2026-07-14, F6.
-     Mesurés sur --night : 10.6 / 9.9 / 9.6 / 9.7 (:1) — seuil kiosque ≥ 7:1. */
-  successInv: "#7FD4A8",
-  warningInv: "#E8B45E",
-  dangerInv: "#F2A69B",
-  infoInv: "#8FC1E3",
+  success: "#15803D",
+  successSoft: "#DCFCE7",
+  warning: "#B45309",
+  warningSoft: "#FEF3C7",
+  danger: "#DC2626",
+  dangerSoft: "#FFF5F5",
+  info: "#0369A1",
+  infoSoft: "#E0F2FE",
+  /* Inverses pour fond sombre (--night/--night-2). Ratios mesures sur
+     --night / --night-2 : 11.36/11.70, 11.86/12.21, 10.43/10.74, 9.24/9.51
+     (:1) — seuil kiosque/TV >= 7:1. */
+  successInv: "#4ADE80",
+  warningInv: "#FBBF24",
+  dangerInv: "#FCA5A5",
+  infoInv: "#38BDF8",
 } as const;
 
 /** All colour tokens, flattened, keyed by CSS custom-property name. */
@@ -81,6 +86,8 @@ export const color = {
   "--brand-strong": brand.brandStrong,
   "--brand-soft": brand.brandSoft,
   "--brand-contrast": brand.brandContrast,
+  "--brand-inv": brand.brandInv,
+  /* DEPRECATED v3 — à supprimer après migration des surfaces. */
   "--forest": brand.forest,
   "--forest-soft": brand.forestSoft,
   "--gold": brand.gold,
@@ -124,13 +131,16 @@ export const radius = {
   full: 999,
 } as const;
 
-/** Warm, soft, layered elevation. Tinted brown, never pure black. */
+/** Neutral, subtle elevation — pure black at low alpha, never tinted.
+ * `brand` mirrors the resolved `color-mix(brand 22%, transparent)` and
+ * `gold` (DEPRECATED v3 — à supprimer après migration des surfaces) the
+ * resolved brand-inv halo, both for the default brand #1D4ED8. */
 export const shadow = {
-  "1": "0 1px 2px rgba(26,19,12,.06), 0 1px 3px rgba(26,19,12,.05)",
-  "2": "0 4px 12px rgba(26,19,12,.08), 0 2px 4px rgba(26,19,12,.05)",
-  "3": "0 12px 32px rgba(26,19,12,.12), 0 4px 8px rgba(26,19,12,.06)",
-  brand: "0 8px 24px rgba(184,85,19,.28)",
-  gold: "0 0 48px rgba(199,154,58,.35)",
+  "1": "0 1px 2px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.04)",
+  "2": "0 4px 12px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04)",
+  "3": "0 12px 32px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.05)",
+  brand: "0 8px 24px rgba(29,78,216,.22)",
+  gold: "0 0 48px rgba(142,167,236,.30)",
 } as const;
 
 /** Spacing scale (base 4, generous). Values in px. */

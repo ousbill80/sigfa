@@ -1,65 +1,75 @@
 /**
- * SIGFA Design System v2 — « Sérénité Premium ».
+ * SIGFA Design System v3 — « Neutre Premium ».
  * SINGLE SOURCE OF HEX VALUES. No colour literal may live outside this file
  * (its JS mirror is `tokens.ts`). Components reference `var(--token)` only.
  *
- * Palette « Or & Forêt » — terracotta / forêt / or on a warm base.
+ * Chassis neutre haut de gamme (fintech premium / banque privee) : surfaces et
+ * encre en neutres purs, la couleur de la banque (`--brand`) est le SEUL accent
+ * chromatique, personnalisable par tenant. Supplante la v2 « Or & Foret ».
  */
 
 :root {
-  /* ---- Encre & surfaces (base chaude) ---- */
-  --paper: #fbf8f3; /* fond clair — blanc chaud (papier ivoire) */
-  --surface-1: #ffffff; /* cartes (élévation sur paper) */
-  --surface-2: #f4eee4; /* sections alternées, champs au repos */
-  --ink: #1a130c; /* texte principal — brun-noir chaud */
-  --ink-soft: #6b5d4f; /* texte secondaire — taupe chaud */
-  --ink-faint: #a99c8b; /* placeholder, métadonnées */
-  --hairline: #ece3d6; /* séparateurs 1px */
+  /* ---- Encre & surfaces (neutres purs, base claire) ---- */
+  --paper: #fafafa; /* fond app */
+  --surface-1: #ffffff; /* cartes (elevation sur paper) */
+  --surface-2: #f5f5f5; /* sections alternees, champs au repos */
+  --ink: #0a0a0a; /* texte principal — 18.97:1 sur paper */
+  --ink-soft: #525252; /* texte secondaire — 7.49:1 sur paper, 7.17:1 sur surface-2 */
+  --ink-faint: #a3a3a3; /* placeholder, metadonnees (jamais texte porteur) */
+  --hairline: #e5e5e5; /* separateurs 1px */
 
   /* ---- Sombre (kiosque plein soleil + TV) ---- */
-  --night: #16110b; /* fond kiosque — brun-nuit profond */
-  --night-2: #0e0a06; /* écran TV — contraste max */
-  --ink-inverse: #fbf6ee; /* texte sur sombre — blanc chaud */
-  --ink-inverse-soft: #b8ab98; /* secondaire sur sombre */
+  --night: #0a0a0a; /* fond kiosque */
+  --night-2: #050505; /* ecran TV — contraste max */
+  --ink-inverse: #fafafa; /* 18.97:1 sur night, 19.53:1 sur night-2 */
+  --ink-inverse-soft: #a3a3a3; /* 7.85:1 sur night, 8.08:1 sur night-2 (seuil >= 7:1) */
 
-  /* ---- Marque SIGFA — « Or & Forêt » ---- */
+  /* ---- Marque — SEUL accent chromatique ---- */
   /* SEUL token tenant : une banque surcharge `--tenant-brand` (via
-     BankThemeProvider) et toute l'UI se re-thème. Défaut = terracotta SIGFA.
-     Les dérivés sont recalculés en JS (WCAG-safe) par le provider ; les
-     `color-mix` ci-dessous ne servent que de repli si `--tenant-brand` est
-     posé sans le provider. `--forest`/`--gold`/sémantiques restent FIXES. */
-  /* Terracotta/ambre brûlé — surchargeable. Assombri #C25A16 → #B85513 (audit
-     borne 2026-07-14, F10) : blanc dessus = 4.83:1 mesuré (seuil ≥ 4.5:1). */
-  --brand: var(--tenant-brand, #b85513);
-  /* Pressé / hover + libellés d'action kiosque (--action-label) sur carte
-     claire. Mix 70% (F10) : résout #813B0D par défaut = 8.1:1 mesuré sur
-     --surface-1 (seuil kiosque ≥ 7:1 ; l'ancien mix 85% donnait 5.7:1). */
+     BankThemeProvider) et toute l'UI se re-theme. Defaut = bleu profond SIGFA
+     (repli produit — chaque banque le remplace). Les derives sont recalcules
+     en JS (WCAG-safe) par le provider ; les `color-mix` ci-dessous ne servent
+     que de repli si `--tenant-brand` est pose sans le provider. */
+  /* Blanc sur #1d4ed8 = 6.70:1 mesure (seuil >= 4.5:1). */
+  --brand: var(--tenant-brand, #1d4ed8);
+  /* Hover / pressed + libelles d'action kiosque sur carte claire. Mix 70% :
+     resout #143797 par defaut = 10.38:1 mesure sur --surface-1 (seuil >= 7:1). */
   --brand-strong: color-mix(in srgb, var(--brand) 70%, #000000);
-  --brand-soft: color-mix(in srgb, var(--brand) 12%, #ffffff); /* fonds de badge, surbrillance douce */
-  --brand-contrast: #ffffff; /* texte sur brand — 4.83:1 mesuré (défaut), recalculé WCAG par le provider */
+  /* Fonds de badge, surbrillance douce — ~10% de brand sur blanc. Resout
+     #e8edfb par defaut : --ink dessus = 16.91:1. */
+  --brand-soft: color-mix(in srgb, var(--brand) 10%, #ffffff);
+  --brand-contrast: #ffffff; /* texte sur brand — 6.70:1 mesure (defaut), recalcule WCAG par le provider */
+  /* Version eclaircie de brand pour fonds sombres (numero de ticket TV/kiosk).
+     Mix 50% blanc : resout #8ea7ec par defaut = 8.38:1 sur --night et 8.63:1
+     sur --night-2 (seuil >= 7:1). Le provider recalcule par eclaircissement
+     iteratif (luminance relative WCAG) pour tout brand tenant. */
+  --brand-inv: color-mix(in srgb, var(--brand) 50%, #ffffff);
 
-  --forest: #0f6b4a; /* vert forêt profond — confiance, positif */
-  --forest-soft: #dbefe6;
-  --gold: #c79a3a; /* or patiné — accents premium, jalons */
-  --gold-soft: #f6ecd2;
+  /* ---- Semantiques (sobres, standards) ---- */
+  --success: #15803d; /* guichet ouvert, ticket confirme — 4.81:1 sur paper */
+  --success-soft: #dcfce7; /* success dessus = 4.57:1, --ink = 18.03:1 */
+  --warning: #b45309; /* file chargee, SLA approche — 4.81:1 sur paper */
+  --warning-soft: #fef3c7; /* warning dessus = 4.51:1 */
+  --danger: #dc2626; /* SLA depasse, erreur — pastille, jamais fond ; 4.63:1 sur paper */
+  --danger-soft: #fff5f5; /* danger dessus = 4.51:1 */
+  --info: #0369a1; /* information neutre, offline — 5.68:1 sur paper */
+  --info-soft: #e0f2fe; /* info dessus = 5.17:1 */
 
-  /* ---- Sémantiques (fonctionnels harmonisés) ---- */
-  --success: #0f7a4d; /* guichet ouvert, ticket confirmé */
-  --success-soft: #dbefe6;
-  --warning: #c77d0a; /* file chargée, SLA approche (ambre) */
-  --warning-soft: #f9ebd1;
-  --danger: #c0362c; /* SLA dépassé, erreur — pastille, jamais fond */
-  --danger-soft: #f7ded9;
-  --info: #2c6e9b; /* information neutre, offline (bleu ardoise) */
-  --info-soft: #dceaf3;
+  /* ---- Semantiques inverses — texte sur fond sombre (--night / --night-2).
+     Ratios mesures sur --night / --night-2 (seuil kiosque/TV >= 7:1) : */
+  --success-inv: #4ade80; /* 11.36:1 / 11.70:1 — consignes positives */
+  --warning-inv: #fbbf24; /* 11.86:1 / 12.21:1 — affluence, SLA approche */
+  --danger-inv: #fca5a5; /* 10.43:1 / 10.74:1 — erreurs (pictogramme/texte, jamais fond) */
+  --info-inv: #38bdf8; /* 9.24:1 / 9.51:1 — offline, information neutre */
 
-  /* ---- Sémantiques inverses — texte sur fond sombre (--night / --night-2).
-     Audit borne 2026-07-14 (F6/F10) : les sémantiques directs tombent à
-     3.4–3.5:1 sur nuit. Ratios mesurés sur --night (seuil kiosque ≥ 7:1) : */
-  --success-inv: #7fd4a8; /* 10.6:1 — consignes positives (« Récupérez votre ticket ») */
-  --warning-inv: #e8b45e; /* 9.9:1 — affluence, SLA approche */
-  --danger-inv: #f2a69b; /* 9.6:1 — erreurs (pictogramme/texte, jamais fond) */
-  --info-inv: #8fc1e3; /* 9.7:1 — offline, information neutre */
+  /* ---- Alias v2 ---- */
+  /* DEPRECATED v3 — à supprimer après migration des surfaces (web/kiosk/TV).
+     `--forest`/`--gold` ne font plus partie de l'identite : mappes sur les
+     equivalents v3 pour ne pas casser les apps avant leur migration. */
+  --forest: var(--success); /* DEPRECATED v3 — à supprimer après migration des surfaces */
+  --forest-soft: var(--success-soft); /* DEPRECATED v3 — à supprimer après migration des surfaces */
+  --gold: var(--brand-inv); /* DEPRECATED v3 — à supprimer après migration des surfaces */
+  --gold-soft: var(--brand-soft); /* DEPRECATED v3 — à supprimer après migration des surfaces */
 
   /* ---- Typographie ---- */
   /* Polices swappables : surcharger ces deux tokens suffit à changer la fonte. */
@@ -94,12 +104,15 @@
   --r-xl: 28px; /* feuilles, moments forts */
   --r-full: 999px;
 
-  /* ---- Élévation (ombres chaudes, teintées brun) ---- */
-  --shadow-1: 0 1px 2px rgba(26, 19, 12, 0.06), 0 1px 3px rgba(26, 19, 12, 0.05);
-  --shadow-2: 0 4px 12px rgba(26, 19, 12, 0.08), 0 2px 4px rgba(26, 19, 12, 0.05);
-  --shadow-3: 0 12px 32px rgba(26, 19, 12, 0.12), 0 4px 8px rgba(26, 19, 12, 0.06);
-  --shadow-brand: 0 8px 24px rgba(184, 85, 19, 0.28); /* bouton primaire = présence */
-  --shadow-gold: 0 0 48px rgba(199, 154, 58, 0.35); /* halo Moment Ticket */
+  /* ---- Élévation (ombres neutres — noir pur à faible alpha) ---- */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.05);
+  /* Bouton primaire = presence — teinte brand a faible alpha, suit le tenant. */
+  --shadow-brand: 0 8px 24px color-mix(in srgb, var(--brand) 22%, transparent);
+  /* DEPRECATED v3 — à supprimer après migration des surfaces (halo Moment
+     Ticket : desormais halo brand discret, plus d'or). */
+  --shadow-gold: 0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent);
 
   /* ---- Espacement (base 4, généreux) ---- */
   --space-0: 0;
@@ -121,7 +134,10 @@
 
   /* Anneau de focus (marque, 3px) */
   --focus-ring: 0 0 0 3px var(--brand-soft), 0 0 0 5px var(--brand);
-  --focus-ring-inverse: 0 0 0 3px rgba(199, 154, 58, 0.35), 0 0 0 5px var(--gold);
+  /* Variante pour fonds sombres — derivee de --brand-inv. */
+  --focus-ring-inverse: 0 0 0 3px
+      color-mix(in srgb, var(--brand-inv) 35%, transparent),
+    0 0 0 5px var(--brand-inv);
 }
 
 /* Repli mouvement : instantané si l'utilisateur le demande. */
