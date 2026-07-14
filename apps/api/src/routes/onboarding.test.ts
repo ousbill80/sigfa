@@ -73,7 +73,8 @@ async function seedTemplateConfig(): Promise<void> {
     [bankA.bankId, templateAgencyId, (svc1.rows[0] as { id: string }).id]
   );
   await h.db.query(
-    `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number) VALUES ($1,$2,$3,$4,1)`,
+    // Schéma FIDÈLE : `tickets.tracking_id` (char(21) UNIQUE) et `channel` NOT NULL sans défaut.
+    `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, tracking_id, channel) VALUES ($1,$2,$3,$4,1,'trkOnboardingOpen0001','KIOSK')`,
     [bankA.bankId, templateAgencyId, (q.rows[0] as { id: string }).id, (svc1.rows[0] as { id: string }).id]
   );
 }

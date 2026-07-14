@@ -52,9 +52,11 @@ async function seedPurgeableTickets(): Promise<void> {
   const phoneHash = hashPhone(PURGE_PHONE);
   for (let i = 0; i < 3; i += 1) {
     await h.db.query(
-      `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, phone_hash, phone_encrypted, closed_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'v1:x:y:z', now())`,
-      [bankA.bankId, bankA.agencyId, queueId, serviceId, i + 1, phoneHash]
+      // Schéma FIDÈLE : `tickets.tracking_id` (char(21) UNIQUE) et `channel`
+      // (ticket_channel) sont NOT NULL sans défaut — fournis explicitement.
+      `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, phone_hash, phone_encrypted, closed_at, tracking_id, channel)
+       VALUES ($1,$2,$3,$4,$5,$6,'v1:x:y:z', now(), $7, 'KIOSK')`,
+      [bankA.bankId, bankA.agencyId, queueId, serviceId, i + 1, phoneHash, `trkPrivacyPurge0000${i}`]
     );
   }
 }

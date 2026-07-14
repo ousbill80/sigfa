@@ -45,7 +45,9 @@ beforeAll(async () => {
   );
   serviceId = (svc.rows[0] as { id: string }).id;
   const ag = await h.db.query(
-    `INSERT INTO users (bank_id, email, role) VALUES ($1,'agent-prof@t.ci','AGENT') RETURNING id`,
+    // Schéma FIDÈLE : `users.password_hash`/`first_name`/`last_name` NOT NULL sans défaut.
+    `INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role)
+       VALUES ($1,'agent-prof@t.ci','x','Agent','Prof','AGENT') RETURNING id`,
     [bankA.bankId]
   );
   agentId = (ag.rows[0] as { id: string }).id;
@@ -103,7 +105,7 @@ describe("API-008: PATCH profil agent + audit", () => {
 
   it("API-008: tenant-isolation — DIRECTOR de A ne modifie pas un agent de B (404)", async () => {
     const bankB = await seedBankAgency(h.db, "prof-bank-b");
-    const ag = await h.db.query(`INSERT INTO users (bank_id, email, role) VALUES ($1,'b-agent@t.ci','AGENT') RETURNING id`, [bankB.bankId]);
+    const ag = await h.db.query(`INSERT INTO users (bank_id, email, password_hash, first_name, last_name, role) VALUES ($1,'b-agent@t.ci','x','B','Agent','AGENT') RETURNING id`, [bankB.bankId]);
     const otherAgent = (ag.rows[0] as { id: string }).id;
     const res = await req("PATCH", `/agents/${otherAgent}`, dirToken, { languages: ["FR"] });
     expect(res.status).toBe(404);
