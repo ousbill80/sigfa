@@ -75,7 +75,6 @@ const homeMessages = {
     queueUnavailable: "Queue unavailable",
     offlineBanner: "Offline mode — your tickets remain valid",
     loading: "Loading...",
-    welcomeAgency: "to {agencyName} branch",
   },
 };
 
