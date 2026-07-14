@@ -119,6 +119,19 @@ describe("MODEL-KIOSK-B: ManagersScreen", () => {
     expect(screen.getByTestId("managers-loading")).toBeInTheDocument();
   });
 
+  it("AUDIT-F20: loading → skeleton de tuiles animé (plus d'icône statique figée)", () => {
+    mockManagers(3);
+    renderScreen();
+    const loading = screen.getByTestId("managers-loading");
+    expect(loading).toHaveAttribute("role", "status");
+    // Tuiles squelettes en grille (shimmer DS .sig-skeleton, reduced-motion
+    // géré par @sigfa/ui) — la borne ne paraît plus figée.
+    expect(screen.getAllByTestId("skeleton-tile").length).toBeGreaterThanOrEqual(4);
+    expect(document.querySelectorAll(".sig-skeleton").length).toBeGreaterThan(0);
+    // Message localisé toujours visible (texte porteur de sens).
+    expect(screen.getByText("Chargement des conseillers...")).toBeInTheDocument();
+  });
+
   it("MODEL-KIOSK-B: nominal → cartes conseiller (nom + avatar) ≥ 96 px, FR/EN", async () => {
     for (const { locale, messages } of [
       { locale: "fr", messages: frMessages },

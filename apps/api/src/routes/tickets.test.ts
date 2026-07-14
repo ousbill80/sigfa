@@ -59,6 +59,14 @@ async function runMigrations(client: pg.Client): Promise<void> {
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='counter_status') THEN
         CREATE TYPE counter_status AS ENUM ('OPEN','PAUSED','CLOSED');
       END IF;
+      -- Type RÉEL des migrations (0000_dry_nuke.sql restreint par 0011) :
+      -- users.languages est agent_language[] et tickets.required_language est
+      -- agent_language — PAS text. Le déclarer en TEXT masquait le bug
+      -- « COALESCE could not convert type text[] to agent_language[] » (42804)
+      -- qui rendait TOUT call-next 500 en base réelle.
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='agent_language') THEN
+        CREATE TYPE agent_language AS ENUM ('FR','EN');
+      END IF;
     END $$;
   `);
   await client.query(`
@@ -110,7 +118,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       bank_id UUID REFERENCES banks(id),
       email TEXT NOT NULL UNIQUE,
-      languages TEXT[] NOT NULL DEFAULT '{}',
+      languages agent_language[] NOT NULL DEFAULT '{FR}',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
 );
   `);
@@ -130,7 +138,7 @@ async function runMigrations(client: pg.Client): Promise<void> {
       channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
       priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT,
       sms_consent BOOLEAN NOT NULL DEFAULT false,
-      required_language TEXT,
+      required_language agent_language,
       issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ,
       closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER,
       issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED,

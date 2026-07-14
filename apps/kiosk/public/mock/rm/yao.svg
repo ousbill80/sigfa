@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none" role="img" aria-label="Yao Kouassi">
+  <!--
+    AUDIT-F22 : avatar de DEMO (conseiller fictif « Yao Kouassi »), servi
+    localement par le mode mock MSW (handler relationship-managers).
+    Silhouette NEUTRE duotone, palette Serenite Premium (or/nuit) -
+    asset de demonstration uniquement, jamais reference hors mode demo.
+  -->
+  <circle cx="80" cy="80" r="80" fill="#F2E4C0"/>
+  <!-- Buste -->
+  <path d="M24 160 a56 60 0 0 1 112 0 Z" fill="#6B4A17"/>
+  <!-- Col -->
+  <path d="M62 112 L80 132 L98 112 a44 48 0 0 1 12 6 L80 152 L50 118 a44 48 0 0 1 12 -6 Z" fill="#F2E4C0" opacity="0.35"/>
+  <!-- Tete -->
+  <circle cx="80" cy="62" r="30" fill="#6B4A17"/>
+  <!-- Liseret or signature -->
+  <circle cx="80" cy="80" r="76" stroke="#C79A3A" stroke-width="4" fill="none" opacity="0.8"/>
+</svg>

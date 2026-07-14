@@ -34,8 +34,14 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// État file contrôlé par test (AUDIT-F19 : masquer la ligne sans donnée).
+const mockQueueStatus = {
+  count: 5 as number | null,
+  estimatedMinutes: 10 as number | null,
+  isOffline: false,
+};
 vi.mock("@/hooks/useQueueStatus", () => ({
-  useQueueStatus: () => ({ count: 5, estimatedMinutes: 10, isOffline: false }),
+  useQueueStatus: () => mockQueueStatus,
 }));
 
 vi.mock("@/hooks/useInactivityTimeout", () => ({
@@ -95,6 +101,9 @@ describe("KIOSK-002: HomeScreen", () => {
     vi.useFakeTimers();
     mockBankTheme.logoUrl = null;
     mockBankTheme.brandColor = null;
+    mockQueueStatus.count = 5;
+    mockQueueStatus.estimatedMinutes = 10;
+    mockQueueStatus.isOffline = false;
   });
 
   afterEach(() => {
@@ -172,17 +181,17 @@ describe("KIOSK-002: HomeScreen", () => {
     expect(/[\u{1F1E6}-\u{1F1FF}]/u.test(text)).toBe(false);
   });
 
-  it("KIOSK-002: ligne agence sous le titre — nom d'agence (repli) en --ink-muted-inv", () => {
+  it("KIOSK-002: ligne agence sous le titre — nom d'agence (repli, dédoublonné AUDIT-F18) en --ink-muted-inv", () => {
     for (const { locale, messages, expected } of [
-      { locale: "fr", messages: frMessages, expected: "à l'agence Agence Centrale" },
-      { locale: "en", messages: enMessages, expected: "to Agence Centrale branch" },
+      { locale: "fr", messages: frMessages, expected: "à l'agence Centrale" },
+      { locale: "en", messages: enMessages, expected: "to Centrale branch" },
     ]) {
       const { unmount, container } = render(
         <NextIntlClientProvider locale={locale} messages={messages}>
           <HomeScreen />
         </NextIntlClientProvider>
       );
-      const line = container.querySelector("[data-testid='home-agency-line']") as HTMLElement;
+      const line = container.querySelector("[data-testid='agency-welcome']") as HTMLElement;
       expect(line, `agency line for locale ${locale}`).toBeInTheDocument();
       expect(line.textContent).toBe(expected);
       // Hiérarchie : discrète sous le titre display.
@@ -282,6 +291,58 @@ describe("KIOSK-002: HomeScreen", () => {
     // Queue status should be visible
     const queueEl = container.querySelector("[data-testid='queue-status']");
     expect(queueEl).toBeInTheDocument();
+    expect(queueEl?.textContent).toContain("5");
+  });
+
+  it("AUDIT-F19: aucune donnée file (nominal en ligne) → la ligne d'état est MASQUÉE (pas de message négatif permanent)", () => {
+    mockQueueStatus.count = null;
+    mockQueueStatus.estimatedMinutes = null;
+    mockQueueStatus.isOffline = false;
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    // Sans donnée ET sans dégradation : aucune ligne d'état, aucun texte négatif.
+    expect(
+      container.querySelector("[data-testid='queue-status']")
+    ).not.toBeInTheDocument();
+    expect(container.textContent).not.toContain("File d'attente non disponible");
+  });
+
+  it("AUDIT-F19: vraie dégradation (hors connexion) → « File d'attente non disponible » visible", () => {
+    mockQueueStatus.count = null;
+    mockQueueStatus.estimatedMinutes = null;
+    mockQueueStatus.isOffline = true;
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen isOffline={true} />
+      </NextIntlClientProvider>
+    );
+
+    const queueEl = container.querySelector("[data-testid='queue-status']");
+    expect(queueEl).toBeInTheDocument();
+    expect(queueEl?.textContent).toContain("File d'attente non disponible");
+  });
+
+  it("AUDIT-F18: ligne agence sans doublon — « à l'agence Centrale », jamais « agence Agence »", () => {
+    // Nom d'agence par défaut : « Agence Centrale » (env de test sans NEXT_PUBLIC_AGENCY_NAME).
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const agencyLine = container.querySelector(
+      "[data-testid='agency-welcome']"
+    );
+    expect(agencyLine).toBeInTheDocument();
+    expect(agencyLine?.textContent).toBe("à l'agence Centrale");
+    // Le doublon de l'audit ne doit JAMAIS réapparaître.
+    expect(container.textContent).not.toMatch(/agence\s+agence/i);
   });
 
   it("KIOSK-002: timeout 30 s → back to home (Vitest fake-timer)", () => {

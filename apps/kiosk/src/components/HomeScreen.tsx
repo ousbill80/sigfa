@@ -28,9 +28,12 @@ import { useQueueStatus } from "@/hooks/useQueueStatus";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { NOMINAL_VOICE_RATE, speakInLocale } from "@/lib/kiosk-voice";
-import { kioskAgencyName } from "@/lib/kiosk-branding";
 import { useBankTheme } from "@/hooks/useBankTheme";
-import { kioskBankName } from "@/lib/bank-brand";
+import {
+  agencyWelcomeName,
+  kioskAgencyName,
+  kioskBankName,
+} from "@/lib/bank-brand";
 import { BankBrandMark } from "@/components/BankBrandMark";
 // Catalogues i18n importés en direct : l'annonce vocale doit être dite dans la
 // langue CHOISIE (pas la locale courante de rendu) — source unique = clé
@@ -79,9 +82,6 @@ export function HomeScreen({
   const { logoUrl, brandColor } = useBankTheme();
 
   const isOffline = isOfflineProp !== undefined ? isOfflineProp : isOfflineHook;
-
-  // Identité d'agence (non-PII) — provisionnement borne, repli sûr.
-  const agencyName = kioskAgencyName();
 
   const timeoutMs = isAccessibilityMode ? 60000 : 30000;
 
@@ -204,17 +204,21 @@ export function HomeScreen({
           >
             {t("title")}
           </h1>
-          {/* KIOSK-BORNE — ligne agence discrète (provisionnement, non-PII). */}
+          {/* KIOSK-BORNE / AUDIT-F18 : ligne agence discrète (provisionnement,
+              non-PII) SANS doublon — le préfixe « Agence » du nom provisionné
+              est retiré avant injection dans « à l'agence {x} »
+              (« Agence Centrale » → « à l'agence Centrale »). */}
           <p
-            data-testid="home-agency-line"
+            data-testid="agency-welcome"
             style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "var(--text-2xl)",
+              fontSize: "var(--text-xl)",
               color: "var(--ink-muted-inv)",
               margin: 0,
             }}
           >
-            {t("welcomeAgency", { agencyName })}
+            {t("welcomeAgency", {
+              agencyName: agencyWelcomeName(kioskAgencyName()),
+            })}
           </p>
           <p
             style={{
@@ -298,23 +302,29 @@ export function HomeScreen({
           ))}
         </div>
 
-        {/* Queue status — statut discret, ancré en bas de l'écran. */}
-        <div
-          data-testid="queue-status"
-          style={{
-            position: "absolute",
-            bottom: "var(--space-8)",
-            left: "var(--space-8)",
-            right: "var(--space-8)",
-            fontSize: "24px",
-            color: "var(--ink-muted-inv)",
-            textAlign: "center",
-          }}
-        >
-          {count !== null && estimatedMinutes !== null
-            ? t("queueStatus", { count, minutes: estimatedMinutes })
-            : t("queueUnavailable")}
-        </div>
+        {/* Queue status — statut discret, ancré en bas de l'écran.
+            AUDIT-F19 : ne JAMAIS afficher « File d'attente non disponible » en
+            nominal quand le socket n'a simplement rien poussé (message négatif
+            permanent) — la ligne est masquée sans donnée, et l'indisponibilité
+            n'est dite que sur une vraie dégradation (hors connexion). */}
+        {(count !== null && estimatedMinutes !== null) || isOffline ? (
+          <div
+            data-testid="queue-status"
+            style={{
+              position: "absolute",
+              bottom: "var(--space-8)",
+              left: "var(--space-8)",
+              right: "var(--space-8)",
+              fontSize: "24px",
+              color: "var(--ink-muted-inv)",
+              textAlign: "center",
+            }}
+          >
+            {count !== null && estimatedMinutes !== null
+              ? t("queueStatus", { count, minutes: estimatedMinutes })
+              : t("queueUnavailable")}
+          </div>
+        ) : null}
       </main>
     </BankThemeProvider>
   );

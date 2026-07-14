@@ -3,6 +3,7 @@
  * Handlers MSW 2.x pour les tests kiosque.
  */
 import { http, HttpResponse } from "msw";
+import type { ServiceItem } from "@/components/ServicesScreen";
 
 /** Opération de démo (vue publique PublicOperation — SLA résolu). */
 interface DemoOperation {
@@ -144,4 +145,57 @@ export const handlers = [
       { status: 200 }
     );
   }),
+  // AUDIT-F21 (démo feedback) — GET /public/tickets/{trackingId} : ticket DONE
+  // clos il y a 1 h → l'écran feedback est ÉLIGIBLE en démo (fenêtre < 24 h).
+  // Ouvrir http://localhost:3002/fr/feedback?trackingId=TRK-00001 pour vérifier
+  // visuellement la notation (« Plus tard ») et le merci (compte à rebours).
+  http.get("*/public/tickets/:trackingId", ({ params }) => {
+    return HttpResponse.json(
+      {
+        trackingId: String(params.trackingId),
+        number: 7,
+        displayNumber: "A007",
+        position: 0,
+        estimatedWaitMinutes: 0,
+        queueLength: 10,
+        serviceId: "svc-001",
+        agencyId: "agt-001",
+        channel: "KIOSK",
+        status: "DONE",
+        createdAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
+        closedAt: new Date(Date.now() - 3600_000).toISOString(),
+      },
+      { status: 200 }
+    );
+  }),
+  // AUDIT-F21 (démo feedback) — POST /public/tickets/{trackingId}/feedback :
+  // 201 → l'écran merci (compte à rebours + « Terminer ») est vérifiable en démo.
+  http.post("*/public/tickets/:trackingId/feedback", () => {
+    return HttpResponse.json(
+      { success: true, message: "Merci pour votre avis !" },
+      { status: 201 }
+    );
+  }),
+];
+
+/**
+ * AUDIT-F24 — Fixture démo « affluence » (bannière file longue KIOSK-007).
+ *
+ * Les services de démo nominaux restent tous SOUS le seuil « file longue »
+ * (30 min — `DEFAULT_LONG_QUEUE_THRESHOLD_MIN`) : la bannière d'affluence,
+ * exigée par le gate 5 états, n'était JAMAIS vérifiable visuellement. Cette
+ * fixture porte deux services au-dessus du seuil pour la déclencher.
+ *
+ * ACTIVATION (mode démo MSW uniquement — `NEXT_PUBLIC_ENABLE_MSW=1`) :
+ *   NEXT_PUBLIC_ENABLE_MSW=1 pnpm --filter @sigfa/kiosk dev
+ *   puis ouvrir http://localhost:3002/fr/services?demo=affluence
+ * La page services substitue alors cette fixture aux services nominaux
+ * (voir `app/[locale]/services/ServicesPageClient.tsx`). Le paramètre est
+ * inerte hors mode démo : jamais actif sur une borne réelle.
+ */
+export const DEMO_AFFLUENCE_SERVICES: ServiceItem[] = [
+  { id: "svc-1", name: "Dépôt", code: "deposit", estimatedMinutes: 35, isOpen: true },
+  { id: "svc-2", name: "Retrait", code: "withdrawal", estimatedMinutes: 32, isOpen: true },
+  { id: "svc-3", name: "Virement", code: "transfer", estimatedMinutes: 18, isOpen: true },
+  { id: "svc-4", name: "Réclamation", code: "complaint", estimatedMinutes: 15, isOpen: true },
 ];

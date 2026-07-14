@@ -32,6 +32,9 @@ const frMessages = {
     micLabel: "Dicter un commentaire",
     submitButton: "Envoyer mon avis",
     thankYou: "Merci pour votre avis !",
+    laterButton: "Plus tard",
+    finishButton: "Terminer",
+    returning: "Retour automatique dans {seconds} s",
   },
 };
 const enMessages = {
@@ -42,6 +45,9 @@ const enMessages = {
     micLabel: "Dictate a comment",
     submitButton: "Send my feedback",
     thankYou: "Thank you for your feedback!",
+    laterButton: "Maybe later",
+    finishButton: "Done",
+    returning: "Returning automatically in {seconds} s",
   },
 };
 const DONE_TRACKING = "V9k2mXpLqRwZsYn8fBjH";
@@ -390,6 +396,129 @@ describe("KIOSK-009: FeedbackScreen", () => {
       expect(mockPush).toHaveBeenCalledWith("/fr");
     });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  // ─── AUDIT-F21 : sortie explicite + retour non captif après merci ─────────
+  it("AUDIT-F21: sortie explicite « Plus tard » (≥ 72 px) sur l'écran de notation → retour accueil", async () => {
+    mockGet(doneTicket(2));
+    renderFeedback("fr", frMessages);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("feedback-star").length).toBe(5)
+    );
+
+    const laterBtn = screen.getByTestId("feedback-later");
+    expect(laterBtn.textContent).toContain("Plus tard");
+    // Cible tactile kiosque ≥ 72 px : le client n'est jamais captif.
+    expect(parseInt((laterBtn as HTMLElement).style.minHeight, 10)).toBeGreaterThanOrEqual(72);
+
+    fireEvent.click(laterBtn);
+    expect(mockPush).toHaveBeenCalledWith("/fr");
+  });
+
+  /** Secondes affichées par le compte à rebours (tolère la dérive du fake-timer auto-avancé). */
+  function returningSeconds(): number {
+    const text = screen.getByTestId("feedback-returning").textContent ?? "";
+    const match = text.match(/(\d+)/);
+    expect(match, `compte à rebours illisible : « ${text} »`).not.toBeNull();
+    return Number(match![1]);
+  }
+
+  it("AUDIT-F21: après merci — compte à rebours 10 s VISIBLE (pattern Moment Ticket), puis retour accueil", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockGet(doneTicket(2));
+    server.use(
+      http.post("*/public/tickets/:trackingId/feedback", () =>
+        HttpResponse.json({ success: true }, { status: 201 })
+      )
+    );
+    renderFeedback("fr", frMessages);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("feedback-star").length).toBe(5)
+    );
+    fireEvent.click(screen.getAllByTestId("feedback-star")[4]);
+    fireEvent.click(screen.getByTestId("feedback-submit"));
+    await waitFor(() => {
+      expect(screen.getByTestId("feedback-thankyou")).toBeInTheDocument();
+    });
+
+    // Compte à rebours visible, aligné sur le Moment Ticket (10 s nominal —
+    // le fake-timer auto-avancé peut déjà avoir décrémenté d'1 ou 2 s).
+    const s0 = returningSeconds();
+    expect(s0).toBeLessThanOrEqual(10);
+    expect(s0).toBeGreaterThanOrEqual(7);
+
+    mockPush.mockClear();
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(returningSeconds()).toBe(s0 - 3);
+    expect(mockPush).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime((s0 - 3) * 1000);
+    });
+    expect(mockPush).toHaveBeenCalledWith("/fr");
+  });
+
+  it("AUDIT-F21: après merci — bouton « Terminer » (≥ 72 px) → retour accueil immédiat", async () => {
+    mockGet(doneTicket(2));
+    server.use(
+      http.post("*/public/tickets/:trackingId/feedback", () =>
+        HttpResponse.json({ success: true }, { status: 201 })
+      )
+    );
+    renderFeedback("fr", frMessages);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("feedback-star").length).toBe(5)
+    );
+    fireEvent.click(screen.getAllByTestId("feedback-star")[2]);
+    fireEvent.click(screen.getByTestId("feedback-submit"));
+    await waitFor(() => {
+      expect(screen.getByTestId("feedback-thankyou")).toBeInTheDocument();
+    });
+
+    const finishBtn = screen.getByTestId("feedback-finish-btn");
+    expect(finishBtn.textContent).toContain("Terminer");
+    expect(parseInt((finishBtn as HTMLElement).style.minHeight, 10)).toBeGreaterThanOrEqual(72);
+    mockPush.mockClear();
+    fireEvent.click(finishBtn);
+    expect(mockPush).toHaveBeenCalledWith("/fr");
+  });
+
+  it("AUDIT-F21: mode accessibilité — compte à rebours doublé à 20 s après merci", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockGet(doneTicket(2));
+    server.use(
+      http.post("*/public/tickets/:trackingId/feedback", () =>
+        HttpResponse.json({ success: true }, { status: 201 })
+      )
+    );
+    renderFeedback("fr", frMessages, { isAccessibilityMode: true });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("feedback-star").length).toBe(5)
+    );
+    fireEvent.click(screen.getAllByTestId("feedback-star")[4]);
+    fireEvent.click(screen.getByTestId("feedback-submit"));
+    await waitFor(() => {
+      expect(screen.getByTestId("feedback-thankyou")).toBeInTheDocument();
+    });
+
+    // Délai DOUBLÉ (20 s) — strictement au-dessus du nominal 10 s, tolérance
+    // de dérive du fake-timer auto-avancé.
+    const s0 = returningSeconds();
+    expect(s0).toBeLessThanOrEqual(20);
+    expect(s0).toBeGreaterThan(15);
+
+    mockPush.mockClear();
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    // Après 10 s (le délai nominal entier), l'écran accessibilité est TOUJOURS là.
+    expect(mockPush).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 
   // ─── Critère 9 : contraste ≥ 7:1 ──────────────────────────────────────────

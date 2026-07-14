@@ -7,7 +7,7 @@
  * DIRECTE. Service sans opération → tuile unique du service. 5 états conservés.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach, afterAll } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { http, HttpResponse } from "msw";
@@ -68,6 +68,7 @@ const frMessages = {
     offlineBanner: "Mode hors connexion",
     advisorCard: "Voir mon conseiller",
     advisorHint: "Rencontrer un chargé de clientèle",
+    scrollHint: "Plus de services en bas",
   },
   degraded007: {
     longQueueTitle: "Forte affluence — environ {estimate} min",
@@ -92,6 +93,7 @@ const enMessages = {
     offlineBanner: "Offline mode",
     advisorCard: "See my advisor",
     advisorHint: "Meet a relationship manager",
+    scrollHint: "More services below",
   },
   degraded007: {
     longQueueTitle: "High volume — about {estimate} min",
@@ -337,5 +339,116 @@ describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
     await screen.findAllByTestId("family-section");
     fireEvent.click(screen.getByTestId("back-btn"));
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * AUDIT-F7 — Affordance de scroll + accessibilité toujours visible.
+ * AUDIT-F20 — État loading = skeleton de tuiles (plus d'écran figé).
+ */
+describe("AUDIT-F7/F20: ServicesScreen — affordance de scroll + skeleton", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function renderServices(services = MOCK_SERVICES, extraProps = {}) {
+    return render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <ServicesScreen services={services} agencyId="agt-001" {...extraProps} />
+      </NextIntlClientProvider>
+    );
+  }
+
+  /** Simule les métriques de scroll (jsdom ne mesure pas la mise en page). */
+  function setScrollMetrics(
+    el: HTMLElement,
+    metrics: { scrollHeight: number; clientHeight: number; scrollTop: number }
+  ) {
+    Object.defineProperty(el, "scrollHeight", {
+      value: metrics.scrollHeight,
+      configurable: true,
+    });
+    Object.defineProperty(el, "clientHeight", {
+      value: metrics.clientHeight,
+      configurable: true,
+    });
+    Object.defineProperty(el, "scrollTop", {
+      value: metrics.scrollTop,
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  it("AUDIT-F7: la grille vit dans une région scrollable dédiée (le bouton accessibilité N'y est PAS)", async () => {
+    renderServices();
+    await screen.findAllByTestId("family-section");
+    const region = screen.getByTestId("services-scroll-region");
+    const a11yBtn = screen.getByTestId("accessibility-btn");
+    // Le bouton accessibilité reste TOUJOURS visible pendant le scroll :
+    // il vit hors de la région scrollable, épinglé en bas de l'écran.
+    expect(region.contains(a11yBtn)).toBe(false);
+    // Les tuiles, elles, vivent dans la région scrollable.
+    const firstTile = screen.getAllByTestId("operation-tile")[0];
+    expect(region.contains(firstTile)).toBe(true);
+  });
+
+  it("AUDIT-F7: contenu sous le pli → dégradé + chevron + texte d'affordance visibles", async () => {
+    renderServices();
+    await screen.findAllByTestId("family-section");
+    const region = screen.getByTestId("services-scroll-region");
+    expect(screen.queryByTestId("services-scroll-hint")).not.toBeInTheDocument();
+
+    setScrollMetrics(region, { scrollHeight: 1600, clientHeight: 700, scrollTop: 0 });
+    act(() => {
+      fireEvent.scroll(region);
+    });
+
+    const hint = screen.getByTestId("services-scroll-hint");
+    expect(hint).toBeInTheDocument();
+    // Affordance décorative : ne doit pas être annoncée par le lecteur d'écran.
+    expect(hint).toHaveAttribute("aria-hidden", "true");
+    // Icône + texte appariés (règle DS) — texte porteur de sens ≥ 24px.
+    expect(hint.querySelector("svg")).toBeInTheDocument();
+    expect(hint.textContent).toContain("Plus de services en bas");
+    // Le dégradé n'intercepte JAMAIS le toucher (cibles sous-jacentes ≥ 72px).
+    expect((hint as HTMLElement).style.pointerEvents).toBe("none");
+  });
+
+  it("AUDIT-F7: en fin de scroll, l'affordance disparaît", async () => {
+    renderServices();
+    await screen.findAllByTestId("family-section");
+    const region = screen.getByTestId("services-scroll-region");
+    setScrollMetrics(region, { scrollHeight: 1600, clientHeight: 700, scrollTop: 0 });
+    act(() => {
+      fireEvent.scroll(region);
+    });
+    expect(screen.getByTestId("services-scroll-hint")).toBeInTheDocument();
+
+    setScrollMetrics(region, { scrollHeight: 1600, clientHeight: 700, scrollTop: 900 });
+    act(() => {
+      fireEvent.scroll(region);
+    });
+    expect(screen.queryByTestId("services-scroll-hint")).not.toBeInTheDocument();
+  });
+
+  it("AUDIT-F20: isLoading → skeleton de tuiles animé, aucune carte service", () => {
+    renderServices(MOCK_SERVICES, { isLoading: true });
+    const loading = screen.getByTestId("services-loading");
+    expect(loading).toBeInTheDocument();
+    expect(loading).toHaveAttribute("role", "status");
+    // Tuiles squelettes (shimmer DS, reduced-motion géré par @sigfa/ui).
+    expect(screen.getAllByTestId("skeleton-tile").length).toBeGreaterThanOrEqual(4);
+    expect(document.querySelectorAll(".sig-skeleton").length).toBeGreaterThan(0);
+    // Pas de tuiles réelles ni d'état vide pendant le chargement.
+    expect(screen.queryAllByTestId("operation-tile")).toHaveLength(0);
+    expect(screen.queryByText("Aucun service disponible")).not.toBeInTheDocument();
+    // Message localisé visible (texte porteur de sens).
+    expect(screen.getByText("Chargement des opérations...")).toBeInTheDocument();
+  });
+
+  it("AUDIT-F20: isLoading prime sur l'état vide (services encore inconnus)", () => {
+    renderServices([], { isLoading: true });
+    expect(screen.getByTestId("services-loading")).toBeInTheDocument();
+    expect(screen.queryByText("Aucun service disponible")).not.toBeInTheDocument();
   });
 });

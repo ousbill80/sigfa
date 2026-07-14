@@ -3,7 +3,7 @@
 exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → tuile grisée avec horaire, non cliquable (snapshot 'en') 1`] = `
 <main
   role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-6) var(--space-8) var(--space-8); gap: var(--space-6); overflow-y: auto;"
+  style="background-color: var(--surface-kiosk); height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; padding: var(--space-6) var(--space-8) var(--space-8); gap: var(--space-6);"
 >
   <header
     data-testid="kiosk-header-banner"
@@ -54,7 +54,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
     </div>
   </header>
   <div
-    style="display: flex; align-items: baseline; gap: var(--space-4); width: 100%; max-width: 960px; margin: 0px auto;"
+    style="display: flex; align-items: baseline; gap: var(--space-4); width: 100%; max-width: 960px; margin: 0px auto; flex-shrink: 0;"
   >
     <button
       data-testid="back-btn"
@@ -118,49 +118,151 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
     />
   </div>
   <div
-    style="flex: 1 1 0%; display: flex; flex-direction: column; gap: var(--space-8); width: 100%; max-width: 960px; margin: 0px auto;"
+    style="position: relative; flex: 1 1 0%; min-height: 0;"
   >
-    <section
-      aria-label="Virement international"
-      data-testid="family-section"
-      style="display: flex; flex-direction: column; gap: var(--space-4);"
+    <div
+      data-testid="services-scroll-region"
+      style="height: 100%; overflow-y: auto;"
     >
       <div
-        style="display: flex; align-items: center; gap: var(--space-3);"
+        style="width: 100%; max-width: 960px; margin: 0px auto; display: flex; flex-direction: column; gap: var(--space-8); padding-bottom: var(--space-6);"
       >
-        <span
-          aria-hidden="true"
-          style="width: 6px; height: 28px; border-radius: var(--r-full); background-color: var(--gold); flex-shrink: 0;"
-        />
-        <h2
-          data-testid="family-title"
-          style="font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
+        <section
+          aria-label="Virement international"
+          data-testid="family-section"
+          style="display: flex; flex-direction: column; gap: var(--space-4);"
         >
-          Virement international
-        </h2>
-      </div>
-      <div
-        data-testid="family-grid"
-        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4);"
-      >
+          <div
+            style="display: flex; align-items: center; gap: var(--space-3);"
+          >
+            <span
+              aria-hidden="true"
+              style="width: 6px; height: 28px; border-radius: var(--r-full); background-color: var(--gold); flex-shrink: 0;"
+            />
+            <h2
+              data-testid="family-title"
+              style="font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
+            >
+              Virement international
+            </h2>
+          </div>
+          <div
+            data-testid="family-grid"
+            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4);"
+          >
+            <button
+              aria-disabled="true"
+              data-testid="service-tile"
+              style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: none; cursor: not-allowed; opacity: 0.4; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); text-align: left;"
+            >
+              <span
+                data-testid="operation-tile-icon"
+                style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
+              >
+                <svg
+                  aria-hidden="true"
+                  data-icon="transfer"
+                  fill="none"
+                  focusable="false"
+                  height="32"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  width="32"
+                >
+                  <g
+                    data-layer="duo"
+                    fill="currentColor"
+                    opacity="0.2"
+                    stroke="none"
+                  >
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="3"
+                      y="3.5"
+                    />
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="15.5"
+                      y="15"
+                    />
+                  </g>
+                  <g
+                    data-layer="line"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                  >
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="3"
+                      y="3.5"
+                    />
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="15.5"
+                      y="15"
+                    />
+                    <path
+                      d="M11.5 6.25h9"
+                    />
+                    <path
+                      d="m17.5 3.25 3 3-3 3"
+                    />
+                    <path
+                      d="M12.5 17.75h-9"
+                    />
+                    <path
+                      d="m6.5 14.75-3 3 3 3"
+                    />
+                  </g>
+                </svg>
+              </span>
+              <span
+                style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
+              >
+                <span
+                  data-testid="operation-tile-label"
+                  style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--action-label);"
+                >
+                  Virement international
+                </span>
+                <span
+                  data-testid="service-schedule"
+                  style="font-size: 18px; color: var(--ink-soft);"
+                >
+                  Closed — lundi 08h00
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
         <button
-          aria-disabled="true"
-          data-testid="service-tile"
-          style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: none; cursor: not-allowed; opacity: 0.4; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); text-align: left;"
+          data-testid="advisor-access-card"
+          style="min-height: 88px; background-color: transparent; border: 1px solid var(--gold-soft); border-radius: var(--r-lg); cursor: pointer; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); text-align: left; color: var(--ink-inverse);"
         >
           <span
-            data-testid="operation-tile-icon"
-            style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
+            data-testid="advisor-access-icon"
+            style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); border: 1px solid var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center;"
           >
             <svg
               aria-hidden="true"
-              data-icon="transfer"
+              data-icon="conseiller"
               fill="none"
               focusable="false"
-              height="32"
+              height="30"
               stroke="currentColor"
               viewBox="0 0 24 24"
-              width="32"
+              width="30"
             >
               <g
                 data-layer="duo"
@@ -168,19 +270,17 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
                 opacity="0.2"
                 stroke="none"
               >
-                <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="3"
-                  y="3.5"
+                <circle
+                  cx="12"
+                  cy="7"
+                  r="3"
                 />
                 <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="15.5"
-                  y="15"
+                  height="5"
+                  rx="1"
+                  width="6.5"
+                  x="14"
+                  y="14"
                 />
               </g>
               <g
@@ -191,31 +291,23 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
                 stroke-linejoin="round"
                 stroke-width="2"
               >
+                <circle
+                  cx="12"
+                  cy="7"
+                  r="3"
+                />
+                <path
+                  d="M5 20a7 7 0 0 1 14 0"
+                />
                 <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="3"
-                  y="3.5"
-                />
-                <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="15.5"
-                  y="15"
+                  height="5"
+                  rx="1"
+                  width="6.5"
+                  x="14"
+                  y="14"
                 />
                 <path
-                  d="M11.5 6.25h9"
-                />
-                <path
-                  d="m17.5 3.25 3 3-3 3"
-                />
-                <path
-                  d="M12.5 17.75h-9"
-                />
-                <path
-                  d="m6.5 14.75-3 3 3 3"
+                  d="M16 16.5h2.5"
                 />
               </g>
             </svg>
@@ -224,145 +316,62 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
             style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
           >
             <span
-              data-testid="operation-tile-label"
-              style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--action-label);"
+              data-testid="advisor-access-label"
+              style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--ink-inverse);"
             >
-              Virement international
+              See my advisor
             </span>
             <span
-              data-testid="service-schedule"
-              style="font-size: 18px; color: var(--ink-soft);"
+              style="font-size: 18px; color: var(--ink-muted-inv);"
             >
-              Closed — lundi 08h00
+              Meet a relationship manager
             </span>
+          </span>
+          <span
+            aria-hidden="true"
+            style="margin-left: auto; color: var(--gold); display: flex;"
+          >
+            <svg
+              aria-hidden="true"
+              data-icon="chevron"
+              fill="none"
+              focusable="false"
+              height="28"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              width="28"
+            >
+              <g
+                data-layer="duo"
+                fill="currentColor"
+                opacity="0.2"
+                stroke="none"
+              >
+                <path
+                  d="m9.2 5.8 6.2 6.2-6.2 6.2Z"
+                />
+              </g>
+              <g
+                data-layer="line"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              >
+                <path
+                  d="m9.2 5.8 6.2 6.2-6.2 6.2"
+                />
+              </g>
+            </svg>
           </span>
         </button>
       </div>
-    </section>
-    <button
-      data-testid="advisor-access-card"
-      style="min-height: 88px; background-color: transparent; border: 1px solid var(--gold-soft); border-radius: var(--r-lg); cursor: pointer; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); text-align: left; color: var(--ink-inverse);"
-    >
-      <span
-        data-testid="advisor-access-icon"
-        style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); border: 1px solid var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center;"
-      >
-        <svg
-          aria-hidden="true"
-          data-icon="conseiller"
-          fill="none"
-          focusable="false"
-          height="30"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          width="30"
-        >
-          <g
-            data-layer="duo"
-            fill="currentColor"
-            opacity="0.2"
-            stroke="none"
-          >
-            <circle
-              cx="12"
-              cy="7"
-              r="3"
-            />
-            <rect
-              height="5"
-              rx="1"
-              width="6.5"
-              x="14"
-              y="14"
-            />
-          </g>
-          <g
-            data-layer="line"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-          >
-            <circle
-              cx="12"
-              cy="7"
-              r="3"
-            />
-            <path
-              d="M5 20a7 7 0 0 1 14 0"
-            />
-            <rect
-              height="5"
-              rx="1"
-              width="6.5"
-              x="14"
-              y="14"
-            />
-            <path
-              d="M16 16.5h2.5"
-            />
-          </g>
-        </svg>
-      </span>
-      <span
-        style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
-      >
-        <span
-          data-testid="advisor-access-label"
-          style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--ink-inverse);"
-        >
-          See my advisor
-        </span>
-        <span
-          style="font-size: 18px; color: var(--ink-muted-inv);"
-        >
-          Meet a relationship manager
-        </span>
-      </span>
-      <span
-        aria-hidden="true"
-        style="margin-left: auto; color: var(--gold); display: flex;"
-      >
-        <svg
-          aria-hidden="true"
-          data-icon="chevron"
-          fill="none"
-          focusable="false"
-          height="28"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          width="28"
-        >
-          <g
-            data-layer="duo"
-            fill="currentColor"
-            opacity="0.2"
-            stroke="none"
-          >
-            <path
-              d="m9.2 5.8 6.2 6.2-6.2 6.2Z"
-            />
-          </g>
-          <g
-            data-layer="line"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-          >
-            <path
-              d="m9.2 5.8 6.2 6.2-6.2 6.2"
-            />
-          </g>
-        </svg>
-      </span>
-    </button>
+    </div>
   </div>
   <button
     data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center; display: flex; align-items: center; gap: var(--space-3);"
+    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center; flex-shrink: 0; display: flex; align-items: center; gap: var(--space-3);"
   >
     <svg
       aria-hidden="true"
@@ -423,7 +432,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
 exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: service CLOSED → tuile grisée avec horaire, non cliquable (snapshot 'fr') 1`] = `
 <main
   role="main"
-  style="background-color: var(--surface-kiosk); min-height: 100vh; display: flex; flex-direction: column; padding: var(--space-6) var(--space-8) var(--space-8); gap: var(--space-6); overflow-y: auto;"
+  style="background-color: var(--surface-kiosk); height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; padding: var(--space-6) var(--space-8) var(--space-8); gap: var(--space-6);"
 >
   <header
     data-testid="kiosk-header-banner"
@@ -474,7 +483,7 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
     </div>
   </header>
   <div
-    style="display: flex; align-items: baseline; gap: var(--space-4); width: 100%; max-width: 960px; margin: 0px auto;"
+    style="display: flex; align-items: baseline; gap: var(--space-4); width: 100%; max-width: 960px; margin: 0px auto; flex-shrink: 0;"
   >
     <button
       data-testid="back-btn"
@@ -538,49 +547,151 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
     />
   </div>
   <div
-    style="flex: 1 1 0%; display: flex; flex-direction: column; gap: var(--space-8); width: 100%; max-width: 960px; margin: 0px auto;"
+    style="position: relative; flex: 1 1 0%; min-height: 0;"
   >
-    <section
-      aria-label="Virement international"
-      data-testid="family-section"
-      style="display: flex; flex-direction: column; gap: var(--space-4);"
+    <div
+      data-testid="services-scroll-region"
+      style="height: 100%; overflow-y: auto;"
     >
       <div
-        style="display: flex; align-items: center; gap: var(--space-3);"
+        style="width: 100%; max-width: 960px; margin: 0px auto; display: flex; flex-direction: column; gap: var(--space-8); padding-bottom: var(--space-6);"
       >
-        <span
-          aria-hidden="true"
-          style="width: 6px; height: 28px; border-radius: var(--r-full); background-color: var(--gold); flex-shrink: 0;"
-        />
-        <h2
-          data-testid="family-title"
-          style="font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
+        <section
+          aria-label="Virement international"
+          data-testid="family-section"
+          style="display: flex; flex-direction: column; gap: var(--space-4);"
         >
-          Virement international
-        </h2>
-      </div>
-      <div
-        data-testid="family-grid"
-        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4);"
-      >
+          <div
+            style="display: flex; align-items: center; gap: var(--space-3);"
+          >
+            <span
+              aria-hidden="true"
+              style="width: 6px; height: 28px; border-radius: var(--r-full); background-color: var(--gold); flex-shrink: 0;"
+            />
+            <h2
+              data-testid="family-title"
+              style="font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--ink-inverse); margin: 0px;"
+            >
+              Virement international
+            </h2>
+          </div>
+          <div
+            data-testid="family-grid"
+            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4);"
+          >
+            <button
+              aria-disabled="true"
+              data-testid="service-tile"
+              style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: none; cursor: not-allowed; opacity: 0.4; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); text-align: left;"
+            >
+              <span
+                data-testid="operation-tile-icon"
+                style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
+              >
+                <svg
+                  aria-hidden="true"
+                  data-icon="transfer"
+                  fill="none"
+                  focusable="false"
+                  height="32"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  width="32"
+                >
+                  <g
+                    data-layer="duo"
+                    fill="currentColor"
+                    opacity="0.2"
+                    stroke="none"
+                  >
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="3"
+                      y="3.5"
+                    />
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="15.5"
+                      y="15"
+                    />
+                  </g>
+                  <g
+                    data-layer="line"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                  >
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="3"
+                      y="3.5"
+                    />
+                    <rect
+                      height="5.5"
+                      rx="1.5"
+                      width="5.5"
+                      x="15.5"
+                      y="15"
+                    />
+                    <path
+                      d="M11.5 6.25h9"
+                    />
+                    <path
+                      d="m17.5 3.25 3 3-3 3"
+                    />
+                    <path
+                      d="M12.5 17.75h-9"
+                    />
+                    <path
+                      d="m6.5 14.75-3 3 3 3"
+                    />
+                  </g>
+                </svg>
+              </span>
+              <span
+                style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
+              >
+                <span
+                  data-testid="operation-tile-label"
+                  style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--action-label);"
+                >
+                  Virement international
+                </span>
+                <span
+                  data-testid="service-schedule"
+                  style="font-size: 18px; color: var(--ink-soft);"
+                >
+                  Fermé — lundi 08h00
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
         <button
-          aria-disabled="true"
-          data-testid="service-tile"
-          style="min-height: 96px; background-color: var(--surface-1); border-radius: var(--r-lg); border: 1px solid var(--hairline); box-shadow: none; cursor: not-allowed; opacity: 0.4; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); text-align: left;"
+          data-testid="advisor-access-card"
+          style="min-height: 88px; background-color: transparent; border: 1px solid var(--gold-soft); border-radius: var(--r-lg); cursor: pointer; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); text-align: left; color: var(--ink-inverse);"
         >
           <span
-            data-testid="operation-tile-icon"
-            style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); background-color: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center;"
+            data-testid="advisor-access-icon"
+            style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); border: 1px solid var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center;"
           >
             <svg
               aria-hidden="true"
-              data-icon="transfer"
+              data-icon="conseiller"
               fill="none"
               focusable="false"
-              height="32"
+              height="30"
               stroke="currentColor"
               viewBox="0 0 24 24"
-              width="32"
+              width="30"
             >
               <g
                 data-layer="duo"
@@ -588,19 +699,17 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
                 opacity="0.2"
                 stroke="none"
               >
-                <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="3"
-                  y="3.5"
+                <circle
+                  cx="12"
+                  cy="7"
+                  r="3"
                 />
                 <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="15.5"
-                  y="15"
+                  height="5"
+                  rx="1"
+                  width="6.5"
+                  x="14"
+                  y="14"
                 />
               </g>
               <g
@@ -611,31 +720,23 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
                 stroke-linejoin="round"
                 stroke-width="2"
               >
+                <circle
+                  cx="12"
+                  cy="7"
+                  r="3"
+                />
+                <path
+                  d="M5 20a7 7 0 0 1 14 0"
+                />
                 <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="3"
-                  y="3.5"
-                />
-                <rect
-                  height="5.5"
-                  rx="1.5"
-                  width="5.5"
-                  x="15.5"
-                  y="15"
+                  height="5"
+                  rx="1"
+                  width="6.5"
+                  x="14"
+                  y="14"
                 />
                 <path
-                  d="M11.5 6.25h9"
-                />
-                <path
-                  d="m17.5 3.25 3 3-3 3"
-                />
-                <path
-                  d="M12.5 17.75h-9"
-                />
-                <path
-                  d="m6.5 14.75-3 3 3 3"
+                  d="M16 16.5h2.5"
                 />
               </g>
             </svg>
@@ -644,145 +745,62 @@ exports[`KIOSK-007: ServicesScreen file longue + service fermé > KIOSK-007: ser
             style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
           >
             <span
-              data-testid="operation-tile-label"
-              style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--action-label);"
+              data-testid="advisor-access-label"
+              style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--ink-inverse);"
             >
-              Virement international
+              Voir mon conseiller
             </span>
             <span
-              data-testid="service-schedule"
-              style="font-size: 18px; color: var(--ink-soft);"
+              style="font-size: 18px; color: var(--ink-muted-inv);"
             >
-              Fermé — lundi 08h00
+              Rencontrer un chargé de clientèle
             </span>
+          </span>
+          <span
+            aria-hidden="true"
+            style="margin-left: auto; color: var(--gold); display: flex;"
+          >
+            <svg
+              aria-hidden="true"
+              data-icon="chevron"
+              fill="none"
+              focusable="false"
+              height="28"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              width="28"
+            >
+              <g
+                data-layer="duo"
+                fill="currentColor"
+                opacity="0.2"
+                stroke="none"
+              >
+                <path
+                  d="m9.2 5.8 6.2 6.2-6.2 6.2Z"
+                />
+              </g>
+              <g
+                data-layer="line"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              >
+                <path
+                  d="m9.2 5.8 6.2 6.2-6.2 6.2"
+                />
+              </g>
+            </svg>
           </span>
         </button>
       </div>
-    </section>
-    <button
-      data-testid="advisor-access-card"
-      style="min-height: 88px; background-color: transparent; border: 1px solid var(--gold-soft); border-radius: var(--r-lg); cursor: pointer; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); text-align: left; color: var(--ink-inverse);"
-    >
-      <span
-        data-testid="advisor-access-icon"
-        style="flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full); border: 1px solid var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center;"
-      >
-        <svg
-          aria-hidden="true"
-          data-icon="conseiller"
-          fill="none"
-          focusable="false"
-          height="30"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          width="30"
-        >
-          <g
-            data-layer="duo"
-            fill="currentColor"
-            opacity="0.2"
-            stroke="none"
-          >
-            <circle
-              cx="12"
-              cy="7"
-              r="3"
-            />
-            <rect
-              height="5"
-              rx="1"
-              width="6.5"
-              x="14"
-              y="14"
-            />
-          </g>
-          <g
-            data-layer="line"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-          >
-            <circle
-              cx="12"
-              cy="7"
-              r="3"
-            />
-            <path
-              d="M5 20a7 7 0 0 1 14 0"
-            />
-            <rect
-              height="5"
-              rx="1"
-              width="6.5"
-              x="14"
-              y="14"
-            />
-            <path
-              d="M16 16.5h2.5"
-            />
-          </g>
-        </svg>
-      </span>
-      <span
-        style="display: flex; flex-direction: column; gap: var(--space-1); min-width: 0;"
-      >
-        <span
-          data-testid="advisor-access-label"
-          style="font-size: 22px; font-weight: 600; line-height: var(--leading-tight); color: var(--ink-inverse);"
-        >
-          Voir mon conseiller
-        </span>
-        <span
-          style="font-size: 18px; color: var(--ink-muted-inv);"
-        >
-          Rencontrer un chargé de clientèle
-        </span>
-      </span>
-      <span
-        aria-hidden="true"
-        style="margin-left: auto; color: var(--gold); display: flex;"
-      >
-        <svg
-          aria-hidden="true"
-          data-icon="chevron"
-          fill="none"
-          focusable="false"
-          height="28"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          width="28"
-        >
-          <g
-            data-layer="duo"
-            fill="currentColor"
-            opacity="0.2"
-            stroke="none"
-          >
-            <path
-              d="m9.2 5.8 6.2 6.2-6.2 6.2Z"
-            />
-          </g>
-          <g
-            data-layer="line"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-          >
-            <path
-              d="m9.2 5.8 6.2 6.2-6.2 6.2"
-            />
-          </g>
-        </svg>
-      </span>
-    </button>
+    </div>
   </div>
   <button
     data-testid="accessibility-btn"
-    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center; display: flex; align-items: center; gap: var(--space-3);"
+    style="font-size: 24px; color: var(--ink-muted-inv); background: none; cursor: pointer; padding: var(--space-2); min-height: 72px; align-self: center; flex-shrink: 0; display: flex; align-items: center; gap: var(--space-3);"
   >
     <svg
       aria-hidden="true"
