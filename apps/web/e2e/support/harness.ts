@@ -40,8 +40,14 @@ export interface E2eFixtures {
   counterId: string;
   agentId: string;
   adminId: string;
+  /** Auditeur (rôle ORTHOGONAL lecture seule) — écran journal d'audit SEC-001b. */
+  auditorId: string;
   kioskId: string;
   kioskSecret: string;
+  /** Borne MUETTE seedée (last_seen ancien > seuil 90 s) — supervision ADM-003b. */
+  silentKioskId: string;
+  /** Borne EN LIGNE seedée (last_seen récent) — supervision ADM-003b. */
+  onlineKioskId: string;
 }
 
 /** État complet du backend E2E, sérialisé pour les specs. */
@@ -54,6 +60,8 @@ export interface E2eBackend extends E2eFixtures {
   agentToken: string;
   /** JWT BANK_ADMIN (scope banque) pour la console theming (ADM-001b). */
   adminToken: string;
+  /** JWT AUDITOR (scope banque, lecture seule) — écran journal d'audit SEC-001b. */
+  auditorToken: string;
 }
 
 /** Poignée interne des ressources à nettoyer. */
@@ -274,11 +282,18 @@ async function seed(db: pg.Client): Promise<E2eFixtures> {
     [bankId]
   );
   const adminId = (admin.rows[0] as { id: string }).id;
+  // Auditeur (rôle ORTHOGONAL lecture seule, scope banque) — écran journal d'audit
+  // SEC-001b : il lit `GET /audit-logs` borné à SA banque (jamais cross-tenant).
+  const auditor = await db.query(
+    `INSERT INTO users (bank_id, email, role) VALUES ($1,'auditor@oc.ci','AUDITOR') RETURNING id`,
+    [bankId]
+  );
+  const auditorId = (auditor.rows[0] as { id: string }).id;
   // Affectation d'agence (agency_users) — requise par le nettoyage socket
   // (`forceOffline` sur déconnexion agent) et le scope agence.
   await db.query(
-    `INSERT INTO agency_users (bank_id, agency_id, user_id) VALUES ($1,$2,$3),($1,$2,$4)`,
-    [bankId, agencyId, agentId, adminId]
+    `INSERT INTO agency_users (bank_id, agency_id, user_id) VALUES ($1,$2,$3),($1,$2,$4),($1,$2,$5)`,
+    [bankId, agencyId, agentId, adminId, auditorId]
   );
   // Guichet affecté à l'agent + statut OPEN → call-next opérationnel.
   const ctr = await db.query(
@@ -307,7 +322,30 @@ async function seed(db: pg.Client): Promise<E2eFixtures> {
     [bankId, agencyId]
   );
   const kioskId = (kiosk.rows[0] as { id: string }).id;
-  return { bankId, agencyId, serviceId, queueId, counterId, agentId, adminId, kioskId, kioskSecret };
+  // ── Supervision borne ADM-003b : deux bornes à `last_seen` CONTRÔLÉ ──────────
+  // Le statut est DÉRIVÉ à la lecture depuis `last_seen` + l'horloge serveur
+  // (seuil SILENT = 90 s, DEGRADED ≥ 60 s). On seede des horodatages déterministes
+  // (jamais un état figé en base) pour que `GET /agencies/:id/kiosks/status`
+  // renvoie une borne MUETTE (silence 10 min) et une borne EN LIGNE (5 s) sans
+  // dépendre du passage réel du temps pendant le test.
+  const silent = await db.query(
+    `INSERT INTO kiosks (bank_id, agency_id, label, credentials_hash, printer_status, last_seen)
+     VALUES ($1,$2,'Borne Muette','x','OK', now() - interval '10 minutes')
+     RETURNING id`,
+    [bankId, agencyId]
+  );
+  const silentKioskId = (silent.rows[0] as { id: string }).id;
+  const online = await db.query(
+    `INSERT INTO kiosks (bank_id, agency_id, label, credentials_hash, printer_status, last_seen)
+     VALUES ($1,$2,'Borne En Ligne','x','OK', now() - interval '5 seconds')
+     RETURNING id`,
+    [bankId, agencyId]
+  );
+  const onlineKioskId = (online.rows[0] as { id: string }).id;
+  return {
+    bankId, agencyId, serviceId, queueId, counterId, agentId, adminId, auditorId,
+    kioskId, kioskSecret, silentKioskId, onlineKioskId,
+  };
 }
 
 /** Forge un JWT agent (scope agence) signé avec le secret E2E. */
@@ -327,6 +365,21 @@ async function forgeAdminToken(fx: E2eFixtures): Promise<string> {
   return new SignJWT({ role: "BANK_ADMIN", bankId: fx.bankId, agencyIds: [fx.agencyId] })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(fx.adminId)
+    .setIssuedAt()
+    .setExpirationTime("2h")
+    .sign(secret);
+}
+
+/**
+ * Forge un JWT AUDITOR (scope banque, lecture seule) signé avec le secret E2E.
+ * `bankId` renseigné → le journal d'audit est borné à cette banque (jamais
+ * cross-tenant, SEC-001b). `agencyIds` permet la dérivation du contexte de page.
+ */
+async function forgeAuditorToken(fx: E2eFixtures): Promise<string> {
+  const secret = new TextEncoder().encode(E2E_JWT_SECRET);
+  return new SignJWT({ role: "AUDITOR", bankId: fx.bankId, agencyIds: [fx.agencyId] })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(fx.auditorId)
     .setIssuedAt()
     .setExpirationTime("2h")
     .sign(secret);
@@ -406,12 +459,14 @@ export async function startHarness(apiPort: number): Promise<E2eResources> {
 
   const agentToken = await forgeAgentToken(fx);
   const adminToken = await forgeAdminToken(fx);
+  const auditorToken = await forgeAuditorToken(fx);
   const backend: E2eBackend = {
     ...fx,
     apiOrigin,
     apiBase: `${apiOrigin}/api/v1`,
     agentToken,
     adminToken,
+    auditorToken,
   };
   return { pg: pgContainer, redis: redisContainer, api, backend };
 }
