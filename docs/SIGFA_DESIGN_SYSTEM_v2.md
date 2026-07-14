@@ -1,5 +1,11 @@
 # SIGFA — SYSTÈME DE DESIGN v2 · « Sérénité Premium »
 
+> **OBSOLÈTE — SUPPLANTÉ PAR LA v3.** Ce document est conservé pour l'historique.
+> La palette « Or & Forêt » (terracotta + vert forêt + or patiné + fonds brun-nuit)
+> a été **rejetée par le PO** (2026-07-14 : mariage des couleurs jugé très mauvais).
+> La référence en vigueur est **[SIGFA_DESIGN_SYSTEM_v3.md](./SIGFA_DESIGN_SYSTEM_v3.md)**
+> (« Neutre Premium » : châssis neutre, la couleur de la banque comme seul accent).
+
 > **Version** : 2.0 · **2026-07-12** · Refonte complète (directive PO : l'UX/UI doit être IRRÉPROCHABLE — l'expérience client est la raison d'être du produit).
 > Remplace la palette générique v1 (Untitled-UI standard, sans personnalité) par une identité propre à SIGFA.
 > **Source de vérité unique.** Les tokens vivent désormais dans `packages/ui` (partagé) ; aucune valeur hex hors des tokens.
