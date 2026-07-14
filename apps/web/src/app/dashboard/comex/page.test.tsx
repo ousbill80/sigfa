@@ -54,10 +54,10 @@ describe("S3: /dashboard/comex — proxy authentifié", () => {
     await expect(ComexDashboardPage()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("mode mock → base mock d'env", async () => {
+  it("mode mock → proxy /api/rt (upstream mock côté serveur)", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await ComexDashboardPage();
     const client = findElementByType(tree, ComexPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
   });
 });

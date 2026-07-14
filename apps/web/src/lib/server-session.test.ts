@@ -80,11 +80,13 @@ describe("S3: resolveTenantContext — proxy + tenant issus du JWT vérifié", (
     await expect(resolveTenantContext()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("mode mock → base mock d'env + fixtures tenant (bascule d'env respectée)", async () => {
+  it("mode mock → proxy /api/rt + fixtures tenant (bascule d'env respectée)", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:4010");
     const ctx = await resolveTenantContext();
-    expect(ctx.apiBase).toBe("http://localhost:4010");
+    // S3 : même en mock, le navigateur passe par le proxy same-origin — c'est
+    // le proxy qui rebase vers le mock Prism (jamais de cross-origin client).
+    expect(ctx.apiBase).toBe("/api/rt");
     expect(ctx.realtime).toBe(false);
     expect(ctx.bankId).toBe(MOCK_TENANT.bankId);
     expect(ctx.agencyId).toBe(MOCK_TENANT.agencyId);

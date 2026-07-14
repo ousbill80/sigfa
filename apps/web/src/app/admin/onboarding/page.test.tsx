@@ -67,11 +67,11 @@ describe("ADM-002b: /admin/onboarding — tenant des claims + reprise via query"
     expect(client?.props.resumeOnboardingId).toBe("ob-1");
   });
 
-  it("ADM-002b: mode mock → base mock + fixtures tenant", async () => {
+  it("ADM-002b: mode mock → proxy /api/rt + fixtures tenant", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await OnboardingPage({});
     const client = findElementByType(tree, OnboardingPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
     expect(client?.props.bankId).toBe(MOCK_TENANT.bankId);
     expect(client?.props.role).toBe(MOCK_TENANT.role);
   });

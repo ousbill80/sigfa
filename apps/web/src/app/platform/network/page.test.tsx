@@ -54,10 +54,10 @@ describe("NET-001: /platform/network — page Super Admin (S3)", () => {
     await expect(PlatformNetworkPage()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("NET-001: mode mock → base mock Prism", async () => {
+  it("NET-001: mode mock → proxy /api/rt (upstream Prism)", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await PlatformNetworkPage();
     const client = findElementByType(tree, NetAdminPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
   });
 });

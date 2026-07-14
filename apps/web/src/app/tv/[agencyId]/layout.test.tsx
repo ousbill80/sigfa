@@ -34,6 +34,8 @@ describe("RT-003: /tv/[agencyId] layout — mint DISPLAY public, sans JWT agent"
     expect(rt).not.toBeNull();
     expect(rt?.props.mode).toBe("real");
     expect(rt?.props.agencyId).toBe(AGENCY_ID);
+    // S3 : le mint DISPLAY passe par le proxy same-origin (pas de cross-origin).
+    expect(rt?.props.apiBase).toBe("/api/rt");
     // Aucun JWT agent ne doit transiter par l'arbre public.
     expect(treeContainsString(tree, JWT)).toBe(false);
   });

@@ -9,19 +9,39 @@
  * quel sous `/api/v1` (C1). Les en-têtes de contrat (X-Idempotency-Key) sont
  * transmis.
  *
+ * Depuis le fix « /dashboard vide » (S3), `/api/rt` est la porte API UNIQUE du
+ * navigateur (lib/browser-api) dans les DEUX modes RT-001b :
+ * - mode real : upstream = origine de `NEXT_PUBLIC_API_URL` + `/api/v1` ;
+ * - mode off  : upstream = base mock Prism VERBATIM (les bundles Prism servent
+ *   les chemins nus, sans préfixe /api/v1).
+ *
  * @module app/api/rt/[...path]/route
  */
 import { NextRequest, NextResponse } from "next/server";
+import { resolveRealtimeMode, restApiBase } from "@/lib/realtime-env";
 
-/** Origine de l'API réelle (racine, on préfixe /api/v1 nous-mêmes). */
-function apiOrigin(): string {
-  const raw = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4010";
+/**
+ * Base upstream selon le mode (RT-001b).
+ * - real : origine de l'env + préfixe /api/v1 (dérivation miroir de
+ *   lib/agency-label#apiV1Base) ;
+ * - off  : base d'env verbatim (mock Prism, chemins nus).
+ */
+function upstreamBase(): string {
+  const raw = restApiBase().replace(/\/+$/, "");
+  if (resolveRealtimeMode() !== "real") return raw;
   try {
-    return new URL(raw).origin;
+    return `${new URL(raw).origin}/api/v1`;
   } catch {
     return raw;
   }
 }
+
+/**
+ * Bearer factice du mode mock : les bundles OpenAPI sécurisés (Boucle 2)
+ * imposent le scheme bearer — Prism valide sa PRÉSENCE, jamais sa valeur.
+ * JAMAIS utilisé en mode real (le proxy y relaie le cookie vérifié ou rien).
+ */
+const MOCK_BEARER = "prism-mock";
 
 /** En-têtes de contrat autorisés à traverser le proxy. */
 const FORWARD_HEADERS = ["content-type", "x-idempotency-key"] as const;
@@ -35,14 +55,18 @@ const FORWARD_HEADERS = ["content-type", "x-idempotency-key"] as const;
 async function proxy(request: NextRequest, path: string[]): Promise<NextResponse> {
   const token = request.cookies.get("access_token")?.value;
   const search = request.nextUrl.search;
-  const target = `${apiOrigin()}/api/v1/${path.join("/")}${search}`;
+  const target = `${upstreamBase()}/${path.join("/")}${search}`;
 
   const headers = new Headers();
   for (const h of FORWARD_HEADERS) {
     const v = request.headers.get(h);
     if (v) headers.set(h, v);
   }
-  if (token) headers.set("authorization", `Bearer ${token}`);
+  if (token) {
+    headers.set("authorization", `Bearer ${token}`);
+  } else if (resolveRealtimeMode() !== "real") {
+    headers.set("authorization", `Bearer ${MOCK_BEARER}`);
+  }
 
   const method = request.method;
   const body =

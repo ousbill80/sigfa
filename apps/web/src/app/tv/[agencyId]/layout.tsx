@@ -11,7 +11,8 @@
  */
 import type { ReactElement } from "react";
 import { TvRealtime } from "@/components/tv/tv-realtime";
-import { resolveRealtimeMode, restApiBase, socketOrigin } from "@/lib/realtime-env";
+import { resolveRealtimeMode, socketOrigin } from "@/lib/realtime-env";
+import { BROWSER_API_BASE } from "@/lib/browser-api";
 
 export default async function TvAgencyLayout({
   children,
@@ -25,7 +26,7 @@ export default async function TvAgencyLayout({
     <TvRealtime
       agencyId={agencyId}
       mode={resolveRealtimeMode()}
-      apiBase={restApiBase()}
+      apiBase={BROWSER_API_BASE}
       socketUrl={socketOrigin()}
     >
       {children}

@@ -14,7 +14,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getJwtSecret, verifySessionToken, type SessionClaims } from "./session";
-import { resolveRealtimeMode, restApiBase } from "./realtime-env";
+import { resolveRealtimeMode } from "./realtime-env";
+import { BROWSER_API_BASE } from "./browser-api";
 import type { Role } from "./roles";
 
 /** Nom du cookie httpOnly posé par /api/auth/login. */
@@ -40,7 +41,11 @@ export const MOCK_TENANT: { bankId: string; agencyId: string; role: Role } = {
 
 /** Contexte de page authentifiée (S3). */
 export interface TenantPageContext {
-  /** Base API : proxy same-origin `/api/rt` en real, mock Prism sinon. */
+  /**
+   * Base API navigateur : TOUJOURS le proxy same-origin `/api/rt`
+   * (lib/browser-api) — jamais d'URL cross-origin dans l'arbre client. Le
+   * proxy résout lui-même l'upstream (API réelle ou mock Prism, RT-001b).
+   */
   apiBase: string;
   /** Banque du JWT vérifié (vide pour SUPER_ADMIN — scope platform). */
   bankId: string;
@@ -67,15 +72,17 @@ export async function readVerifiedSession(): Promise<VerifiedSession | null> {
 
 /**
  * Résout le contexte tenant d'une page authentifiée (S3).
- * - mode mock : base d'env + fixtures MOCK_TENANT (bascule inchangée) ;
- * - mode real : proxy `/api/rt` + claims du JWT vérifié ; session absente ou
- *   invalide → redirection /login (défense en profondeur, en plus du
- *   middleware).
+ * - mode mock : fixtures MOCK_TENANT (bascule inchangée) ;
+ * - mode real : claims du JWT vérifié ; session absente ou invalide →
+ *   redirection /login (défense en profondeur, en plus du middleware).
+ * Dans les DEUX modes, la base API navigateur est le proxy same-origin
+ * `/api/rt` : c'est le proxy qui choisit l'upstream (API réelle /api/v1 ou
+ * mock Prism) — le navigateur ne fait jamais d'appel cross-origin.
  * @returns Le contexte tenant de la page.
  */
 export async function resolveTenantContext(): Promise<TenantPageContext> {
   if (resolveRealtimeMode() !== "real") {
-    return { apiBase: restApiBase(), ...MOCK_TENANT, realtime: false };
+    return { apiBase: BROWSER_API_BASE, ...MOCK_TENANT, realtime: false };
   }
 
   const verified = await readVerifiedSession();
@@ -83,7 +90,7 @@ export async function resolveTenantContext(): Promise<TenantPageContext> {
 
   const { claims } = verified;
   return {
-    apiBase: "/api/rt",
+    apiBase: BROWSER_API_BASE,
     bankId: claims.bankId ?? "",
     agencyId: claims.agencyIds[0] ?? "",
     role: claims.role,

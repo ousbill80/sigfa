@@ -63,11 +63,11 @@ describe("S3: /dashboard/reports — proxy authentifié + contexte des claims", 
     await expect(ReportsPage()).rejects.toThrow("NEXT_REDIRECT:/login");
   });
 
-  it("mode mock → base mock + fixture tenant", async () => {
+  it("mode mock → proxy /api/rt + fixture tenant", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_MODE", "off");
     const tree = await ReportsPage();
     const client = findElementByType(tree, ReportsPageClient);
-    expect(client?.props.apiBase).toBe("http://localhost:4010");
+    expect(client?.props.apiBase).toBe("/api/rt");
     expect(client?.props.bankId).toBe(MOCK_TENANT.bankId);
     expect(client?.props.role).toBe(MOCK_TENANT.role);
   });
