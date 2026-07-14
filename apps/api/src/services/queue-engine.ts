@@ -62,8 +62,12 @@ export async function getAgentLanguages(
   counterId: string,
   tx: Tx
 ): Promise<string[]> {
+  // `u.languages` est du type enum `agent_language[]` en base réelle
+  // (migrations 0000/0011) : cast explicite en text[] sinon le COALESCE lève
+  // « COALESCE could not convert type text[] to agent_language[] » (42804)
+  // et TOUT call-next répond 500.
   const res = await tx.query(
-    `SELECT COALESCE(u.languages, ARRAY[]::text[]) AS languages
+    `SELECT COALESCE(u.languages::text[], ARRAY[]::text[]) AS languages
        FROM counters c
        LEFT JOIN users u ON u.id = c.agent_id
       WHERE c.id = $1`,
@@ -103,7 +107,7 @@ export const selectNextPriority: TicketSelector = async (
        WHERE t.queue_id = $1
          AND t.status = 'WAITING'
          AND (t.required_language IS NULL
-              OR t.required_language = ANY($2::text[])
+              OR t.required_language::text = ANY($2::text[])
               OR t.issued_at <= $3)
        ORDER BY ${PRIORITY_CASE_T} ASC, t.issued_at ASC
        LIMIT 1
