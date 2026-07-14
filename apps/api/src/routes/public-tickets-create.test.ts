@@ -20,8 +20,9 @@ import pg from "pg";
 import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { randomUUID } from "node:crypto";
+import { applyMigrations } from "@sigfa/database/test-support";
+import type { PostgresHarness } from "@sigfa/testing/tenant-isolation";
 import { createApp } from "src/app.js";
-import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 process.env["PHONE_ENCRYPTION_KEY"] =
   process.env["PHONE_ENCRYPTION_KEY"] ??
@@ -50,28 +51,34 @@ let pausedServiceId: string;
 
 const jwtSecretBytes = new TextEncoder().encode("public-create-secret-32-chars-long!!!!");
 
-/** Applique le schéma minimal (banks/agencies/services/queues/tickets). */
+/**
+ * Applique les VRAIES migrations SQL (`packages/database/migrations/`) sur la base
+ * de test — FIDÉLITÉ au schéma de production (même convention que
+ * `schemathesis-public.test.ts` / `armed-tenant.integration.test.ts`). Un DDL inline
+ * déclarait `tickets.required_language` en `VARCHAR(10)` : le vrai schéma le type en
+ * enum `agent_language` (FR/EN — migrations 0008+0011). Le drift est désormais
+ * structurellement impossible : le schéma exercé EST celui des migrations (enum réel,
+ * RLS `tenant_isolation` ENABLE/FORCE + policies (0001), vrai `audit_log` (0003),
+ * unicité `(queue_id, number, issued_day)`, CHECK `channel` NOT NULL sans défaut).
+ *
+ * La connexion applicative est le rôle `sigfa` (superuser Testcontainers) : il
+ * contourne FORCE RLS, donc la résolution PRÉ-TENANT légitime (bankId dérivé de
+ * l'`agencyId` du corps, avant armement) reste fonctionnelle — comme en production
+ * sur le chemin pré-résolution. L'isolation RLS armée POST-résolution est prouvée
+ * séparément par `config-cutover-lot7-tenant-isolation.integration.test.ts`
+ * (`sigfa_app` NOBYPASSRLS), hors périmètre de ce test fonctionnel de route.
+ */
 async function runMigrations(client: pg.Client): Promise<void> {
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_status') THEN
-        CREATE TYPE ticket_status AS ENUM ('WAITING','CALLED','SERVING','DONE','NO_SHOW','ABANDONED','TRANSFERRED'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_priority') THEN
-        CREATE TYPE ticket_priority AS ENUM ('STANDARD','PRIORITY','VIP','PMR','SENIOR'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_channel') THEN
-        CREATE TYPE ticket_channel AS ENUM ('KIOSK','QR','MOBILE','WHATSAPP'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='queue_status') THEN
-        CREATE TYPE queue_status AS ENUM ('OPEN','PAUSED','CLOSED'); END IF;
-    END $$;
-  `);
-  await client.query(`CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS agencies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS services (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS operations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER, display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(service_id, code));`);
-  await client.query(`CREATE TABLE IF NOT EXISTS queues (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), current_ticket_number INTEGER NOT NULL DEFAULT 0, status queue_status NOT NULL DEFAULT 'OPEN', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL DEFAULT 'KIOSK', status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, required_language VARCHAR(10), issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ, closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER, feedback_score INTEGER, feedback_comment TEXT, feedback_at TIMESTAMPTZ, issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), target_manager_id UUID
-);`);
+  const harness: PostgresHarness = {
+    connectionString: "",
+    query: async (sql: string, values?: unknown[]) => {
+      const res =
+        values !== undefined ? await client.query(sql, values) : await client.query(sql);
+      return { rows: res.rows as Array<Record<string, unknown>> };
+    },
+    stop: async () => {},
+  };
+  await applyMigrations(harness);
 }
 
 /** POST /public/tickets avec IP simulée + clé d'idempotence optionnelle. */
@@ -104,7 +111,6 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test` });
   await db.connect();
   await runMigrations(db);
-  await ensureAuditLogSchema(db);
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
 
   // Tenant A

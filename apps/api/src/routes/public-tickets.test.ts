@@ -21,8 +21,9 @@ import pg from "pg";
 import { Redis } from "ioredis";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { nanoid } from "nanoid";
+import { applyMigrations } from "@sigfa/database/test-support";
+import type { PostgresHarness } from "@sigfa/testing/tenant-isolation";
 import { createApp } from "src/app.js";
-import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
 
 process.env["PHONE_ENCRYPTION_KEY"] =
   process.env["PHONE_ENCRYPTION_KEY"] ??
@@ -43,32 +44,41 @@ let queueId: string;
 
 const jwtSecretBytes = new TextEncoder().encode("public-feedback-secret-32-chars-long!!");
 
-/** Applique le schéma minimal (tickets + daily_agency_stats + parents). */
+/**
+ * Applique les VRAIES migrations SQL (`packages/database/migrations/`) sur la base
+ * de test — FIDÉLITÉ au schéma de production (même convention que
+ * `schemathesis-public.test.ts` / `armed-tenant.integration.test.ts`). Le drift
+ * harnais/schéma est structurellement impossible : le schéma exercé EST celui des
+ * migrations. En particulier `tickets.required_language` (enum `agent_language`
+ * FR/EN, migrations 0008+0011), la RLS `tenant_isolation` (ENABLE/FORCE + policies,
+ * 0001), le vrai `audit_log` (0003) et l'unicité `(queue_id, number, issued_day)`
+ * sont présents — un DDL inline les omettait ou les typait faux, masquant des bugs.
+ *
+ * La connexion applicative est le rôle `sigfa` (superuser Testcontainers) : il
+ * contourne FORCE RLS, donc les lookups PRÉ-TENANT légitimes de la surface publique
+ * (résolution du ticket par `tracking_id` global, du bankId de l'agence) restent
+ * fonctionnels — comme en production sur le chemin pré-résolution. L'isolation RLS
+ * armée POST-résolution est prouvée séparément par
+ * `config-cutover-lot7-tenant-isolation.integration.test.ts` (connexion `sigfa_app`
+ * NOBYPASSRLS), hors périmètre de ce test fonctionnel de route.
+ */
 async function runMigrations(client: pg.Client): Promise<void> {
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_status') THEN
-        CREATE TYPE ticket_status AS ENUM ('WAITING','CALLED','SERVING','DONE','NO_SHOW','ABANDONED','TRANSFERRED'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_priority') THEN
-        CREATE TYPE ticket_priority AS ENUM ('STANDARD','PRIORITY','VIP','PMR','SENIOR'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_channel') THEN
-        CREATE TYPE ticket_channel AS ENUM ('KIOSK','QR','MOBILE','WHATSAPP'); END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='queue_status') THEN
-        CREATE TYPE queue_status AS ENUM ('OPEN','PAUSED','CLOSED'); END IF;
-    END $$;
-  `);
-  await client.query(`CREATE TABLE IF NOT EXISTS banks (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS agencies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS services (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS operations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER, display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(service_id, code));`);
-  await client.query(`CREATE TABLE IF NOT EXISTS queues (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id), current_ticket_number INTEGER NOT NULL DEFAULT 0, is_open BOOLEAN NOT NULL DEFAULT true, status queue_status NOT NULL DEFAULT 'OPEN', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE TABLE IF NOT EXISTS tickets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id), service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID, number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE, channel ticket_channel NOT NULL DEFAULT 'KIOSK', status ticket_status NOT NULL DEFAULT 'WAITING', priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT, sms_consent BOOLEAN NOT NULL DEFAULT false, issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ, closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER, feedback_score INTEGER, feedback_comment TEXT, feedback_at TIMESTAMPTZ, issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), target_manager_id UUID
-);`);
-  await client.query(`CREATE TABLE IF NOT EXISTS daily_agency_stats (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id), agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID REFERENCES services(id), day DATE NOT NULL, tickets_issued INTEGER NOT NULL DEFAULT 0, tickets_served INTEGER NOT NULL DEFAULT 0, tickets_abandoned INTEGER NOT NULL DEFAULT 0, tickets_no_show INTEGER NOT NULL DEFAULT 0, total_wait_seconds INTEGER NOT NULL DEFAULT 0, total_service_seconds INTEGER NOT NULL DEFAULT 0, sla_met_count INTEGER NOT NULL DEFAULT 0, sla_total_count INTEGER NOT NULL DEFAULT 0, feedback_count INTEGER NOT NULL DEFAULT 0, feedback_sum INTEGER NOT NULL DEFAULT 0, nps_promoters INTEGER NOT NULL DEFAULT 0, nps_passives INTEGER NOT NULL DEFAULT 0, nps_detractors INTEGER NOT NULL DEFAULT 0, agent_active_seconds INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
-  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS das_no_service_uniq ON daily_agency_stats (bank_id, agency_id, day) WHERE service_id IS NULL;`);
-  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS das_with_service_uniq ON daily_agency_stats (bank_id, agency_id, service_id, day) WHERE service_id IS NOT NULL;`);
+  const harness: PostgresHarness = {
+    connectionString: "",
+    query: async (sql: string, values?: unknown[]) => {
+      const res =
+        values !== undefined ? await client.query(sql, values) : await client.query(sql);
+      return { rows: res.rows as Array<Record<string, unknown>> };
+    },
+    stop: async () => {},
+  };
+  await applyMigrations(harness);
 }
+
+/** Compteur monotone : garantit un `number` distinct par ticket (contrainte réelle
+ * `tickets_queue_id_number_issued_day_key` UNIQUE(queue_id, number, issued_day) —
+ * absente du DDL inline qui réutilisait `number=1`, ce qui aurait échoué en prod). */
+let ticketSeq = 0;
 
 /**
  * Insère un ticket clôturé (DONE) avec un `closed_at` contrôlé.
@@ -76,10 +86,12 @@ async function runMigrations(client: pg.Client): Promise<void> {
  */
 async function seedClosedTicket(closedAt: Date | null, status = "DONE"): Promise<string> {
   const trackingId = nanoid(21);
+  ticketSeq += 1;
+  const number = ticketSeq;
   await db.query(
     `INSERT INTO tickets (bank_id, agency_id, queue_id, service_id, number, display_number, tracking_id, channel, status, closed_at)
-     VALUES ($1,$2,$3,$4,1,'OC-001',$5,'KIOSK',$6,$7)`,
-    [bankId, agencyId, queueId, serviceId, trackingId, status, closedAt]
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'KIOSK',$8,$9)`,
+    [bankId, agencyId, queueId, serviceId, number, `OC-${String(number).padStart(3, "0")}`, trackingId, status, closedAt]
   );
   return trackingId;
 }
@@ -106,7 +118,6 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: `postgresql://sigfa:sigfa_test@${pgContainer.getHost()}:${pgContainer.getMappedPort(5432)}/sigfa_test` });
   await db.connect();
   await runMigrations(db);
-  await ensureAuditLogSchema(db);
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
 
   const bank = await db.query(`INSERT INTO banks (name, slug) VALUES ('B','b') RETURNING id`);
