@@ -26,6 +26,11 @@ export interface SessionClaims {
   bankId: string | null;
   /** Scope tenant agences (vide si absent du token). */
   agencyIds: string[];
+  /**
+   * Nom d'affichage de l'utilisateur (claim additif WEB-002-HDR).
+   * Null sur les tokens historiques émis avant l'ajout du claim.
+   */
+  displayName: string | null;
 }
 
 /**
@@ -86,5 +91,11 @@ function toSessionClaims(payload: JWTPayload): SessionClaims | null {
     ? agencyIdsRaw.filter((id): id is string => typeof id === "string" && id.length > 0)
     : [];
 
-  return { sub, role: role as Role, bankId, agencyIds };
+  const displayNameRaw = payload["displayName"];
+  const displayName =
+    typeof displayNameRaw === "string" && displayNameRaw.trim().length > 0
+      ? displayNameRaw.trim()
+      : null;
+
+  return { sub, role: role as Role, bankId, agencyIds, displayName };
 }

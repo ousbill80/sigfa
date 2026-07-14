@@ -8,7 +8,13 @@ import { AgentConsole, type AgentConsoleProps } from "./agent-console";
 import type { ServingTicket } from "@/lib/use-agent-flow";
 import { t } from "@/lib/i18n";
 
-const serving: ServingTicket = { id: "t1", number: "A047", startedAt: Date.now() };
+const serving: ServingTicket = {
+  id: "t1",
+  number: "A047",
+  operationName: "Retrait espèces",
+  serviceName: "Opérations courantes",
+  startedAt: Date.now(),
+};
 
 function setup(overrides: Partial<AgentConsoleProps> = {}) {
   const props: AgentConsoleProps = {
@@ -45,6 +51,31 @@ describe("AgentConsole — layout & tokens", () => {
     setup();
     const console = screen.getByTestId("agent-console");
     expect(console.outerHTML).not.toMatch(/#[0-9a-fA-F]{6}/);
+  });
+});
+
+describe("AgentConsole — opération choisie à la borne (WEB-002-OP)", () => {
+  it("WEB-002-OP: l'opération du ticket est affichée sous le numéro, bien lisible (tokens)", () => {
+    setup();
+    const operation = screen.getByTestId("agent-ticket-operation");
+    expect(operation).toHaveTextContent("Retrait espèces");
+    const style = operation.getAttribute("style") ?? "";
+    expect(style).toContain("var(--text-xl)");
+    expect(style).toContain("var(--ink)");
+  });
+
+  it("WEB-002-OP: le service est affiché en second niveau (discret)", () => {
+    setup();
+    const service = screen.getByTestId("agent-ticket-service");
+    expect(service).toHaveTextContent("Opérations courantes");
+    expect(service.getAttribute("style") ?? "").toContain("var(--ink-soft)");
+  });
+
+  it("WEB-002-OP: sans opération (ticket émis par service seul) → pas de bloc opération, pas de crash", () => {
+    setup({ ticket: { ...serving, operationName: null, serviceName: null } });
+    expect(screen.getByTestId("agent-ticket-number")).toHaveTextContent("A047");
+    expect(screen.queryByTestId("agent-ticket-operation")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-ticket-service")).not.toBeInTheDocument();
   });
 });
 

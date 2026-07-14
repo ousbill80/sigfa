@@ -29,6 +29,10 @@ export interface ServingTicket {
   id: string;
   /** Human-readable ticket number (ex. "A047"). */
   number: string;
+  /** Libellé de l'opération choisie à la borne (WEB-002-OP), ou null. */
+  operationName: string | null;
+  /** Libellé du service du ticket (WEB-002-OP), ou null. */
+  serviceName: string | null;
   /** Monotonic key used to (re)start the chrono. */
   startedAt: number;
 }
@@ -61,19 +65,37 @@ export interface UseAgentFlowResult {
   closeTransfer: () => void;
 }
 
+/** Résumé affichable d'un ticket appelé (numéro + libellés WEB-002-OP). */
+interface TicketSummary {
+  /** Numéro d'appel (ex. "A001") — vide si indisponible. */
+  number: string;
+  /** Libellé de l'opération choisie à la borne, ou null. */
+  operationName: string | null;
+  /** Libellé du service, ou null. */
+  serviceName: string | null;
+}
+
 /**
- * Lit le numéro d'appel d'un ticket via GET /tickets/{id} (route de contrat).
- * Renvoie une chaîne vide en cas d'échec (affichage dégradé, jamais un crash).
+ * Lit le résumé affichable d'un ticket via GET /tickets/{id} (route de contrat) :
+ * numéro d'appel + libellés opération/service (WEB-002-OP). Renvoie un résumé
+ * vide en cas d'échec (affichage dégradé, jamais un crash).
  * @param client - Client core typé.
  * @param id - UUID du ticket.
- * @returns Le numéro (ex. "A001") ou "".
+ * @returns Le résumé (champs vides/null si indisponibles).
  */
-async function fetchTicketNumber(client: CoreClient, id: string): Promise<string> {
+async function fetchTicketSummary(client: CoreClient, id: string): Promise<TicketSummary> {
   try {
     const { data } = await client.GET("/tickets/{id}", { params: { path: { id } } });
-    return (data as { number?: string } | undefined)?.number ?? "";
+    const ticket = data as
+      | { number?: string; operationName?: string | null; serviceName?: string }
+      | undefined;
+    return {
+      number: ticket?.number ?? "",
+      operationName: ticket?.operationName ?? null,
+      serviceName: ticket?.serviceName ?? null,
+    };
   } catch {
-    return "";
+    return { number: "", operationName: null, serviceName: null };
   }
 }
 
@@ -108,13 +130,27 @@ export function useAgentFlow(options: UseAgentFlowOptions): UseAgentFlowResult {
         setMessage("agent.error");
         return;
       }
-      const called = data as { id?: string; number?: string };
+      const called = data as {
+        id?: string;
+        number?: string;
+        operationName?: string | null;
+        serviceName?: string;
+      };
       const id = called.id ?? "";
-      // La route call-next renvoie l'id mais PAS le numéro d'appel (callView).
-      // Le numéro affichable (ex. "A001") est lu via GET /tickets/{id} — route
-      // de contrat renvoyant `number`. Fallback conservé si déjà présent.
-      const number = called.number ?? (id ? await fetchTicketNumber(client, id) : "");
-      setTicket({ id, number, startedAt: Date.now() });
+      // WEB-002-OP : call-next renvoie désormais number + operationName/serviceName.
+      // Fallback GET /tickets/{id} conservé pour les réponses historiques sans
+      // `number` (résumé lu en une requête — affichage dégradé, jamais un crash).
+      const summary: TicketSummary =
+        called.number !== undefined
+          ? {
+              number: called.number,
+              operationName: called.operationName ?? null,
+              serviceName: called.serviceName ?? null,
+            }
+          : id
+            ? await fetchTicketSummary(client, id)
+            : { number: "", operationName: null, serviceName: null };
+      setTicket({ id, ...summary, startedAt: Date.now() });
       setStatus("serving");
     } catch {
       setStatus("error");

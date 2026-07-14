@@ -54,6 +54,14 @@ export type TranslationKey =
   | "agent.queue_empty"
   | "agent.error"
   | "agent.select_destination"
+  | "session.logout"
+  | "session.signed_in_as"
+  | "role.SUPER_ADMIN"
+  | "role.BANK_ADMIN"
+  | "role.AGENCY_DIRECTOR"
+  | "role.MANAGER"
+  | "role.AGENT"
+  | "role.AUDITOR"
   | "manager.tma"
   | "manager.abandon"
   | "manager.nps"
@@ -383,6 +391,14 @@ export const FR: TranslationDict = {
   "agent.queue_empty": "Aucun client en attente",
   "agent.error": "Une erreur est survenue, veuillez réessayer",
   "agent.select_destination": "Choisir un guichet de destination",
+  "session.logout": "Se déconnecter",
+  "session.signed_in_as": "Connecté en tant que",
+  "role.SUPER_ADMIN": "Super administrateur",
+  "role.BANK_ADMIN": "Administrateur banque",
+  "role.AGENCY_DIRECTOR": "Directeur d'agence",
+  "role.MANAGER": "Manager",
+  "role.AGENT": "Agent",
+  "role.AUDITOR": "Auditeur",
   "manager.tma": "TMA ACTUEL",
   "manager.abandon": "Taux d'abandon",
   "manager.nps": "NPS du jour",
@@ -714,6 +730,14 @@ export const EN: TranslationDict = {
   "agent.queue_empty": "No customer waiting",
   "agent.error": "An error occurred, please try again",
   "agent.select_destination": "Choose a destination counter",
+  "session.logout": "Log out",
+  "session.signed_in_as": "Signed in as",
+  "role.SUPER_ADMIN": "Super administrator",
+  "role.BANK_ADMIN": "Bank administrator",
+  "role.AGENCY_DIRECTOR": "Agency director",
+  "role.MANAGER": "Manager",
+  "role.AGENT": "Agent",
+  "role.AUDITOR": "Auditor",
   "manager.tma": "CURRENT AWT",
   "manager.abandon": "Abandonment rate",
   "manager.nps": "NPS today",

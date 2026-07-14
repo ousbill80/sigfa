@@ -248,19 +248,50 @@ export function AgentConsole({
         >
           <p style={eyebrow}>{t("agent.current_ticket", locale)}</p>
           {ticket ? (
-            <div
-              data-testid="agent-ticket-number"
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "var(--kpi-value)",
-                fontWeight: 700,
-                color: "var(--brand)",
-                lineHeight: "var(--leading-tight)",
-                letterSpacing: "var(--tracking-numeric)",
-              }}
-            >
-              {ticket.number}
-            </div>
+            <>
+              <div
+                data-testid="agent-ticket-number"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "var(--kpi-value)",
+                  fontWeight: 700,
+                  color: "var(--brand)",
+                  lineHeight: "var(--leading-tight)",
+                  letterSpacing: "var(--tracking-numeric)",
+                }}
+              >
+                {ticket.number}
+              </div>
+              {/* WEB-002-OP : opération choisie à la borne, bien lisible sous le numéro */}
+              {ticket.operationName && (
+                <div
+                  data-testid="agent-ticket-operation"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "var(--text-xl)",
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                    lineHeight: "var(--leading-tight)",
+                    letterSpacing: "var(--tracking-tight)",
+                  }}
+                >
+                  {ticket.operationName}
+                </div>
+              )}
+              {ticket.serviceName && (
+                <div
+                  data-testid="agent-ticket-service"
+                  style={{
+                    fontFamily: "var(--font-text)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: 500,
+                    color: "var(--ink-soft)",
+                  }}
+                >
+                  {ticket.serviceName}
+                </div>
+              )}
+            </>
           ) : (
             <div
               data-testid="agent-ticket-empty"

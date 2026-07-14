@@ -79,6 +79,72 @@ describe("useAgentFlow — call-next", () => {
     expect(result.current.ticket?.number).toBe("");
   });
 
+  it("WEB-002-OP: call-next avec operationName/serviceName → exposés sur le ticket servi", async () => {
+    server.use(
+      http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
+        HttpResponse.json({
+          id: TICKET_ID,
+          number: "A042",
+          status: "CALLED",
+          counterId: COUNTER_ID,
+          operationName: "Retrait espèces",
+          serviceName: "Opérations courantes",
+        }),
+      ),
+    );
+    const { result } = makeFlow();
+    await act(async () => {
+      await result.current.callNext();
+    });
+    expect(result.current.ticket?.operationName).toBe("Retrait espèces");
+    expect(result.current.ticket?.serviceName).toBe("Opérations courantes");
+  });
+
+  it("WEB-002-OP: sans opération (operationName null) → ticket servi avec operationName null", async () => {
+    server.use(
+      http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
+        HttpResponse.json({
+          id: TICKET_ID,
+          number: "A042",
+          status: "CALLED",
+          counterId: COUNTER_ID,
+          operationName: null,
+          serviceName: "Opérations courantes",
+        }),
+      ),
+    );
+    const { result } = makeFlow();
+    await act(async () => {
+      await result.current.callNext();
+    });
+    expect(result.current.ticket?.operationName).toBeNull();
+    expect(result.current.ticket?.serviceName).toBe("Opérations courantes");
+  });
+
+  it("WEB-002-OP: réponse historique sans `number` → libellés lus via GET /tickets/{id}", async () => {
+    server.use(
+      http.post(`${BASE}/counters/${COUNTER_ID}/call-next`, () =>
+        HttpResponse.json({ id: TICKET_ID, status: "CALLED", counterId: COUNTER_ID }),
+      ),
+      http.get(`${BASE}/tickets/${TICKET_ID}`, () =>
+        HttpResponse.json({
+          id: TICKET_ID,
+          number: "A007",
+          status: "CALLED",
+          operationName: "Dépôt espèces",
+          serviceName: "Opérations courantes",
+        }),
+      ),
+    );
+    const { result } = makeFlow();
+    await act(async () => {
+      await result.current.callNext();
+    });
+    expect(result.current.ticket?.number).toBe("A007");
+    expect(result.current.ticket?.operationName).toBe("Dépôt espèces");
+    expect(result.current.ticket?.serviceName).toBe("Opérations courantes");
+  });
+
   it("WEB-002: appelle bien /call-next (jamais /call) — route canonique", async () => {
     let calledPath = "";
     server.use(
