@@ -50,6 +50,12 @@ import {
   releaseIdempotencyLock,
 } from "src/services/idempotency.js";
 import { createNoopBus, type RealtimeBus } from "src/services/realtime.js";
+import {
+  DEFAULT_AGENT_STATUS,
+  getCurrentStatuses,
+  isAgentPresent,
+  type AgentStatus,
+} from "src/services/agent-status.js";
 import { issueTicketFor, type IssueTicketInput } from "src/routes/tickets.js";
 import { recordAudit, extractIp } from "src/lib/audit-context.js";
 import { asArmable, withArmedTenant } from "src/lib/armed-tenant.js";
@@ -162,12 +168,21 @@ export function createPublicTicketRouter(): Hono<PublicEnv> {
 
 /**
  * GET /public/agencies/:agencyId/relationship-managers (role NONE) — liste
- * publique NOMINATIVE des conseillers (MODEL-API-B/D5).
+ * publique NOMINATIVE des conseillers (MODEL-API-B/D5 ; CONTRACT-014).
  *
- * Retourne UNIQUEMENT `{ id, displayName, photoUrl? }` des users conseillers
- * ACTIFS de l'agence (`is_relationship_manager AND is_active AND deleted_at IS
- * NULL`). **ZÉRO PII** : jamais email/rôle/téléphone/phone_hash — liste blanche
- * stricte de colonnes (la requête ne SELECTionne que id/display_name/photo_url).
+ * Retourne UNIQUEMENT `{ id, displayName, photoUrl?, available }` des users
+ * conseillers ACTIFS de l'agence (`is_relationship_manager AND is_active AND
+ * deleted_at IS NULL`). **ZÉRO PII** : jamais email/rôle/téléphone/phone_hash —
+ * liste blanche stricte de colonnes (la requête ne SELECTionne que
+ * id/display_name/photo_url).
+ *
+ * `available` (CONTRACT-014) : présence AUJOURD'HUI dérivée de la machine à
+ * états agents (API-007) — présent si le guichet n'est pas fermé
+ * (AVAILABLE/SERVING/PAUSED), absent si ABSENT/OFFLINE ou jamais journalisé
+ * (défaut OFFLINE). JAMAIS le statut brut ni un horaire : le booléen seul.
+ * Perf : le statut des conseillers est lu EN LOT (`getCurrentStatuses`, une
+ * requête pour toute l'agence — pas de N+1 sur une route publique).
+ *
  * `agencyId` malformé → 400 VALIDATION_ERROR. Scope agence (aucune fuite tenant :
  * filtre `au.agency_id`). Un conseiller sans `display_name` est exclu (nominatif).
  * Rate-limit IP anti-énumération (60/min) appliqué en amont par
@@ -181,10 +196,10 @@ function registerPublicRelationshipManagers(router: Hono<PublicEnv>): void {
       return c.json(buildError("VALIDATION_ERROR", "agencyId requis (UUID)."), 400);
     }
     const db = c.get("db");
-    // SEC-002 : résolution pré-tenant du bankId de l'agence, puis lecture ARMÉE.
+    // SEC-002 : résolution pré-tenant du bankId de l'agence, puis lectures ARMÉES.
     const bankId = await resolveAgencyBankId(db, agencyId);
     if (bankId === null) return c.json({ data: [] }, 200);
-    const rows = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+    const { rows, statuses } = await withArmedTenant(asArmable(db), bankId, async (conn) => {
       const res = await conn.query(
         `SELECT u.id, u.display_name, u.photo_url
            FROM users u
@@ -196,9 +211,18 @@ function registerPublicRelationshipManagers(router: Hono<PublicEnv>): void {
           ORDER BY u.display_name ASC, u.id ASC`,
         [agencyId]
       );
-      return res.rows as PublicRelationshipManagerRow[];
+      const managers = res.rows as PublicRelationshipManagerRow[];
+      // CONTRACT-014 : statut courant de TOUS les conseillers en UNE requête
+      // (batch armé — la machine à états reste la source de vérité, zéro N+1).
+      const currentStatuses = await getCurrentStatuses(
+        conn as unknown as Client,
+        managers.map((m) => m.id)
+      );
+      return { rows: managers, statuses: currentStatuses };
     });
-    const data = rows.map(publicRelationshipManagerDto);
+    const data = rows.map((row) =>
+      publicRelationshipManagerDto(row, statuses.get(row.id) ?? DEFAULT_AGENT_STATUS)
+    );
     return c.json({ data }, 200);
   });
 }
@@ -210,12 +234,20 @@ interface PublicRelationshipManagerRow {
   photo_url: string | null;
 }
 
-/** Projette le DTO public d'un conseiller (LA LOI `PublicRelationshipManager`). */
-function publicRelationshipManagerDto(row: PublicRelationshipManagerRow): Record<string, unknown> {
+/**
+ * Projette le DTO public d'un conseiller (LA LOI `PublicRelationshipManager`).
+ * `available` (requis) est le SEUL dérivé du statut exposé — jamais le statut
+ * brut ni d'horodatage (CONTRACT-014, zéro PII).
+ */
+function publicRelationshipManagerDto(
+  row: PublicRelationshipManagerRow,
+  status: AgentStatus
+): Record<string, unknown> {
   return {
     id: row.id,
     displayName: row.display_name,
     ...(row.photo_url !== null ? { photoUrl: row.photo_url } : {}),
+    available: isAgentPresent(status),
   };
 }
 

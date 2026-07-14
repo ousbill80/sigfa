@@ -8,10 +8,7 @@
     // `react-jsx` = runtime automatique (aucun import React explicite requis).
     "jsx": "react-jsx",
     "paths": {
-      "src/*": ["./src/*"],
-      "@sigfa/contracts/events/realtime.js": [
-        "../../packages/contracts/dist/events/realtime.d.ts"
-      ]
+      "src/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"]

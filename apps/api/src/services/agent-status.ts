@@ -75,6 +75,57 @@ export function agentStatusToCounterStatus(
 }
 
 /**
+ * Présence de l'agent AUJOURD'HUI, dérivée de la machine à états (CONTRACT-014).
+ *
+ * Sémantique retenue : présent = statut dont le guichet n'est PAS fermé
+ * (`agentStatusToCounterStatus(status) !== "CLOSED"`), soit :
+ * - AVAILABLE / SERVING → présent (en service, guichet OPEN) ;
+ * - PAUSED → présent (pause courte : l'agent est physiquement en agence et
+ *   reprendra le service — son guichet est PAUSED, pas fermé) ;
+ * - ABSENT / OFFLINE → absent (pas en service aujourd'hui, guichet CLOSED).
+ *
+ * Un agent jamais journalisé est OFFLINE par défaut (`DEFAULT_AGENT_STATUS`)
+ * donc absent. Ce booléen est la SEULE donnée dérivée exposable publiquement :
+ * jamais le statut brut, jamais d'horaire (zéro PII, D5).
+ *
+ * @param status - Statut courant de l'agent
+ * @returns `true` si l'agent est présent en agence maintenant
+ */
+export function isAgentPresent(status: AgentStatus): boolean {
+  return agentStatusToCounterStatus(status) !== "CLOSED";
+}
+
+/**
+ * Lit EN LOT le statut courant d'un ensemble d'agents (dernière ligne
+ * d'historique par agent) en UNE seule requête — jamais de N+1, condition
+ * de perf des routes publiques (CONTRACT-014). Même ordre de résolution que
+ * `getCurrentStatus` (`changed_at DESC, id DESC`).
+ *
+ * @param db       - Connexion PG
+ * @param agentIds - Agents ciblés (UUID)
+ * @returns Map agentId → statut courant. Un agent jamais journalisé est ABSENT
+ *          de la Map : l'appelant applique `DEFAULT_AGENT_STATUS` (OFFLINE).
+ */
+export async function getCurrentStatuses(
+  db: Db,
+  agentIds: readonly string[]
+): Promise<Map<string, AgentStatus>> {
+  if (agentIds.length === 0) return new Map();
+  const res = await db.query(
+    `SELECT DISTINCT ON (agent_id) agent_id, to_status
+       FROM agent_status_history
+      WHERE agent_id = ANY($1::uuid[])
+      ORDER BY agent_id, changed_at DESC, id DESC`,
+    [agentIds]
+  );
+  const statuses = new Map<string, AgentStatus>();
+  for (const row of res.rows as Array<{ agent_id: string; to_status: AgentStatus }>) {
+    statuses.set(row.agent_id, row.to_status);
+  }
+  return statuses;
+}
+
+/**
  * Lève une 409 `ILLEGAL_AGENT_TRANSITION` conforme au contrat.
  *
  * @param from            - Statut courant

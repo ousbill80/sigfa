@@ -50,6 +50,9 @@ async function provisionKiosk(): Promise<{ kioskId: string; clientId: string; cl
 async function openSession(k: { kioskId: string; clientId: string; clientSecret: string }): Promise<{
   accessToken: string;
   expiresIn: number;
+  kioskId: string;
+  agencyId: string;
+  bankId: string;
 }> {
   const res = await req("POST", "/kiosk/session", null, {
     kioskId: k.kioskId,
@@ -57,7 +60,13 @@ async function openSession(k: { kioskId: string; clientId: string; clientSecret:
     agencyId: bankA.agencyId,
   });
   expect(res.status).toBe(201);
-  return (await res.json()) as { accessToken: string; expiresIn: number };
+  return (await res.json()) as {
+    accessToken: string;
+    expiresIn: number;
+    kioskId: string;
+    agencyId: string;
+    bankId: string;
+  };
 }
 
 beforeAll(async () => {
@@ -81,6 +90,16 @@ describe("API-009: session borne — login credentials → JWT 12h utilisable pu
     expect(ttl).toBe(KIOSK_SESSION_TTL_SECONDS);
     expect(claims["role"]).toBe("AUTHENTICATED");
     expect(claims["agencyIds"]).toEqual([bankA.agencyId]);
+  });
+
+  it("CONTRACT-014: la réponse de session porte bankId (enseigne de la borne, requis LA LOI)", async () => {
+    const k = await provisionKiosk();
+    const session = await openSession(k);
+    // La borne connaît sa banque via la session : theming --brand/logo SANS
+    // variable d'environnement NEXT_PUBLIC_BANK_ID côté borne.
+    expect(session.bankId).toBe(bankA.bankId);
+    expect(session.kioskId).toBe(k.kioskId);
+    expect(session.agencyId).toBe(bankA.agencyId);
   });
 
   it("API-009: session borne — JWT 12h utilisable sur heartbeat", async () => {
