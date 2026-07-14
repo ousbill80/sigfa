@@ -9,11 +9,12 @@
  *   - rate ralentie en mode accessibilité,
  *   - facteurs de font-size et de timeout en accessibilité.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildVoiceAnnouncement,
   localeToBcp47,
   pickVoiceForLocale,
+  speakInLocale,
   voiceRate,
   accessibilityFontSizePx,
   accessibilityTimeoutMs,
@@ -22,6 +23,7 @@ import {
   A11Y_LINE_HEIGHT,
   NOMINAL_TICKET_RETURN_MS,
   A11Y_TICKET_RETURN_MS,
+  VOICES_LOAD_TIMEOUT_MS,
 } from "@/lib/kiosk-voice";
 
 /** Fabrique une voix minimale conforme à SpeechSynthesisVoice. */
@@ -100,6 +102,139 @@ describe("KIOSK-008: sélection de voix avec fallback FR", () => {
     const voices = [makeVoice("fr-CA")];
     const v = pickVoiceForLocale("fr", voices);
     expect(v?.lang).toBe("fr-CA");
+  });
+});
+
+describe("KIOSK-002: speakInLocale — voix explicite, voiceschanged, cancel", () => {
+  /** Double minimal de SpeechSynthesisUtterance (jsdom ne l'expose pas). */
+  class FakeUtterance {
+    text: string;
+    lang = "";
+    rate = 1;
+    voice: SpeechSynthesisVoice | null = null;
+    constructor(text: string) {
+      this.text = text;
+    }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("KIOSK-002: voix en-US disponible → posée sur l'utterance (pas de repli FR)", () => {
+    const speak = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => [makeVoice("fr-FR"), makeVoice("en-US")],
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "en", text: "English", rate: 1 });
+
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.text).toBe("English");
+    expect(utt.lang).toBe("en-US");
+    expect(utt.voice?.lang).toBe("en-US");
+  });
+
+  it("KIOSK-002: cancel() appelé AVANT speak() (purge d'une annonce qui traîne)", () => {
+    const order: string[] = [];
+    const synth = {
+      speak: vi.fn(() => order.push("speak")),
+      cancel: vi.fn(() => order.push("cancel")),
+      getVoices: () => [makeVoice("fr-FR")],
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "fr", text: "Français", rate: 1 });
+
+    expect(order).toEqual(["cancel", "speak"]);
+  });
+
+  it("KIOSK-002: getVoices() vide au 1er appel → attend voiceschanged puis parle avec la voix en-US (pas de repli FR fautif)", () => {
+    let voices: SpeechSynthesisVoice[] = [];
+    let listener: (() => void) | undefined;
+    const speak = vi.fn();
+    const removeEventListener = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => voices,
+      addEventListener: (type: string, cb: () => void) => {
+        if (type === "voiceschanged") listener = cb;
+      },
+      removeEventListener,
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "en", text: "English", rate: 1 });
+
+    // Liste pas encore chargée : on ne parle PAS (sinon voix FR par défaut).
+    expect(speak).not.toHaveBeenCalled();
+    expect(listener).toBeDefined();
+
+    // Chargement asynchrone terminé → voiceschanged.
+    voices = [makeVoice("fr-FR"), makeVoice("en-US")];
+    listener?.();
+
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.voice?.lang).toBe("en-US");
+    expect(removeEventListener).toHaveBeenCalledWith("voiceschanged", listener);
+
+    // L'écouteur ne rejoue pas (garde `done`).
+    listener?.();
+    vi.advanceTimersByTime(VOICES_LOAD_TIMEOUT_MS);
+    expect(speak).toHaveBeenCalledTimes(1);
+  });
+
+  it("KIOSK-002: voiceschanged ne vient jamais → parle quand même après le délai borné (dégradation, lang seul)", () => {
+    const speak = vi.fn();
+    const synth = {
+      speak,
+      cancel: vi.fn(),
+      getVoices: () => [],
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    } as unknown as SpeechSynthesis;
+
+    speakInLocale(synth, { locale: "en", text: "English", rate: 1 });
+    expect(speak).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(VOICES_LOAD_TIMEOUT_MS);
+
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.lang).toBe("en-US");
+    expect(utt.voice).toBeNull();
+  });
+
+  it("KIOSK-002: API partielle (ni addEventListener ni cancel) → parle immédiatement sans erreur", () => {
+    const speak = vi.fn();
+    const synth = { speak, getVoices: () => [] } as unknown as SpeechSynthesis;
+
+    expect(() =>
+      speakInLocale(synth, { locale: "fr", text: "Français", rate: 1 })
+    ).not.toThrow();
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utt = speak.mock.calls[0][0] as FakeUtterance;
+    expect(utt.voice).toBeNull();
+  });
+
+  it("KIOSK-002: SpeechSynthesisUtterance absent → dégradation silencieuse (aucun speak)", () => {
+    vi.unstubAllGlobals(); // retire le double d'utterance
+    const speak = vi.fn();
+    const synth = { speak, getVoices: () => [] } as unknown as SpeechSynthesis;
+
+    expect(() =>
+      speakInLocale(synth, { locale: "fr", text: "Français", rate: 1 })
+    ).not.toThrow();
+    expect(speak).not.toHaveBeenCalled();
   });
 });
 

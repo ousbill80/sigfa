@@ -6,6 +6,9 @@
  *   - mapping locale de session → BCP-47 (FR/EN), avec repli FR pour toute
  *     locale sans voix native (fallback explicitement documenté) ;
  *   - sélection d'une voix `SpeechSynthesisVoice` avec repli FR ;
+ *   - `speakInLocale` : parole dans la locale cible en gérant le chargement
+ *     ASYNCHRONE des voix (`voiceschanged`) et l'annulation de l'annonce
+ *     précédente — mécanique unique réutilisée par tous les écrans ;
  *   - `rate` ralentie (0.8) en mode accessibilité ;
  *   - facteurs de taille de police (28 px × 1.2) et de délais (× 2) ;
  *   - calcul de contraste WCAG (preuve ≥ 7:1 sans dépendance axe-core runtime).
@@ -117,6 +120,77 @@ export function pickVoiceForLocale(
   // Repli FR explicite (toute locale sans voix native disponible).
   const frFallback = voices.find((v) => v.lang.split("-")[0] === "fr");
   return frFallback ?? null;
+}
+
+/**
+ * Délai max (ms) d'attente du chargement asynchrone des voix (`voiceschanged`)
+ * avant de parler quand même en mode dégradé (`utterance.lang` seul).
+ */
+export const VOICES_LOAD_TIMEOUT_MS = 1000 as const;
+
+/** Entrées de `speakInLocale`. */
+export interface SpeakInLocaleOptions {
+  /** Locale CIBLE de l'annonce (la langue choisie, pas celle du rendu). */
+  locale: string;
+  /** Texte à synthétiser. */
+  text: string;
+  /** Rate de la voix (voir `voiceRate`). */
+  rate: number;
+}
+
+/**
+ * Parle `text` dans la locale cible en réutilisant la mécanique commune :
+ *   1. voix explicite via `pickVoiceForLocale` (le seul `utterance.lang` ne
+ *      suffit pas sur certains moteurs : sans `utterance.voice`, la voix par
+ *      défaut — souvent FR — lit le texte anglais) ;
+ *   2. chargement ASYNCHRONE des voix : sur Chrome/WebView le premier
+ *      `getVoices()` renvoie `[]` ; on attend alors `voiceschanged` (une seule
+ *      fois, borné à `VOICES_LOAD_TIMEOUT_MS`) pour que le repli FR documenté
+ *      ne joue que si AUCUNE voix native n'existe réellement — jamais parce
+ *      que la liste n'était pas encore chargée ;
+ *   3. `cancel()` juste avant `speak()` pour purger toute annonce qui traîne.
+ * Dégradation silencieuse si l'API est partielle ou absente (aucune erreur).
+ *
+ * @param synth - Instance `speechSynthesis` du navigateur.
+ * @param options - Locale cible, texte et rate.
+ */
+export function speakInLocale(
+  synth: SpeechSynthesis,
+  options: SpeakInLocaleOptions
+): void {
+  if (typeof SpeechSynthesisUtterance === "undefined") return;
+
+  const speakNow = (voices: readonly SpeechSynthesisVoice[]): void => {
+    const utterance = new SpeechSynthesisUtterance(options.text);
+    utterance.lang = localeToBcp47(options.locale);
+    utterance.rate = options.rate;
+    const voice = pickVoiceForLocale(options.locale, voices);
+    if (voice) utterance.voice = voice;
+    // Purge une éventuelle annonce précédente encore en cours AVANT de parler.
+    synth.cancel?.();
+    synth.speak(utterance);
+  };
+
+  const voices = synth.getVoices?.() ?? [];
+  if (voices.length > 0 || typeof synth.addEventListener !== "function") {
+    speakNow(voices);
+    return;
+  }
+
+  // Liste vide : soit un vrai « aucune voix », soit un chargement asynchrone
+  // pas encore terminé. On attend `voiceschanged` une seule fois ; au-delà du
+  // délai borné, on parle quand même (dégradation : voix par défaut du moteur).
+  let done = false;
+  let timer: ReturnType<typeof setTimeout> | undefined = undefined;
+  const onVoicesReady = (): void => {
+    if (done) return;
+    done = true;
+    synth.removeEventListener?.("voiceschanged", onVoicesReady);
+    if (timer !== undefined) clearTimeout(timer);
+    speakNow(synth.getVoices?.() ?? []);
+  };
+  synth.addEventListener("voiceschanged", onVoicesReady);
+  timer = setTimeout(onVoicesReady, VOICES_LOAD_TIMEOUT_MS);
 }
 
 /**

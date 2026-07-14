@@ -311,9 +311,14 @@ describe("KIOSK-002: HomeScreen", () => {
       text: string;
       lang = "";
       rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
       constructor(text: string) {
         this.text = text;
       }
+    }
+
+    function makeVoice(lang: string): SpeechSynthesisVoice {
+      return { lang, name: lang, default: false, localService: true, voiceURI: lang };
     }
 
     const speak = vi.fn();
@@ -364,6 +369,75 @@ describe("KIOSK-002: HomeScreen", () => {
       expect(utterance.text).toBe("English");
       expect(utterance.lang).toBe("en-US");
       expect(mockPush).toHaveBeenCalledWith("/en/choice");
+    });
+
+    it("KIOSK-002: carte EN + voix en-US disponible → la voix ANGLAISE est posée sur l'utterance et cancel précède speak", () => {
+      // Bug PO « la voix anglaise ne marche pas » : sans utterance.voice, le
+      // moteur lit « English » avec la voix par défaut (souvent FR).
+      const order: string[] = [];
+      const localSpeak = vi.fn((utterance: FakeUtterance) => {
+        void utterance;
+        order.push("speak");
+      });
+      const cancel = vi.fn(() => order.push("cancel"));
+      vi.stubGlobal("speechSynthesis", {
+        speak: localSpeak,
+        cancel,
+        getVoices: () => [makeVoice("fr-FR"), makeVoice("en-US")],
+      });
+
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      fireEvent.click(container.querySelectorAll("[data-testid='language-card']")[1]);
+
+      expect(localSpeak).toHaveBeenCalledTimes(1);
+      const utterance = localSpeak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.voice?.lang).toBe("en-US");
+      expect(utterance.lang).toBe("en-US");
+      // Purge de toute annonce précédente AVANT de parler.
+      expect(order).toEqual(["cancel", "speak"]);
+    });
+
+    it("KIOSK-002: liste de voix vide au clic (chargement asynchrone) → attend voiceschanged puis parle en-US, sans bloquer la navigation", () => {
+      let voices: SpeechSynthesisVoice[] = [];
+      let listener: (() => void) | undefined;
+      const localSpeak = vi.fn();
+      vi.stubGlobal("speechSynthesis", {
+        speak: localSpeak,
+        cancel: vi.fn(),
+        getVoices: () => voices,
+        addEventListener: (type: string, cb: () => void) => {
+          if (type === "voiceschanged") listener = cb;
+        },
+        removeEventListener: vi.fn(),
+      });
+
+      const { container } = render(
+        <NextIntlClientProvider locale="fr" messages={frMessages}>
+          <HomeScreen />
+        </NextIntlClientProvider>
+      );
+
+      fireEvent.click(container.querySelectorAll("[data-testid='language-card']")[1]);
+
+      // Pas de lecture prématurée (elle sortirait avec la voix FR par défaut),
+      // mais la navigation n'attend pas la voix.
+      expect(localSpeak).not.toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith("/en/choice");
+
+      // Les voix finissent de charger → voiceschanged.
+      voices = [makeVoice("fr-FR"), makeVoice("en-US")];
+      listener?.();
+
+      expect(localSpeak).toHaveBeenCalledTimes(1);
+      const utterance = localSpeak.mock.calls[0][0] as FakeUtterance;
+      expect(utterance.text).toBe("English");
+      expect(utterance.lang).toBe("en-US");
+      expect(utterance.voice?.lang).toBe("en-US");
     });
   });
 

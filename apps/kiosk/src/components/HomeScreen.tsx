@@ -14,7 +14,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useQueueStatus } from "@/hooks/useQueueStatus";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
-import { localeToBcp47, voiceRate } from "@/lib/kiosk-voice";
+import { speakInLocale, voiceRate } from "@/lib/kiosk-voice";
 import {
   bankInitial,
   kioskAgencyName,
@@ -79,13 +79,20 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
     // (« Français » / « English »), jamais le code de locale brut ni la phrase
     // complète affichée à l'écran (ajustement PO). Repli FR par cohérence
     // avec kiosk-voice si une locale inconnue arrivait ici.
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      const text =
-        LANGUAGE_NAME_ANNOUNCEMENT[locale] ?? LANGUAGE_NAME_ANNOUNCEMENT.fr;
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = localeToBcp47(locale);
-      utterance.rate = voiceRate(isAccessibilityMode);
-      window.speechSynthesis.speak(utterance);
+    // Mécanique commune `speakInLocale` (fix PO « la voix anglaise ne marche
+    // pas ») : voix ANGLAISE explicitement posée sur l'utterance quand elle
+    // existe, attente `voiceschanged` si la liste n'est pas encore chargée,
+    // `cancel` avant `speak`.
+    if (
+      typeof window !== "undefined" &&
+      "speechSynthesis" in window &&
+      window.speechSynthesis
+    ) {
+      speakInLocale(window.speechSynthesis, {
+        locale,
+        text: LANGUAGE_NAME_ANNOUNCEMENT[locale] ?? LANGUAGE_NAME_ANNOUNCEMENT.fr,
+        rate: voiceRate(isAccessibilityMode),
+      });
     }
     // MODEL-KIOSK-B : après la langue, la borne offre DEUX chemins clairs
     // (« Une opération » / « Voir mon conseiller ») via l'écran de choix.
