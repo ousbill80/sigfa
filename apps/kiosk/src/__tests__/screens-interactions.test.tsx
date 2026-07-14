@@ -410,23 +410,19 @@ describe("KIOSK-004: ConfirmationScreen additional branches", () => {
     server.close();
   });
 
-  it("KIOSK-004: star key (*) press — does nothing to phone digits", () => {
+  it("KIOSK-004 (audit F23): la touche « * » morte n'existe plus sur le clavier", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={confirmationMessages}>
         <ConfirmationScreen serviceId="svc-1" agencyId="agt-001" />
       </NextIntlClientProvider>
     );
 
-    const phoneInput = container.querySelector("[data-testid='phone-input']") as HTMLInputElement;
     const keys = container.querySelectorAll("[data-testid='keypad-key']");
 
-    // Star is at index 9 (rows: 1,2,3,4,5,6,7,8,9,*,0,⌫)
+    // 11 touches utiles (1-9, 0, ⌫) — plus aucune touche sans fonction.
+    expect(keys.length).toBe(11);
     const starKey = Array.from(keys).find((k) => k.textContent === "*");
-    expect(starKey).toBeDefined();
-    fireEvent.click(starKey!);
-
-    // Phone should remain empty
-    expect(phoneInput.value).toBe("");
+    expect(starKey).toBeUndefined();
   });
 
   it("KIOSK-004: backspace (⌫) removes last digit and clears error", async () => {
@@ -461,27 +457,26 @@ describe("KIOSK-004: ConfirmationScreen additional branches", () => {
     expect(container.querySelector("[data-testid='phone-error']")).not.toBeInTheDocument();
   });
 
-  it("KIOSK-004: smsConsent checkbox appears when phone digits entered, toggle works", () => {
+  it("KIOSK-004 (audit F15): smsConsent visible dès le départ, activable après le 1er chiffre, toggle works", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={confirmationMessages}>
         <ConfirmationScreen serviceId="svc-1" agencyId="agt-001" />
       </NextIntlClientProvider>
     );
 
-    // Initially no consent checkbox
-    expect(container.querySelector("[data-testid='sms-consent']")).not.toBeInTheDocument();
+    // Audit F15 : le consentement est visible d'emblée, désactivé numéro vide.
+    const consentLabel = container.querySelector("[data-testid='sms-consent']");
+    expect(consentLabel).toBeInTheDocument();
+    const checkbox = consentLabel!.querySelector("input[type='checkbox']") as HTMLInputElement;
+    expect(checkbox.disabled).toBe(true);
 
     // Enter a digit
     const keys = container.querySelectorAll("[data-testid='keypad-key']");
     const zeroKey = Array.from(keys).find((k) => k.textContent === "0");
     fireEvent.click(zeroKey!);
 
-    // Now SMS consent checkbox should appear
-    const consentLabel = container.querySelector("[data-testid='sms-consent']");
-    expect(consentLabel).toBeInTheDocument();
-
-    // Toggle the checkbox
-    const checkbox = consentLabel!.querySelector("input[type='checkbox']") as HTMLInputElement;
+    // La case devient activable — toggle
+    expect(checkbox.disabled).toBe(false);
     expect(checkbox.checked).toBe(false);
     fireEvent.click(checkbox);
     expect(checkbox.checked).toBe(true);

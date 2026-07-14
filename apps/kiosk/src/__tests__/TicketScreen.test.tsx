@@ -272,7 +272,33 @@ describe("KIOSK-005: TicketScreen", () => {
     // Should show masked number: "07 •• •• •• 47"
     const smsEl = screen.getByTestId("sms-sent");
     expect(smsEl).toBeInTheDocument();
-    expect(smsEl.textContent).toContain("47");
+    expect(smsEl.textContent).toContain("07 •• •• •• 47");
+  });
+
+  // AUDIT-F16 : le masque n'invente plus un préfixe « 07 » — il repart des
+  // VRAIS premiers chiffres saisis (un client 01/05 voyait un faux numéro).
+  it("AUDIT-F16: maskPhoneNumber — préfixe réel conservé (01… → « 01 •• •• •• 05 », jamais un faux « 07 »)", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} phoneNumber="0102030405" smsConsent={true} />
+      </NextIntlClientProvider>
+    );
+
+    const smsEl = screen.getByTestId("sms-sent");
+    expect(smsEl.textContent).toContain("01 •• •• •• 05");
+    expect(smsEl.textContent).not.toContain("07");
+  });
+
+  it("AUDIT-F16: maskPhoneNumber — préfixe 05 réel (05… → « 05 •• •• •• 89 »)", () => {
+    render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <TicketScreen {...defaultProps} phoneNumber="0512345689" smsConsent={true} />
+      </NextIntlClientProvider>
+    );
+
+    expect(screen.getByTestId("sms-sent").textContent).toContain(
+      "05 •• •• •• 89"
+    );
   });
 
   it("KIOSK-005b (audit F9): return to home at 10 s nominal (Vitest fake-timer)", () => {

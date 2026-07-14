@@ -334,6 +334,8 @@ export function FeedbackScreen({
           maxWidth: "640px",
           minHeight: "96px",
           fontSize: "24px",
+          // AUDIT-F17 : hérite la police kiosque (fin du monospace navigateur).
+          fontFamily: "inherit",
           color: "var(--ink-strong)",
           backgroundColor: "var(--surface-1)",
           border: "1px solid var(--hairline)",

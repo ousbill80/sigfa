@@ -15,6 +15,8 @@ import { useRouter, useParams } from "next/navigation";
 import { IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { ChevronIcon, OperationIcon, PersonIcon } from "@/components/icons/UiIcons";
+import { BankBrandMark } from "@/components/BankBrandMark";
+import { kioskBankName, kioskBankLogoUrl } from "@/lib/kiosk-branding";
 
 export function ChoiceScreen() {
   const t = useTranslations("choiceModelB");
@@ -94,6 +96,13 @@ export function ChoiceScreen() {
           {t("languageChosen")}
         </span>
       </header>
+
+      {/* AUDIT-F23 — Identité banque : /choice était le seul écran sans marque.
+          BankBrandMark (logo tenant ou repli monogramme --brand) comble aussi
+          le vide entre l'en-tête et les cartes. */}
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <BankBrandMark bankName={kioskBankName()} logoUrl={kioskBankLogoUrl()} />
+      </div>
 
       {/* Title */}
       <h1

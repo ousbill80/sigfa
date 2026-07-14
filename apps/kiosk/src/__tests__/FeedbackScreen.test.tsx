@@ -264,6 +264,22 @@ describe("KIOSK-009: FeedbackScreen", () => {
     });
   });
 
+  // AUDIT-F17 : le textarea n'hérite pas de la police kiosque → monospace
+  // navigateur (rupture de craft). font-family: inherit obligatoire.
+  it("AUDIT-F17: textarea commentaire en font-family inherit (fin du monospace navigateur)", async () => {
+    mockGet(doneTicket(2));
+    const { container } = renderFeedback("fr", frMessages);
+    await waitFor(() => {
+      expect(
+        container.querySelector("[data-testid='feedback-comment']")
+      ).toBeInTheDocument();
+    });
+    const textarea = container.querySelector(
+      "[data-testid='feedback-comment']"
+    ) as HTMLTextAreaElement;
+    expect(textarea.style.fontFamily).toBe("inherit");
+  });
+
   it("KIOSK-009: submit désactivé tant qu'aucune note n'est sélectionnée", async () => {
     mockGet(doneTicket(2));
     renderFeedback("fr", frMessages);

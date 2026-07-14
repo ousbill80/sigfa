@@ -86,13 +86,16 @@ interface TicketScreenProps {
 }
 
 /**
- * Mask phone number: show only last 2 digits
- * "0707474747" → "07 •• •• •• 47"
+ * Mask phone number: show only real first 2 and last 2 digits.
+ * "0707474747" → "07 •• •• •• 47" ; "0102030405" → "01 •• •• •• 05".
+ * AUDIT-F16 : plus jamais de préfixe « 07 » inventé — un client 01/05 voyait
+ * son SMS annoncé sur un faux numéro.
  */
 function maskPhoneNumber(phone: string): string {
   if (phone.length < 2) return phone;
+  const first2 = phone.slice(0, 2);
   const last2 = phone.slice(-2);
-  return `07 •• •• •• ${last2}`;
+  return `${first2} •• •• •• ${last2}`;
 }
 
 /**
