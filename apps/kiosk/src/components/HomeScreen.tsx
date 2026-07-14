@@ -23,7 +23,11 @@ import { useQueueStatus } from "@/hooks/useQueueStatus";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { useBankTheme } from "@/hooks/useBankTheme";
-import { kioskBankName } from "@/lib/bank-brand";
+import {
+  agencyWelcomeName,
+  kioskAgencyName,
+  kioskBankName,
+} from "@/lib/bank-brand";
 import { BankBrandMark } from "@/components/BankBrandMark";
 
 interface HomeScreenProps {
@@ -164,6 +168,21 @@ export function HomeScreen({
           >
             {t("title")}
           </h1>
+          {/* AUDIT-F18 : ligne agence SANS doublon — le préfixe « Agence » du
+              nom provisionné est retiré avant injection dans « à l'agence {x} »
+              (« Agence Centrale » → « à l'agence Centrale »). */}
+          <p
+            data-testid="agency-welcome"
+            style={{
+              fontSize: "var(--text-xl)",
+              color: "var(--ink-muted-inv)",
+              margin: 0,
+            }}
+          >
+            {t("welcomeAgency", {
+              agencyName: agencyWelcomeName(kioskAgencyName()),
+            })}
+          </p>
           <p
             style={{
               fontSize: "var(--text-xl)",
@@ -246,23 +265,29 @@ export function HomeScreen({
           ))}
         </div>
 
-        {/* Queue status — statut discret, ancré en bas de l'écran. */}
-        <div
-          data-testid="queue-status"
-          style={{
-            position: "absolute",
-            bottom: "var(--space-8)",
-            left: "var(--space-8)",
-            right: "var(--space-8)",
-            fontSize: "24px",
-            color: "var(--ink-muted-inv)",
-            textAlign: "center",
-          }}
-        >
-          {count !== null && estimatedMinutes !== null
-            ? t("queueStatus", { count, minutes: estimatedMinutes })
-            : t("queueUnavailable")}
-        </div>
+        {/* Queue status — statut discret, ancré en bas de l'écran.
+            AUDIT-F19 : ne JAMAIS afficher « File d'attente non disponible » en
+            nominal quand le socket n'a simplement rien poussé (message négatif
+            permanent) — la ligne est masquée sans donnée, et l'indisponibilité
+            n'est dite que sur une vraie dégradation (hors connexion). */}
+        {(count !== null && estimatedMinutes !== null) || isOffline ? (
+          <div
+            data-testid="queue-status"
+            style={{
+              position: "absolute",
+              bottom: "var(--space-8)",
+              left: "var(--space-8)",
+              right: "var(--space-8)",
+              fontSize: "24px",
+              color: "var(--ink-muted-inv)",
+              textAlign: "center",
+            }}
+          >
+            {count !== null && estimatedMinutes !== null
+              ? t("queueStatus", { count, minutes: estimatedMinutes })
+              : t("queueUnavailable")}
+          </div>
+        ) : null}
       </main>
     </BankThemeProvider>
   );

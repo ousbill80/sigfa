@@ -15,6 +15,10 @@
  *  - 422 TICKET_NOT_CLOSED | FEEDBACK_WINDOW_EXPIRED → retour accueil silencieux.
  *  - Bouton micro masqué si SpeechRecognition absent (Electron).
  *  - Retour accueil auto après 30 s d'inactivité (60 s mode accessibilité).
+ *  - AUDIT-F21 : le client n'est JAMAIS captif — sortie explicite « Plus tard »
+ *    sur l'écran de notation, et après le merci retour accueil aligné sur le
+ *    pattern Moment Ticket (10 s nominal / 20 s accessibilité, compte à
+ *    rebours visible + bouton « Terminer »).
  *  - Tokens @sigfa/ui uniquement, cibles ≥ 72 px, contraste ≥ 7:1.
  */
 "use client";
@@ -25,7 +29,11 @@ import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
 import { IconEtoile, IconMicro } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
-import { A11Y_BASE_FONT_PX, accessibilityFontSizePx } from "@/lib/kiosk-voice";
+import {
+  A11Y_BASE_FONT_PX,
+  accessibilityFontSizePx,
+  ticketReturnDelayMs,
+} from "@/lib/kiosk-voice";
 import {
   getSpeechRecognitionConstructor,
   type SpeechRecognitionInstance,
@@ -68,6 +76,23 @@ export function FeedbackScreen({
   const labelFontPx = isAccessibilityMode
     ? accessibilityFontSizePx()
     : A11Y_BASE_FONT_PX;
+
+  // AUDIT-F21 — après le merci : compte à rebours VISIBLE avant retour accueil,
+  // aligné sur le pattern du Moment Ticket (10 s nominal, 20 s accessibilité).
+  const returnDelayMs = ticketReturnDelayMs(isAccessibilityMode);
+  const [secondsLeft, setSecondsLeft] = useState(returnDelayMs / 1000);
+  useEffect(() => {
+    if (phase !== "thankyou") return;
+    const interval = setInterval(() => {
+      setSecondsLeft((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase]);
+  useEffect(() => {
+    if (phase === "thankyou" && secondsLeft <= 0) {
+      router.push(`/${currentLocale}`);
+    }
+  }, [phase, secondsLeft, router, currentLocale]);
 
   // Détection de la Web Speech API (masque le bouton micro dans Electron).
   useEffect(() => {
@@ -189,6 +214,41 @@ export function FeedbackScreen({
           }}
         >
           {t("thankYou")}
+        </p>
+        {/* AUDIT-F21 : sortie immédiate possible (pattern Moment Ticket). */}
+        <button
+          type="button"
+          data-testid="feedback-finish-btn"
+          onClick={goHome}
+          style={{
+            minHeight: "72px",
+            minWidth: "240px",
+            backgroundColor: "var(--brand)",
+            color: "var(--brand-contrast)",
+            fontSize: "28px",
+            fontWeight: 600,
+            border: "none",
+            borderRadius: "var(--r-lg)",
+            boxShadow: "var(--shadow-brand)",
+            cursor: "pointer",
+            padding: "var(--space-3) var(--space-8)",
+          }}
+        >
+          {t("finishButton")}
+        </button>
+        {/* AUDIT-F21 : compte à rebours VISIBLE — plus jamais un reset sec. */}
+        <p
+          data-testid="feedback-returning"
+          role="status"
+          aria-live="polite"
+          style={{
+            fontSize: "24px",
+            color: "var(--ink-muted-inv)",
+            textAlign: "center",
+            margin: 0,
+          }}
+        >
+          {t("returning", { seconds: secondsLeft })}
         </p>
       </main>
     );
@@ -334,6 +394,30 @@ export function FeedbackScreen({
         }}
       >
         {t("submitButton")}
+      </button>
+
+      {/* AUDIT-F21 : sortie explicite — le client peut refuser poliment de
+          noter, il n'est jamais captif de l'écran de feedback. */}
+      <button
+        type="button"
+        data-testid="feedback-later"
+        onClick={goHome}
+        style={{
+          minHeight: "72px",
+          width: "100%",
+          maxWidth: "640px",
+          backgroundColor: "transparent",
+          color: "var(--ink-muted-inv)",
+          fontSize: "24px",
+          fontWeight: 500,
+          border: "none",
+          borderRadius: "var(--r-lg)",
+          cursor: "pointer",
+          textDecoration: "underline",
+          textUnderlineOffset: "6px",
+        }}
+      >
+        {t("laterButton")}
       </button>
     </main>
   );

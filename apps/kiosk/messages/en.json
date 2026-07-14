@@ -27,7 +27,8 @@
     "queueStatus": "Queue: {count} people — estimated wait: {minutes} min",
     "queueUnavailable": "Queue unavailable",
     "offlineBanner": "Offline mode — your tickets remain valid",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "welcomeAgency": "to {agencyName} branch"
   },
   "services003": {
     "title": "Which service do you need?",
@@ -113,7 +114,10 @@
     "commentPlaceholder": "Add a comment (optional)",
     "micLabel": "Dictate a comment",
     "submitButton": "Send my feedback",
-    "thankYou": "Thank you for your feedback!"
+    "thankYou": "Thank you for your feedback!",
+    "laterButton": "Maybe later",
+    "finishButton": "Done",
+    "returning": "Returning automatically in {seconds} s"
   },
   "degraded007": {
     "photographNumber": "Take a photo of your number or receive it by SMS",

@@ -20,8 +20,14 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// État file contrôlé par test (AUDIT-F19 : masquer la ligne sans donnée).
+const mockQueueStatus = {
+  count: 5 as number | null,
+  estimatedMinutes: 10 as number | null,
+  isOffline: false,
+};
 vi.mock("@/hooks/useQueueStatus", () => ({
-  useQueueStatus: () => ({ count: 5, estimatedMinutes: 10, isOffline: false }),
+  useQueueStatus: () => mockQueueStatus,
 }));
 
 vi.mock("@/hooks/useInactivityTimeout", () => ({
@@ -54,6 +60,7 @@ const frMessages = {
     queueUnavailable: "File d'attente non disponible",
     offlineBanner: "Mode hors connexion — vos tickets restent valables",
     loading: "Chargement...",
+    welcomeAgency: "à l'agence {agencyName}",
   },
 };
 
@@ -67,6 +74,7 @@ const enMessages = {
     queueUnavailable: "Queue unavailable",
     offlineBanner: "Offline mode — your tickets remain valid",
     loading: "Loading...",
+    welcomeAgency: "to {agencyName} branch",
   },
 };
 
@@ -79,6 +87,9 @@ describe("KIOSK-002: HomeScreen", () => {
     vi.useFakeTimers();
     mockBankTheme.logoUrl = null;
     mockBankTheme.brandColor = null;
+    mockQueueStatus.count = 5;
+    mockQueueStatus.estimatedMinutes = 10;
+    mockQueueStatus.isOffline = false;
   });
 
   afterEach(() => {
@@ -247,6 +258,58 @@ describe("KIOSK-002: HomeScreen", () => {
     // Queue status should be visible
     const queueEl = container.querySelector("[data-testid='queue-status']");
     expect(queueEl).toBeInTheDocument();
+    expect(queueEl?.textContent).toContain("5");
+  });
+
+  it("AUDIT-F19: aucune donnée file (nominal en ligne) → la ligne d'état est MASQUÉE (pas de message négatif permanent)", () => {
+    mockQueueStatus.count = null;
+    mockQueueStatus.estimatedMinutes = null;
+    mockQueueStatus.isOffline = false;
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    // Sans donnée ET sans dégradation : aucune ligne d'état, aucun texte négatif.
+    expect(
+      container.querySelector("[data-testid='queue-status']")
+    ).not.toBeInTheDocument();
+    expect(container.textContent).not.toContain("File d'attente non disponible");
+  });
+
+  it("AUDIT-F19: vraie dégradation (hors connexion) → « File d'attente non disponible » visible", () => {
+    mockQueueStatus.count = null;
+    mockQueueStatus.estimatedMinutes = null;
+    mockQueueStatus.isOffline = true;
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen isOffline={true} />
+      </NextIntlClientProvider>
+    );
+
+    const queueEl = container.querySelector("[data-testid='queue-status']");
+    expect(queueEl).toBeInTheDocument();
+    expect(queueEl?.textContent).toContain("File d'attente non disponible");
+  });
+
+  it("AUDIT-F18: ligne agence sans doublon — « à l'agence Centrale », jamais « agence Agence »", () => {
+    // Nom d'agence par défaut : « Agence Centrale » (env de test sans NEXT_PUBLIC_AGENCY_NAME).
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const agencyLine = container.querySelector(
+      "[data-testid='agency-welcome']"
+    );
+    expect(agencyLine).toBeInTheDocument();
+    expect(agencyLine?.textContent).toBe("à l'agence Centrale");
+    // Le doublon de l'audit ne doit JAMAIS réapparaître.
+    expect(container.textContent).not.toMatch(/agence\s+agence/i);
   });
 
   it("KIOSK-002: timeout 30 s → back to home (Vitest fake-timer)", () => {
