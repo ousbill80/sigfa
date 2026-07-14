@@ -5,7 +5,9 @@
  *   - registre SIGFA du texte annoncé (via traduction injectée) ;
  *   - mapping locale de session → BCP-47 (FR/EN), avec repli FR pour toute
  *     locale sans voix native (fallback explicitement documenté) ;
- *   - sélection d'une voix `SpeechSynthesisVoice` avec repli FR ;
+ *   - sélection d'une voix `SpeechSynthesisVoice` par SCORE de qualité
+ *     (exacte > préfixe, voix réputées > ordinaires, malus novelty macOS,
+ *     localService puis default à score égal), avec repli FR ;
  *   - `speakInLocale` : parole dans la locale cible en gérant le chargement
  *     ASYNCHRONE des voix (`voiceschanged`) et l'annulation de l'annonce
  *     précédente — mécanique unique réutilisée par tous les écrans ;
@@ -91,10 +93,144 @@ export function localeToBcp47(locale: string): string {
 }
 
 /**
+ * Voix réputées de bonne qualité, par préfixe de langue (noms en minuscules,
+ * correspondance par sous-chaîne insensible à la casse). Retour PO : « la voix
+ * anglaise ne marche toujours pas bien » — la PREMIÈRE voix qui matchait la
+ * locale pouvait être une voix robotique bas de gamme (Albert, Fred, compact…).
+ */
+const QUALITY_VOICE_NAMES: Readonly<Record<string, readonly string[]>> = {
+  en: [
+    "google us english",
+    "samantha",
+    "ava",
+    "allison",
+    "zoe",
+    "karen",
+    "daniel",
+  ],
+  fr: [
+    "google français",
+    "google francais",
+    "amélie",
+    "amelie",
+    "thomas",
+    "audrey",
+    "aurélie",
+    "aurelie",
+    "marie",
+  ],
+};
+
+/** Indices génériques de qualité dans le nom d'une voix (moteurs premium). */
+const QUALITY_NAME_HINTS: readonly string[] = [
+  "enhanced",
+  "premium",
+  "natural",
+  "neural",
+];
+
+/**
+ * Voix macOS robotiques/novelty connues → malus fort : elles ne doivent être
+ * retenues QUE s'il n'existe aucune autre voix de la langue cible.
+ */
+const NOVELTY_VOICE_NAMES: readonly string[] = [
+  "albert",
+  "bad news",
+  "bahh",
+  "bells",
+  "boing",
+  "bubbles",
+  "cellos",
+  "wobble",
+  "whisper",
+  "zarvox",
+  "trinoids",
+  "ralph",
+  "fred",
+  "junior",
+  "kathy",
+  "organ",
+  "superstar",
+  "jester",
+  "compact",
+];
+
+/**
+ * Barème du score de voix. Les critères principaux sont espacés d'au moins 10
+ * points ; `localService` (+2) puis `default` (+1) ne servent QUE de
+ * départage à score égal (2 + 1 < 10, ils ne peuvent pas inverser un critère).
+ */
+const SCORE_EXACT_LANG = 100 as const;
+const SCORE_PREFIX_LANG = 50 as const;
+const SCORE_QUALITY_NAME = 30 as const;
+const SCORE_QUALITY_HINT = 10 as const;
+const SCORE_NOVELTY_MALUS = -80 as const;
+const SCORE_LOCAL_SERVICE = 2 as const;
+const SCORE_DEFAULT_VOICE = 1 as const;
+
+/** Normalise un tag de langue (`en_US` → `en-us`) pour comparaison. */
+function normalizeLang(lang: string): string {
+  return lang.replace("_", "-").toLowerCase();
+}
+
+/**
+ * Score de qualité d'une voix pour un BCP-47 cible, du meilleur au moins bon :
+ *   1. correspondance BCP-47 EXACTE (+100) avant simple préfixe (+50) ;
+ *   2. voix réputée de qualité pour la langue (+30), indice premium dans le
+ *      nom — enhanced/premium/natural/neural — (+10) ;
+ *   3. malus fort (−80) pour les voix robotiques/novelty macOS : une exacte
+ *      novelty (100 − 80 = 20) perd contre n'importe quelle ordinaire (≥ 50) ;
+ *   4. à score égal : `localService` (+2, pas de latence réseau) puis
+ *      `default` (+1).
+ */
+function scoreVoice(voice: SpeechSynthesisVoice, target: string): number {
+  const name = voice.name.toLowerCase();
+  const prefix = target.split("-")[0];
+
+  let score =
+    normalizeLang(voice.lang) === normalizeLang(target)
+      ? SCORE_EXACT_LANG
+      : SCORE_PREFIX_LANG;
+  const qualityNames = QUALITY_VOICE_NAMES[prefix] ?? [];
+  if (qualityNames.some((q) => name.includes(q))) score += SCORE_QUALITY_NAME;
+  if (QUALITY_NAME_HINTS.some((h) => name.includes(h)))
+    score += SCORE_QUALITY_HINT;
+  if (NOVELTY_VOICE_NAMES.some((n) => name.includes(n)))
+    score += SCORE_NOVELTY_MALUS;
+  if (voice.localService) score += SCORE_LOCAL_SERVICE;
+  if (voice.default) score += SCORE_DEFAULT_VOICE;
+  return score;
+}
+
+/**
+ * Meilleure voix (score maximal) parmi celles dont la langue partage le
+ * préfixe du BCP-47 cible. Stable : à score strictement égal, la première
+ * voix de la liste l'emporte.
+ */
+function bestVoiceForBcp47(
+  target: string,
+  voices: readonly SpeechSynthesisVoice[]
+): SpeechSynthesisVoice | null {
+  const prefix = target.split("-")[0];
+  let best: SpeechSynthesisVoice | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (const voice of voices) {
+    if (normalizeLang(voice.lang).split("-")[0] !== prefix) continue;
+    const score = scoreVoice(voice, target);
+    if (score > bestScore) {
+      best = voice;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/**
  * Sélectionne une voix pour la locale cible parmi les voix disponibles.
- * Stratégie : voix exacte du BCP-47 cible → voix de même préfixe de langue →
- * repli sur une voix FR. Retourne `null` si aucune voix n'existe (dégradation
- * silencieuse, aucune erreur).
+ * Stratégie : meilleure voix par SCORE de qualité (voir `scoreVoice`) parmi
+ * celles de la langue cible → repli sur la meilleure voix FR (aucune voix de
+ * la locale — repli documenté, inchangé). Retourne `null` si aucune voix
+ * n'existe (dégradation silencieuse, aucune erreur).
  *
  * @param locale - Locale de session.
  * @param voices - Voix disponibles (`speechSynthesis.getVoices()`).
@@ -107,19 +243,11 @@ export function pickVoiceForLocale(
   if (voices.length === 0) return null;
 
   const target = localeToBcp47(locale);
-  const targetPrefix = target.split("-")[0];
-
-  const exact = voices.find((v) => v.lang === target);
-  if (exact) return exact;
-
-  const byPrefix = voices.find(
-    (v) => v.lang.split("-")[0] === targetPrefix
-  );
-  if (byPrefix) return byPrefix;
+  const best = bestVoiceForBcp47(target, voices);
+  if (best) return best;
 
   // Repli FR explicite (toute locale sans voix native disponible).
-  const frFallback = voices.find((v) => v.lang.split("-")[0] === "fr");
-  return frFallback ?? null;
+  return bestVoiceForBcp47(FALLBACK_BCP47, voices);
 }
 
 /**
@@ -134,8 +262,13 @@ export interface SpeakInLocaleOptions {
   locale: string;
   /** Texte à synthétiser. */
   text: string;
-  /** Rate de la voix (voir `voiceRate`). */
-  rate: number;
+  /**
+   * Rate de la voix (voir `voiceRate`). Optionnel : défaut
+   * `NOMINAL_VOICE_RATE` (1.0) — un mot isolé (« Français » / « English »)
+   * ralenti sonne artificiel ; seuls les textes longs (annonce ticket,
+   * accessibilité) passent un rate ralenti explicite.
+   */
+  rate?: number;
 }
 
 /**
@@ -152,7 +285,7 @@ export interface SpeakInLocaleOptions {
  * Dégradation silencieuse si l'API est partielle ou absente (aucune erreur).
  *
  * @param synth - Instance `speechSynthesis` du navigateur.
- * @param options - Locale cible, texte et rate.
+ * @param options - Locale cible, texte et rate (optionnel, défaut nominal 1.0).
  */
 export function speakInLocale(
   synth: SpeechSynthesis,
@@ -163,7 +296,7 @@ export function speakInLocale(
   const speakNow = (voices: readonly SpeechSynthesisVoice[]): void => {
     const utterance = new SpeechSynthesisUtterance(options.text);
     utterance.lang = localeToBcp47(options.locale);
-    utterance.rate = options.rate;
+    utterance.rate = options.rate ?? NOMINAL_VOICE_RATE;
     const voice = pickVoiceForLocale(options.locale, voices);
     if (voice) utterance.voice = voice;
     // Purge une éventuelle annonce précédente encore en cours AVANT de parler.

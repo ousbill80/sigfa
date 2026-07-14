@@ -229,6 +229,29 @@ describe("KIOSK-002: HomeScreen interactions", () => {
     expect(speakMock).toHaveBeenCalledTimes(1);
   });
 
+  it("KIOSK-002: annonce de langue au débit NOMINAL (rate 1) — un mot ralenti sonne artificiel (retour PO)", () => {
+    const speakMock = vi.fn();
+    window.speechSynthesis = {
+      ...window.speechSynthesis,
+      speak: speakMock,
+    } as unknown as SpeechSynthesis;
+
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={homeMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const cards = container.querySelectorAll("[data-testid='language-card']");
+    fireEvent.click(cards[1]); // English
+
+    expect(speakMock).toHaveBeenCalledTimes(1);
+    const utterance = speakMock.mock.calls[0][0] as SpeechSynthesisUtterance;
+    expect(utterance.rate).toBe(1);
+    // Voix ANGLAISE explicitement posée (voix en-US du mock, pas de repli FR).
+    expect(utterance.voice?.lang).toBe("en-US");
+  });
+
   it("KIOSK-002: queue unavailable — shows queueUnavailable text when count/minutes are null", () => {
     // Override mock to return null count/minutes
     vi.doMock("@/hooks/useQueueStatus", () => ({

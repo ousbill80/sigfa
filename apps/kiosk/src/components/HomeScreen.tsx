@@ -14,7 +14,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useQueueStatus } from "@/hooks/useQueueStatus";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
-import { speakInLocale, voiceRate } from "@/lib/kiosk-voice";
+import { NOMINAL_VOICE_RATE, speakInLocale } from "@/lib/kiosk-voice";
 import {
   bankInitial,
   kioskAgencyName,
@@ -80,9 +80,12 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
     // complète affichée à l'écran (ajustement PO). Repli FR par cohérence
     // avec kiosk-voice si une locale inconnue arrivait ici.
     // Mécanique commune `speakInLocale` (fix PO « la voix anglaise ne marche
-    // pas ») : voix ANGLAISE explicitement posée sur l'utterance quand elle
-    // existe, attente `voiceschanged` si la liste n'est pas encore chargée,
-    // `cancel` avant `speak`.
+    // pas ») : voix de QUALITÉ de la langue cible explicitement posée sur
+    // l'utterance (scoring anti-voix robotiques), attente `voiceschanged` si
+    // la liste n'est pas encore chargée, `cancel` avant `speak`.
+    // Rate NOMINAL (1.0) même en accessibilité : un mot isolé ralenti sonne
+    // artificiel (retour PO) — l'annonce complète du ticket, elle, conserve
+    // `voiceRate` (0.8 en accessibilité) via useVoiceAnnouncement.
     if (
       typeof window !== "undefined" &&
       "speechSynthesis" in window &&
@@ -91,7 +94,7 @@ export function HomeScreen({ isOffline: isOfflineProp }: HomeScreenProps = {}) {
       speakInLocale(window.speechSynthesis, {
         locale,
         text: LANGUAGE_NAME_ANNOUNCEMENT[locale] ?? LANGUAGE_NAME_ANNOUNCEMENT.fr,
-        rate: voiceRate(isAccessibilityMode),
+        rate: NOMINAL_VOICE_RATE,
       });
     }
     // MODEL-KIOSK-B : après la langue, la borne offre DEUX chemins clairs
