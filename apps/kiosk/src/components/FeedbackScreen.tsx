@@ -23,7 +23,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
-import { IconAudio, IconEtoile } from "@sigfa/ui";
+import { IconEtoile, IconMicro } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { A11Y_BASE_FONT_PX, accessibilityFontSizePx } from "@/lib/kiosk-voice";
 import {
@@ -306,7 +306,7 @@ export function FeedbackScreen({
             padding: "var(--space-2) var(--space-4)",
           }}
         >
-          <IconAudio size={28} />
+          <IconMicro size={28} />
           <span>{t("micLabel")}</span>
         </button>
       )}

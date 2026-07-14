@@ -131,6 +131,9 @@ describe("UiIcons: icônes d'interface", () => {
     ["accessibility", <AccessibilityIcon key="a" />, "accessibilite"],
     ["person", <PersonIcon key="pe" />, "conseiller"],
     ["operation", <OperationIcon key="o" />, "guichet"],
+    // ICONS-002 : chevron et téléphone rejoignent le set SIGFA duotone.
+    ["chevron", <ChevronIcon key="c" />, "chevron"],
+    ["phone", <PhoneIcon key="p" />, "telephone"],
   ])(
     "ICONS-001: %s est rendue par le set SIGFA duotone",
     (_label, element, sigfaName) => {
