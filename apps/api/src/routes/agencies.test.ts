@@ -92,6 +92,33 @@ describe("API-008: agences CRUD + soft-delete + RBAC + audit", () => {
     expect(res.status).toBe(403);
   });
 
+  it("WEB-002-HDR: RBAC — AGENT lit SA propre agence → 200 (nom d'agence du bandeau session)", async () => {
+    // Contrat core 1.1.0 : GET /agencies/{id} passe de AGENCY_DIRECTOR à AGENT
+    // pour que toute console connectée résolve le nom de l'agence de
+    // rattachement côté serveur (SessionHeader web).
+    const agentToken = await forgeToken(
+      h.jwtSecretBytes, "AGENT", bankA.directorId, bankA.bankId, [bankA.agencyId]
+    );
+    const res = await req("GET", `/agencies/${bankA.agencyId}`, agentToken);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; name: string };
+    expect(body.id).toBe(bankA.agencyId);
+    expect(typeof body.name).toBe("string");
+    expect(body.name.length).toBeGreaterThan(0);
+  });
+
+  it("WEB-002-HDR: RBAC — AGENT lisant une agence HORS de son périmètre agencyIds → 403 (scope agency inchangé)", async () => {
+    const other = await h.db.query(
+      `INSERT INTO agencies (bank_id, name) VALUES ($1,'HorsPerimetre') RETURNING id`, [bankA.bankId]
+    );
+    const otherAgencyId = (other.rows[0] as { id: string }).id;
+    const agentToken = await forgeToken(
+      h.jwtSecretBytes, "AGENT", bankA.directorId, bankA.bankId, [bankA.agencyId]
+    );
+    const res = await req("GET", `/agencies/${otherAgencyId}`, agentToken);
+    expect(res.status).toBe(403);
+  });
+
   it("API-008: PATCH merge partiel + diff d'audit", async () => {
     const res = await req("PATCH", `/agencies/${bankA.agencyId}`, dirToken, { name: "Agence renommée" });
     expect(res.status).toBe(200);

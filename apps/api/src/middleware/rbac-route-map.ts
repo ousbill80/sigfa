@@ -146,7 +146,10 @@ export const ROUTE_RBAC_MAP: RouteRbacEntry[] = [
   // ── AGENCIES (core.yaml) ──────────────────────────────────────────────────
   { method: "GET",    path: "/agencies",        requiredRole: "BANK_ADMIN",       tenantScope: "bank" },
   { method: "POST",   path: "/agencies",        requiredRole: "BANK_ADMIN",       tenantScope: "bank" },
-  { method: "GET",    path: "/agencies/{id}",   requiredRole: "AGENCY_DIRECTOR",  tenantScope: "agency" },
+  // WEB-002-HDR (core 1.1.0) : lecture d'agence ouverte à AGENT — tout connecté
+  // résout le nom de SON agence de rattachement (scope agency inchangé : 403
+  // hors périmètre agencyIds via assertAgencyScope).
+  { method: "GET",    path: "/agencies/{id}",   requiredRole: "AGENT",            tenantScope: "agency" },
   { method: "PATCH",  path: "/agencies/{id}",   requiredRole: "AGENCY_DIRECTOR",  tenantScope: "agency" },
   { method: "DELETE", path: "/agencies/{id}",   requiredRole: "BANK_ADMIN",       tenantScope: "bank" },
 
