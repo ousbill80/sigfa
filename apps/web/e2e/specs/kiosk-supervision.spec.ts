@@ -31,10 +31,17 @@
  */
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { readState, type E2eState } from "../support/state";
+import { refreshKioskHeartbeats } from "../support/reset";
 
 let state: E2eState;
-test.beforeAll(() => {
+// Isolation d'état (E2E-STATE-ISOLATION) : le statut d'une borne est DÉRIVÉ à la
+// lecture depuis `last_seen`. Le seed fige les horodatages UNE fois au setup ; la
+// suite dure plusieurs minutes, si bien que la borne « en ligne » (seed -5 s) est
+// devenue SILENT quand ce spec s'exécute. On re-stampe les deux bornes JUSTE AVANT
+// pour un statut déterministe (ONLINE + SILENT), indépendant du temps écoulé.
+test.beforeAll(async () => {
   state = readState();
+  await refreshKioskHeartbeats(state);
 });
 
 /** Pose le cookie httpOnly BANK_ADMIN (network view activée + scope agence). */

@@ -77,6 +77,8 @@ export interface E2eBackend extends E2eFixtures {
   apiOrigin: string;
   /** URL REST préfixée /api/v1 (base des clients de contrat). */
   apiBase: string;
+  /** URL PostgreSQL owner du conteneur E2E (isolation d'état par spec, `reset.ts`). */
+  dbUrl: string;
   /** JWT agent (scope agence) pour l'authentification web. */
   agentToken: string;
   /** JWT BANK_ADMIN (scope banque) pour la console theming (ADM-001b). */
@@ -353,6 +355,7 @@ export async function startHarness(apiPort: number): Promise<E2eResources> {
     ...fx,
     apiOrigin,
     apiBase: `${apiOrigin}/api/v1`,
+    dbUrl,
     agentToken,
     adminToken,
     auditorToken,

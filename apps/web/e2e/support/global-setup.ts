@@ -84,6 +84,7 @@ export default async function globalSetup(): Promise<void> {
     webBaseUrl,
     apiOrigin: backend.apiOrigin,
     apiBase: backend.apiBase,
+    dbUrl: backend.dbUrl,
     agentToken: backend.agentToken,
     adminToken: backend.adminToken,
     auditorToken: backend.auditorToken,

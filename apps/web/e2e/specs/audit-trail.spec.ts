@@ -31,10 +31,16 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { readState, type E2eState } from "../support/state";
 import { takeTicketAtKiosk } from "../support/journey";
+import { resetQueueState } from "../support/reset";
 
 let state: E2eState;
-test.beforeAll(() => {
+// Isolation d'état (E2E-STATE-ISOLATION) : ce spec émet un ticket sans jamais
+// l'appeler — il laisserait donc un WAITING qui polluerait la file d'un spec
+// aval. La purge AVANT exécution garde l'assertion (filtre par entityId propre)
+// tout en évitant que ce spec devienne une SOURCE de dérive FIFO.
+test.beforeAll(async () => {
   state = readState();
+  await resetQueueState(state);
 });
 
 /** UUID canonique manifestement absent du tenant (preuve d'absence de fuite). */
