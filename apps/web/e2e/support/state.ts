@@ -26,6 +26,8 @@ export interface E2eState {
   agentToken: string;
   /** JWT BANK_ADMIN (scope banque) — console theming ADM-001b. */
   adminToken: string;
+  /** JWT AUDITOR (scope banque, lecture seule) — écran journal d'audit SEC-001b. */
+  auditorToken: string;
   bankId: string;
   agencyId: string;
   serviceId: string;
@@ -33,6 +35,10 @@ export interface E2eState {
   counterId: string;
   agentId: string;
   kioskId: string;
+  /** Borne MUETTE seedée (last_seen ancien) — supervision ADM-003b. */
+  silentKioskId: string;
+  /** Borne EN LIGNE seedée (last_seen récent) — supervision ADM-003b. */
+  onlineKioskId: string;
 }
 
 /** Persiste l'état pour les workers. */

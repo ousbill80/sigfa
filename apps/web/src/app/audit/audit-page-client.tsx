@@ -10,7 +10,7 @@
  */
 "use client";
 
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { createSigfaClient } from "@sigfa/contracts";
 import { AuditLogTable } from "@/components/audit/audit-log-table";
 import { useAuditLog, type AuditFilters } from "@/lib/use-audit-log";
@@ -37,10 +37,17 @@ export function AuditPageClient({ apiBase, locale = "fr" }: AuditPageClientProps
   const activeLocale: Locale = SUPPORTED_LOCALES.includes(locale) ? locale : "fr";
 
   const { refresh } = audit;
-  // Initial load (page 1, no filters). refresh is stable per admin client.
+  // Initial load (page 1, no filters) — EXACTEMENT UNE FOIS au montage.
+  // `refresh` change d'identité à chaque fetch (il dépend de filters/page dans
+  // useAuditLog) : le déclarer en dépendance rejouerait le chargement initial
+  // (filtres vides) à chaque application de filtre → boucle infinie qui clobbe le
+  // filtre de l'utilisateur et fige l'écran en « chargement ». On garde donc la
+  // dernière `refresh` dans un ref et on ne déclenche l'effet qu'au montage.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
   useEffect(() => {
-    void refresh({ filters: {}, page: 1 });
-  }, [refresh]);
+    void refreshRef.current({ filters: {}, page: 1 });
+  }, []);
 
   useEffect(() => {
     const goOffline = (): void => setOffline(true);

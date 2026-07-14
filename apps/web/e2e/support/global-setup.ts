@@ -86,6 +86,7 @@ export default async function globalSetup(): Promise<void> {
     apiBase: backend.apiBase,
     agentToken: backend.agentToken,
     adminToken: backend.adminToken,
+    auditorToken: backend.auditorToken,
     bankId: backend.bankId,
     agencyId: backend.agencyId,
     serviceId: backend.serviceId,
@@ -93,6 +94,8 @@ export default async function globalSetup(): Promise<void> {
     counterId: backend.counterId,
     agentId: backend.agentId,
     kioskId: backend.kioskId,
+    silentKioskId: backend.silentKioskId,
+    onlineKioskId: backend.onlineKioskId,
   });
 
   globalThis.__RT003_HELD__ = { harness, web };
