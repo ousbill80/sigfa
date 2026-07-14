@@ -112,7 +112,8 @@ describe("ManagerDashboard — --danger réservé aux alertes", () => {
     expect(
       alertIcon.querySelector('svg[data-icon="alerte"]'),
     ).toBeInTheDocument();
-    expect(alertIcon.textContent).not.toContain("⚠");
+    // U+26A0 en échappement : la source elle-même reste sans pictogramme (sigfa/no-emoji).
+    expect(alertIcon.textContent).not.toContain("\u26A0");
   });
 });
 

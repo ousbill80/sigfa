@@ -14,9 +14,16 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { hasRequiredRole } from "src/middleware/rbac-route-map.js";
+import { hasRequiredRole, ROLE_HIERARCHY } from "src/middleware/rbac-route-map.js";
 
 describe("SEC-F3: RBAC AUDITOR orthogonal (lecture seule)", () => {
+  it("SEC-F3: AUDITOR et DISPLAY ABSENTS de ROLE_HIERARCHY (rôles orthogonaux, jamais hiérarchiques)", () => {
+    // Verrouille l'invariant documenté sur ROLE_HIERARCHY : les réintroduire
+    // rouvrirait l'escalade de privilèges (Boucle 3 F3 / LEÇON SEC-F3-01).
+    expect(ROLE_HIERARCHY).not.toHaveProperty("AUDITOR");
+    expect(ROLE_HIERARCHY).not.toHaveProperty("DISPLAY");
+  });
+
   it("SEC-F3: AUDITOR REFUSÉ sur POST /tickets (requiredRole AGENT, méthode mutante)", () => {
     expect(hasRequiredRole("AUDITOR", "AGENT", "POST")).toBe(false);
   });

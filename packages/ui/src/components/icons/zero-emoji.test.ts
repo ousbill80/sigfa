@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** Plages Unicode interdites : emoji, pictogrammes, dingbats, variantes. */
 const EMOJI_PATTERN =
@@ -32,7 +33,7 @@ function collectSources(dir: string): string[] {
 
 describe("ICONS-001: zéro emoji dans @sigfa/ui", () => {
   const srcRoot = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
+    path.dirname(fileURLToPath(import.meta.url)),
     "..",
     "..",
   );

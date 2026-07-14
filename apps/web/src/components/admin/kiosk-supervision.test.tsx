@@ -231,7 +231,6 @@ describe("ADM-003b: tokens uniquement — zéro couleur en dur, zéro emoji", ()
     );
     const html = container.innerHTML;
     expect(html).not.toMatch(/#[0-9a-fA-F]{6}/);
-    // eslint-disable-next-line no-control-regex
     expect(html).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
   });
 });

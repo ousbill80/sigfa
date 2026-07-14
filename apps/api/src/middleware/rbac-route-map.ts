@@ -45,12 +45,12 @@ export interface RouteRbacEntry {
  * Hiérarchie des rôles SIGFA (du plus large au plus restreint).
  * Un rôle supérieur peut effectuer toutes les actions d'un rôle inférieur.
  *
- * ⚠️ AUDITOR est ABSENT de cette hiérarchie : c'est un rôle ORTHOGONAL (lecture
+ * ATTENTION : AUDITOR est ABSENT de cette hiérarchie : c'est un rôle ORTHOGONAL (lecture
  * seule), il ne dérive JAMAIS un accès de la hiérarchie numérique (cf.
  * `hasRequiredRole`). Le placer ici (ex. AUDITOR > AGENT) rouvrirait l'escalade
  * de privilèges vers les routes mutantes AGENT (Boucle 3 F3 — BLOCKER).
  *
- * ⚠️ DISPLAY (token d'affichage TV public) est lui aussi ABSENT et ORTHOGONAL —
+ * ATTENTION : DISPLAY (token d'affichage TV public) est lui aussi ABSENT et ORTHOGONAL —
  * LEÇON SEC-F3-01. C'est un rôle d'AFFICHAGE SOCKET pur : il n'autorise AUCUNE
  * route HTTP (ni lecture ni mutation), seulement la réception des flux socket de
  * SA room. Le placer dans la hiérarchie (ou l'autoriser sur une lecture HTTP)

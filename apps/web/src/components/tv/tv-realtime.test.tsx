@@ -17,7 +17,7 @@ import type { AddressInfo } from "node:net";
 import { Server as IOServer, type Socket as ServerSocket } from "socket.io";
 import { http, HttpResponse } from "msw";
 import React, { type ReactElement } from "react";
-import { server as msw } from "../../test/msw-server";
+import { server as msw } from "@/test/msw-server";
 import { useSocket } from "@/lib/socket-provider";
 import { TvRealtime } from "./tv-realtime";
 

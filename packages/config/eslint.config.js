@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
+import { noEmojiConfigs } from "./src/rules/no-emoji.config.js";
 
 const base = [
   js.configs.recommended,
@@ -27,6 +28,10 @@ const base = [
       ],
     },
   },
+  // Règle anti-emoji monorepo (exigence PO « n'utilise jamais d'émoticône »).
+  // Exemption temporaire apps/kiosk — voir src/rules/no-emoji.config.js.
+  ...noEmojiConfigs,
 ];
 
 export default base;
+export { noEmojiConfigs };

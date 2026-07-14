@@ -4,7 +4,7 @@
  * Source : SIGFA_PROMPT_v5.md §MODULE 4 — Matrice des droits.
  * Consommable par l'API (API-001/002 — hors scope F2) comme source de vérité des droits.
  *
- * ⚠ EXCLUDED (volontaire, documenté) :
+ * ATTENTION — EXCLUDED (volontaire, documenté) :
  *   - `NONE` : convention de route "accès public" — JAMAIS persisté en base.
  *   - `AUTHENTICATED` : convention de route "authentifié" — JAMAIS persisté en base.
  *   Ces deux valeurs sont des sentinelles de routage Hono/middleware ;
@@ -56,17 +56,18 @@ export type PersistableRole = (typeof PERSISTABLE_ROLES)[number];
 
 /**
  * Matrice des droits SIGFA v5 §MODULE 4 — 6 rôles × 8 actions.
+ * Légende : X = autorisé · - = refusé.
  *
  * | Action              | SUPER_ADMIN | BANK_ADMIN | AGENCY_DIRECTOR | MANAGER | AGENT | AUDITOR |
  * |---------------------|:-----------:|:----------:|:---------------:|:-------:|:-----:|:-------:|
- * | create_bank         | ✅          | ❌         | ❌              | ❌      | ❌    | ❌      |
- * | create_agency       | ✅          | ✅         | ❌              | ❌      | ❌    | ❌      |
- * | configure_services  | ✅          | ✅         | ✅              | ❌      | ❌    | ❌      |
- * | manage_agents       | ✅          | ✅         | ✅              | ❌      | ❌    | ❌      |
- * | dashboard_realtime  | ✅          | ✅         | ✅              | ✅      | ❌    | ✅      |
- * | process_tickets     | ❌          | ❌         | ❌              | ❌      | ✅    | ❌      |
- * | view_reports        | ✅          | ✅         | ✅              | ✅      | ❌    | ✅      |
- * | export_data         | ✅          | ✅         | ✅              | ❌      | ❌    | ✅      |
+ * | create_bank         | X          | -         | -              | -      | -    | -      |
+ * | create_agency       | X          | X         | -              | -      | -    | -      |
+ * | configure_services  | X          | X         | X              | -      | -    | -      |
+ * | manage_agents       | X          | X         | X              | -      | -    | -      |
+ * | dashboard_realtime  | X          | X         | X              | X      | -    | X      |
+ * | process_tickets     | -          | -         | -              | -      | X    | -      |
+ * | view_reports        | X          | X         | X              | X      | -    | X      |
+ * | export_data         | X          | X         | X              | -      | -    | X      |
  *
  * Source : SIGFA_PROMPT_v5.md §MODULE 4 — Matrice des droits (recopie fidèle).
  */

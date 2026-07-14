@@ -12,7 +12,7 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { server } from "../test/msw-server";
+import { server } from "@/test/msw-server";
 import {
   parseRetryAfterSeconds,
   TV_SESSION_PATH,

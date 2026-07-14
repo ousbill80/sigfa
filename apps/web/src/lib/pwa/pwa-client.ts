@@ -13,19 +13,18 @@
  * @module lib/pwa/pwa-client
  */
 import { createSigfaClient, type PublicPaths } from "@sigfa/contracts";
-import type { paths } from "../../../../../packages/contracts/generated/types/public";
 
 /** Public ticket status (live tracking payload). */
 export type PublicTicketStatus =
-  paths["/public/tickets/{trackingId}"]["get"]["responses"]["200"]["content"]["application/json"];
+  PublicPaths["/public/tickets/{trackingId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /** Ticket-created response after a QR emission. */
 export type PublicTicketCreated =
-  paths["/public/tickets"]["post"]["responses"]["201"]["content"]["application/json"];
+  PublicPaths["/public/tickets"]["post"]["responses"]["201"]["content"]["application/json"];
 
 /** One active operation for a service (SLA résolu). */
 export type PublicOperation =
-  paths["/public/agencies/{agencyId}/operations"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
+  PublicPaths["/public/agencies/{agencyId}/operations"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
 
 /** Input for a QR-channel ticket emission (phone optional, consent gated). */
 export interface EmitQrTicketInput {
@@ -64,9 +63,7 @@ function publicClient(baseUrl: string): ReturnType<typeof createSigfaClient<"pub
   return createSigfaClient("public", baseUrl);
 }
 
-// PublicPaths is re-exported for consumers who type their own handlers; the
-// locally-imported `paths` and the package `PublicPaths` describe the same
-// contract surface.
+// PublicPaths is re-exported for consumers who type their own handlers.
 export type { PublicPaths };
 
 /**
