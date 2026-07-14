@@ -4,6 +4,38 @@ Journal des évolutions des contrats OpenAPI (LA LOI des échanges client↔serv
 Convention : les changements additifs passent le gate `contract-diff` (oasdiff) ;
 tout breaking change doit être documenté ici et assumé par une décision PO.
 
+## 2026-07-14 — CONTRACT-014 : dispo conseillers + bankId session borne + exports sous-chemins (additif, non-breaking)
+
+Trois évolutions groupées (décision PO — audit UX borne + dettes consignées).
+100% additif : le gate `contract-diff` (oasdiff) passe sans breaking change.
+
+- `public.yaml` (`info.version` 1.0.0 → **1.1.0**)
+  - `PublicRelationshipManager` : nouveau champ **`available: boolean`** (required
+    en réponse — additif non-breaking, le serveur le calcule toujours). Présence du
+    conseiller AUJOURD'HUI, **dérivée serveur du statut temps réel de la machine à
+    états agents**. JAMAIS d'horaire personnel ni de planning exposé (zéro PII, D5) ;
+    `additionalProperties: false` préservé. Le client borne/web sait si le conseiller
+    qu'il choisit est là.
+  - `KioskSessionResponse` : nouveau champ **`bankId` (string uuid, required)** —
+    donnée d'enseigne publique de la banque de la borne. Permet le theming
+    (couleur `--brand`, logo) depuis la session, et élimine la variable
+    d'environnement `NEXT_PUBLIC_BANK_ID` côté borne.
+
+- `package.json` — **fix des exports de sous-chemins** (dette : le dist API n'était
+  pas exécutable sans hook de résolution) :
+  - `"./events/*": "./dist/events/*"` — couvre `@sigfa/contracts/events/realtime.js`
+    (seul sous-chemin réellement importé par les apps, vérifié par grep).
+  - `".": "./dist/index.js"` → `"./dist/src/index.js"` — l'entrée est émise par tsc
+    en `dist/src/index.js` (`rootDir: "."`) ; l'ancienne cible n'existait pas.
+
+Impacts consommateurs (stories suivantes) :
+- `apps/api` : dériver `available` (machine à états agents) dans la liste publique
+  conseillers ; renvoyer `bankId` dans `POST /kiosk/session` ; les alias de
+  résolution (`vitest.config.ts`, `tsconfig.json` paths sur
+  `@sigfa/contracts/events/realtime.js`) deviennent supprimables.
+- `apps/kiosk` : consommer `bankId` de la session (suppression de
+  `NEXT_PUBLIC_BANK_ID`) et afficher la disponibilité du conseiller.
+
 ## 2026-07-13 — BREAKING : restriction des langues à FR/EN (décision PO)
 
 Retrait des langues Dioula et Baoulé du périmètre produit (décision PO actée,
