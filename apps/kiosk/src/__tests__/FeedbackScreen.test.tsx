@@ -159,6 +159,11 @@ describe("KIOSK-009: FeedbackScreen", () => {
         const el = star as HTMLElement;
         expect(el.style.minWidth, `star size ${locale}`).toBe("72px");
         expect(el.style.minHeight, `star size ${locale}`).toBe("72px");
+        // ICONS-001 : étoile = icône SIGFA « etoile », plus de glyphe texte.
+        expect(
+          el.querySelector("svg[data-icon='etoile']"),
+          `star icon ${locale}`,
+        ).toBeInTheDocument();
       });
       const title = container.querySelector(
         "[data-testid='feedback-title']"
@@ -474,6 +479,8 @@ describe("KIOSK-009: commentaire vocal (SpeechRecognition)", () => {
     );
     const micBtn = screen.getByTestId("feedback-mic");
     expect(micBtn).toBeInTheDocument();
+    // ICONS-002 : icône SIGFA « micro » appariée au label « Dicter ».
+    expect(micBtn.querySelector("svg[data-icon='micro']")).toBeInTheDocument();
     fireEvent.click(micBtn);
     expect(lastInstance).not.toBeNull();
     expect(lastInstance!.start).toHaveBeenCalled();
@@ -494,7 +501,7 @@ describe("KIOSK-009: commentaire vocal (SpeechRecognition)", () => {
     expect(textarea.value).toBe("corrigé");
   });
 
-  it("KIOSK-009: SpeechRecognition absent → bouton 🎤 masqué, commentaire textuel disponible", async () => {
+  it("KIOSK-009: SpeechRecognition absent → bouton micro masqué, commentaire textuel disponible", async () => {
     // Pas d'installation de SpeechRecognition (environnement Electron).
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
@@ -511,7 +518,7 @@ describe("KIOSK-009: commentaire vocal (SpeechRecognition)", () => {
     ).toBeInTheDocument();
   });
 
-  it("KIOSK-009: webkitSpeechRecognition (préfixe WebKit) supporté → bouton 🎤 visible", async () => {
+  it("KIOSK-009: webkitSpeechRecognition (préfixe WebKit) supporté → bouton micro visible", async () => {
     const ctor = vi.fn(() => makeInstance());
     (window as unknown as Record<string, unknown>).webkitSpeechRecognition =
       ctor;

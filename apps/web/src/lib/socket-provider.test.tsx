@@ -18,7 +18,7 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Server as IOServer, type Socket as ServerSocket } from "socket.io";
 import React, { type ReactElement } from "react";
-import { server } from "../test/msw-server";
+import { server } from "@/test/msw-server";
 import { SocketProvider, useSocket } from "./socket-provider";
 
 // Le harnais démarre un VRAI serveur socket.io in-process sur un port aléatoire

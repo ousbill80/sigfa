@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { tokens, color, fontSize, radius, space, font } from "./tokens.js";
+import { contrastRatio } from "./lib/contrast.js";
 
 describe("design tokens", () => {
   it("every colour token is a valid hex string", () => {
@@ -9,7 +10,7 @@ describe("design tokens", () => {
   });
 
   it("exposes the « Or & Forêt » brand trio", () => {
-    expect(color["--brand"]).toBe("#C25A16");
+    expect(color["--brand"]).toBe("#B85513");
     expect(color["--forest"]).toBe("#0F6B4A");
     expect(color["--gold"]).toBe("#C79A3A");
   });
@@ -54,5 +55,58 @@ describe("design tokens", () => {
     expect(tokens.space).toBe(space);
     expect(tokens.font).toBe(font);
     expect(tokens.motion.ease).toContain("cubic-bezier");
+  });
+});
+
+/**
+ * Preuves de contraste WCAG sur les paires de tokens (audit UX borne
+ * 2026-07-14, findings F6/F10). Seuils DS kiosque : ≥ 7:1 sur fond nuit,
+ * ≥ 4.5:1 minimum absolu (texte normal). Ces tests verrouillent les valeurs :
+ * tout assombrissement/éclaircissement d'un token qui casse un seuil échoue ici.
+ */
+describe("token contrast proofs (WCAG)", () => {
+  it("F10: --brand-contrast on --brand ≥ 4.5:1 (normal text, claimed by the DS)", () => {
+    expect(
+      contrastRatio(color["--brand-contrast"], color["--brand"]),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("F10: --brand-strong (kiosk --action-label) ≥ 7:1 on --surface-1", () => {
+    expect(
+      contrastRatio(color["--brand-strong"], color["--surface-1"]),
+    ).toBeGreaterThanOrEqual(7);
+  });
+
+  it("F6: inverse semantic tokens ≥ 7:1 on --night AND --night-2", () => {
+    for (const token of [
+      "--success-inv",
+      "--warning-inv",
+      "--danger-inv",
+      "--info-inv",
+    ] as const) {
+      expect(
+        contrastRatio(color[token], color["--night"]),
+        `${token} on --night`,
+      ).toBeGreaterThanOrEqual(7);
+      expect(
+        contrastRatio(color[token], color["--night-2"]),
+        `${token} on --night-2`,
+      ).toBeGreaterThanOrEqual(7);
+    }
+  });
+
+  it("F1: inverse ink ramp ≥ 7:1 on --night (EmptyState on-night variant)", () => {
+    expect(
+      contrastRatio(color["--ink-inverse"], color["--night"]),
+    ).toBeGreaterThanOrEqual(7);
+    expect(
+      contrastRatio(color["--ink-inverse-soft"], color["--night"]),
+    ).toBeGreaterThanOrEqual(7);
+  });
+
+  it("gold ticket number stays ≥ 7:1 on --night (Moment Ticket)", () => {
+    expect(
+      contrastRatio(color["--gold"], color["--night"]),
+    ).toBeGreaterThanOrEqual(7);
   });
 });

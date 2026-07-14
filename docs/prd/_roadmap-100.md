@@ -11,7 +11,7 @@
 
 ## F6 — Notifications & Jobs ✅ (API complet, poussé)
 - ✅ **NOTIF-001** infra BullMQ · ✅ **NOTIF-002** SMS · ✅ **NOTIF-003** WhatsApp · ✅ **NOTIF-004** email · ✅ **NOTIF-005-A** QR API.
-- ⏳ **NOTIF-005-B** PWA ticket web → **story WEB** (rattachée F4/F5).
+- ✅ **NOTIF-005-B** PWA ticket web publique `/q/[token]` (`apps/web/src/app/q/[token]/` + API `public-tickets.ts`) — durcie lot C design (échec d'émission visible + retry, cibles ≥44px).
 - ⚠️ **Dépendance DB** : migration réelle requise pour `whatsapp_config`/`whatsapp_menu_mapping`, source `INBOUND_WHATSAPP`, types `POSITION_NEAR/NEXT`, colonnes consentement par canal (tests via DDL harnais ; PO travaille peut-être dessus dans `packages/database`).
 
 ## F7 — Reporting ✅ (API complet, poussé)
@@ -36,28 +36,25 @@ Passe design-reviewer (audit code vs DS v2, 8 surfaces scorées) → 3 vagues de
 
 ## F9 — Sécurité & Charge (quasi complet)
 - ✅ **SEC-001** audit trail exhaustif (mutation-registry + wrapper transactionnel) + écran Auditor.
-- 🔄 **SEC-002** tenant-isolation exhaustif + RLS `withTenant` armée (ferme dette SEC-F3-02 + Schemathesis response-conformance) — EN COURS.
+- ✅ **SEC-002** tenant-isolation exhaustif + RLS armée (`withArmedTenant`) — **DETTE SEC-F3-02 FERMÉE** (2026-07-13, `230a49d`) : 25 routes basculées en 10 lots séquencés (isolation prouvée Testcontainers PG16 `sigfa_app` NOBYPASSRLS), `ARMED_CUTOVER_PENDING` VIDE. Chemins plateforme/cross-tenant (agrégat réseau `reports?scope=network`, CRUD `banks.ts`, bootstrap `onboarding`) routés `withPlatform`. Coutures DB : GRANT UPDATE colonne-scopé seuils tenant (`0014`+`0015`).
 - ✅ **SEC-003** PRA backup/restore chiffré (mock S3, game day CI) — 🔒 RTO/RPO réel gated infra.
 - 🔒 **SEC-004** k6 charge — env de charge réel (PgBouncer×prepared-statements à tester tôt).
 - ✅ **SEC-005** Stryker mutation **100 %** sur queue-engine + sla-engine.
 
 ## F10 — IA & Prédiction ✅ (code+synthétique complet, poussé ; critères pilote 🔒)
 - ✅ **IA-001** features · ✅ **IA-002** prévision+staffing · ✅ **IA-003** anomalies · ✅ **IA-004** NLP FR/EN · ✅ **IA-005** surfaces insights/COMEX.
-- 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j) ; ⏳ couture : câbler feature-store→table `ai_features` (DB-AI-FEATURES ✅ poussée).
+- 🔒 cibles MAE/volume + critères pilote = données réelles (≥90 j) ; ✅ couture **feature-store→`ai_features`** câblée (`DbFeatureStore` armé, gated `FEATURE_STORE_PROVIDER`, défaut sûr `none`) — `230a49d`.
 
 ## F11 — Supervision réseau (quasi complet)
-- ✅ **NET-001-API** super admin network-overview zéro-PII + PLATFORM_READ_ONLY · 🔄 **NET-001-WEB** console (web, en cours).
+- ✅ **NET-001-API** super admin network-overview zéro-PII + PLATFORM_READ_ONLY · ✅ **NET-001-WEB** console (console + page-client + allowlist + hook, tous testés ; durcie lot C design).
 - ✅ **NET-002** MAJ bornes canary/halt/rollback (mécanique) · 🔒 signature artefact réelle.
 - ✅ **NET-003** monitoring règles+scrubbing PII (mock/simulé) · 🔒 infra réelle Grafana/Sentry.
 
-## Infra / dette
+## Infra / dette — ✅ drainée
 - ✅ **Registre de routes** (`route-registry.ts`) — fin des conflits `app.ts` ; les nouvelles routes = 1 ligne.
-- ⏳ Skew **zod v4/v3** (`@sigfa/schemas`) · ⏳ correctif teardown Redis REP-002 (mineur, CI verte) · ⏳ `harden/f3-debt` (Schemathesis) à merger avec SEC-002.
-
-## Bouts transverses
-- ⏳ Fix unité REP-001 + réconcilie `app.ts`.
-- ⏳ Skew **zod v4/v3** dans `@sigfa/schemas` (chantier `packages`) → débloque le DRY complet.
-- ⏳ NOTIF-005-B PWA (story WEB).
+- ✅ Skew **zod v4/v3** unifié en **v4** (schemas/contracts/factories) — DRY realtime rétabli (`44444b8`).
+- ✅ Teardown Redis REP-002 : rejet de teardown avalé explicitement (déjà en place). ✅ Schemathesis F3 : `schemathesis-f3-gate.test.ts` sur main (SKIP gracieux si Docker absent).
+- ✅ REP-001 (unité minutes) + `app.ts` : aucun résidu (réconcilié par le registre de routes).
 
 ## Blockers du VRAI 100 % (hors code — PO/infra)
 🔒 Comptes fournisseurs SMS/WhatsApp/Email (**PO — demain**) · Infra R2/S3, PgBouncer, Grafana, Sentry, env k6 · **Pilote terrain** (→ F10 réel + critères sortie : TMA −30 %, NPS ≥75, uptime 99,9 %) · 4 DESIGN-gates (theming, onboarding, supervision, super admin) · décision GitHub Pro/public.

@@ -172,7 +172,8 @@ export interface paths {
                          *       "accessToken": "eyJhbGciOiJIUzI1NiJ9.kioskPayload.sig",
                          *       "expiresIn": 43200,
                          *       "kioskId": "14141414-1414-4141-a141-141414141414",
-                         *       "agencyId": "33333333-3333-4333-a333-333333333333"
+                         *       "agencyId": "33333333-3333-4333-a333-333333333333",
+                         *       "bankId": "22222222-2222-4222-a222-222222222222"
                          *     }
                          */
                         "application/json": components["schemas"]["KioskSessionResponse"];
@@ -972,11 +973,13 @@ export interface paths {
                          *         {
                          *           "id": "55555555-5555-4555-a555-555555555555",
                          *           "displayName": "Kofi A.",
-                         *           "photoUrl": "https://cdn.sigfa.ci/rm/kofi.jpg"
+                         *           "photoUrl": "https://cdn.sigfa.ci/rm/kofi.jpg",
+                         *           "available": true
                          *         },
                          *         {
                          *           "id": "66666666-6666-4666-a666-666666666666",
-                         *           "displayName": "Awa D."
+                         *           "displayName": "Awa D.",
+                         *           "available": false
                          *         }
                          *       ]
                          *     }
@@ -1156,6 +1159,14 @@ export interface components {
             kioskId: string;
             /** Format: uuid */
             agencyId: string;
+            /**
+             * Format: uuid
+             * @description Identifiant de la banque (enseigne) de l'agence de la borne (CONTRACT-014).
+             *     **Donnée d'enseigne publique** (aucune donnée sensible) : permet à la borne
+             *     de charger son theming (couleur `--brand`, logo) sans variable d'environnement
+             *     `NEXT_PUBLIC_BANK_ID` — la session est LA source de vérité de l'enseigne.
+             */
+            bankId: string;
         };
         HeartbeatRequest: {
             printerStatus: components["schemas"]["PrinterStatus"];
@@ -1473,8 +1484,8 @@ export interface components {
         };
         /**
          * @description Vue publique NOMINATIVE d'un conseiller clientèle actif (D5). Expose UNIQUEMENT
-         *     `{ id, displayName, photoUrl? }` — **zéro PII** : ni email, ni rôle, ni téléphone,
-         *     ni lien client↔conseiller attitré (hors-scope CRM — CLAUDE.md §5).
+         *     `{ id, displayName, photoUrl?, available }` — **zéro PII** : ni email, ni rôle,
+         *     ni téléphone, ni lien client↔conseiller attitré (hors-scope CRM — CLAUDE.md §5).
          *     `additionalProperties: false` garantit qu'aucune donnée sensible ne peut fuir.
          */
         PublicRelationshipManager: {
@@ -1493,6 +1504,15 @@ export interface components {
              * @description URL de la photo du conseiller (optionnel).
              */
             photoUrl?: string | null;
+            /**
+             * @description Présence du conseiller AUJOURD'HUI (CONTRACT-014) — **dérivée serveur du
+             *     statut temps réel de la machine à états agents** (le conseiller est présent
+             *     en agence maintenant), pour que le client borne/web sache si le conseiller
+             *     qu'il choisit est là. JAMAIS d'horaire personnel ni de planning exposé
+             *     (zéro PII, D5) : uniquement ce booléen instantané, calculé côté serveur.
+             * @example true
+             */
+            available: boolean;
         };
         PublicRelationshipManagerListResponse: {
             data: components["schemas"]["PublicRelationshipManager"][];

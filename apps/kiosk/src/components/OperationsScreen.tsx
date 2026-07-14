@@ -26,12 +26,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
-import { EmptyState } from "@sigfa/ui";
+import { EmptyState, IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
 import { AccessibilityIcon, ChevronIcon } from "@/components/icons/UiIcons";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { storeTicketOperationLabel } from "@/lib/ticket-operation-store";
 
 /** Opération publique telle qu'exposée par le contrat (SLA résolu). */
 export interface OperationItem {
@@ -72,16 +73,23 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
     router.push(`/${currentLocale}`);
   }, timeoutMs);
 
-  /** Navigue vers la confirmation en portant serviceId, operationId ET le
-   *  libellé public de l'opération (ticket imprimé — non-PII). */
+  /**
+   * Navigue vers la confirmation en portant serviceId ET operationId.
+   * KIOSK-005b (audit F8) : le libellé PUBLIC de l'opération est déposé dans
+   * le store mémoire — le Moment Ticket l'affichera en eyebrow (vérification
+   * du choix d'un coup d'œil).
+   * KIOSK-BORNE : le libellé est AUSSI porté par l'URL (`operationLabel`,
+   * non-PII) — la confirmation le propage jusqu'au ticket imprimé 80 mm.
+   */
   const goToConfirmation = useCallback(
-    (operationId: string, operationLabel?: string) => {
+    (operation: Pick<OperationItem, "id" | "name">) => {
+      storeTicketOperationLabel(operation.name);
       const query = new URLSearchParams({
         serviceId,
-        operationId,
+        operationId: operation.id,
         agencyId,
+        operationLabel: operation.name,
       });
-      if (operationLabel) query.set("operationLabel", operationLabel);
       router.push(`/${currentLocale}/confirmation?${query.toString()}`);
     },
     [router, currentLocale, serviceId, agencyId]
@@ -103,7 +111,7 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
       const ops = (data.data ?? []) as OperationItem[];
       // Saut « opération unique » : une seule opération → confirmation directe.
       if (ops.length === 1) {
-        goToConfirmation(ops[0].id, ops[0].name);
+        goToConfirmation(ops[0]);
         return;
       }
       if (ops.length === 0) {
@@ -146,7 +154,11 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
             minHeight: "72px",
           }}
         >
-          ← {t("backButton")}
+          <IconRetour
+            size={24}
+            style={{ verticalAlign: "middle", marginRight: "var(--space-2)" }}
+          />
+          {t("backButton")}
         </button>
         <span
           style={{
@@ -311,7 +323,7 @@ export function OperationsScreen({ serviceId, agencyId }: OperationsScreenProps)
             <button
               key={operation.id}
               data-testid="operation-card"
-              onClick={() => goToConfirmation(operation.id, operation.name)}
+              onClick={() => goToConfirmation(operation)}
               style={{
                 minHeight: "96px",
                 backgroundColor: "var(--surface-1)",

@@ -14,6 +14,17 @@
  * ne sont PAS des PII. La seule garde est l'existence de l'agence — sinon **404
  * opaque** (`AGENCY_NOT_FOUND`) anti-énumération, sans divulguer l'existence.
  *
+ * ## Armement RLS (SEC-002-CUTOVER-LOT7)
+ * Le tenant (bankId) d'une session TV n'est PAS porté par une auth staff : il est
+ * RÉSOLU depuis l'`agencyId` revendiqué (token de session publique). La résolution
+ * initiale — trouver la banque d'une agence dont on IGNORE encore le tenant — est
+ * INTRINSÈQUEMENT PRÉ-TENANT (on ne peut pas armer `app.current_bank_id` avant de
+ * connaître la banque). Elle s'exécute donc hors armement (lookup d'identité de
+ * session). UNE FOIS le bankId dérivé, la confirmation d'existence de l'agence DANS
+ * le tenant est REJOUÉE à travers `withArmedTenant(bankId, …)` (RLS `agencies`
+ * contraignante) : une session ne peut confirmer QUE des agences de SA banque —
+ * défense-en-profondeur au-delà du seul `WHERE id`.
+ *
  * @module
  */
 
@@ -21,15 +32,18 @@ import { SignJWT } from "jose";
 import type { Client } from "pg";
 import { TV_SESSION_TTL_SECONDS, TV_DISPLAY_ROLE } from "@sigfa/contracts/events/realtime.js";
 import { SigfaError } from "src/lib/errors.js";
+import { type ArmableConnection } from "src/lib/armed-tenant.js";
 
 /** Paramètres de création d'une session TV. */
 export interface CreateTvSessionParams {
-  /** Connexion PG. */
+  /** Connexion PG (résolution pré-tenant du bankId de l'agence). */
   db: Client;
   /** Secret JWT (bytes). */
   jwtSecret: Uint8Array;
   /** Agence revendiquée par l'écran TV. */
   agencyId: string;
+  /** Fabrique d'exécution ARMÉE (SEC-002) fournie par la route — confirmation tenant. */
+  armedRead: ArmedRead;
 }
 
 /** Résultat d'une création de session TV (LA LOI `TvSessionResponse`). */
@@ -59,8 +73,13 @@ interface AgencyBankRow {
  * @throws {SigfaError} 404 AGENCY_NOT_FOUND si l'agence n'existe pas (opaque)
  */
 export async function createTvSession(params: CreateTvSessionParams): Promise<TvSession> {
-  const { db, jwtSecret, agencyId } = params;
+  const { db, jwtSecret, agencyId, armedRead } = params;
+  // Étape 1 (PRÉ-TENANT) : résoudre la banque de l'agence revendiquée. On ignore
+  // encore le tenant — impossible d'armer `app.current_bank_id` à ce stade.
   const bankId = await resolveAgencyBankId(db, agencyId);
+  // Étape 2 (ARMÉE) : confirmer l'agence DANS le tenant résolu (RLS contraignante).
+  // La fabrique `armedRead` est fournie par la route (elle porte `withArmedTenant`).
+  await assertAgencyInArmedTenant(armedRead, bankId, agencyId);
   const accessToken = await signTvToken(jwtSecret, agencyId, bankId);
   return {
     accessToken,
@@ -71,9 +90,24 @@ export async function createTvSession(params: CreateTvSessionParams): Promise<Tv
 }
 
 /**
+ * Fabrique d'exécution ARMÉE : la route fournit une fonction qui, pour un `bankId`
+ * donné, exécute son corps à travers `withArmedTenant` (`app.current_bank_id`
+ * armé, connexion `sigfa_app`). Le service en reste découplé (testable), la source
+ * unique d'armement demeure `src/lib/armed-tenant.ts` invoquée dans la route.
+ */
+export type ArmedRead = <T>(
+  bankId: string,
+  fn: (conn: ArmableConnection) => Promise<T>
+) => Promise<T>;
+
+/**
  * Dérive le `bankId` d'une agence existante et active. Une agence inconnue,
  * supprimée ou inactive → **404 opaque** `AGENCY_NOT_FOUND` (anti-énumération :
  * même corps d'erreur, ne jamais divulguer l'existence).
+ *
+ * SEC-002 : lookup INTRINSÈQUEMENT PRÉ-TENANT (résolution d'identité de session :
+ * on cherche la banque d'une agence dont le tenant est encore inconnu). Il ne peut
+ * pas être armé — c'est la seule étape légitimement hors `withArmedTenant`.
  *
  * @param db       - Connexion PG
  * @param agencyId - Agence revendiquée
@@ -91,6 +125,36 @@ async function resolveAgencyBankId(db: Client, agencyId: string): Promise<string
     throw new SigfaError("AGENCY_NOT_FOUND", "Agence introuvable.", 404);
   }
   return row.bank_id;
+}
+
+/**
+ * Confirme, SOUS ARMEMENT (`app.current_bank_id = bankId`), que l'agence existe,
+ * est active et appartient bien au tenant résolu. Sous RLS FORCE (`sigfa_app`
+ * NOBYPASSRLS), la policy `tenant_isolation` de `agencies` borne la lecture à la
+ * banque armée : une session ne peut confirmer QUE ses propres agences. Toute
+ * incohérence (agence hors tenant / inactive) → **404 opaque** identique.
+ *
+ * @param armedRead - Fabrique d'exécution armée (portée par la route)
+ * @param bankId    - Banque résolue (armement RLS)
+ * @param agencyId  - Agence revendiquée
+ * @throws {SigfaError} 404 AGENCY_NOT_FOUND si l'agence n'est pas confirmée armée
+ */
+async function assertAgencyInArmedTenant(
+  armedRead: ArmedRead,
+  bankId: string,
+  agencyId: string
+): Promise<void> {
+  const confirmed = await armedRead(bankId, async (conn) => {
+    const res = await conn.query(
+      `SELECT id FROM agencies
+        WHERE id = $1 AND is_active = true AND deleted_at IS NULL`,
+      [agencyId]
+    );
+    return res.rows.length > 0;
+  });
+  if (!confirmed) {
+    throw new SigfaError("AGENCY_NOT_FOUND", "Agence introuvable.", 404);
+  }
 }
 
 /**

@@ -11,6 +11,16 @@
  * MANAGER+ agit/lit dans son scope d'agence. Le RBAC de route autorise AGENT ;
  * la restriction fine self-vs-scope est appliquée ici.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT5)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Tables `users` /
+ * `agency_users` / `user_services` / `services` / `agencies` / `agent_status_history`
+ * (policy `tenant_isolation` + GRANT CRUD `sigfa_app`, 0001) : lecture de scope,
+ * mutations de profil, transitions de statut et audit composé SEC-001 (savepoint)
+ * s'exécutent dans UNE transaction armée. La lecture (GET profil/stats) partage la
+ * même connexion armée le temps de la requête.
+ *
  * @module
  */
 
@@ -27,10 +37,18 @@ import {
   type AgentStatus,
 } from "src/services/agent-status.js";
 import { computeAgentStats, type StatsPeriod } from "src/services/agent-stats.js";
-import { recordAudit, buildDiff, extractIp } from "src/lib/audit-context.js";
-import { withAudit, auditContextFrom } from "src/audit/with-audit.js";
+import { buildDiff, extractIp } from "src/lib/audit-context.js";
+import {
+  withAudit,
+  type AuditRequestContext,
+} from "src/audit/with-audit.js";
 import { parseStrict } from "src/lib/admin-helpers.js";
 import { safeText } from "src/lib/safe-text.js";
+import {
+  withArmedTenant,
+  asArmable,
+  isCanonicalUuid,
+} from "src/lib/armed-tenant.js";
 
 /** Variables de contexte Hono du routeur agents (bus injecté par app.ts). */
 interface AgentEnv {
@@ -210,8 +228,14 @@ function registerGetProfile(router: Hono<AgentEnv>): void {
     const tenant = c.get("tenant");
     try {
       const agentId = paramUuid(c, "id");
-      await assertAgentInTenantScope(db, tenant, agentId);
-      const profile = await loadAgentProfile(db, tenant, agentId);
+      const bankId = requireArmableBankId(tenant);
+      // SEC-002 : lecture de scope + chargement du profil dans UNE transaction
+      // ARMÉE (RLS `app.current_bank_id` contraignante en défense-en-profondeur).
+      const profile = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armed = conn as unknown as Client;
+        await assertAgentInTenantScope(armed, tenant, agentId);
+        return loadAgentProfile(armed, tenant, agentId);
+      });
       return c.json(profile, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -227,7 +251,7 @@ async function loadAgentProfile(
 ): Promise<Record<string, unknown>> {
   const res = await db.query(
     `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.bank_id,
-            u.languages, u.work_schedule, u.is_relationship_manager, u.display_name,
+            u.languages::text[] AS languages, u.work_schedule, u.is_relationship_manager, u.display_name,
             u.photo_url, u.created_at
        FROM users u
       WHERE u.id = $1 AND u.bank_id = $2`,
@@ -302,30 +326,47 @@ function registerPatchProfile(router: Hono<AgentEnv>): void {
     const tenant = c.get("tenant");
     try {
       const agentId = paramUuid(c, "id");
-      await assertAgentInTenantScope(db, tenant, agentId);
       const input = parseStrict(updateProfileSchema, await parseJson(c));
-      const before = await loadAgentProfile(db, tenant, agentId);
-      await applyProfileUpdate(db, tenant, agentId, input);
-      const after = await loadAgentProfile(db, tenant, agentId);
-      await recordAudit({
-        db,
-        tenant,
-        action: "PATCH /agents/:id",
-        entityType: "user",
-        entityId: agentId,
-        ip: extractIp(c),
-        diff: buildDiff(
-          {
-            languages: before["languages"], serviceIds: before["serviceIds"], agencyIds: before["agencyIds"],
-            workSchedule: before["workSchedule"], isRelationshipManager: before["isRelationshipManager"],
-            displayName: before["displayName"], photoUrl: before["photoUrl"],
-          },
-          {
-            languages: after["languages"], serviceIds: after["serviceIds"], agencyIds: after["agencyIds"],
-            workSchedule: after["workSchedule"], isRelationshipManager: after["isRelationshipManager"],
-            displayName: after["displayName"], photoUrl: after["photoUrl"],
-          }
-        ),
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : lecture de scope + before/after + mutation + audit (savepoint)
+      // dans UNE transaction ARMÉE. `withAudit(inTransaction:true)` compose par
+      // SAVEPOINT : la mutation et l'insert d'audit héritent du contexte RLS
+      // `app.current_bank_id` et committent atomiquement une seule fois.
+      const after = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armed = conn as unknown as Client;
+        await assertAgentInTenantScope(armed, tenant, agentId);
+        const before = await loadAgentProfile(armed, tenant, agentId);
+        const auditCtx: AuditRequestContext = {
+          db: armed,
+          tenant,
+          ip,
+          inTransaction: true,
+        };
+        return withAudit(auditCtx, async (tx) => {
+          await applyProfileUpdate(tx, tenant, agentId, input);
+          const updated = await loadAgentProfile(tx, tenant, agentId);
+          return {
+            result: updated,
+            audit: {
+              action: "PATCH /agents/:id",
+              entityType: "user",
+              entityId: agentId,
+              diff: buildDiff(
+                {
+                  languages: before["languages"], serviceIds: before["serviceIds"], agencyIds: before["agencyIds"],
+                  workSchedule: before["workSchedule"], isRelationshipManager: before["isRelationshipManager"],
+                  displayName: before["displayName"], photoUrl: before["photoUrl"],
+                },
+                {
+                  languages: updated["languages"], serviceIds: updated["serviceIds"], agencyIds: updated["agencyIds"],
+                  workSchedule: updated["workSchedule"], isRelationshipManager: updated["isRelationshipManager"],
+                  displayName: updated["displayName"], photoUrl: updated["photoUrl"],
+                }
+              ),
+            },
+          };
+        });
       });
       return c.json(after, 200);
     } catch (err) {
@@ -344,11 +385,11 @@ async function applyProfileUpdate(
   agentId: string,
   input: z.infer<typeof updateProfileSchema>
 ): Promise<void> {
-  const bankId = requireBankId(tenant);
+  const bankId = requireArmableBankId(tenant);
   if (input.languages !== undefined || input.workSchedule !== undefined) {
     await db.query(
       `UPDATE users
-          SET languages = COALESCE($3::text[], languages),
+          SET languages = COALESCE($3::agent_language[], languages),
               work_schedule = COALESCE($4::jsonb, work_schedule),
               updated_at = NOW()
         WHERE id=$1 AND bank_id=$2`,
@@ -442,7 +483,6 @@ function registerPostStatus(router: Hono<AgentEnv>): void {
     const tenant = c.get("tenant");
     try {
       const agentId = paramUuid(c, "id");
-      await assertSelfOrScope(db, tenant, agentId);
       const parsed = statusSchema.safeParse(await parseJson(c));
       if (!parsed.success) {
         return c.json(
@@ -452,28 +492,42 @@ function registerPostStatus(router: Hono<AgentEnv>): void {
           400
         );
       }
-      // SEC-001a : changement de statut + audit dans UNE transaction. Un échec
-      // d'audit rollback l'écriture d'agent_status_history (pas de best-effort).
-      const result = await withAudit(auditContextFrom(c), async () => {
-        const changed = await changeAgentStatus({
-          db,
-          bus: getBus(c),
-          bankId: requireBankId(tenant),
-          agentId,
-          target: parsed.data.status as AgentStatus,
-        });
-        return {
-          result: changed,
-          audit: {
-            action: "POST /agents/:id/status",
-            entityType: "user",
-            entityId: agentId,
-            diff: buildDiff(
-              { status: changed.previousStatus },
-              { status: changed.status }
-            ),
-          },
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : garde self/scope + changement de statut + audit dans UNE
+      // transaction ARMÉE. `withAudit(inTransaction:true)` compose par SAVEPOINT
+      // sous le contexte RLS `app.current_bank_id` : un échec d'audit rollback
+      // l'écriture d'agent_status_history (pas de best-effort), RLS armée AVANT.
+      const result = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armed = conn as unknown as Client;
+        await assertSelfOrScope(armed, tenant, agentId);
+        const auditCtx: AuditRequestContext = {
+          db: armed,
+          tenant,
+          ip,
+          inTransaction: true,
         };
+        return withAudit(auditCtx, async (tx) => {
+          const changed = await changeAgentStatus({
+            db: tx,
+            bus: getBus(c),
+            bankId,
+            agentId,
+            target: parsed.data.status as AgentStatus,
+          });
+          return {
+            result: changed,
+            audit: {
+              action: "POST /agents/:id/status",
+              entityType: "user",
+              entityId: agentId,
+              diff: buildDiff(
+                { status: changed.previousStatus },
+                { status: changed.status }
+              ),
+            },
+          };
+        });
       });
       return c.json(result, 200);
     } catch (err) {
@@ -491,7 +545,6 @@ function registerGetStats(router: Hono<AgentEnv>): void {
     const tenant = c.get("tenant");
     try {
       const agentId = paramUuid(c, "id");
-      await assertSelfOrScope(db, tenant, agentId);
       const parsedPeriod = periodSchema.safeParse(
         c.req.query("period") ?? "day"
       );
@@ -501,12 +554,19 @@ function registerGetStats(router: Hono<AgentEnv>): void {
           400
         );
       }
-      const stats = await computeAgentStats(
-        db,
-        agentId,
-        requireBankId(tenant),
-        parsedPeriod.data as StatsPeriod
-      );
+      const bankId = requireArmableBankId(tenant);
+      // SEC-002 : garde self/scope + calcul des stats dans UNE transaction ARMÉE
+      // (RLS `app.current_bank_id` contraignante — lecture tenant isolée).
+      const stats = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armed = conn as unknown as Client;
+        await assertSelfOrScope(armed, tenant, agentId);
+        return computeAgentStats(
+          armed,
+          agentId,
+          bankId,
+          parsedPeriod.data as StatsPeriod
+        );
+      });
       return c.json(stats, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -523,14 +583,22 @@ async function parseJson(c: AgentCtx): Promise<unknown> {
   }
 }
 
-/** Extrait le bankId requis (jamais null pour ces routes agency). */
-function requireBankId(tenant: TenantContext): string {
-  if (!tenant.bankId) {
+/**
+ * Exige un `bankId` tenant en UUID canonique pour l'armement RLS (SEC-002).
+ * Absent (contexte plateforme) ou malformé → 403 : une route tenant ne s'arme
+ * jamais sans banque résolue (le `bank_id` est interpolé dans `SET LOCAL`).
+ *
+ * @param tenant - Contexte tenant résolu
+ * @throws {SigfaError} 403 FORBIDDEN si `bankId` absent/non-UUID
+ */
+function requireArmableBankId(tenant: TenantContext): string {
+  const bankId = tenant.bankId;
+  if (!bankId || !isCanonicalUuid(bankId)) {
     throw new SigfaError(
       "FORBIDDEN",
       "Contexte de banque requis pour cette opération.",
       403
     );
   }
-  return tenant.bankId;
+  return bankId;
 }

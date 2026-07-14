@@ -207,7 +207,7 @@ async function insertFixtures(client: pg.Client) {
   // Agent FR (parle français)
   const userId = "99999999-9999-4999-a999-999999999999";
   await client.query(
-    `INSERT INTO users (id, bank_id, email, languages) VALUES ($1,$2,'agent@test.com','{FR}')`,
+    `INSERT INTO users (id, bank_id, email, languages) VALUES ($1,$2,'agent@test.com',ARRAY['FR']::agent_language[])`,
     [userId, bankId]
   );
   // Lier agent au guichet
@@ -425,6 +425,32 @@ describe("API-004: langue non parlée → sauté pour ce guichet, soft timeout �
     const called = await post(`/counters/${ids.counterId}/call-next`, {});
     // Soft-timeout dépassé → le ticket est pris même par un agent FR
     expect(called.status).toBe(200);
+  });
+});
+
+// ── Régression FIX-QUEUE-CALLNEXT-AGENTLANG ──────────────────────────────────
+// `users.languages` est un `agent_language[]` (enum array) en production. Un
+// COALESCE(u.languages, ARRAY[]::text[]) échoue PG 42846 (impossible de convertir
+// text[] → agent_language[]) → tout call-next d'un agent AYANT une langue déclarée
+// renvoie 500. Ce cas exerce précisément le chemin cassé (l'agent fixture parle FR)
+// sur le VRAI type enum, et vérifie qu'aucune 500 n'est renvoyée.
+describe("API-004: call-next d'un agent AYANT une langue déclarée ne casse pas (enum agent_language[])", () => {
+  it("API-004: agent FR déclaré → call-next sur ticket sans exigence renvoie 200 (pas de 500 42846)", async () => {
+    // L'agent de la fixture a languages = ARRAY['FR'] (agentLangs.length > 0 → branche filtrée).
+    const t = await issue(); // ticket sans requiredLanguage
+    const called = await post(`/counters/${ids.counterId}/call-next`, {});
+    expect(called.status).not.toBe(500);
+    expect(called.status).toBe(200);
+    expect((called.data as { id: string }).id).toBe(t.id as string);
+  });
+
+  it("API-004: agent FR déclaré → call-next sur ticket FR requis renvoie 200 (filtre langue enum ok)", async () => {
+    // Exerce la comparaison required_language::text = ANY($2::text[]) contre les vrais enums.
+    const t = await issue({ requiredLanguage: "FR" });
+    const called = await post(`/counters/${ids.counterId}/call-next`, {});
+    expect(called.status).not.toBe(500);
+    expect(called.status).toBe(200);
+    expect((called.data as { id: string }).id).toBe(t.id as string);
   });
 });
 

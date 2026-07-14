@@ -48,6 +48,10 @@ describe("WEB-004: classement + badges", () => {
     expect(within(rows[0]!).getByTestId("rank-badge").getAttribute("style")).toContain("var(--danger)");
     expect(within(rows[1]!).getByTestId("rank-badge").getAttribute("style")).toContain("var(--warning)");
     expect(within(rows[2]!).getByTestId("rank-badge").getAttribute("style")).toContain("var(--success)");
+    // ICONS-001 : le n°1 porte l'étoile or du set SIGFA (plus de glyphe unicode).
+    expect(rows[0]!.querySelector('svg[data-icon="etoile"]')).toBeInTheDocument();
+    // U+2605 en échappement : la source elle-même reste sans pictogramme (sigfa/no-emoji).
+    expect(rows[0]!.textContent).not.toContain("\u2605");
   });
 
   it("WEB-004: --danger uniquement si TMA > 2×SLA — zéro usage décoratif", () => {
@@ -156,6 +160,18 @@ describe("WEB-004: 5 états", () => {
     const link = screen.getByTestId("network-empty-cta");
     expect(link).toBeInTheDocument();
     expect(link.getAttribute("href")).toContain("/admin/agencies/new");
+  });
+
+  it("ICONS-001: état empty — icône entreprise du set SIGFA, zéro emoji", () => {
+    const { container } = render(
+      <NetworkDashboard state={initialNetworkState} load="empty" slaMinutes={SLA} />,
+    );
+    expect(
+      container.querySelector('svg[data-icon="entreprise"]'),
+    ).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(
+      /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u,
+    );
   });
 
   it("WEB-004: état error — message humain si /reports/network échoue", () => {

@@ -109,5 +109,22 @@ describe("@sigfa/schemas — primitifs partagés", () => {
     it("INFRA-005: tous les types exportés proviennent de z.infer (ErrorSchema)", () => {
       expectTypeOf<ErrorSchema["error"]["code"]>().toEqualTypeOf<string>();
     });
+
+    // CHORE-ZOD-V4-UNIFY : sous zod v4, `details` doit rester un dictionnaire
+    // à clés string (migration `z.record(z.unknown())` → `z.record(z.string(),
+    // z.unknown())`). La sémantique du schéma d'erreur est inchangée.
+    it("INFRA-005: errorSchema — details reste un record<string, unknown> (zod v4)", () => {
+      const valid = {
+        error: {
+          code: "ERR",
+          message: "msg",
+          details: { a: 1, b: "x", c: null, nested: { k: true } },
+        },
+      };
+      expect(() => errorSchema.parse(valid)).not.toThrow();
+      expectTypeOf<NonNullable<ErrorSchema["error"]["details"]>>().toEqualTypeOf<
+        Record<string, unknown>
+      >();
+    });
   });
 });

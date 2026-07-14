@@ -95,14 +95,18 @@
     "managerReminder": "You'll see: {name}"
   },
   "ticket005": {
+    "eyebrow": "Your ticket",
     "position": "Position in queue: {position}",
     "waitEstimate": "Estimated wait: {minutes} minutes",
     "printing": "Your ticket is printing...",
     "smsSent": "SMS sent to {maskedPhone}",
     "returning": "Returning automatically in {seconds} s",
+    "finishButton": "Done",
     "voiceAnnounce": "Your number is {displayNumber}. You are in position {position}. Estimated wait: {minutes} minutes.",
+    "voiceAnnounceOffline": "Your number is {displayNumber}. Position and wait will be estimated on reconnection.",
     "offlineBanner": "Offline mode — temporary ticket",
     "offlineInfo": "Local ticket — sync on reconnection",
+    "offlineEstimate": "Position and wait: estimated on reconnection",
     "printerError": "Printer unavailable — a staff member will give you your ticket",
     "managerReminder": "You'll see: {name}"
   },

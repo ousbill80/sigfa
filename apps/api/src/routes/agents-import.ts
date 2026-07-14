@@ -3,11 +3,22 @@
  *
  * POST /agents/import (multipart/form-data, champ `file`) — AGENCY_DIRECTOR, scope
  * bank. Parse le CSV (module `csv-agents` : ≤500 lignes, colonnes fixées, E.164),
- * puis crée les agents en **transaction PAR LIGNE** : une ligne en échec
- * (doublon, agence inconnue) n'annule PAS les lignes valides déjà créées.
+ * puis crée les agents en **unité PAR LIGNE** : une ligne en échec (doublon, agence
+ * inconnue) n'annule PAS les lignes valides déjà créées.
  *
  * Mots de passe initiaux **aléatoires** (bcrypt), JAMAIS renvoyés (envoi = F6).
  * Réponse : `{ created, skipped, errors[{line,field,code,message}] }`.
+ *
+ * ## Sécurité (SEC-002-CUTOVER-LOT5)
+ * TOUT accès DB tenant est routé via `withArmedTenant` (contexte RLS
+ * `app.current_bank_id` armé sur la connexion `sigfa_app` NOBYPASSRLS) → cette route
+ * est classée **ARMED** dans `tenant-armament-arch.test.ts`. Le batch complet ouvre
+ * UNE transaction armée ; chaque ligne est délimitée par un SAVEPOINT (au lieu d'un
+ * BEGIN/COMMIT par ligne) : un échec de ligne (doublon email, agence inconnue)
+ * relâche SON savepoint sans casser la transaction armée ni les lignes valides. Toutes
+ * les tables touchées (`users` / `agencies` / `agency_users` / `audit_log`) portent
+ * la policy `tenant_isolation` + le GRANT CRUD `sigfa_app` (0001) — l'INSERT `users`
+ * marqué `bank_id` d'un autre tenant serait rejeté par WITH CHECK sous armement.
  *
  * @module
  */
@@ -19,8 +30,13 @@ import type { Client } from "pg";
 import type { Redis } from "ioredis";
 import { SigfaError } from "src/lib/errors.js";
 import type { TenantContext } from "src/middleware/tenant.js";
-import { errorResponse, requireBankId } from "src/lib/admin-helpers.js";
+import { errorResponse } from "src/lib/admin-helpers.js";
 import { recordAudit, extractIp } from "src/lib/audit-context.js";
+import {
+  withArmedTenant,
+  asArmable,
+  isCanonicalUuid,
+} from "src/lib/armed-tenant.js";
 import {
   parseAgentCsv,
   type ImportError,
@@ -58,21 +74,45 @@ export function createAgentImportRouter(): Hono<ImportEnv> {
     const db = c.get("db");
     const tenant = c.get("tenant");
     try {
-      const bankId = requireBankId(tenant);
+      const bankId = requireArmableBankId(tenant);
       const csv = await readCsvFile(c.req.raw);
       // Anti-escalade (Boucle 3 F3) : une ligne ne peut pas provisionner un rôle
       // strictement supérieur à l'importateur, et jamais un SUPER_ADMIN.
       const parsed = parseAgentCsv(csv, tenant.role);
-      const report = await importRows(db, bankId, parsed.rows, parsed.errors, {
-        tenant,
-        ip: extractIp(c),
-      });
+      // SEC-002 : le batch entier s'exécute dans UNE transaction ARMÉE (RLS
+      // `app.current_bank_id`). `importRows` délimite chaque ligne par SAVEPOINT.
+      const report = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        importRows(conn as unknown as Client, bankId, parsed.rows, parsed.errors, {
+          tenant,
+          ip: extractIp(c),
+        })
+      );
       return c.json(report, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
   });
   return router;
+}
+
+/**
+ * Exige un `bankId` tenant en UUID canonique pour l'armement RLS (SEC-002).
+ * Absent (contexte plateforme) ou malformé → 403 : une route tenant ne s'arme
+ * jamais sans banque résolue (le `bank_id` est interpolé dans `SET LOCAL`).
+ *
+ * @param tenant - Contexte tenant résolu
+ * @throws {SigfaError} 403 FORBIDDEN si `bankId` absent/non-UUID
+ */
+function requireArmableBankId(tenant: TenantContext): string {
+  const bankId = tenant.bankId;
+  if (!bankId || !isCanonicalUuid(bankId)) {
+    throw new SigfaError(
+      "FORBIDDEN",
+      "Contexte de banque requis pour cette opération.",
+      403
+    );
+  }
+  return bankId;
 }
 
 /**
@@ -130,10 +170,12 @@ interface ImportAuditCtx {
 }
 
 /**
- * Crée un agent dans sa PROPRE transaction. Rollback si échec (aucune ligne
- * partielle). Retourne "created" ou une `ImportError` décrivant l'échec.
+ * Crée un agent dans SON PROPRE SAVEPOINT à l'intérieur de la transaction armée
+ * du batch (SEC-002). Rollback du seul savepoint si échec (aucune ligne partielle,
+ * les lignes valides déjà créées sont préservées). Retourne "created" ou une
+ * `ImportError` décrivant l'échec.
  *
- * @param db     - Connexion PG
+ * @param db     - Connexion PG armée (transaction du batch déjà ouverte)
  * @param bankId - Banque courante
  * @param row    - Ligne valide à insérer
  * @returns "created" ou l'erreur de création
@@ -144,12 +186,12 @@ async function importOneRow(
   row: ParsedAgentRow,
   audit: ImportAuditCtx
 ): Promise<"created" | ImportError> {
+  await db.query("SAVEPOINT import_row");
   try {
-    await db.query("BEGIN");
     const agencyId = await resolveAgency(db, bankId, row.agencyCode);
     const userId = await insertUser(db, bankId, row);
     if (agencyId) await linkAgency(db, bankId, agencyId, userId);
-    // SEC-001a : audit de la création d'agent DANS la transaction de la ligne.
+    // SEC-001a : audit de la création d'agent DANS le savepoint de la ligne.
     // Le diff n'expose JAMAIS `password_hash` (assaini par recordAudit) ni le
     // téléphone en clair — seuls des champs d'identité non sensibles.
     await recordAudit({
@@ -169,10 +211,15 @@ async function importOneRow(
         },
       },
     });
-    await db.query("COMMIT");
+    await db.query("RELEASE SAVEPOINT import_row");
     return "created";
   } catch (err) {
-    await db.query("ROLLBACK");
+    // Rollback du SEUL savepoint : la transaction armée du batch reste ouverte,
+    // les lignes valides précédentes ne sont pas perdues.
+    await db.query("ROLLBACK TO SAVEPOINT import_row");
+    await db.query("RELEASE SAVEPOINT import_row").catch(() => {
+      // Savepoint déjà libéré par le rollback sur certaines erreurs : sans effet.
+    });
     return toImportError(row, err);
   }
 }

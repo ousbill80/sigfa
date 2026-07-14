@@ -143,6 +143,38 @@ describe("KIOSK-007: ServicesScreen file longue + service fermé", () => {
     expect(screen.getByTestId("long-queue-phone-cta")).toBeInTheDocument();
   });
 
+  it("KIOSK-007 (audit F5): le CTA file longue PORTE le serviceId — jamais de POST invalide", async () => {
+    renderServices([openService]);
+    fireEvent.click(await screen.findByTestId("long-queue-phone-cta"));
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const url = mockPush.mock.calls[0][0] as string;
+    // Le repli « ticket local 0 min » en pleine affluence venait d'une
+    // confirmation SANS serviceId (audit F5).
+    expect(url).toContain("/fr/confirmation");
+    expect(url).toContain(`serviceId=${openService.id}`);
+    expect(url).toContain(`agencyId=${AGENCY_ID}`);
+  });
+
+  it("KIOSK-007 (audit F5): le CTA file longue vise le service OUVERT à la plus longue attente", async () => {
+    const busiest: ServiceItem = {
+      id: "svc-9",
+      name: "Crédit",
+      estimatedMinutes: 60,
+      isOpen: true,
+    };
+    const closedButLonger: ServiceItem = {
+      id: "svc-10",
+      name: "International",
+      estimatedMinutes: 90,
+      isOpen: false,
+    };
+    renderServices([openService, busiest, closedButLonger]);
+    fireEvent.click(await screen.findByTestId("long-queue-phone-cta"));
+    const url = mockPush.mock.calls[0][0] as string;
+    // Service fermé ignoré ; c'est la file la plus chargée OUVERTE qui porte le CTA.
+    expect(url).toContain("serviceId=svc-9");
+  });
+
   it("KIOSK-007: attente sous le seuil → aucune bannière affluence", async () => {
     renderServices([{ ...openService, estimatedMinutes: 10 }]);
     await screen.findAllByTestId("family-section");

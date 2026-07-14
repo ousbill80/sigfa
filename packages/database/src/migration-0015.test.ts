@@ -20,10 +20,10 @@ import { withTenant } from "./tenant.js";
  *
  * Prouve, sur PostgreSQL 16 réelle (Testcontainers — LA LOI T5), rôle sigfa_app
  * NOBYPASSRLS, connexion armée via `SET LOCAL app.current_bank_id` :
- *   - ✅ tenant A PEUT `UPDATE ... SET <3 seuils>, updated_at = NOW()` sur SA ligne ;
- *   - ❌ le même UPDATE sur la ligne du tenant B → 0 ligne (RLS tenant_update) ;
- *   - ❌ UPDATE d'une AUTRE colonne (name) → permission denied (hors GRANT) ;
- *   - ❌ INSERT/DELETE sur banks restent refusés (inchangés) ;
+ *   - [OK] tenant A PEUT `UPDATE ... SET <3 seuils>, updated_at = NOW()` sur SA ligne ;
+ *   - [NON] le même UPDATE sur la ligne du tenant B → 0 ligne (RLS tenant_update) ;
+ *   - [NON] UPDATE d'une AUTRE colonne (name) → permission denied (hors GRANT) ;
+ *   - [NON] INSERT/DELETE sur banks restent refusés (inchangés) ;
  *   - le GRANT colonne couvre EXACTEMENT les 3 seuils + updated_at (rien d'autre).
  *
  * Nommés `DB-0015: ...`.

@@ -21,6 +21,7 @@ import { useMemo, useState, type CSSProperties, type ReactElement } from "react"
 import {
   Badge,
   EmptyState,
+  IconAlerte,
   KpiTile,
   OfflineBanner,
   SectionTitle,
@@ -188,22 +189,6 @@ function CounterRow({
   );
 }
 
-/** Small triangle glyph for the error EmptyState (icon+text pairing). */
-function WarnGlyph(): ReactElement {
-  return (
-    <svg width="28" height="28" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M8 1.5 15 14H1L8 1.5Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      <path d="M8 6v3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <circle cx="8" cy="11.5" r="0.85" fill="currentColor" />
-    </svg>
-  );
-}
-
 /**
  * Kiosk supervision screen.
  * @param props - {@link KioskSupervisionProps}.
@@ -242,7 +227,7 @@ export function KioskSupervision({
     return (
       <div style={shell}>
         <div data-testid="supervision-error" role="alert">
-          <EmptyState icon={<WarnGlyph />} title={t("admSuper.error", locale)} />
+          <EmptyState icon={<IconAlerte size={28} />} title={t("admSuper.error", locale)} />
         </div>
       </div>
     );

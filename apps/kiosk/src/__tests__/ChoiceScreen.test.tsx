@@ -109,6 +109,8 @@ describe("MODEL-KIOSK-B: ChoiceScreen (point d'entrée 2 chemins)", () => {
     const back = container.querySelector("[data-testid='choice-back-btn']") as HTMLElement;
     expect(back).toBeInTheDocument();
     expect(back.style.minHeight).toBe("72px");
+    // ICONS-001 : icône SIGFA « retour » appariée au texte (plus de flèche glyphe).
+    expect(back.querySelector("svg[data-icon='retour']")).toBeInTheDocument();
     fireEvent.click(back);
     expect(mockBack).toHaveBeenCalled();
   });

@@ -17,6 +17,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { TicketScreen } from "@/components/TicketScreen";
 import { readTicketMomentPii, purgeTicketMomentPii } from "@/lib/ticket-moment-store";
+import {
+  readTicketOperationLabel,
+  purgeTicketOperationLabel,
+} from "@/lib/ticket-operation-store";
+import { isLocalDisplayNumber } from "@/lib/offline-db";
 
 export function TicketPageClient() {
   const searchParams = useSearchParams();
@@ -27,9 +32,14 @@ export function TicketPageClient() {
   // S6 : PII lue UNE fois depuis le store mémoire (jamais depuis l'URL),
   // puis purgée au départ de l'écran.
   const [pii] = useState(() => readTicketMomentPii());
+  // KIOSK-005b (audit F8) : libellé d'opération lu UNE fois (store mémoire,
+  // non-PII), purgé au départ — jamais réaffiché au client suivant. L'URL
+  // (`serviceLabel`, donnée publique) reste prioritaire si présente.
+  const [storedOperationLabel] = useState(() => readTicketOperationLabel());
   useEffect(() => {
     return () => {
       purgeTicketMomentPii();
+      purgeTicketOperationLabel();
     };
   }, []);
 
@@ -51,7 +61,14 @@ export function TicketPageClient() {
   const managerName = searchParams.get("managerName") ?? undefined;
   // KIOSK-BORNE : données publiques du ticket imprimé (jamais de PII en URL).
   const trackingId = searchParams.get("trackingId") ?? undefined;
-  const serviceLabel = searchParams.get("serviceLabel") ?? undefined;
+  // KIOSK-005b (audit F8) : opération choisie (URL prioritaire, store en repli).
+  const serviceLabel =
+    searchParams.get("serviceLabel") ?? storedOperationLabel ?? undefined;
+  // KIOSK-005b (audit F5) : numéro LOCAL (émis hors-ligne, préfixe H) →
+  // position/attente non fiables → Moment Ticket HONNÊTE (bandeau temporaire,
+  // « estimation à la reconnexion »).
+  const isOfflineTicket =
+    displayNumber !== null && isLocalDisplayNumber(displayNumber);
 
   // S6 : aucune donnée de ticket (visite directe/historique) → retour accueil.
   const hasTicket = displayNumber !== null;
@@ -73,10 +90,11 @@ export function TicketPageClient() {
       phoneNumber={pii?.phoneNumber}
       smsConsent={pii?.smsConsent ?? false}
       managerName={managerName}
+      serviceLabel={serviceLabel}
+      isOfflineTicket={isOfflineTicket}
       printerStatus={printerStatus}
       networkLostBeforePrinterConfirm={networkLostBeforePrinterConfirm}
       trackingId={trackingId}
-      serviceLabel={serviceLabel}
     />
   );
 }

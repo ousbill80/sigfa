@@ -439,3 +439,58 @@ describe("CONTRACT-002: typecheck strict vert, types consommables depuis @sigfa/
     }
   });
 });
+
+// ─── CHORE-ZOD-V4-UNIFY : sémantique du contrat PRÉSERVÉE sous zod v4 ──────────
+//
+// L'unification zod v3→v4 ne doit RIEN changer à LA LOI (client↔serveur). On
+// verrouille ici les deux points sensibles de la v4 :
+//   1. `.datetime()` par défaut n'accepte QUE l'UTC suffixé `Z` (offset et forme
+//      naïve rejetés) — comportement identique à la v3, aucun assouplissement ni
+//      durcissement du contrat.
+//   2. `alert:manager.payload` (migré `z.record(z.unknown())` →
+//      `z.record(z.string(), z.unknown())`) reste un dictionnaire à clés string.
+describe("CONTRACT-002 (CHORE-ZOD-V4-UNIFY): sémantique préservée sous zod v4", () => {
+  const baseTicket = {
+    id: "00000000-0000-4000-a000-000000000001",
+    number: "A001",
+    status: "WAITING" as const,
+    serviceId: "00000000-0000-4000-a000-000000000002",
+    agencyId: "00000000-0000-4000-a000-0000000000aa",
+    channel: "KIOSK" as const,
+  };
+
+  it("CONTRACT-002: createdAt UTC `Z` accepté (datetime v4, offset par défaut interdit)", () => {
+    const payload = {
+      ticket: { ...baseTicket, createdAt: "2026-07-12T10:00:00.000Z" },
+      position: 0,
+      estimate: 0,
+    };
+    expect(() => ticketCreatedEvent.payloadSchema.parse(payload)).not.toThrow();
+  });
+
+  it("CONTRACT-002: createdAt avec offset `+01:00` REJETÉ (parité v3, contrat inchangé)", () => {
+    const payload = {
+      ticket: { ...baseTicket, createdAt: "2026-07-12T10:00:00+01:00" },
+      position: 0,
+      estimate: 0,
+    };
+    expect(() => ticketCreatedEvent.payloadSchema.parse(payload)).toThrow();
+  });
+
+  it("CONTRACT-002: createdAt naïf (sans zone) REJETÉ (parité v3, contrat inchangé)", () => {
+    const payload = {
+      ticket: { ...baseTicket, createdAt: "2026-07-12T10:00:00" },
+      position: 0,
+      estimate: 0,
+    };
+    expect(() => ticketCreatedEvent.payloadSchema.parse(payload)).toThrow();
+  });
+
+  it("CONTRACT-002: alert:manager.payload reste un record<string, unknown> (zod v4)", () => {
+    const payload = {
+      type: "QUEUE_CRITICAL",
+      payload: { queueId: "q1", length: 12, nested: { k: true }, flag: null },
+    };
+    expect(() => alertManagerEvent.payloadSchema.parse(payload)).not.toThrow();
+  });
+});

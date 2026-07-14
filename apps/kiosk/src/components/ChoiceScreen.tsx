@@ -12,6 +12,7 @@
 
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
+import { IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { ChevronIcon, OperationIcon, PersonIcon } from "@/components/icons/UiIcons";
 
@@ -76,7 +77,11 @@ export function ChoiceScreen() {
             minHeight: "72px",
           }}
         >
-          ← {t("backButton")}
+          <IconRetour
+            size={24}
+            style={{ verticalAlign: "middle", marginRight: "var(--space-2)" }}
+          />
+          {t("backButton")}
         </button>
         <span
           data-testid="choice-language-note"

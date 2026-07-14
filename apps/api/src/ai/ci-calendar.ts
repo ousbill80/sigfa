@@ -14,9 +14,10 @@
  *
  * ## Libellés = énumération CONTRACT-008 (LA LOI)
  * `ContextualFactor` reproduit à l'identique l'énum de `ai.yaml` (CONTRACT-008)
- * et du schéma DB-007 (`contextual_factor`). On ne dépend pas d'un import de type
- * cross-package (skew zod D8) : la constante `CONTEXTUAL_FACTORS` est vérifiée
- * structurellement par les tests contre l'énum de LA LOI.
+ * et du schéma DB-007 (`contextual_factor`). Ce module reste PUR (zéro I/O) et ne
+ * tire donc aucun runtime cross-package (le contrat résout des YAML/paths) : la
+ * constante `CONTEXTUAL_FACTORS` est vérifiée structurellement par les tests
+ * contre l'énum de LA LOI.
  *
  * ## Zéro I/O, zéro horloge cachée, zéro PII
  * Le jeu de jours fériés (`holidays: ReadonlySet<string>`) est INJECTÉ (source =

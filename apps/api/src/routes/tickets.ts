@@ -12,6 +12,19 @@
  * POST   /tickets/:id/abandon  — WAITING/CALLED → ABANDONED
  * POST   /counters/:counterId/call-next — sélection prioritaire VIP>PMR>SENIOR>PRIORITY>STANDARD (API-004)
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT4)
+ * Les routes AGENT du cycle ticket (JWT tenant) routent TOUT accès DB via
+ * `withArmedTenant` (contexte RLS `app.current_bank_id` armé, connexion `sigfa_app`
+ * NOBYPASSRLS) → cette route est **ARMED**. Tables `tickets` / `queues` /
+ * `ticket_transfers` / `counters` / `operations` / `services` / `users` /
+ * `agency_users` / `banks` (SELECT) / `agent_status_history` / `audit_log` :
+ * policy `tenant_isolation` + GRANT CRUD `sigfa_app` (0001/0003/0009/0010) vérifiés.
+ *
+ * Le cœur d'émission `issueTicketFor` reste PARTAGÉ avec les chemins publics/WhatsApp
+ * (NON armés, hors ce lot) : il est rendu TRANSACTION-AWARE (`inTransaction`) —
+ * SAVEPOINT quand la transaction armée est déjà ouverte (chemin agent), BEGIN/COMMIT
+ * propre sinon (chemins publics inchangés). Même composition SEC-001 que `withAudit`.
+ *
  * @module
  */
 
@@ -21,6 +34,7 @@ import type { Redis } from "ioredis";
 import type { Client } from "pg";
 import { nanoid } from "nanoid";
 import { SigfaError, buildError } from "src/lib/errors.js";
+import { withArmedTenant, asArmable, isCanonicalUuid } from "src/lib/armed-tenant.js";
 import { encryptPhone, hashPhone } from "src/lib/phone-cipher.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
@@ -143,6 +157,67 @@ export function createTicketRouter(
 /** Résout le bus depuis le contexte, ou fournit un no-op. */
 function getBus(c: TicketCtx): RealtimeBus {
   return (c.get("bus") as RealtimeBus | undefined) ?? createNoopBus();
+}
+
+/**
+ * Exige un `bankId` tenant en UUID canonique pour l'armement RLS (SEC-002).
+ * Absent (contexte plateforme) ou malformé → 403 : une route tenant ne s'arme
+ * jamais sans banque résolue.
+ *
+ * @param tenant - Contexte tenant résolu
+ * @throws {SigfaError} 403 FORBIDDEN si `bankId` absent/non-UUID
+ */
+function requireArmableBankId(tenant: TenantContext): string {
+  const bankId = tenant.bankId;
+  if (!bankId || !isCanonicalUuid(bankId)) {
+    throw new SigfaError("FORBIDDEN", "Contexte de banque requis.", 403);
+  }
+  return bankId;
+}
+
+/**
+ * Unité transactionnelle TRANSACTION-AWARE (composition SEC-001/SEC-002).
+ *
+ * - `inTransaction=false` (chemins publics/WhatsApp NON armés) : BEGIN/COMMIT
+ *   propre, ROLLBACK sur erreur — comportement historique inchangé.
+ * - `inTransaction=true` (chemin agent ARMÉ) : la transaction est DÉJÀ ouverte +
+ *   armée (`withArmedTenant`, `app.current_bank_id` posé). On délimite par
+ *   SAVEPOINT : le corps hérite du contexte RLS ; un échec relâche le savepoint et
+ *   propage (l'englobant décide du ROLLBACK global) ; le succès relâche le savepoint
+ *   et laisse l'englobant committer une seule fois. Atomicité préservée.
+ *
+ * @param db            - Connexion PG (armée si `inTransaction`)
+ * @param inTransaction - Vrai si une transaction armée englobante est ouverte
+ * @param body          - Corps métier exécuté dans l'unité
+ * @returns Résultat du corps
+ */
+async function runTicketUnit<T>(
+  db: Client,
+  inTransaction: boolean,
+  body: () => Promise<T>
+): Promise<T> {
+  if (inTransaction) {
+    await db.query("SAVEPOINT sec002_ticket");
+    try {
+      const result = await body();
+      await db.query("RELEASE SAVEPOINT sec002_ticket");
+      return result;
+    } catch (err) {
+      await db.query("ROLLBACK TO SAVEPOINT sec002_ticket").catch(() => {
+        // Transaction englobante déjà avortée : ROLLBACK global géré en amont.
+      });
+      throw err;
+    }
+  }
+  await db.query("BEGIN");
+  try {
+    const result = await body();
+    await db.query("COMMIT");
+    return result;
+  } catch (err) {
+    await db.query("ROLLBACK");
+    throw err;
+  }
 }
 
 /**
@@ -366,7 +441,13 @@ async function issueTicket(
 ): Promise<Record<string, unknown>> {
   const agencyId = tenant.agencyIds[0];
   if (!agencyId) throw new SigfaError("FORBIDDEN", "Aucune agence dans le scope du JWT.", 403);
-  return issueTicketFor(db, redis, { bankId: tenant.bankId, agencyId }, input, bus, audit);
+  const bankId = requireArmableBankId(tenant);
+  // SEC-002 : émission agent DANS une transaction ARMÉE (RLS `app.current_bank_id`).
+  // `issueTicketFor` compose par SAVEPOINT (inTransaction:true) ; le `bankId` d'émission
+  // reste dérivé de la file résolue (jamais du client) — l'armement l'exige identique.
+  return withArmedTenant(asArmable(db), bankId, (conn) =>
+    issueTicketFor(conn as unknown as Client, redis, { bankId: tenant.bankId, agencyId }, input, bus, audit, true)
+  );
 }
 
 /**
@@ -389,10 +470,24 @@ export async function issueTicketFor(
   at: IssueTenant,
   input: IssueTicketInput,
   bus: RealtimeBus,
-  audit?: IssueAuditHook
+  audit?: IssueAuditHook,
+  /**
+   * SEC-002 — vrai quand une transaction armée englobante est déjà ouverte
+   * (chemin agent). L'émission compose alors par SAVEPOINT au lieu de BEGIN/COMMIT.
+   * Absent/false → chemin public/WhatsApp historique (BEGIN/COMMIT propre).
+   */
+  inTransaction = false
 ): Promise<Record<string, unknown>> {
-  await db.query("BEGIN");
-  try {
+  const {
+    inserted,
+    ctx,
+    resolved,
+    targetManagerId,
+    number,
+    position,
+    estimate,
+    trackingId,
+  } = await runTicketUnit(db, inTransaction, async () => {
     // MODEL-API-A/D1 : si operationId fourni, dérive le service_id de l'opération
     // (scope agence), pose operation_id ; mismatch avec serviceId → 422.
     const resolved = await resolveOperation(db, at, input);
@@ -439,36 +534,37 @@ export async function issueTicketFor(
         },
       });
     }
-    await db.query("COMMIT");
-    await emitCreated(bus, redis, db, {
-      inserted,
-      ctx,
-      input,
-      serviceId: resolved.serviceId,
-      number,
-      position,
-      estimate,
-    });
-    return {
-      id: inserted.id,
-      number: `A${String(number).padStart(3, "0")}`,
-      displayNumber,
-      status: "WAITING",
-      priority: input.priority ?? "STANDARD",
-      serviceId: resolved.serviceId,
-      ...(resolved.operationId ? { operationId: resolved.operationId } : {}),
-      ...(targetManagerId ? { targetManagerId } : {}),
-      agencyId: ctx.agencyId,
-      channel: input.channel,
-      position,
-      estimatedWaitMinutes: estimate,
-      trackingId,
-      createdAt: inserted.issued_at.toISOString(),
-    };
-  } catch (err) {
-    await db.query("ROLLBACK");
-    throw err;
-  }
+    return { inserted, ctx, resolved, targetManagerId, number, position, estimate, trackingId };
+  });
+
+  // Post-commit (chemin non armé) / avant COMMIT englobant (chemin armé) : émission
+  // temps réel. Sous armement, la connexion est la même (RLS armée) et la lecture de
+  // recalcul reste isolée ; l'englobant committe une seule fois au retour.
+  await emitCreated(bus, redis, db, {
+    inserted,
+    ctx,
+    input,
+    serviceId: resolved.serviceId,
+    number,
+    position,
+    estimate,
+  });
+  return {
+    id: inserted.id,
+    number: `A${String(number).padStart(3, "0")}`,
+    displayNumber: `${ctx.code}-${String(number).padStart(3, "0")}`,
+    status: "WAITING",
+    priority: input.priority ?? "STANDARD",
+    serviceId: resolved.serviceId,
+    ...(resolved.operationId ? { operationId: resolved.operationId } : {}),
+    ...(targetManagerId ? { targetManagerId } : {}),
+    agencyId: ctx.agencyId,
+    channel: input.channel,
+    position,
+    estimatedWaitMinutes: estimate,
+    trackingId,
+    createdAt: inserted.issued_at.toISOString(),
+  };
 }
 
 /**
@@ -712,13 +808,22 @@ function registerGet(router: Hono<TicketEnv>): void {
     const tenant = c.get("tenant");
     const db = c.get("db");
     try {
-      const row = await loadTicket(db, tenant, paramUuid(c, "id"));
-      // API-004 : position reflète l'ordre VIP>PMR>SENIOR>PRIORITY>STANDARD
-      const position = await computePositionPriority(row.id, db);
-      // D4 : SLA résolu (opération sinon service) en fallback TMT.
-      const estimate = await estimateWaitMinutes(position, row.service_id, db, row.operation_id);
-      // WEB-002-OP : libellés opération/service pour l'affichage agent.
-      const labels = await loadCallLabels(db, row.id);
+      const id = paramUuid(c, "id");
+      const bankId = requireArmableBankId(tenant);
+      // SEC-002 : lecture détail + position + estimation à travers la connexion
+      // ARMÉE (RLS `app.current_bank_id` contraignante) — un ticket d'un autre
+      // tenant est invisible même en ciblant son id.
+      const { row, position, estimate, labels } = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await loadTicket(armedDb, tenant, id);
+        // API-004 : position reflète l'ordre VIP>PMR>SENIOR>PRIORITY>STANDARD
+        const position = await computePositionPriority(row.id, armedDb);
+        // D4 : SLA résolu (opération sinon service) en fallback TMT.
+        const estimate = await estimateWaitMinutes(position, row.service_id, armedDb, row.operation_id);
+        // WEB-002-OP : libellés opération/service pour l'affichage agent.
+        const labels = await loadCallLabels(armedDb, row.id);
+        return { row, position, estimate, labels };
+      });
       return c.json(ticketView(row, position, estimate, labels), 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -764,7 +869,13 @@ function registerCallNext(router: Hono<TicketEnv>, selector: TicketSelector): vo
     const db = c.get("db");
     try {
       const counterId = paramUuid(c, "counterId");
-      const result = await callNext(db, c.get("redis"), tenant, counterId, selector, getBus(c), extractIp(c));
+      const bankId = requireArmableBankId(tenant);
+      // SEC-002 : sélection + appel + audit + émissions à travers la connexion
+      // ARMÉE (RLS `app.current_bank_id`). Le seuil de débordement lit `banks`
+      // (SELECT armé) et `queues` sous la même isolation.
+      const result = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        callNext(conn as unknown as Client, c.get("redis"), tenant, counterId, selector, getBus(c), extractIp(c))
+      );
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -782,12 +893,13 @@ async function callNext(
   bus: RealtimeBus,
   ip: string | null
 ): Promise<Record<string, unknown>> {
-  await db.query("BEGIN");
-  try {
+  const now = new Date();
+  // SEC-002 : la connexion est déjà armée + en transaction (withArmedTenant).
+  // La sélection + l'UPDATE + l'audit composent par SAVEPOINT.
+  const { queueId, serviceId, bankId, agencyId, selected } = await runTicketUnit(db, true, async () => {
     const { queueId, serviceId, bankId, agencyId } = await counterQueueFull(db, tenant, counterId);
     const selected = await selector(queueId, counterId, db);
     if (!selected) throw new SigfaError("QUEUE_EMPTY", "Aucun ticket éligible dans la file.", 404);
-    const now = new Date();
     await db.query(
       `UPDATE tickets SET status = 'CALLED', counter_id = $1, called_at = $2, updated_at = NOW() WHERE id = $3`,
       [counterId, now, selected.id]
@@ -799,17 +911,15 @@ async function callNext(
       entityId: selected.id,
       diff: { after: { status: "CALLED", counterId } },
     });
-    await db.query("COMMIT");
-    await afterCall(bus, redis, db, { ticketId: selected.id, queueId, counterId });
-    // API-004 : vérification débordement après chaque appel
-    await checkAndEmitOverflow(db, redis, bus, { queueId, serviceId, bankId, agencyId });
-    // WEB-002-OP : numéro + libellés opération/service pour la console agent.
-    const labels = await loadCallLabels(db, selected.id);
-    return callView(selected.id, selected.serviceId, counterId, now, labels);
-  } catch (err) {
-    await db.query("ROLLBACK");
-    throw err;
-  }
+    return { queueId, serviceId, bankId, agencyId, selected };
+  });
+  await afterCall(bus, redis, db, { ticketId: selected.id, queueId, counterId });
+  // API-004 : vérification débordement après chaque appel
+  await checkAndEmitOverflow(db, redis, bus, { queueId, serviceId, bankId, agencyId });
+  // WEB-002-OP : numéro + libellés opération/service pour la console agent
+  // (`db` est ici la connexion ARMÉE ouverte par withArmedTenant — SEC-002).
+  const labels = await loadCallLabels(db, selected.id);
+  return callView(selected.id, selected.serviceId, counterId, now, labels);
 }
 
 /**
@@ -991,7 +1101,9 @@ function registerCall(router: Hono<TicketEnv>): void {
       const body = await parseJson(c);
       const parsed = callSchema.safeParse(body);
       if (!parsed.success) return c.json(buildError("VALIDATION_ERROR", "Corps invalide."), 400);
-      const result = await callTargeted(db, redis, tenant, paramUuid(c, "id"), parsed.data.counterId, getBus(c), extractIp(c));
+      const id = paramUuid(c, "id");
+      const bankId = requireArmableBankId(tenant);
+      const result = await callTargeted(db, redis, tenant, id, parsed.data.counterId, bankId, getBus(c), extractIp(c));
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -1016,16 +1128,20 @@ async function callTargeted(
   tenant: TenantContext,
   id: string,
   counterId: string,
+  bankId: string,
   bus: RealtimeBus,
   ip: string | null
 ): Promise<Record<string, unknown>> {
-  // Étape 1 : charger le ticket pour la vérification de transition
+  // Étape 1 : charger le ticket pour la vérification de transition (pré-check).
   const row = await loadTicket(db, tenant, id);
 
   // Étape 2 : vérifier la transition (lève ILLEGAL_TRANSITION si status non légal)
   nextStatus(row.status, "call");
 
-  // Étape 3 : verrou Redis durci SET NX PX 5000
+  // Étape 3 : verrou Redis durci SET NX PX 5000 — SÉRIALISE AVANT toute transaction.
+  // Deux appels concurrents : un seul acquiert le verrou et ouvre la transaction
+  // armée ; les autres échouent ici (409) sans jamais toucher la connexion partagée
+  // (`c.get("db")` est un Client unique — pas d'ouverture de BEGIN concurrente).
   const lockKey = `ticket-lock:${id}`;
   const locked = await redis.set(lockKey, counterId, "PX", 5000, "NX");
   if (locked === null) {
@@ -1036,61 +1152,50 @@ async function callTargeted(
     });
   }
 
-  // Étape 4 : re-vérification transactionnelle (FOR UPDATE)
-  await db.query("BEGIN");
-  const checkRes = await db.query(
-    `SELECT id, status, queue_id, service_id, counter_id, called_at
-       FROM tickets WHERE id = $1 AND bank_id = $2 FOR UPDATE`,
-    [id, tenant.bankId]
-  );
-  const freshRow = checkRes.rows[0] as {
-    id: string; status: string; queue_id: string; service_id: string;
-    counter_id: string | null; called_at: Date | null;
-  } | undefined;
-
-  if (!freshRow) {
-    await db.query("ROLLBACK");
-    await redis.del(lockKey);
-    throw new SigfaError("NOT_FOUND", "Ticket introuvable.", 404);
-  }
-
-  // Re-vérification : si entre-temps le ticket a été pris → 409 TICKET_ALREADY_CLAIMED
-  if (freshRow.status !== "WAITING") {
-    await db.query("ROLLBACK");
-    await redis.del(lockKey);
-    throw new SigfaError("TICKET_ALREADY_CLAIMED", "Ce ticket a déjà été pris.", 409, {
-      currentStatus: freshRow.status,
-    });
-  }
-
-  // Étape 5 : UPDATE + audit (même transaction) + COMMIT. Un échec d'audit doit
-  // rollback ET libérer le verrou Redis (pas de best-effort — SEC-001a).
+  // Étapes 4-5 : re-vérification FOR UPDATE + UPDATE + audit + émissions dans la
+  // transaction ARMÉE (SEC-002, RLS `app.current_bank_id`). Tout échec libère le
+  // verrou Redis (pas de best-effort — SEC-001a) puis propage.
   const now = new Date();
   try {
-    await db.query(
-      `UPDATE tickets SET status = 'CALLED', counter_id = $1, called_at = COALESCE(called_at, $2), updated_at = NOW() WHERE id = $3`,
-      [counterId, now, id]
-    );
-    // SEC-001a : audit de l'appel ciblé DANS la transaction (verrou déjà tenu).
-    await auditTicketTx(db, {
-      bankId: tenant.bankId, actorId: tenant.userId || null, actorRole: tenant.role, ip,
-      action: "POST /tickets/:id/call",
-      entityId: id,
-      diff: { after: { status: "CALLED", counterId } },
+    return await withArmedTenant(asArmable(db), bankId, async (conn) => {
+      const armedDb = conn as unknown as Client;
+      const checkRes = await armedDb.query(
+        `SELECT id, status, queue_id, service_id, counter_id, called_at
+           FROM tickets WHERE id = $1 AND bank_id = $2 FOR UPDATE`,
+        [id, tenant.bankId]
+      );
+      const freshRow = checkRes.rows[0] as {
+        id: string; status: string; queue_id: string; service_id: string;
+        counter_id: string | null; called_at: Date | null;
+      } | undefined;
+      if (!freshRow) throw new SigfaError("NOT_FOUND", "Ticket introuvable.", 404);
+      // Re-vérification : si entre-temps le ticket a été pris → 409 TICKET_ALREADY_CLAIMED
+      if (freshRow.status !== "WAITING") {
+        throw new SigfaError("TICKET_ALREADY_CLAIMED", "Ce ticket a déjà été pris.", 409, {
+          currentStatus: freshRow.status,
+        });
+      }
+      await armedDb.query(
+        `UPDATE tickets SET status = 'CALLED', counter_id = $1, called_at = COALESCE(called_at, $2), updated_at = NOW() WHERE id = $3`,
+        [counterId, now, id]
+      );
+      // SEC-001a : audit de l'appel ciblé DANS la transaction (verrou déjà tenu).
+      await auditTicketTx(armedDb, {
+        bankId: tenant.bankId, actorId: tenant.userId || null, actorRole: tenant.role, ip,
+        action: "POST /tickets/:id/call",
+        entityId: id,
+        diff: { after: { status: "CALLED", counterId } },
+      });
+      await afterCall(bus, redis, armedDb, { ticketId: id, queueId: freshRow.queue_id, counterId });
+      // WEB-002-OP : numéro + libellés opération/service pour la console agent
+      // (lecture via la MÊME connexion armée — isolation SEC-002 préservée).
+      const labels = await loadCallLabels(armedDb, id);
+      return callView(id, freshRow.service_id, counterId, freshRow.called_at ?? now, labels);
     });
-    await db.query("COMMIT");
-  } catch (err) {
-    await db.query("ROLLBACK");
+  } finally {
+    // Verrou libéré sur tout chemin (succès comme erreur), après COMMIT/ROLLBACK.
     await redis.del(lockKey);
-    throw err;
   }
-
-  // Post-commit: libérer le verrou et émettre les événements
-  await redis.del(lockKey);
-  await afterCall(bus, redis, db, { ticketId: id, queueId: freshRow.queue_id, counterId });
-  // WEB-002-OP : numéro + libellés opération/service pour la console agent.
-  const labels = await loadCallLabels(db, id);
-  return callView(id, freshRow.service_id, counterId, freshRow.called_at ?? now, labels);
 }
 
 // ── POST /tickets/:id/serve ──────────────────────────────────────────────────
@@ -1101,29 +1206,33 @@ function registerTransition(router: Hono<TicketEnv>, action: "serve"): void {
     const tenant = c.get("tenant");
     const db = c.get("db");
     try {
-      const row = await loadTicket(db, tenant, paramUuid(c, "id"));
-      const target = nextStatus(row.status, action);
-      // SEC-001a : mutation + audit atomiques (transaction unique).
-      await db.query("BEGIN");
-      try {
-        await db.query(
-          `UPDATE tickets SET status = $1, served_at = COALESCE(served_at, NOW()), updated_at = NOW() WHERE id = $2`,
-          [target, row.id]
-        );
-        await auditTicketTx(db, {
-          bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
-          action: `POST /tickets/:id/${action}`,
-          entityId: row.id,
-          diff: { before: { status: row.status }, after: { status: target } },
+      const id = paramUuid(c, "id");
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : lecture + transition + audit + pilotage agent à travers la
+      // connexion ARMÉE (RLS `app.current_bank_id`).
+      const view = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await loadTicket(armedDb, tenant, id);
+        const target = nextStatus(row.status, action);
+        // SEC-001a : mutation + audit atomiques (SAVEPOINT dans la tx armée).
+        await runTicketUnit(armedDb, true, async () => {
+          await armedDb.query(
+            `UPDATE tickets SET status = $1, served_at = COALESCE(served_at, NOW()), updated_at = NOW() WHERE id = $2`,
+            [target, row.id]
+          );
+          await auditTicketTx(armedDb, {
+            bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip,
+            action: `POST /tickets/:id/${action}`,
+            entityId: row.id,
+            diff: { before: { status: row.status }, after: { status: target } },
+          });
         });
-        await db.query("COMMIT");
-      } catch (err) {
-        await db.query("ROLLBACK");
-        throw err;
-      }
-      // API-007 : le cycle ticket PILOTE le statut agent (AVAILABLE → SERVING).
-      await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "SERVING");
-      return c.json({ id: row.id, status: target, counterId: row.counter_id ?? undefined }, 200);
+        // API-007 : le cycle ticket PILOTE le statut agent (AVAILABLE → SERVING).
+        await driveAgentCycle(armedDb, getBus(c), tenant, row.counter_id, "SERVING");
+        return { id: row.id, status: target, counterId: row.counter_id ?? undefined };
+      });
+      return c.json(view, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
@@ -1180,13 +1289,22 @@ function registerClose(router: Hono<TicketEnv>): void {
     const db = c.get("db");
     const redis = c.get("redis");
     try {
-      const row = await loadTicket(db, tenant, paramUuid(c, "id"));
-      nextStatus(row.status, "close");
-      const result = await closeTicket(db, redis, row, getBus(c), {
-        actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
+      const id = paramUuid(c, "id");
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : lecture + clôture + audit + émissions + pilotage agent à travers
+      // la connexion ARMÉE (RLS `app.current_bank_id`).
+      const result = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await loadTicket(armedDb, tenant, id);
+        nextStatus(row.status, "close");
+        const view = await closeTicket(armedDb, redis, row, getBus(c), {
+          actorId: tenant.userId || null, actorRole: tenant.role, ip,
+        });
+        // API-007 : clôture → l'agent repasse AVAILABLE (piloté par le cycle).
+        await driveAgentCycle(armedDb, getBus(c), tenant, row.counter_id, "AVAILABLE");
+        return view;
       });
-      // API-007 : clôture → l'agent repasse AVAILABLE (piloté par le cycle).
-      await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "AVAILABLE");
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -1205,9 +1323,8 @@ async function closeTicket(
   const closedAt = new Date();
   const waitTime = row.called_at ? computeWaitSeconds(row.issued_at, row.called_at) : 0;
   const serviceTime = row.served_at ? computeServiceSeconds(row.served_at, closedAt) : 0;
-  // SEC-001a : clôture + audit atomiques (transaction unique).
-  await db.query("BEGIN");
-  try {
+  // SEC-001a/SEC-002 : clôture + audit atomiques (SAVEPOINT dans la tx armée).
+  await runTicketUnit(db, true, async () => {
     await db.query(
       `UPDATE tickets SET status = 'DONE', closed_at = $1, wait_time_seconds = $2, service_time_seconds = $3, updated_at = NOW() WHERE id = $4`,
       [closedAt, waitTime, serviceTime, row.id]
@@ -1218,11 +1335,7 @@ async function closeTicket(
       entityId: row.id,
       diff: { before: { status: row.status }, after: { status: "DONE", waitTime, serviceTime } },
     });
-    await db.query("COMMIT");
-  } catch (err) {
-    await db.query("ROLLBACK");
-    throw err;
-  }
+  });
   // Forme CONTRAT ticket:closed : { ticketId, waitTime, serviceTime }.
   bus.emit("ticket:closed", row.agency_id, {
     ticketId: row.id,
@@ -1241,31 +1354,34 @@ function registerNoShow(router: Hono<TicketEnv>): void {
     const tenant = c.get("tenant");
     const db = c.get("db");
     try {
-      const row = await loadTicket(db, tenant, paramUuid(c, "id"));
-      nextStatus(row.status, "no-show");
-      await assertNoShowTimeout(db, row);
-      // SEC-001a : mutation + audit atomiques (transaction unique).
-      await db.query("BEGIN");
-      try {
-        await db.query(
-          `UPDATE tickets SET status = 'NO_SHOW', no_show_at = NOW(), updated_at = NOW() WHERE id = $1`,
-          [row.id]
-        );
-        await auditTicketTx(db, {
-          bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
-          action: "POST /tickets/:id/no-show",
-          entityId: row.id,
-          diff: { before: { status: row.status }, after: { status: "NO_SHOW" } },
+      const id = paramUuid(c, "id");
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : lecture + garde timeout (banque, SELECT armé) + mutation + audit +
+      // émissions + pilotage agent à travers la connexion ARMÉE.
+      await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await loadTicket(armedDb, tenant, id);
+        nextStatus(row.status, "no-show");
+        await assertNoShowTimeout(armedDb, row);
+        // SEC-001a : mutation + audit atomiques (SAVEPOINT dans la tx armée).
+        await runTicketUnit(armedDb, true, async () => {
+          await armedDb.query(
+            `UPDATE tickets SET status = 'NO_SHOW', no_show_at = NOW(), updated_at = NOW() WHERE id = $1`,
+            [row.id]
+          );
+          await auditTicketTx(armedDb, {
+            bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip,
+            action: "POST /tickets/:id/no-show",
+            entityId: row.id,
+            diff: { before: { status: row.status }, after: { status: "NO_SHOW" } },
+          });
         });
-        await db.query("COMMIT");
-      } catch (err) {
-        await db.query("ROLLBACK");
-        throw err;
-      }
-      await emitQueueUpdated(getBus(c), c.get("redis"), db, row.agency_id, row.queue_id);
-      // API-007 : no-show → l'agent repasse AVAILABLE (piloté par le cycle).
-      await driveAgentCycle(db, getBus(c), tenant, row.counter_id, "AVAILABLE");
-      return c.json({ id: row.id, status: "NO_SHOW" }, 200);
+        await emitQueueUpdated(getBus(c), c.get("redis"), armedDb, row.agency_id, row.queue_id);
+        // API-007 : no-show → l'agent repasse AVAILABLE (piloté par le cycle).
+        await driveAgentCycle(armedDb, getBus(c), tenant, row.counter_id, "AVAILABLE");
+      });
+      return c.json({ id, status: "NO_SHOW" }, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
@@ -1303,9 +1419,17 @@ function registerTransfer(router: Hono<TicketEnv>): void {
       const body = await parseJson(c);
       const parsed = transferSchema.safeParse(body);
       if (!parsed.success) return c.json(buildError("VALIDATION_ERROR", "Corps invalide."), 400);
-      const row = await loadTicket(db, tenant, paramUuid(c, "id"));
-      nextStatus(row.status, "transfer");
-      const result = await transferTicket(db, c.get("redis"), tenant, row, parsed.data, getBus(c), extractIp(c));
+      const id = paramUuid(c, "id");
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : lecture + transfert (tickets + ticket_transfers + réinsertion) +
+      // audit + émissions à travers la connexion ARMÉE (RLS `app.current_bank_id`).
+      const result = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await loadTicket(armedDb, tenant, id);
+        nextStatus(row.status, "transfer");
+        return transferTicket(armedDb, c.get("redis"), tenant, row, parsed.data, getBus(c), ip);
+      });
       return c.json(result, 200);
     } catch (err) {
       return errorResponse(c, err);
@@ -1323,8 +1447,8 @@ async function transferTicket(
   bus: RealtimeBus,
   ip: string | null
 ): Promise<Record<string, unknown>> {
-  await db.query("BEGIN");
-  try {
+  // SEC-002 : mutations + réinsertion + audit dans la tx ARMÉE (SAVEPOINT).
+  const target = await runTicketUnit(db, true, async () => {
     await db.query(`UPDATE tickets SET status = 'TRANSFERRED', updated_at = NOW() WHERE id = $1`, [row.id]);
     await db.query(
       `INSERT INTO ticket_transfers (bank_id, ticket_id, from_counter_id, from_service_id, to_service_id, to_counter_id, reason, transferred_by)
@@ -1343,15 +1467,12 @@ async function transferTicket(
         after: { status: "TRANSFERRED", targetServiceId: input.targetServiceId, targetTicketId: target.ticketId },
       },
     });
-    await db.query("COMMIT");
-    // La réinsertion cible copie l'agency_id source → même agence pour les deux files.
-    await emitQueueUpdated(bus, redis, db, row.agency_id, row.queue_id);
-    await emitQueueUpdated(bus, redis, db, row.agency_id, target.queueId);
-    return { id: row.id, status: "TRANSFERRED", targetTicketId: target.ticketId, targetServiceId: input.targetServiceId };
-  } catch (err) {
-    await db.query("ROLLBACK");
-    throw err;
-  }
+    return target;
+  });
+  // La réinsertion cible copie l'agency_id source → même agence pour les deux files.
+  await emitQueueUpdated(bus, redis, db, row.agency_id, row.queue_id);
+  await emitQueueUpdated(bus, redis, db, row.agency_id, target.queueId);
+  return { id: row.id, status: "TRANSFERRED", targetTicketId: target.ticketId, targetServiceId: input.targetServiceId };
 }
 
 /** Réinsère un nouveau ticket WAITING dans la file du service cible. */
@@ -1384,25 +1505,27 @@ function registerAbandon(router: Hono<TicketEnv>): void {
     const tenant = c.get("tenant");
     const db = c.get("db");
     try {
-      const row = await loadTicket(db, tenant, paramUuid(c, "id"));
-      nextStatus(row.status, "abandon");
-      // SEC-001a : mutation + audit atomiques (transaction unique).
-      await db.query("BEGIN");
-      try {
-        await db.query(`UPDATE tickets SET status = 'ABANDONED', updated_at = NOW() WHERE id = $1`, [row.id]);
-        await auditTicketTx(db, {
-          bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip: extractIp(c),
-          action: "POST /tickets/:id/abandon",
-          entityId: row.id,
-          diff: { before: { status: row.status }, after: { status: "ABANDONED" } },
+      const id = paramUuid(c, "id");
+      const bankId = requireArmableBankId(tenant);
+      const ip = extractIp(c);
+      // SEC-002 : lecture + abandon + audit + émission à travers la connexion ARMÉE.
+      await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const armedDb = conn as unknown as Client;
+        const row = await loadTicket(armedDb, tenant, id);
+        nextStatus(row.status, "abandon");
+        // SEC-001a : mutation + audit atomiques (SAVEPOINT dans la tx armée).
+        await runTicketUnit(armedDb, true, async () => {
+          await armedDb.query(`UPDATE tickets SET status = 'ABANDONED', updated_at = NOW() WHERE id = $1`, [row.id]);
+          await auditTicketTx(armedDb, {
+            bankId: row.bank_id, actorId: tenant.userId || null, actorRole: tenant.role, ip,
+            action: "POST /tickets/:id/abandon",
+            entityId: row.id,
+            diff: { before: { status: row.status }, after: { status: "ABANDONED" } },
+          });
         });
-        await db.query("COMMIT");
-      } catch (err) {
-        await db.query("ROLLBACK");
-        throw err;
-      }
-      await emitQueueUpdated(getBus(c), c.get("redis"), db, row.agency_id, row.queue_id);
-      return c.json({ id: row.id, status: "ABANDONED" }, 200);
+        await emitQueueUpdated(getBus(c), c.get("redis"), armedDb, row.agency_id, row.queue_id);
+      });
+      return c.json({ id, status: "ABANDONED" }, 200);
     } catch (err) {
       return errorResponse(c, err);
     }

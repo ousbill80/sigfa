@@ -4,8 +4,9 @@
  * `createSocketBus(io)` implémente `RealtimeBus` :
  *   `emit(event, agencyId, payload)` →
  *     1. valide `payload` contre le `payloadSchema` du CONTRAT de l'événement
- *        (transcrit dans `EVENT_SCHEMAS`, `services/realtime.ts` ; parité prouvée
- *        par `socket-bus.test.ts` / `contract-parity.test.ts`) ;
+ *        (référencé DIRECTEMENT dans `EVENT_SCHEMAS`, `services/realtime.ts` :
+ *        aucune transcription depuis l'unification zod v4 ; couvert par
+ *        `socket-bus.test.ts`) ;
  *     2. payload invalide → NON diffusé + log d'erreur (JAMAIS de throw : une
  *        émission fautive ne casse ni la requête ni les émissions valides) ;
  *     3. payload valide → diffusion vers la room SÉGRÉGÉE PAR RÔLE (F-SEC-TV-01) :

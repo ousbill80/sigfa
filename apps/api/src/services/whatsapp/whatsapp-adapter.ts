@@ -112,7 +112,7 @@ function defaultId(): string {
  * fournisseur pour prouver le cycle de vie du worker (SENT / retry / DLQ) de façon
  * déterministe et sans réseau.
  *
- * ⚠️ Un mock vert ne prouve PAS l'approbation des templates HSM Meta (voir LIMITE
+ * ATTENTION : Un mock vert ne prouve PAS l'approbation des templates HSM Meta (voir LIMITE
  * du module) : l'issue `template_rejected` existe pour couvrir la branche d'échec,
  * mais la conformité réelle HSM est hors portée.
  *

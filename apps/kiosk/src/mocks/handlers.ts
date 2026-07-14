@@ -122,4 +122,26 @@ export const handlers = [
       { status: 201 }
     );
   }),
+  // KIOSK-HOME: GET /public/banks/{id}/theme (CONTRACT-013 — route publique,
+  // zéro PII). Projection du thème tenant pour l'écran de marque de l'accueil :
+  // logo + couleurs appliquées + messages de bienvenue. Démo : logo servi par
+  // un asset LOCAL (public/mock/bank/logo.svg) — aucune image réseau externe.
+  // Le wildcard `:id` matche l'identifiant provisionné (NEXT_PUBLIC_BANK_ID).
+  http.get("*/public/banks/:id/theme", () => {
+    return HttpResponse.json(
+      {
+        logoUrl: "/mock/bank/logo.svg",
+        appliedColors: {
+          primary: "#003f7f",
+          secondary: "#c79a3a",
+          background: "#ffffff",
+        },
+        welcomeMessages: {
+          fr: "Bienvenue à la BNCI",
+          en: "Welcome to BNCI",
+        },
+      },
+      { status: 200 }
+    );
+  }),
 ];

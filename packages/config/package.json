@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./eslint": "./eslint.config.js",
+    "./eslint-no-emoji": "./src/rules/no-emoji.config.js",
     "./prettier": "./prettier.config.js",
     "./tsconfig/base": "./tsconfig.base.json",
     "./vitest": "./vitest.config.base.ts"

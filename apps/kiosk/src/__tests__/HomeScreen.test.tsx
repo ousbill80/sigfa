@@ -1,6 +1,11 @@
 /**
  * KIOSK-002 — Tests TDD pour HomeScreen.tsx
  * Écrits AVANT l'implémentation (phase rouge).
+ *
+ * KIOSK-HOME (retour visuel PO, 2026-07-13) : l'écran d'accueil est l'écran de
+ * marque du tenant — logo banque central (repli monogramme --brand, jamais
+ * d'image cassée), sélecteur de langue SANS drapeaux emoji (pastilles lettrées
+ * FR/EN), hiérarchie logo, Akwaba, langues, statut discret en bas.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
@@ -44,6 +49,15 @@ vi.mock("@/hooks/useAccessibilityMode", () => ({
   }),
 }));
 
+// Thème tenant contrôlé par test : repli (pas de logo) par défaut.
+const mockBankTheme = {
+  logoUrl: null as string | null,
+  brandColor: null as string | null,
+};
+vi.mock("@/hooks/useBankTheme", () => ({
+  useBankTheme: () => mockBankTheme,
+}));
+
 const frMessages = {
   home002: {
     title: "Akwaba — Bienvenue",
@@ -79,6 +93,8 @@ describe("KIOSK-002: HomeScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockBankTheme.logoUrl = null;
+    mockBankTheme.brandColor = null;
   });
 
   afterEach(() => {
@@ -126,26 +142,34 @@ describe("KIOSK-002: HomeScreen", () => {
     }
   });
 
-  it("KIOSK-002: monogrammes FR/EN dans une pastille --brand-soft — zéro emoji drapeau", () => {
+  it("KIOSK-HOME: pastilles lettrées FR/EN (duotone --brand) — AUCUN drapeau emoji", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <HomeScreen />
       </NextIntlClientProvider>
     );
 
-    const icons = Array.from(container.querySelectorAll("[data-testid='card-icon']"));
-    expect(icons.map((el) => el.textContent)).toEqual(["FR", "EN"]);
-    icons.forEach((icon) => {
-      const el = icon as HTMLElement;
+    const chips = container.querySelectorAll("[data-testid='card-icon']");
+    expect(chips.length).toBe(2);
+    expect(chips[0]?.textContent).toBe("FR");
+    expect(chips[1]?.textContent).toBe("EN");
+
+    chips.forEach((chip) => {
+      const el = chip as HTMLElement;
+      // Chip duotone teinté --brand : fond soft, lettres brand-strong.
       expect(el.style.backgroundColor).toBe("var(--brand-soft)");
       expect(el.style.color).toBe("var(--brand-strong)");
-      // Règle design : zéro emoji (les drapeaux 🇫🇷/🇬🇧 sont bannis).
-      expect(el.textContent).toMatch(/^(FR|EN)$/);
-      expect(el.textContent).not.toMatch(/\p{Extended_Pictographic}|\p{Regional_Indicator}/u);
+      // Pastille généreuse ≥ 72 px (règle kiosque, cible portée par la carte).
+      expect(el.style.width).toBe("72px");
+      expect(el.style.height).toBe("72px");
+      // Décoratif : le libellé en toutes lettres porte le sens.
+      expect(el.getAttribute("aria-hidden")).toBe("true");
     });
-    // Le libellé complet reste appairé au monogramme.
-    const labels = Array.from(container.querySelectorAll("[data-testid='card-label']"));
-    expect(labels.map((el) => el.textContent)).toEqual(["Français", "English"]);
+
+    // AUCUN emoji nulle part sur l'écran (drapeaux interdits).
+    const text = (container as HTMLElement).textContent ?? "";
+    expect(/\p{Extended_Pictographic}/u.test(text)).toBe(false);
+    expect(/[\u{1F1E6}-\u{1F1FF}]/u.test(text)).toBe(false);
   });
 
   it("KIOSK-002: ligne agence sous le titre — nom d'agence (repli) en --ink-muted-inv", () => {
@@ -167,43 +191,61 @@ describe("KIOSK-002: HomeScreen", () => {
     }
   });
 
-  it("KIOSK-002: sans logo provisionné → repli pastille --brand + nom de banque (aucune image)", () => {
+  it("KIOSK-HOME: repli monogramme — pastille --brand (initiales) + nom de banque, sans logo", () => {
     const { container } = render(
       <NextIntlClientProvider locale="fr" messages={frMessages}>
         <HomeScreen />
       </NextIntlClientProvider>
     );
 
-    const badge = container.querySelector("[data-testid='home-brand-badge']") as HTMLElement;
-    expect(badge).toBeInTheDocument();
-    expect(badge.textContent).toBe("S"); // repli SIGFA
-    expect(badge.style.backgroundColor).toBe("var(--brand)");
-    expect(badge.style.color).toBe("var(--brand-contrast)");
-    expect(
-      container.querySelector("[data-testid='home-brand-name']")?.textContent
-    ).toBe("SIGFA");
-    expect(container.querySelector("[data-testid='home-brand-logo']")).toBeNull();
+    // Sans thème tenant chargé : monogramme (jamais d'image cassée).
+    const monogram = container.querySelector("[data-testid='bank-monogram']");
+    expect(monogram).toBeInTheDocument();
+
+    const name = container.querySelector("[data-testid='bank-name']");
+    expect(name).toBeInTheDocument();
+    expect(name?.textContent?.length ?? 0).toBeGreaterThan(0);
+
+    expect(container.querySelector("[data-testid='bank-logo']")).not.toBeInTheDocument();
   });
 
-  it("KIOSK-002: NEXT_PUBLIC_BANK_LOGO_URL provisionnée → logo image centré (pastille masquée)", () => {
-    vi.stubEnv("NEXT_PUBLIC_BANK_LOGO_URL", "https://cdn.exemple.ci/banques/logo.svg");
-    try {
-      const { container } = render(
-        <NextIntlClientProvider locale="fr" messages={frMessages}>
-          <HomeScreen />
-        </NextIntlClientProvider>
-      );
+  it("KIOSK-HOME: logo tenant exposé par le contrat (CONTRACT-013) — affiché en zone de marque", () => {
+    mockBankTheme.logoUrl = "/mock/bank/logo.svg";
+    mockBankTheme.brandColor = "#003f7f";
 
-      const logo = container.querySelector("[data-testid='home-brand-logo']") as HTMLImageElement;
-      expect(logo).toBeInTheDocument();
-      expect(logo.getAttribute("src")).toBe("https://cdn.exemple.ci/banques/logo.svg");
-      // Hauteur généreuse ~96-120 px, image non déformée (fond transparent respecté).
-      expect(logo.style.height).toBe("112px");
-      expect(logo.style.objectFit).toBe("contain");
-      expect(container.querySelector("[data-testid='home-brand-badge']")).toBeNull();
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const logo = container.querySelector("[data-testid='bank-logo']");
+    expect(logo).toBeInTheDocument();
+    expect(logo?.getAttribute("src")).toBe("/mock/bank/logo.svg");
+
+    // Le nom de banque accompagne le logo.
+    expect(container.querySelector("[data-testid='bank-name']")).toBeInTheDocument();
+    // Le monogramme ne double PAS le logo.
+    expect(container.querySelector("[data-testid='bank-monogram']")).not.toBeInTheDocument();
+  });
+
+  it("KIOSK-HOME: hiérarchie de l'écran — marque banque AVANT le titre Akwaba", () => {
+    const { container } = render(
+      <NextIntlClientProvider locale="fr" messages={frMessages}>
+        <HomeScreen />
+      </NextIntlClientProvider>
+    );
+
+    const main = container.querySelector("main");
+    const brand = container.querySelector("[data-testid='bank-brand']");
+    const title = container.querySelector("h1");
+    expect(brand).toBeInTheDocument();
+    expect(title).toBeInTheDocument();
+    // La zone de marque précède le titre dans l'ordre du document.
+    expect(
+      brand!.compareDocumentPosition(title!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(main?.textContent).toContain("Akwaba");
   });
 
   it("KIOSK-002: card contrast on --surface-kiosk ≥ 7:1 (CSS token assertion, not axe-core)", () => {
@@ -222,9 +264,11 @@ describe("KIOSK-002: HomeScreen", () => {
       const cardEl = card as HTMLElement;
       expect(cardEl.style.backgroundColor).toBe("var(--surface-1)");
 
-      // Card label should use --action-label color token for contrast
+      // Card label : --brand-strong DIRECT (= --action-label hors theming).
+      // Les alias :root ne se re-resolvent pas sous BankThemeProvider : le
+      // label doit suivre la couleur du tenant comme le chip FR/EN.
       const label = card.querySelector("[data-testid='card-label']") as HTMLElement;
-      expect(label?.style.color).toBe("var(--action-label)");
+      expect(label?.style.color).toBe("var(--brand-strong)");
     });
   });
 
@@ -441,5 +485,5 @@ describe("KIOSK-002: HomeScreen", () => {
     });
   });
 
-  // KIOSK-002: régression visuelle ×4 langues → couverte par Playwright (pnpm test:visual)
+  // KIOSK-002: régression visuelle ×2 langues → couverte par Playwright (pnpm test:visual)
 });

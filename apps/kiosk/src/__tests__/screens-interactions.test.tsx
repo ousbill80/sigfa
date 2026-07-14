@@ -4,7 +4,7 @@
  * Interactions : sélection langue, sélection service, saisie téléphone, états error/offline/empty.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { server } from "@/mocks/server";
@@ -91,7 +91,7 @@ const servicesMessages = {
     subtitle: "Touchez l'opération de votre choix",
     backButton: "Retour",
     closedService: "Fermé — {schedule}",
-    accessibilityButton: "♿ Accès prioritaire",
+    accessibilityButton: "Accès prioritaire",
     emptyTitle: "Aucun service disponible",
     emptyMessage: "Rendez-vous à l'accueil — un agent vous aidera.",
     loadingMessage: "Chargement des opérations...",
@@ -339,6 +339,8 @@ describe("KIOSK-BORNE: ServicesScreen interactions (prise de ticket par familles
 
     await screen.findAllByTestId("family-section");
     const backBtn = screen.getByTestId("back-btn");
+    // ICONS-001 : icône SIGFA « retour » appariée au texte (plus de flèche glyphe).
+    expect(backBtn.querySelector("svg[data-icon='retour']")).toBeInTheDocument();
     fireEvent.click(backBtn);
 
     expect(mockBack).toHaveBeenCalledTimes(1);
@@ -723,7 +725,7 @@ describe("KIOSK-005: TicketScreen additional branches", () => {
     expect(smsEl.textContent).toContain("7");
   });
 
-  it("KIOSK-005: isAccessibilityMode=false → auto-return after 4s", () => {
+  it("KIOSK-005: isAccessibilityMode=false → auto-return after 10s (audit F9)", () => {
     render(
       <NextIntlClientProvider locale="fr" messages={ticketMessages}>
         <TicketScreen
@@ -735,7 +737,9 @@ describe("KIOSK-005: TicketScreen additional branches", () => {
       </NextIntlClientProvider>
     );
 
-    vi.advanceTimersByTime(4000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(mockPush).toHaveBeenCalledWith("/fr");
   });
 

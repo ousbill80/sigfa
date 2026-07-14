@@ -6,7 +6,7 @@
  * pour le catalogue ; il est inséré à la création d'une banque de démo (SEED_DEMO)
  * et cloneable par la banque via l'API (API-009 — hors scope F2).
  *
- * ⚠ SLA en GABARIT BANQUE : ces valeurs sont les défauts recommandés.
+ * ATTENTION — SLA en GABARIT BANQUE : ces valeurs sont les défauts recommandés.
  *    Chaque banque peut les personnaliser après onboarding.
  *
  * @module

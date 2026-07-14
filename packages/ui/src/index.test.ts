@@ -22,7 +22,7 @@ describe("@sigfa/ui public entry", () => {
 
   it("re-exports the token bundle with the brand hex", () => {
     expect(tokens.color).toBe(color);
-    expect(color["--brand"]).toBe("#C25A16");
+    expect(color["--brand"]).toBe("#B85513");
   });
 
   it("re-exports components and utilities", () => {

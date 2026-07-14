@@ -297,7 +297,7 @@ export const alertManagerEvent = {
     /** Type d'alerte (énuméré — pas de type ouvert pour éviter la fuite hors contrat) */
     type: alertManagerTypeSchema,
     /** Payload contextuel libre selon le type d'alerte */
-    payload: z.record(z.unknown()),
+    payload: z.record(z.string(), z.unknown()),
   }),
   emitter: "api-server",
   consumers: ["manager-dashboard"],

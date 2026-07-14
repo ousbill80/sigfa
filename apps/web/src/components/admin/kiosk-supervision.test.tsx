@@ -180,7 +180,10 @@ describe("ADM-003b: cinq états d'écran", () => {
 
   it("ADM-003b: error → carte d'erreur role=alert", () => {
     render(<KioskSupervision state={initialKioskSupervisionState} load="error" nowMs={NOW} />);
-    expect(screen.getByTestId("supervision-error")).toBeInTheDocument();
+    const error = screen.getByTestId("supervision-error");
+    expect(error).toBeInTheDocument();
+    // ICONS-001 : icône alerte du set SIGFA (plus de SVG ad hoc).
+    expect(error.querySelector('svg[data-icon="alerte"]')).not.toBeNull();
   });
 
   it("ADM-003b: stale (API indisponible) → bandeau info + dernier état connu", () => {
@@ -228,7 +231,6 @@ describe("ADM-003b: tokens uniquement — zéro couleur en dur, zéro emoji", ()
     );
     const html = container.innerHTML;
     expect(html).not.toMatch(/#[0-9a-fA-F]{6}/);
-    // eslint-disable-next-line no-control-regex
     expect(html).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
   });
 });

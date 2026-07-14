@@ -67,6 +67,10 @@ const enMessages = {
 };
 
 import { OperationsScreen } from "@/components/OperationsScreen";
+import {
+  readTicketOperationLabel,
+  purgeTicketOperationLabel,
+} from "@/lib/ticket-operation-store";
 
 const AGENCY_ID = "agt-001";
 const SERVICE_ID = "svc-1";
@@ -170,7 +174,23 @@ describe("MODEL-KIOSK-A: OperationsScreen", () => {
     expect(mockPush).toHaveBeenCalledWith(`/fr/confirmation?${expectedQuery}`);
   });
 
+  it("KIOSK-005b (audit F8): clic sur une opération → libellé stocké pour le Moment Ticket", async () => {
+    purgeTicketOperationLabel();
+    mockOperations(3);
+    renderScreen();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("operation-card").length).toBe(3);
+    });
+
+    screen.getAllByTestId("operation-card")[1].click();
+
+    // Le Moment Ticket relira ce libellé (vérification du choix d'un coup d'œil).
+    expect(readTicketOperationLabel()).toBe("Retrait espèces");
+  });
+
   it("MODEL-KIOSK-A: SAUT opération unique → confirmation directe (pas de choix inutile)", async () => {
+    purgeTicketOperationLabel();
     mockOperations(1);
     renderScreen();
 
@@ -186,6 +206,8 @@ describe("MODEL-KIOSK-A: OperationsScreen", () => {
     });
     // Aucune carte affichée : l'écran a été sauté.
     expect(screen.queryByTestId("operation-card")).not.toBeInTheDocument();
+    // KIOSK-005b (audit F8) : le saut stocke AUSSI le libellé pour le ticket.
+    expect(readTicketOperationLabel()).toBe("Dépôt espèces");
   });
 
   it("MODEL-KIOSK-A: empty → message humain, jamais d'écran mort", async () => {
@@ -316,6 +338,8 @@ describe("MODEL-KIOSK-A: OperationsScreen", () => {
     const back = container.querySelector("[data-testid='operations-back-btn']") as HTMLElement;
     expect(back).toBeInTheDocument();
     expect(back.style.minHeight).toBe("72px");
+    // ICONS-001 : icône SIGFA « retour » appariée au texte (plus de flèche glyphe).
+    expect(back.querySelector("svg[data-icon='retour']")).toBeInTheDocument();
     back.click();
     expect(mockBack).toHaveBeenCalled();
   });

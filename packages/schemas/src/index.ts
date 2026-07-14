@@ -42,7 +42,7 @@ export const errorSchema = z.object({
     /** Message d'erreur humain — non vide */
     message: z.string().min(1),
     /** Détails optionnels sous forme de dictionnaire */
-    details: z.record(z.unknown()).optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
   }),
 });
 

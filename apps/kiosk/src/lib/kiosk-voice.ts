@@ -30,11 +30,18 @@ export const A11Y_BASE_FONT_PX = 28 as const;
 /** Interligne appliqué en mode accessibilité (base × ce facteur). */
 export const A11Y_LINE_HEIGHT = 1.2 as const;
 
-/** Délai de retour accueil nominal au Moment Ticket (ms). */
-export const NOMINAL_TICKET_RETURN_MS = 4000 as const;
+/**
+ * Délai de retour accueil nominal au Moment Ticket (ms).
+ * Audit UX F9 (2026-07-14) : 4 s ne laissaient pas le temps de lire 6 lignes
+ * ni d'écouter l'annonce vocale (~8 s) → 10 s, avec compte à rebours visible.
+ */
+export const NOMINAL_TICKET_RETURN_MS = 10000 as const;
 
-/** Délai de retour accueil au Moment Ticket en accessibilité (ms). */
-export const A11Y_TICKET_RETURN_MS = 8000 as const;
+/**
+ * Délai de retour accueil au Moment Ticket en accessibilité/dégradé (ms).
+ * Patron kiosque : délai nominal × 2 (cf. accessibilityTimeoutMs).
+ */
+export const A11Y_TICKET_RETURN_MS = 20000 as const;
 
 /**
  * BCP-47 des locales disposant d'une voix synthétique (FR/EN).
@@ -53,6 +60,12 @@ export interface VoiceAnnouncementInput {
   displayNumber: string;
   position: number;
   estimatedWaitMinutes: number;
+  /**
+   * Audit F5 : ticket émis HORS-LIGNE → position/attente locales non fiables.
+   * L'annonce bascule sur le registre honnête `voiceAnnounceOffline` (numéro
+   * seul + « estimées dès la reconnexion »), jamais de fausse promesse vocale.
+   */
+  isOffline?: boolean;
 }
 
 /** Signature minimale d'une fonction de traduction next-intl. */
@@ -74,6 +87,12 @@ export function buildVoiceAnnouncement(
   input: VoiceAnnouncementInput,
   t: TranslateFn
 ): string {
+  // Audit F5 : chemin hors-ligne → registre honnête, sans position/attente.
+  if (input.isOffline) {
+    return t("voiceAnnounceOffline", {
+      displayNumber: input.displayNumber,
+    });
+  }
   return t("voiceAnnounce", {
     displayNumber: input.displayNumber,
     position: input.position,
@@ -361,7 +380,8 @@ export function accessibilityTimeoutMs(
 }
 
 /**
- * Délai de retour accueil au Moment Ticket : 8 s en accessibilité, 4 s sinon.
+ * Délai de retour accueil au Moment Ticket : 20 s en accessibilité, 10 s sinon
+ * (audit F9 — compte à rebours visible, bouton « Terminer » pour sortir avant).
  *
  * @param isAccessibilityMode - Vrai si le mode accessibilité est actif.
  * @returns Le délai en ms.

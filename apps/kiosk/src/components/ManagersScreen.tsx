@@ -26,11 +26,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
-import { EmptyState } from "@sigfa/ui";
+import { EmptyState, IconRetour } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useAccessibilityMode } from "@/hooks/useAccessibilityMode";
 import { AccessibilityIcon, ChevronIcon, PersonIcon } from "@/components/icons/UiIcons";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { purgeTicketOperationLabel } from "@/lib/ticket-operation-store";
 
 /** Conseiller public tel qu'exposé par le contrat (zéro PII). */
 export interface RelationshipManagerItem {
@@ -157,6 +158,10 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
    */
   const goToConfirmation = useCallback(
     (managerId: string, displayName: string) => {
+      // KIOSK-005b (audit F8) : parcours conseiller — purge du libellé
+      // d'opération d'un éventuel parcours abandonné (le Moment Ticket ne doit
+      // jamais afficher l'opération d'un client précédent).
+      purgeTicketOperationLabel();
       router.push(
         `/${currentLocale}/confirmation?targetManagerId=${managerId}&agencyId=${agencyId}&managerName=${encodeURIComponent(displayName)}`
       );
@@ -217,7 +222,11 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
           minHeight: "72px",
         }}
       >
-        ← {t("backButton")}
+        <IconRetour
+          size={24}
+          style={{ verticalAlign: "middle", marginRight: "var(--space-2)" }}
+        />
+        {t("backButton")}
       </button>
       <span
         style={{

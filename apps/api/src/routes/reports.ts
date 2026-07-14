@@ -10,6 +10,19 @@
  * agrégats matérialisés `daily_agency_stats` (via `aggregate-service`) et projeter
  * la forme contractuelle. RBAC/tenant assurés par le middleware + les gardes locales.
  *
+ * ## Sécurité (SEC-002-CUTOVER-LOT9) — SPLIT tenant/plateforme
+ * - Chemins TENANT (`scope=agency`, daily, benchmark, export) : bornés à UNE banque
+ *   (`requireBankId(tenant)`). TOUT accès DB est routé via `withArmedTenant` (contexte
+ *   RLS `app.current_bank_id` armé sur `sigfa_app` NOBYPASSRLS). La policy
+ *   `tenant_isolation` de `daily_agency_stats`/`agencies`/`export_jobs` devient
+ *   contraignante → défense-en-profondeur au-delà du `WHERE bank_id` applicatif.
+ * - Chemin PLATEFORME (`scope=network`, `buildNetworkResponse`) : agrégat CROSS-TENANT
+ *   réseau anonymisé (SUPER_ADMIN, `AnonymizedNetworkAggregate`) qui lit
+ *   `daily_agency_stats` SANS filtre `bank_id`, PAR CONCEPTION. L'ARMER restreindrait
+ *   silencieusement l'agrégat à UNE banque (policy `tenant_isolation` USING
+ *   `bank_id = current_bank_id`) — cassant la lecture réseau. Ce chemin passe donc par
+ *   `withPlatform` (comme `network-overview.ts`), JAMAIS par un armement tenant.
+ *
  * @module
  */
 
@@ -17,6 +30,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Client } from "pg";
 import type { Redis } from "ioredis";
+import { withPlatform } from "@sigfa/database";
+import { withArmedTenant, asArmable } from "src/lib/armed-tenant.js";
 import { SigfaError } from "src/lib/errors.js";
 import type { TenantContext } from "src/middleware/tenant.js";
 import {
@@ -160,9 +175,24 @@ function registerKpis(router: Hono<ReportEnv>): void {
       const bounds = parsePeriodOr400(c.req.query("period"));
       const now = new Date();
       if (scope === "network") {
-        return c.json(await buildNetworkResponse(asQueryFn(db), bounds, now), 200);
+        // PLATEFORME : agrégat cross-tenant réseau anonymisé (SUPER_ADMIN). Lit
+        // `daily_agency_stats` SANS filtre `bank_id` — l'armer restreindrait à UNE
+        // banque. Passe par `withPlatform` (frontière plateforme, aucun
+        // `SET app.current_bank_id`), comme network-overview.ts : le 1er argument
+        // (query single-arg) matérialise le périmètre plateforme ; l'agrégat
+        // paramétré s'exécute via la `QueryFn` paramétrée capturée dans la clôture.
+        const body = await withPlatform(
+          (sql) => db.query(sql) as unknown as Promise<{ rows: Record<string, unknown>[] }>,
+          () => buildNetworkResponse(asQueryFn(db), bounds, now)
+        );
+        return c.json(body, 200);
       }
-      return c.json(await buildAgencyResponse(asQueryFn(db), tenant, c.req.query("agencyId"), bounds, now), 200);
+      // TENANT : borné à la banque du JWT → accès DB armé (RLS `app.current_bank_id`).
+      const bankId = requireBankId(tenant);
+      const body = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        buildAgencyResponse(asQueryFn(conn as unknown as Client), tenant, c.req.query("agencyId"), bounds, now)
+      );
+      return c.json(body, 200);
     } catch (err) {
       return errorResponse(c, err);
     }
@@ -274,9 +304,14 @@ function registerDailyReport(router: Hono<ReportEnv>): void {
       assertAgencyScope(tenant, agencyId);
       const day = resolveDay(c.req.query("date"));
       const now = new Date();
-      const query = asQueryFn(db);
-      const aggregate = await loadAgencyAggregate(query, bankId, agencyId, day, day);
-      const agencyName = await loadAgencyName(query, bankId, agencyId);
+      // TENANT : lectures armées (RLS `app.current_bank_id`) — daily_agency_stats + agencies.
+      const { aggregate, agencyName } = await withArmedTenant(asArmable(db), bankId, async (conn) => {
+        const query = asQueryFn(conn as unknown as Client);
+        return {
+          aggregate: await loadAgencyAggregate(query, bankId, agencyId, day, day),
+          agencyName: await loadAgencyName(query, bankId, agencyId),
+        };
+      });
       return c.json(
         {
           agencyId,
@@ -358,7 +393,10 @@ function registerBenchmark(router: Hono<ReportEnv>): void {
       const bankId = requireBankId(tenant);
       const bounds = parsePeriodOr400(c.req.query("period"));
       const sortKpi = parseSortKpi(c.req.query("sortKpi"));
-      const entries = await buildBenchmark(asQueryFn(db), bankId, bounds, sortKpi);
+      // TENANT : lecture armée (RLS `app.current_bank_id`) — agencies + daily_agency_stats.
+      const entries = await withArmedTenant(asArmable(db), bankId, (conn) =>
+        buildBenchmark(asQueryFn(conn as unknown as Client), bankId, bounds, sortKpi)
+      );
       return c.json(
         {
           period: bounds.periodKey,
@@ -469,14 +507,17 @@ async function handleExportCreate(
       agencyId = resolveAgencyId(tenant, c.req.query("agencyId"));
       assertAgencyScope(tenant, agencyId);
     }
-    const job = await createExportJob(asQueryFn(db), {
-      bankId,
-      requestedBy: tenant.userId,
-      scope,
-      agencyId,
-      periodKey: bounds.periodKey,
-      format: format as ExportFormat,
-    });
+    // TENANT : création du job d'export armée (RLS `app.current_bank_id`) — export_jobs.
+    const job = await withArmedTenant(asArmable(db), bankId, (conn) =>
+      createExportJob(asQueryFn(conn as unknown as Client), {
+        bankId,
+        requestedBy: tenant.userId,
+        scope,
+        agencyId,
+        periodKey: bounds.periodKey,
+        format: format as ExportFormat,
+      })
+    );
     if (deps.enqueueExport) {
       await deps.enqueueExport(job.id, bankId);
     }
@@ -510,7 +551,10 @@ async function handleExportStatus(c: Context<ReportEnv>): Promise<Response> {
     if (!jobId) {
       throw new SigfaError("EXPORT_JOB_NOT_FOUND", "Aucun job d'export trouvé avec cet identifiant.", 404);
     }
-    const job = await loadOwnedJob(asQueryFn(db), jobId, bankId, tenant.userId, tenant.role);
+    // TENANT : lecture du job armée (RLS `app.current_bank_id`) — ownership opaque.
+    const job = await withArmedTenant(asArmable(db), bankId, (conn) =>
+      loadOwnedJob(asQueryFn(conn as unknown as Client), jobId, bankId, tenant.userId, tenant.role)
+    );
     if (!job) {
       // 404 opaque : jamais d'oracle d'existence cross-tenant / cross-demandeur.
       throw new SigfaError("EXPORT_JOB_NOT_FOUND", "Aucun job d'export trouvé avec cet identifiant.", 404);

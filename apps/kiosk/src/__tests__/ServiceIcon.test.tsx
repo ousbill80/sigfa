@@ -1,6 +1,7 @@
 /**
- * Tests du jeu d'icônes SVG des services (refonte v2 — fin des emoji).
- * Couvre le mapping par mot-clé (FR/EN), le fallback générique et le rendu SVG.
+ * Tests du jeu d'icônes des services (migration ICONS-001 — set SIGFA duotone).
+ * Couvre le mapping par mot-clé (FR/EN), le fallback générique et le rendu
+ * délégué à `SigfaIcon` (@sigfa/ui) avec API et `data-icon` conservés.
  */
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
@@ -14,6 +15,8 @@ import {
 import {
   AccessibilityIcon,
   ChevronIcon,
+  OperationIcon,
+  PersonIcon,
   PhoneIcon,
 } from "@/components/icons/UiIcons";
 
@@ -113,13 +116,17 @@ describe("ServiceIcon: rendu SVG", () => {
     "generic",
   ];
 
-  it.each(allNames)("rend un SVG stroke=currentColor pour %s", (name) => {
+  it.each(allNames)("rend l'icône SIGFA duotone pour %s", (name) => {
     const { container } = render(<ServiceIcon name={name} data-testid="svc-svg" />);
     const svg = container.querySelector("svg");
     expect(svg).toBeInTheDocument();
     expect(svg).toHaveAttribute("stroke", "currentColor");
+    // L'API historique est conservée : data-icon = clé métier du jeu.
     expect(svg).toHaveAttribute("data-icon", name);
-    expect(svg?.querySelectorAll("path, circle").length).toBeGreaterThan(0);
+    // ICONS-001 : rendu délégué au set SIGFA — deux couches duotone.
+    expect(svg?.querySelector("[data-layer='duo']")).toBeInTheDocument();
+    expect(svg?.querySelector("[data-layer='line']")).toBeInTheDocument();
+    expect(svg?.querySelectorAll("path, circle, rect").length).toBeGreaterThan(0);
     // Aucun glyphe emoji : le contenu textuel est vide.
     expect(container.textContent).toBe("");
   });
@@ -147,6 +154,8 @@ describe("UiIcons: icônes d'interface", () => {
     ["chevron", <ChevronIcon key="c" data-testid="ui" />],
     ["phone", <PhoneIcon key="p" data-testid="ui" />],
     ["accessibility", <AccessibilityIcon key="a" data-testid="ui" />],
+    ["person", <PersonIcon key="pe" data-testid="ui" />],
+    ["operation", <OperationIcon key="o" data-testid="ui" />],
   ])("%s rend un SVG stroke=currentColor sans emoji", (_label, element) => {
     const { container } = render(element);
     const svg = container.querySelector("svg");
@@ -154,4 +163,22 @@ describe("UiIcons: icônes d'interface", () => {
     expect(svg).toHaveAttribute("stroke", "currentColor");
     expect(container.textContent).toBe("");
   });
+
+  it.each([
+    ["accessibility", <AccessibilityIcon key="a" />, "accessibilite"],
+    ["person", <PersonIcon key="pe" />, "conseiller"],
+    ["operation", <OperationIcon key="o" />, "guichet"],
+    // ICONS-002 : chevron et téléphone rejoignent le set SIGFA duotone.
+    ["chevron", <ChevronIcon key="c" />, "chevron"],
+    ["phone", <PhoneIcon key="p" />, "telephone"],
+  ])(
+    "ICONS-001: %s est rendue par le set SIGFA duotone",
+    (_label, element, sigfaName) => {
+      const { container } = render(element);
+      const svg = container.querySelector("svg");
+      expect(svg).toHaveAttribute("data-icon", sigfaName);
+      expect(svg?.querySelector("[data-layer='duo']")).toBeInTheDocument();
+      expect(svg?.querySelector("[data-layer='line']")).toBeInTheDocument();
+    },
+  );
 });

@@ -19,11 +19,13 @@ describe("Stepper", () => {
     expect(current).toHaveClass("sig-stepper__step--current");
   });
 
-  it("marks earlier steps as done with a check glyph", () => {
+  it("marks earlier steps as done with the SIGFA check icon (no glyph)", () => {
     const { container } = render(<Stepper steps={STEPS} current={2} />);
     const done = container.querySelectorAll(".sig-stepper__step--done");
     expect(done).toHaveLength(2);
-    expect(screen.getAllByText("✓")).toHaveLength(2);
+    expect(
+      container.querySelectorAll('svg[data-icon="valider"]'),
+    ).toHaveLength(2);
   });
 
   it("marks later steps as upcoming", () => {

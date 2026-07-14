@@ -67,7 +67,7 @@ export async function getAgentLanguages(
   // « COALESCE could not convert type text[] to agent_language[] » (42804)
   // et TOUT call-next répond 500.
   const res = await tx.query(
-    `SELECT COALESCE(u.languages::text[], ARRAY[]::text[]) AS languages
+    `SELECT COALESCE(u.languages, ARRAY[]::agent_language[])::text[] AS languages
        FROM counters c
        LEFT JOIN users u ON u.id = c.agent_id
       WHERE c.id = $1`,

@@ -130,15 +130,17 @@ describe("MODEL-CONTRACT-B — liste publique conseillers (zéro PII, D5)", () =
     expect(hasAgencyId, `GET ${PATH} doit exposer le path param agencyId`).toBe(true);
   });
 
-  it("MODEL-CONTRACT-B: PublicRelationshipManager expose UNIQUEMENT id, displayName, photoUrl? — ZÉRO PII", () => {
+  it("MODEL-CONTRACT-B: PublicRelationshipManager expose UNIQUEMENT id, displayName, photoUrl?, available — ZÉRO PII", () => {
     const schema = publicSchemas["PublicRelationshipManager"];
     expect(schema, "PublicRelationshipManager doit être défini dans public.yaml").toBeDefined();
 
     const props = (schema?.properties ?? {}) as Record<string, Record<string, unknown>>;
     const propNames = Object.keys(props).sort();
 
-    // EXACTEMENT ces 3 champs, ni plus ni moins
-    expect(propNames, "PublicRelationshipManager ne doit exposer QUE id/displayName/photoUrl").toEqual([
+    // EXACTEMENT ces 4 champs, ni plus ni moins (available ajouté par CONTRACT-014 :
+    // booléen instantané dérivé serveur, zéro PII — jamais d'horaire personnel)
+    expect(propNames, "PublicRelationshipManager ne doit exposer QUE id/displayName/photoUrl/available").toEqual([
+      "available",
       "displayName",
       "id",
       "photoUrl",

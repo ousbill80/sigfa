@@ -465,17 +465,26 @@
   color: var(--brand-strong);
   margin-bottom: var(--space-2);
 }
+/* Couleurs et taille pilotables par variante ou par surface hôte (le kiosque
+   pose --sig-empty-* dans son pont design-tokens.css : fond nuit partout).
+   Audit borne 2026-07-14, F1 : le titre forcé à --ink était à 1.02:1 sur
+   --night — les trois états vides de la borne étaient invisibles. */
 .sig-empty__title {
   font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--sig-empty-title, var(--ink));
 }
 .sig-empty__desc {
   max-width: 40ch;
-  font-size: var(--text-md);
+  font-size: var(--sig-empty-desc-size, var(--text-md));
   line-height: var(--leading-body);
-  color: var(--ink-soft);
+  color: var(--sig-empty-desc, var(--ink-soft));
+}
+/* Variante inverse — fonds sombres (--night / --night-2) : 17.4:1 / 8.3:1. */
+.sig-empty--inverse {
+  --sig-empty-title: var(--ink-inverse);
+  --sig-empty-desc: var(--ink-inverse-soft);
 }
 .sig-empty__actions {
   margin-top: var(--space-4);

@@ -13,6 +13,13 @@
  *   --brand + halo pendant la fenêtre de célébration TV-002), derniers appelés
  *   en retrait, longueur de file en bas.
  *
+ * TV-V3-FIX (retour visuel PO sur capture réelle 16:9) : le numéro courant
+ * tient sur UNE ligne (clamp sur la largeur de colonne, bornes en tokens),
+ * l'historique est DISCRET (une ligne « OC-046 · Guichet 1 », --text-2xl /
+ * --text-md), la liste est bornée dans un espace flexible (overflow hidden) et
+ * « En attente » est ancré en bas dans son espace réservé — aucun
+ * chevauchement, la colonne ne scrolle jamais (720p → 4K).
+ *
  * Présentationnel : piloté entièrement par {@link TvState}. La logique temps
  * réel (consommation d'événements / sync / contrat) est INCHANGÉE : ce
  * composant ne fait qu'afficher. Tokens uniquement — aucune couleur/taille en dur.
@@ -89,7 +96,13 @@ const splitStyle: CSSProperties = {
   gridTemplateColumns: "minmax(0, 3fr) minmax(0, 1fr)",
 };
 
-/** Colonne d'appels — fond sombre dédié + séparateur token. */
+/**
+ * Colonne d'appels — fond sombre dédié + séparateur token.
+ * TV-V3-FIX : conteneur de taille (`container-type: inline-size`) — le numéro
+ * courant se clampe sur la largeur RÉELLE de la colonne (unités cqw), donc une
+ * seule ligne à 720p comme en 4K. `overflow: hidden` : la colonne ne scrolle
+ * jamais, rien ne peut déborder de l'écran.
+ */
 const columnStyle: CSSProperties = {
   backgroundColor: "var(--night-2, var(--surface-screen))",
   borderLeft: "1px solid var(--tv-separator)",
@@ -99,13 +112,14 @@ const columnStyle: CSSProperties = {
   padding: "var(--space-6)",
   gap: "var(--space-6)",
   overflow: "hidden",
+  containerType: "inline-size",
 };
 
 /**
- * Renders a single previous-call card (numéro + guichet, en retrait).
- * Recent calls are in retreat: --ink-inverse-soft, tabular --font-display digits.
- * Le numéro tient sur UNE ligne (nowrap + taille adaptative en cqw, ~2/3 de la
- * rangée pour le numéro, le reste au libellé guichet) — jamais de « OC- »/« 001 ».
+ * Renders a single previous-call entry — DISCRÈTE (retour visuel PO, réf. BNI) :
+ * une seule ligne « OC-046 · Guichet 1 », numéro en --text-2xl max, guichet en
+ * --text-md, le tout en retrait (--ink-inverse-soft). L'appel courant reste le
+ * seul élément dominant de la colonne.
  * @param call - The previous call to render.
  * @returns The card element.
  */
@@ -114,23 +128,22 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
     <div
       data-testid="tv-previous-card"
       style={{
-        display: "flex",
-        alignItems: "baseline",
-        justifyContent: "space-between",
-        gap: "var(--space-4)",
-        padding: "var(--space-3) 0",
+        padding: "var(--space-2) 0",
         borderBottom: "1px solid var(--tv-separator)",
-        fontSize: "var(--display-tv)",
         lineHeight: "var(--leading-tight)",
         color: "var(--ink-inverse-soft)",
-        containerType: "inline-size",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        flexShrink: 0,
       }}
     >
       <span
+        data-testid="tv-previous-number"
         style={{
-          whiteSpace: "nowrap",
-          fontSize: tvNumberFontSize(call.displayNumber, 100, "--display-tv"),
+          fontSize: "var(--text-2xl)",
           fontFamily: "var(--font-display)",
+          fontWeight: 600,
           fontVariantNumeric: "tabular-nums",
           letterSpacing: "var(--tracking-numeric)",
           color: "var(--ink-inverse-soft)",
@@ -138,15 +151,10 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
       >
         {call.displayNumber}
       </span>
-      <span
-        style={{
-          fontSize: "var(--text-lg)",
-          color: "var(--ink-inverse-soft)",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
+      <span aria-hidden="true" style={{ color: "var(--ink-inverse-soft)" }}>
+        {" · "}
+      </span>
+      <span data-testid="tv-previous-counter" style={{ fontSize: "var(--text-md)", color: "var(--ink-inverse-soft)" }}>
         {call.counterLabel}
       </span>
     </div>
@@ -155,34 +163,20 @@ function PreviousCard({ call }: { call: TvCall }): ReactElement {
 
 /**
  * Taille du numéro appelé : JAMAIS de retour à la ligne (« OC-001 » cassé en
- * « OC- » / « 001 » interdit). La carte est un container CSS (inline-size) et
- * la taille de police est bornée par la largeur disponible PAR CARACTÈRE
- * (~0,62 em/caractère en chiffres tabulaires + tracking) : des formats plus
- * longs (« OC-123 », « P010 », voire plus) tiennent sur UNE ligne à toutes les
- * résolutions TV (1920×1080 comme ~1366×768), plafonnée à --display-tv-counter.
+ * « OC- » / « 001 » interdit) — réconciliation TV-NOWRAP + TV-V3-FIX (PO) :
+ *  - pente PAR CARACTÈRE (budget ~145 cqw de la colonne réparti sur la longueur,
+ *    chiffres tabulaires) : « OC-123 », « P010 », voire plus long, tiennent sur
+ *    UNE ligne à toutes les résolutions TV (1920×1080 comme ~1366×768) ;
+ *  - bornes en tokens (retour visuel PO) : plancher de lisibilité `--text-4xl`
+ *    (lisible à 6-8 m), plafond `--display-tv-counter`. La colonne d'appels est
+ *    le container CSS (inline-size) de référence des unités cqw.
  * @param displayNumber - Le numéro affiché (ex. « OC-001 »).
- * @returns La taille de police CSS adaptative.
+ * @returns La taille de police CSS adaptative (clamp bornée par tokens).
  */
 export function heroNumberFontSize(displayNumber: string): string {
-  return tvNumberFontSize(displayNumber, 145, "--display-tv-counter");
-}
-
-/**
- * Taille adaptative générique d'un numéro TV sur UNE ligne : budget de largeur
- * container (cqw) réparti par caractère, plafonné par un token d'affichage.
- * @param displayNumber - Le numéro affiché.
- * @param budgetCqw - Largeur container allouée au numéro (en cqw).
- * @param capToken - Token CSS plafonnant la taille (ex. --display-tv).
- * @returns La taille de police CSS adaptative.
- */
-export function tvNumberFontSize(
-  displayNumber: string,
-  budgetCqw: number,
-  capToken: string
-): string {
   const chars = Math.max(displayNumber.length, 1);
-  const perCharCqw = Math.floor(budgetCqw / chars);
-  return `min(var(${capToken}), ${perCharCqw}cqw)`;
+  const perCharCqw = Math.floor(145 / chars);
+  return `clamp(var(--text-4xl), ${perCharCqw}cqw, var(--display-tv-counter))`;
 }
 
 /**
@@ -259,10 +253,11 @@ function CurrentCallCard({
           <div
             data-testid="tv-hero-number"
             style={{
-              /* UNE ligne, toujours : nowrap + taille adaptative (cqw) bornée
-                 par --display-tv-counter — « OC-001 » ne casse jamais. */
-              whiteSpace: "nowrap",
+              /* TV-V3-FIX + TV-NOWRAP : une SEULE ligne, clamp borné par tokens,
+                 pente par caractère sur la largeur de colonne. */
               fontSize: heroNumberFontSize(hero.displayNumber),
+              whiteSpace: "nowrap",
+              maxWidth: "100%",
               fontFamily: "var(--font-display)",
               fontWeight: 600,
               lineHeight: "var(--leading-tight)",
@@ -377,7 +372,23 @@ export function TvScreen({
               reducedMotion={reducedMotion}
             />
 
-            <section data-testid="tv-previous" aria-label={t("tv.recent_calls", locale)} style={{ minHeight: 0 }}>
+            {/*
+             * TV-V3-FIX : la liste vit dans un espace flexible BORNÉ (flex 1 +
+             * min-height 0 + overflow hidden) — elle ne peut ni déborder sur le
+             * bloc « En attente » ni sortir de l'écran : seul ce qui tient est
+             * visible, quelle que soit la hauteur (720p / 1080p / 4K).
+             */}
+            <section
+              data-testid="tv-previous"
+              aria-label={t("tv.recent_calls", locale)}
+              style={{
+                flex: "1 1 0%",
+                minHeight: 0,
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               <div
                 style={{
                   fontSize: "var(--text-md)",
@@ -385,22 +396,27 @@ export function TvScreen({
                   textTransform: "uppercase",
                   color: "var(--ink-inverse-soft)",
                   marginBottom: "var(--space-3)",
+                  flexShrink: 0,
                 }}
               >
                 {t("tv.recent_calls", locale)}
               </div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {state.previous.map((call) => (
+              <div style={{ display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+                {state.previous.slice(0, TV_PREVIOUS_COUNT).map((call) => (
                   <PreviousCard key={`${call.displayNumber}-${call.calledAt}`} call={call} />
                 ))}
               </div>
             </section>
 
-            {/* Longueur de file — en bas de colonne, style actuel conservé. */}
+            {/*
+             * Longueur de file — ancrée en bas dans son PROPRE espace réservé
+             * (flex-shrink 0, plus de marge auto : c'est la liste bornée
+             * ci-dessus qui absorbe l'espace restant, plus aucun chevauchement).
+             */}
             <section
               data-testid="tv-queue"
               aria-label={t("tv.waiting", locale)}
-              style={{ marginTop: "auto", borderTop: "1px solid var(--tv-separator)", paddingTop: "var(--space-6)" }}
+              style={{ flexShrink: 0, borderTop: "1px solid var(--tv-separator)", paddingTop: "var(--space-4)" }}
             >
               <div
                 style={{
@@ -415,7 +431,8 @@ export function TvScreen({
               <div
                 data-testid="tv-queue-count"
                 style={{
-                  fontSize: "var(--display-tv-counter)",
+                  /* TV-V3-FIX : nettement sous le numéro courant (hiérarchie). */
+                  fontSize: "var(--display-tv)",
                   fontFamily: "var(--font-display)",
                   fontWeight: 600,
                   lineHeight: "var(--leading-tight)",

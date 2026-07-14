@@ -54,6 +54,18 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
   // (withPlatform, cross-banques). LECTURE SEULE agrégée : n'arme JAMAIS
   // `app.current_bank_id` (pas de contexte tenant), mutations → 403 PLATFORM_READ_ONLY.
   "network-overview.ts",
+  // SEC-002-CUTOVER-LOT9 — banks.ts : `banks` est la table RACINE du tenant. Par
+  // DB-009 (0001_rls.sql), sigfa_app N'A AUCUN droit de mutation sur `banks`
+  // (`REVOKE INSERT, UPDATE, DELETE`), seul le GRANT colonne-scopé des 3 seuils +
+  // updated_at (0014/0015) est ouvert (réservé à thresholds.ts). Donc POST /banks
+  // (INSERT) et PATCH /banks/:id (UPDATE name/is_active) sont STRUCTURELLEMENT
+  // impossibles sous armement `sigfa_app` : ce sont des opérations de GESTION DE
+  // BANQUE réservées à la connexion PLATEFORME (SUPER_ADMIN, RBAC platform). GET
+  // /banks (liste cross-banques) exige aussi la plateforme (une liste armée serait
+  // bornée à 1 banque par la RLS SELECT). Tout l'accès DB est routé via
+  // `withPlatform` (frontière plateforme explicite). L'armer casserait la gestion
+  // de banque — reclassé PLATFORM, jamais ARMED.
+  "banks.ts",
 ];
 
 /**
@@ -67,39 +79,17 @@ const PLATFORM_OR_PUBLIC: readonly string[] = [
  * DOIT être armée (sinon le test échoue).
  */
 const ARMED_CUTOVER_PENDING: readonly string[] = [
-  "agents-import.ts",
-  "agents.ts",
-  // Routeurs IA (IA-002/003/004) — lectures tenant-scoped (`WHERE bank_id`), montés
-  // sous `/ai/*`. Non encore basculés vers `withArmedTenant`, comme les autres routes
-  // de lecture tenant. Vivent dans `src/ai/` (voir AI_DIR).
-  "ai-forecast.ts",
-  "anomaly-route.ts",
-  "feedback-insights-route.ts",
-  "banks.ts",
-  "data-privacy.ts",
-  "kiosk-session.ts",
-  "onboarding.ts",
-  "public-tickets.ts",
-  "queues.ts",
-  // reports.ts — DIFFÉRÉE (couture d'ARCHITECTURE de route, PAS une couture DB
-  // manquante) : GET /reports/kpis?scope=network (buildNetworkResponse) est un
-  // agrégat CROSS-TENANT réseau (SUPER_ADMIN, `bankId=null`) qui lit
-  // `daily_agency_stats` SANS filtre `bank_id`, par conception (AnonymizedNetworkAggregate).
-  // Sous `withArmedTenant`, la policy `tenant_isolation` de `daily_agency_stats`
-  // (USING bank_id = current_bank_id) restreindrait silencieusement l'agrégat à UNE
-  // seule banque — cassant la lecture réseau. Le chemin réseau appartient à
-  // `withPlatform` (comme network-overview.ts), pas à un armement tenant.
-  // Les tables sont bien couvertes (policy `tenant_isolation` + GRANT CRUD `sigfa_app`
-  // sur daily_agency_stats / export_jobs / agencies, 0005/0001) : la couture DB est
-  // COMPLÈTE. Ce qui manque est une DÉCISION d'architecture de route (scinder le
-  // handler : paths tenant → withArmedTenant ; path network → withPlatform), donc
-  // hors périmètre d'un simple recâblage de connexion — reste PENDING jusqu'à ce split.
-  "reports.ts",
-  "tickets-sync.ts",
-  "tickets.ts",
-  "tv-session.ts",
-  "webhooks-notifications.ts",
-  "webhooks-whatsapp-inbound.ts",
+  // VIDE — dette SEC-F3-02 FERMÉE (F10-FEATURE-STORE + SEC-002-CUTOVER-LOT10).
+  //
+  // Le dernier fichier différé, `ai-forecast.ts`, est désormais ARMÉ : le câblage
+  // feature-store (couture inter-piste) a livré le provider DB-backed
+  // `dbFeatureStoreProvider`, qui lit `ai_features` (migration 0013) SOUS
+  // `withArmedTenant` — la lecture tenant s'exécute sur la connexion `sigfa_app`
+  // NOBYPASSRLS avec `app.current_bank_id` armé (RLS FORCE contraignante). Le fichier
+  // porte l'armement (`withArmedTenant` + `c.get("db")`) → reclassé ARMED ci-dessous.
+  //
+  // Liste vide = toute route tenant accédant à la DB est ARMÉE ou explicitement
+  // PLATFORM_OR_PUBLIC : plus aucune bascule en attente.
 ];
 
 /**
@@ -144,6 +134,121 @@ const ARMED: readonly string[] = [
   "thresholds.ts",
   "operations.ts",
   "agencies.ts",
+  // SEC-002-CUTOVER-LOT4 — bascule du cycle ticket / file d'attente tenant-scopé.
+  // Tout accès DB tenant routé via `withArmedTenant` (armement `app.current_bank_id`).
+  // - tickets.ts : `tickets` / `queues` / `ticket_transfers` / `counters` / `operations`
+  //   / `services` / `users` / `agency_users` / `agent_status_history` (policy
+  //   `tenant_isolation` + GRANT CRUD) + `banks` (SELECT armé pour le timeout no-show).
+  //   Le cœur `issueTicketFor` (partagé avec public/whatsapp NON armés) est rendu
+  //   TRANSACTION-AWARE (SAVEPOINT sous armement, BEGIN/COMMIT sinon).
+  // - tickets-sync.ts : batch offline — `tickets` / `queues` / `services` / `operations`
+  //   / `users` / `agency_users` ; unité par item = SAVEPOINT dans la tx armée du batch.
+  // - queues.ts : `queues` (policy `tenant_isolation` + GRANT CRUD) — audit composé SEC-001.
+  "tickets.ts",
+  "tickets-sync.ts",
+  "queues.ts",
+  // SEC-002-CUTOVER-LOT5 — bascule conseillers / import CSV / droit à l'oubli
+  // tenant-scopé. Tout accès DB tenant routé via `withArmedTenant` (armement
+  // `app.current_bank_id`).
+  // - agents.ts : `users` / `agency_users` / `user_services` / `services` /
+  //   `agencies` / `agent_status_history` (policy `tenant_isolation` + GRANT CRUD,
+  //   0001). GET profil/stats lisent, PATCH + POST status mutent avec audit composé
+  //   SEC-001 (savepoint) dans la transaction armée.
+  // - agents-import.ts : batch offline — `users` / `agencies` / `agency_users` /
+  //   `audit_log` ; unité par ligne = SAVEPOINT dans la transaction armée du batch.
+  // - data-privacy.ts : droit à l'oubli — UPDATE `tickets` (anonymisation) + DELETE
+  //   `notification_consents` (0004) + INSERT `audit_log` (0003) + lecture
+  //   `retention_policies` (0006), tous en policy `tenant_isolation` + GRANT CRUD.
+  //   L'effacement est borné à la banque armée (jamais un autre tenant).
+  "agents.ts",
+  "agents-import.ts",
+  "data-privacy.ts",
+  // SEC-002-CUTOVER-LOT6 — bascule des routes de LECTURE IA tenant-scopées. Tout accès
+  // DB tenant routé via `withArmedTenant` (armement `app.current_bank_id`). Vivent sous
+  // `src/ai/` (voir AI_DIR).
+  // - anomaly-route.ts : `ai_anomalies` (policy `tenant_isolation` + GRANT CRUD
+  //   `sigfa_app`, 0007). `loadAnomalies` (count + liste paginée `WHERE bank_id`) rejoué
+  //   à travers la connexion armée. Lecture seule (zéro mutation).
+  // - feedback-insights-route.ts : `tickets` (feedback_score/feedback_comment ; policy
+  //   `tenant_isolation` + GRANT CRUD `sigfa_app`, 0001). La connexion armée est INJECTÉE
+  //   au service partagé `feedback-insights-service` (INCHANGÉ) qui exécute son SELECT
+  //   `WHERE bank_id` sur cette connexion. Lecture seule (zéro mutation).
+  "anomaly-route.ts",
+  "feedback-insights-route.ts",
+  // SEC-002-CUTOVER-LOT7 — surfaces PUBLIQUES/SEMI-PUBLIQUES à token/session (le
+  // tenant est RÉSOLU depuis un token/agencyId, jamais d'une auth staff). Tout accès
+  // DB tenant est routé via `withArmedTenant` APRÈS résolution du tenant ; les seuls
+  // accès hors armement sont les résolutions d'identité PRÉ-TENANT documentées.
+  // - public-tickets.ts : POST /public/tickets ARME l'émission (`issueTicketFor`
+  //   transaction-aware, SAVEPOINT sous armement) sur le bankId dérivé de l'agence ;
+  //   POST …/feedback ARME UPDATE `tickets` + audit + agrégat NPS `daily_agency_stats`
+  //   (policy `tenant_isolation` + GRANT CRUD, 0001/0005) ; GET …/operations et
+  //   …/relationship-managers ARMENT leurs lectures (`operations`/`services`/`users`/
+  //   `agency_users`) après résolution du bankId de l'agence. PRÉ-TENANT (hors
+  //   armement, documenté) : le lookup `tracking_id` global (GET suivi + résolution
+  //   feedback) et la résolution du bankId d'agence — résolution du token public,
+  //   sans oracle d'énumération.
+  // - tv-session.ts : POST /tv/session résout le bankId de l'agence (pré-tenant) puis
+  //   CONFIRME l'agence DANS le tenant via `withArmedTenant` (RLS `agencies`) avant de
+  //   signer le JWT DISPLAY. La confirmation armée est portée par la route (fabrique
+  //   `armedRead` injectée au service).
+  // - kiosk-session.ts : POST /kiosk/session résout le bankId de la borne (pré-tenant,
+  //   lookup par id) puis ARME l'ouverture de session (`createKioskSession`) + l'audit ;
+  //   DELETE …/:kioskId ARME la révocation `kiosks` + audit (tenant du JWT staff) ;
+  //   POST /kiosks/:kioskId/heartbeat ARME l'UPDATE `kiosks` (tenant du JWT borne).
+  //   Tables `kiosks`/`audit_log` : policy `tenant_isolation` + GRANT CRUD (0001/0003).
+  //   NB : `kiosk-session.service.ts` (chantier borne parallèle) est INCHANGÉ ;
+  //   l'armement est porté ENTIÈREMENT par le fichier de route.
+  "public-tickets.ts",
+  "tv-session.ts",
+  "kiosk-session.ts",
+  // SEC-002-CUTOVER-LOT8 — WEBHOOKS ENTRANTS : le tenant est RÉSOLU depuis le
+  // PAYLOAD/la CONFIG (jamais d'une auth), APRÈS vérification d'authenticité du
+  // webhook. Tout accès DB tenant post-résolution est routé via `withArmedTenant`.
+  // - webhooks-notifications.ts : callbacks provider (statut delivery). La
+  //   corrélation `provider_message_id → notification_log` résout le `bank_id`
+  //   (PRÉ-TENANT, seule lecture hors armement — c'est la résolution du tenant), puis
+  //   la mutation du journal (`applyDeliveryAck`) est ARMÉE (RLS `notification_log`
+  //   `tenant_isolation` + GRANT SELECT/INSERT/UPDATE `sigfa_app`, 0004). Un accusé
+  //   corrélé à A ne met à jour QUE le journal de A.
+  // - webhooks-whatsapp-inbound.ts : messages WhatsApp entrants. La résolution de la
+  //   config par `bankSlug` (`resolveWhatsAppConfig`) PRÉCÈDE légitimement l'armement
+  //   (chicken-and-egg : le tenant n'est connu QU'APRÈS lecture de sa config), puis
+  //   la signature banque est vérifiée ; TOUT le traitement tenant (idempotence
+  //   `whatsapp_inbound_messages`, opt-in `notification_consents`, lecture `tickets`,
+  //   émission `issueTicketFor` transaction-aware → SAVEPOINT) est routé DANS une
+  //   transaction ARMÉE `withArmedTenant(bankId)`. Tables : policy `tenant_isolation`
+  //   + GRANT CRUD `sigfa_app` (0012/0004/0001).
+  "webhooks-notifications.ts",
+  "webhooks-whatsapp-inbound.ts",
+  // SEC-002-CUTOVER-LOT9 — SPLIT tenant/plateforme (FERMETURE de la dette hors
+  // ai-forecast.ts). Tout accès DB TENANT routé via `withArmedTenant` (armement
+  // `app.current_bank_id`).
+  // - reports.ts : chemins TENANT (scope=agency, daily, benchmark, export) armés —
+  //   `daily_agency_stats` / `agencies` / `export_jobs` (policy `tenant_isolation` +
+  //   GRANT CRUD `sigfa_app`, 0005/0001). Le chemin RÉSEAU (scope=network,
+  //   `buildNetworkResponse`) est SCINDÉ vers `withPlatform` (agrégat cross-tenant
+  //   anonymisé, lit `daily_agency_stats` SANS filtre `bank_id` — l'armer le
+  //   restreindrait à UNE banque). ARMED car son accès tenant passe par
+  //   `withArmedTenant` ; le chemin plateforme cohabite via `withPlatform`.
+  // - onboarding.ts : enrôlement d'agence/borne DANS un tenant EXISTANT (pas un
+  //   bootstrap de nouveau tenant — aucune création de banque). clone-from mute
+  //   `agencies`/`services`/`counters`/`counter_services` ; kiosk-access insère
+  //   `kiosks` via `createKioskAccess` (connexion armée injectée). Gardes + mutations
+  //   + audit composé SEC-001 dans UNE transaction armée (policy `tenant_isolation` +
+  //   GRANT CRUD, 0001).
+  "reports.ts",
+  "onboarding.ts",
+  // SEC-002-CUTOVER-LOT10 + F10-FEATURE-STORE — DERNIÈRE bascule, FERME SEC-F3-02.
+  // - ai-forecast.ts : `GET /ai/forecast`. Le provider de features DB-backed
+  //   (`dbFeatureStoreProvider`, activé par `FEATURE_STORE_PROVIDER=db`) lit
+  //   `ai_features` (migration 0013 : policy `tenant_isolation` FORCE + GRANT
+  //   SELECT/INSERT/UPDATE/DELETE `sigfa_app`) via `DbFeatureStore` SOUS
+  //   `withArmedTenant(asArmable(c.get("db")), bankId, …)`. La lecture tenant est
+  //   donc bornée à la banque armée par la RLS (défense-en-profondeur), pas seulement
+  //   par le `WHERE bank_id`/`agency_id` applicatif. Le provider par défaut (feature-
+  //   store désactivé) reste `emptyForecastDataProvider` → 422 gated (inchangé).
+  "ai-forecast.ts",
 ];
 
 /** Un fichier de routeur candidat + le répertoire qui le contient. */

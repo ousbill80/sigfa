@@ -35,6 +35,7 @@ import {
   Card,
   EmptyState,
   Heading,
+  IconAlerte,
   KpiTile,
   OfflineBanner,
   SectionTitle,
@@ -127,27 +128,6 @@ function comexLevelKey(level: ComexPredictiveView["level"]): TranslationKey {
   return `ai.comex.level.${level}` as TranslationKey;
 }
 
-/** Small warning glyph paired with the low-confidence banner (never colour alone). */
-function WarnIcon(): ReactElement {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M9 1.5 17 15.5H1L9 1.5Z" />
-      <path d="M9 7v3.5" />
-      <path d="M9 13h.01" />
-    </svg>
-  );
-}
-
 /** A single aggregated driver row — factor + tone badge + weight mini-bar. */
 function DriverRow({
   factor,
@@ -233,7 +213,7 @@ function ForecastSection({
             fontWeight: 600,
           }}
         >
-          <WarnIcon />
+          <IconAlerte size={18} />
           {t("ai.lowconf.flag", locale)}
         </div>
       )}
@@ -364,7 +344,7 @@ function FeedbackSection({
             fontWeight: 600,
           }}
         >
-          <WarnIcon />
+          <IconAlerte size={18} />
           {t("ai.feedback.insufficient_sample", locale)}
         </div>
       ) : (
@@ -526,7 +506,7 @@ export function AiInsightsDashboard({
     return (
       <div data-testid="ai-error" role="alert" style={{ padding: "var(--space-6)" }}>
         <EmptyState
-          icon={<WarnIcon />}
+          icon={<IconAlerte size={18} />}
           title={t("ai.state.error.title", locale)}
           description={t("ai.state.error", locale)}
           action={

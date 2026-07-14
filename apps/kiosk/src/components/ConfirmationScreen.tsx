@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import { createSigfaClient } from "@sigfa/contracts";
+import { IconAlerte } from "@sigfa/ui";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useOfflineTicket } from "@/hooks/useOfflineTicket";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -313,9 +314,9 @@ export function ConfirmationScreen({
           <span
             data-testid="system-error-pictogram"
             aria-hidden="true"
-            style={{ fontSize: "40px", color: "var(--danger)", lineHeight: 1 }}
+            style={{ color: "var(--danger)", lineHeight: 1 }}
           >
-            ⚠
+            <IconAlerte size={40} />
           </span>
           <span style={{ fontSize: "24px", color: "var(--ink-strong)" }}>
             {tDeg("systemError")}

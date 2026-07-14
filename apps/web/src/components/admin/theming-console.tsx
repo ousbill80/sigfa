@@ -33,6 +33,7 @@ import {
   EmptyState,
   Field,
   Heading,
+  IconAlerte,
   OfflineBanner,
   Overline,
   Skeleton,
@@ -64,22 +65,6 @@ export interface ThemingConsoleProps {
 }
 
 const DEFAULT_BRAND = "#c25a16";
-
-/** A small danger cross glyph (icon+text pairing), tokenised via CSS colour. */
-function WarnGlyph(): ReactElement {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M8 1.5 15 14H1L8 1.5Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-      <path d="M8 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="8" cy="11.5" r="0.85" fill="currentColor" />
-    </svg>
-  );
-}
 
 /**
  * Bank identity theming console.
@@ -123,7 +108,7 @@ export function ThemingConsole(props: ThemingConsoleProps): ReactElement {
     return (
       <section data-testid="theming-error" role="alert">
         <EmptyState
-          icon={<WarnGlyph />}
+          icon={<IconAlerte size="sm" />}
           title={tAdmTheme("admTheme.state_error", locale)}
           action={
             onRetry ? (

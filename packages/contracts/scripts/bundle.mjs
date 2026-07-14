@@ -30,7 +30,7 @@ for (const module of MODULES) {
   const outputPath = resolve(BUNDLED_DIR, `${module}.yaml`);
 
   if (!existsSync(inputPath)) {
-    console.error(`❌ Fichier source manquant : openapi/${module}.yaml`);
+    console.error(`[ERREUR] Fichier source manquant : openapi/${module}.yaml`);
     hasError = true;
     continue;
   }
@@ -58,9 +58,9 @@ for (const module of MODULES) {
         },
       }
     );
-    console.log(`✔ bundle ${module} → generated/bundled/${module}.yaml`);
+    console.log(`[OK] bundle ${module} → generated/bundled/${module}.yaml`);
   } catch (err) {
-    console.error(`❌ Erreur lors du bundle de ${module}:`);
+    console.error(`[ERREUR] Erreur lors du bundle de ${module}:`);
     if (err.stdout) console.error(err.stdout.toString());
     if (err.stderr) console.error(err.stderr.toString());
     hasError = true;
@@ -70,5 +70,5 @@ for (const module of MODULES) {
 if (hasError) {
   process.exit(1);
 } else {
-  console.log(`\n✅ Bundle terminé : ${MODULES.length} modules → generated/bundled/`);
+  console.log(`\n[OK] Bundle terminé : ${MODULES.length} modules → generated/bundled/`);
 }

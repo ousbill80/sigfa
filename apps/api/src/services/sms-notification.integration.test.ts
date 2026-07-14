@@ -30,14 +30,17 @@ import {
   type StartedTestContainer,
   Wait,
 } from "testcontainers";
-import type { QueryFn } from "@sigfa/database";
+import { withTenant, type QueryFn } from "@sigfa/database";
 import {
   processSmsJob,
   type SmsJobData,
   type SmsProcessDeps,
 } from "src/services/sms-notification.js";
 import { createMockSmsAdapter } from "src/services/sms-adapter.js";
-import { applyDeliveryAck } from "src/services/notification-delivery.js";
+import {
+  applyDeliveryAck,
+  type ArmedRunner,
+} from "src/services/notification-delivery.js";
 import type { TemplateSource } from "src/services/sms-templates-render.js";
 import { createApp } from "src/app.js";
 
@@ -50,6 +53,13 @@ const queryFn: QueryFn = async (sql: string) => {
   const res = await db.query(sql);
   return { rows: res.rows as Record<string, unknown>[] };
 };
+
+/**
+ * Exécuteur ARMÉ passé à `applyDeliveryAck` : arme `app.current_bank_id` (via
+ * `withTenant`) sur la connexion réelle avant la mutation du journal (équivaut au
+ * chemin de production `withArmedTenant`, la connexion armée `sigfa_app` en plus).
+ */
+const armedRun: ArmedRunner = (bankId, fn) => withTenant(queryFn, bankId, fn);
 
 /** Source de templates : FR global fixe + variables strictes. */
 const templates: TemplateSource = {
@@ -335,7 +345,8 @@ describe("applyDeliveryAck — webhook (corrélation provider_message_id)", () =
     const logId = await sentLog(ids.bankA);
     const r = await applyDeliveryAck(
       { messageId: "mid-ok", status: "DELIVERED", deliveredAt: "2026-07-12T09:00:10Z" },
-      queryFn
+      queryFn,
+      armedRun
     );
     expect(r).toEqual({ updated: true, status: "DELIVERED" });
     expect((await statusOf(logId)).status).toBe("DELIVERED");
@@ -345,13 +356,14 @@ describe("applyDeliveryAck — webhook (corrélation provider_message_id)", () =
     await sentLog(ids.bankA);
     const r = await applyDeliveryAck(
       { messageId: "mid-ok", status: "FAILED", failureReason: "INVALID_NUMBER" },
-      queryFn
+      queryFn,
+      armedRun
     );
     expect(r).toEqual({ updated: true, status: "FAILED" });
   });
 
   it("NOTIF-002: provider_message_id inconnu → NOT_FOUND", async () => {
-    const r = await applyDeliveryAck({ messageId: "does-not-exist", status: "DELIVERED" }, queryFn);
+    const r = await applyDeliveryAck({ messageId: "does-not-exist", status: "DELIVERED" }, queryFn, armedRun);
     expect(r).toEqual({ updated: false, reason: "NOT_FOUND" });
   });
 });

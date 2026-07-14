@@ -8,6 +8,8 @@
 import { Fragment, type HTMLAttributes, type ReactNode } from "react";
 import { clsx } from "clsx";
 
+import { SigfaIcon } from "./icons/SigfaIcon";
+
 export interface StepperProps extends HTMLAttributes<HTMLOListElement> {
   /** Ordered step labels. */
   steps: readonly string[];
@@ -53,7 +55,7 @@ export function Stepper({
             >
               <span className="sig-stepper__marker">
                 {status === "done" ? (
-                  <span aria-hidden="true">✓</span>
+                  <SigfaIcon name="valider" size={20} />
                 ) : (
                   index + 1
                 )}
