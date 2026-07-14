@@ -44,6 +44,9 @@
     "errorMessage": "Unable to load operations. Retry or go to reception.",
     "retryButton": "Retry",
     "offlineBanner": "Offline mode",
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "See more services",
+    "scrollHint": "More services below",
     "advisorCard": "See my advisor",
     "advisorHint": "Meet a relationship manager"
   },
@@ -128,7 +131,10 @@
     "commentPlaceholder": "Add a comment (optional)",
     "micLabel": "Dictate a comment",
     "submitButton": "Send my feedback",
-    "thankYou": "Thank you for your feedback!"
+    "thankYou": "Thank you for your feedback!",
+    "laterButton": "Maybe later",
+    "finishButton": "Done",
+    "returning": "Returning automatically in {seconds} s"
   },
   "degraded007": {
     "photographNumber": "Take a photo of your number or receive it by SMS",

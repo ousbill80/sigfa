@@ -44,6 +44,9 @@
     "errorMessage": "Impossible de charger les opérations. Réessayez ou adressez-vous à l'accueil.",
     "retryButton": "Réessayer",
     "offlineBanner": "Mode hors connexion",
+    "waitEstimate": "~{minutes} min",
+    "seeMore": "Voir plus de services",
+    "scrollHint": "Plus de services en bas",
     "advisorCard": "Voir mon conseiller",
     "advisorHint": "Rencontrer un chargé de clientèle"
   },
@@ -128,7 +131,10 @@
     "commentPlaceholder": "Ajoutez un commentaire (facultatif)",
     "micLabel": "Dicter un commentaire",
     "submitButton": "Envoyer mon avis",
-    "thankYou": "Merci pour votre avis !"
+    "thankYou": "Merci pour votre avis !",
+    "laterButton": "Plus tard",
+    "finishButton": "Terminer",
+    "returning": "Retour automatique dans {seconds} s"
   },
   "degraded007": {
     "photographNumber": "Photographiez votre numéro ou recevez-le par SMS",
