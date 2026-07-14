@@ -20,7 +20,7 @@ import { createApp } from "src/app.js";
 import { createCaptureBus, type CaptureBus } from "src/services/realtime.js";
 import { computePosition, queueLength } from "src/services/queue-strategy.js";
 import { getCachedEstimate } from "src/services/queue-estimation.js";
-import { ensureAuditLogSchema } from "src/audit/audit-log-test-schema.js";
+import { applyRealMigrations } from "src/routes/tickets-test-migrations.js";
 
 let pgContainer: StartedTestContainer;
 let redisContainer: StartedTestContainer;
@@ -38,122 +38,6 @@ process.env["PHONE_ENCRYPTION_KEY"] =
   "1111111111111111111111111111111111111111111111111111111111111111";
 process.env["PHONE_HASH_KEY"] =
   "2222222222222222222222222222222222222222222222222222222222222222";
-
-/** Migrations minimales : enums + tables nécessaires à API-003. */
-async function runMigrations(client: pg.Client): Promise<void> {
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-  await client.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_status') THEN
-        CREATE TYPE ticket_status AS ENUM ('WAITING','CALLED','SERVING','DONE','NO_SHOW','ABANDONED','TRANSFERRED');
-      END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_priority') THEN
-        CREATE TYPE ticket_priority AS ENUM ('STANDARD','PRIORITY','VIP','PMR','SENIOR');
-      END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='ticket_channel') THEN
-        CREATE TYPE ticket_channel AS ENUM ('KIOSK','QR','MOBILE','WHATSAPP');
-      END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='queue_status') THEN
-        CREATE TYPE queue_status AS ENUM ('OPEN','PAUSED','CLOSED');
-      END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='counter_status') THEN
-        CREATE TYPE counter_status AS ENUM ('OPEN','PAUSED','CLOSED');
-      END IF;
-      -- Type RÉEL des migrations (0000_dry_nuke.sql restreint par 0011) :
-      -- users.languages est agent_language[] et tickets.required_language est
-      -- agent_language — PAS text. Le déclarer en TEXT masquait le bug
-      -- « COALESCE could not convert type text[] to agent_language[] » (42804)
-      -- qui rendait TOUT call-next 500 en base réelle.
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='agent_language') THEN
-        CREATE TYPE agent_language AS ENUM ('FR','EN');
-      END IF;
-    END $$;
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS banks (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
-      no_show_timeout_minutes INTEGER NOT NULL DEFAULT 3,
-      queue_critical_threshold INTEGER,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS agencies (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS services (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      agency_id UUID NOT NULL REFERENCES agencies(id), code VARCHAR(4) NOT NULL, name TEXT NOT NULL,
-      sla_minutes INTEGER NOT NULL DEFAULT 10, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS operations (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id),
-      code VARCHAR(6) NOT NULL, name TEXT NOT NULL, sla_minutes INTEGER,
-      display_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, icon_key TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(service_id, code));
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS queues (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      agency_id UUID NOT NULL REFERENCES agencies(id), service_id UUID NOT NULL REFERENCES services(id),
-      current_ticket_number INTEGER NOT NULL DEFAULT 0, is_open BOOLEAN NOT NULL DEFAULT true,
-      status queue_status NOT NULL DEFAULT 'OPEN',
-      open_at TEXT, close_at TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS counters (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      agency_id UUID NOT NULL REFERENCES agencies(id), number INTEGER NOT NULL, label TEXT NOT NULL,
-      status counter_status NOT NULL DEFAULT 'OPEN', agent_id UUID, current_ticket_id UUID,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      bank_id UUID REFERENCES banks(id),
-      email TEXT NOT NULL UNIQUE,
-      languages agent_language[] NOT NULL DEFAULT '{FR}',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), is_relationship_manager BOOLEAN NOT NULL DEFAULT false, display_name TEXT, photo_url TEXT
-);
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS counter_services (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      counter_id UUID NOT NULL REFERENCES counters(id),
-      service_id UUID NOT NULL REFERENCES services(id),
-      UNIQUE(counter_id, service_id));
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS tickets (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      agency_id UUID NOT NULL REFERENCES agencies(id), queue_id UUID NOT NULL REFERENCES queues(id),
-      service_id UUID NOT NULL REFERENCES services(id), operation_id UUID REFERENCES operations(id), counter_id UUID, agent_id UUID,
-      number INTEGER NOT NULL, display_number TEXT, tracking_id CHAR(21) NOT NULL UNIQUE,
-      channel ticket_channel NOT NULL, status ticket_status NOT NULL DEFAULT 'WAITING',
-      priority ticket_priority NOT NULL DEFAULT 'STANDARD', phone_encrypted TEXT, phone_hash TEXT,
-      sms_consent BOOLEAN NOT NULL DEFAULT false,
-      required_language agent_language,
-      issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), called_at TIMESTAMPTZ, served_at TIMESTAMPTZ,
-      closed_at TIMESTAMPTZ, no_show_at TIMESTAMPTZ, wait_time_seconds INTEGER, service_time_seconds INTEGER,
-      issued_day DATE GENERATED ALWAYS AS ((issued_at AT TIME ZONE 'Africa/Abidjan')::date) STORED,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (queue_id, number, issued_day), target_manager_id UUID
-);
-  `);
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS ticket_transfers (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bank_id UUID NOT NULL REFERENCES banks(id),
-      ticket_id UUID NOT NULL REFERENCES tickets(id), from_counter_id UUID, from_service_id UUID NOT NULL REFERENCES services(id),
-      to_service_id UUID NOT NULL REFERENCES services(id), to_counter_id UUID, reason TEXT,
-      transferred_by UUID NOT NULL, transferred_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-  `);
-}
 
 /** Insère bank/agency/services/queues/counter. */
 async function insertFixtures(client: pg.Client): Promise<{
@@ -175,7 +59,17 @@ async function insertFixtures(client: pg.Client): Promise<{
   const queue2Id = (q2.rows[0] as { id: string }).id;
   const ctr = await client.query(`INSERT INTO counters (bank_id, agency_id, number, label) VALUES ($1,$2,1,'G1') RETURNING id`, [bankId, agencyId]);
   const counterId = (ctr.rows[0] as { id: string }).id;
+  // Agent RÉEL du tenant : sujet du JWT ET `transferred_by` des transferts.
+  // Le schéma de prod pose la FK `ticket_transfers.transferred_by → users(id)`
+  // (0000_dry_nuke.sql) ; le harnais inline l'omettait, laissant passer un
+  // acteur fantôme. Colonnes NOT NULL réelles : email/password_hash/
+  // first_name/last_name/role (enum `role`).
   const userId = "99999999-9999-4999-a999-999999999999";
+  await client.query(
+    `INSERT INTO users (id, bank_id, email, password_hash, first_name, last_name, role)
+     VALUES ($1,$2,'agent@b.ci','x','Agent','Test','AGENT')`,
+    [userId, bankId]
+  );
   return { bankId, agencyId, userId, serviceId, queueId, code: "OC", service2Id, queue2Id, counterId };
 }
 
@@ -205,8 +99,7 @@ beforeAll(async () => {
   });
   await db.connect();
   redis = new Redis(`redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`);
-  await runMigrations(db);
-  await ensureAuditLogSchema(db);
+  await applyRealMigrations(db);
   ids = await insertFixtures(db);
   bus = createCaptureBus();
   app = createApp({ db, redis, jwtSecret: jwtSecretBytes, bus });
