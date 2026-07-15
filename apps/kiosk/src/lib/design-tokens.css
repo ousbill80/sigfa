@@ -34,8 +34,8 @@
      (audit borne 2026-07-14, F10 : 6.66:1 réel à l'époque). */
   --action-label: var(--brand-strong);
 
-  /* ─── Marque : héritée de @sigfa/ui (terracotta/ambre + or & forêt). ──────── */
-  /* Le theming banque surcharge --brand en amont ; --forest/--gold restent. */
+  /* ─── Marque : héritée de @sigfa/ui (Neutre Premium — brand / brand-inv). ── */
+  /* Le theming banque surcharge --brand en amont. */
 
   /* ─── États sémantiques : hérités de @sigfa/ui (harmonisés palette chaude). ── */
   /* Sur fond nuit, TOUJOURS les variantes inverses (--success-inv, etc.) :

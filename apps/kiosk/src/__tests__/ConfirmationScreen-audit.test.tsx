@@ -7,7 +7,7 @@
  * F3 (P1) : bouton Retour commun (IconRetour + texte, cible ≥ 72 px) vers
  *           l'étape précédente (router.back()).
  * F13 (P2, partiel) : bascule « Texte plus grand » honnête — état visuel non
- *           ambigu (aria-pressed + fond --gold + badge « Activé »), le texte
+ *           ambigu (aria-pressed + fond --brand-inv + badge « Activé »), le texte
  *           grandit RÉELLEMENT, timeout d'inactivité doublé (30 s → 60 s).
  * F15 (P2) : la VALEUR du SMS expliquée AVANT le clavier + consentement
  *           visible dès le départ (désactivé tant que le numéro est vide).
@@ -188,13 +188,13 @@ describe("AUDIT-F13: ConfirmationScreen — bascule « Texte plus grand » à é
     expect((toggle as HTMLElement).style.minHeight).toBe("72px");
   });
 
-  it("AUDIT-F13: activation → état visuel NON ambigu (aria-pressed, fond --gold contrasté, badge « Activé ») + persistance session", () => {
+  it("AUDIT-F13: activation → état visuel NON ambigu (aria-pressed, fond --brand-inv contrasté, badge « Activé ») + persistance session", () => {
     renderScreen();
     const toggle = screen.getByTestId("accessibility-toggle");
     fireEvent.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
-    expect((toggle as HTMLElement).style.backgroundColor).toBe("var(--gold)");
+    expect((toggle as HTMLElement).style.backgroundColor).toBe("var(--brand-inv)");
     const badge = screen.getByTestId("accessibility-toggle-state");
     expect(badge.textContent).toBe("Activé");
     // Persistance (même comportement que les autres écrans).

@@ -1,9 +1,9 @@
 /**
  * BenchmarkTable — inter-agency ranking as respiring row-cards (REP-003b).
  *
- * Design system v2 « Sérénité Premium »: the lined `<table>` (hierarchy by
+ * Design system v3 « Neutre Premium »: the lined `<table>` (hierarchy by
  * borders = anti-pattern DS §5) is replaced by respiring row-cards separated by
- * space, not rules — a rounded rank chip (halo `--gold` for #1), the agency
+ * space, not rules — a rounded rank chip (halo `--brand` for #1), the agency
  * name, the numeric value of the sorted KPI (`--font-display`, tabular-nums,
  * right-aligned), and a functional status pill. The pill colour is a pure
  * translation of the SERVER verdict (statusToken): VERT → --success, ORANGE →
@@ -82,7 +82,7 @@ const rowCardStyle = (isNa: boolean, hovered: boolean): CSSProperties => ({
   transition: "background-color var(--dur-1) var(--ease)",
 });
 
-/** Rounded rank chip — #1 wears a soft --gold halo. */
+/** Rounded rank chip — #1 wears a soft --brand halo. */
 const rankChipStyle = (isTop: boolean, isNa: boolean): CSSProperties => ({
   display: "inline-flex",
   alignItems: "center",
@@ -95,9 +95,9 @@ const rankChipStyle = (isTop: boolean, isNa: boolean): CSSProperties => ({
   fontSize: "var(--text-md)",
   fontWeight: 700,
   fontVariantNumeric: "tabular-nums",
-  color: isTop ? "var(--gold)" : isNa ? "var(--ink-faint)" : "var(--ink-soft)",
-  backgroundColor: isTop ? "var(--gold-soft)" : "var(--surface-2)",
-  boxShadow: isTop ? "0 0 0 3px var(--gold-soft)" : "none",
+  color: isTop ? "var(--brand-strong)" : isNa ? "var(--ink-faint)" : "var(--ink-soft)",
+  backgroundColor: isTop ? "var(--brand-soft)" : "var(--surface-2)",
+  boxShadow: isTop ? "0 0 0 3px var(--brand-soft)" : "none",
 });
 
 const valueStyle: CSSProperties = {

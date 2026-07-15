@@ -6,7 +6,7 @@
  * (--surface-screen ≙ --night-2, assombri via color-mix — aucun hex en dur),
  * numéro géant centré (MÊME règle qu'ailleurs : UNE ligne, nowrap + taille
  * adaptative en cqw par caractère), « Guichet N » bien lisible dessous, halo
- * or (--shadow-gold) digne. Entrée en fondu/échelle sur tokens de durée,
+ * brand-inv (halo digne). Entrée en fondu/échelle sur tokens de durée,
  * sortie fluide pilotée par `closing` ; `prefers-reduced-motion` → aucune
  * transition (apparition/disparition instantanées).
  *
@@ -136,8 +136,9 @@ export function TvCallOverlay({
             fontVariantNumeric: "tabular-nums",
             letterSpacing: "var(--tracking-numeric)",
             color: "var(--ink-inverse)",
-            /* Halo or digne — token Moment Ticket. */
-            textShadow: "var(--shadow-gold)",
+            /* Halo brand-inv — même pattern que TicketMoment. */
+            textShadow:
+              "0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent)",
           }}
         >
           {call.displayNumber}
@@ -151,7 +152,7 @@ export function TvCallOverlay({
             lineHeight: "var(--leading-tight)",
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "var(--gold)",
+            color: "var(--brand-inv)",
             whiteSpace: "nowrap",
           }}
         >

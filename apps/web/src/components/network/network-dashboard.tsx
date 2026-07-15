@@ -3,8 +3,8 @@
  *
  * Layout: agency ranking (sorted TMA-desc, token-coloured status pills) + static
  * CI SVG map (Leaflet-free) + aggregated alert panel + network overview. Visual
- * refonte on design system v2 « Sérénité Premium »: calm surfaces, --font-display
- * rank numerals, --gold accent for #1. `--danger` stays reserved for TMA > 2×SLA
+ * refonte on design system v3 « Neutre Premium »: calm surfaces, --font-display
+ * rank numerals, --brand accent for #1. `--danger` stays reserved for TMA > 2×SLA
  * breaches (pill/dot, never a solid fill); offline agencies use `--info`. Tokens
  * only. Realtime is simulated (RT-001).
  * @module components/network/network-dashboard
@@ -234,7 +234,7 @@ export function NetworkDashboard({
                             fontWeight: 700,
                             fontVariantNumeric: "tabular-nums",
                             letterSpacing: "var(--tracking-numeric)",
-                            color: isTop ? "var(--gold)" : "var(--ink-faint)",
+                            color: isTop ? "var(--brand-strong)" : "var(--ink-faint)",
                           }}
                         >
                           {rank}
@@ -247,7 +247,7 @@ export function NetworkDashboard({
                             aria-hidden="true"
                             style={{
                               marginLeft: "var(--space-2)",
-                              color: "var(--gold)",
+                              color: "var(--brand)",
                               verticalAlign: "-2px",
                               display: "inline-flex",
                             }}

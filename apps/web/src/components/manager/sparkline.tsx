@@ -18,8 +18,8 @@ export interface SparklineProps {
   height?: number;
   /** Accessible label. */
   label?: string;
-  /** Stroke token — one of the v2 accent tokens. */
-  stroke?: "var(--brand)" | "var(--forest)" | "var(--gold)";
+  /** Stroke token — one of the v3 accent tokens. */
+  stroke?: "var(--brand)" | "var(--success)" | "var(--brand-inv)";
 }
 
 /**

@@ -80,7 +80,7 @@ describe("KIOSK-HOME: useBankTheme", () => {
             logoUrl: null,
             appliedColors: {
               primary: "#0f6b4a",
-              secondary: "#c79a3a",
+              secondary: "#8ea7ec",
               background: "#ffffff",
             },
             welcomeMessages: { fr: "Bienvenue" },
@@ -112,7 +112,7 @@ describe("CONTRACT-014: useBankTheme — bankId depuis la session borne", () => 
         return HttpResponse.json(
           {
             logoUrl: "/mock/bank/logo.svg",
-            appliedColors: { primary: "#003f7f", secondary: "#c79a3a", background: "#ffffff" },
+            appliedColors: { primary: "#003f7f", secondary: "#8ea7ec", background: "#ffffff" },
             welcomeMessages: { fr: "Bienvenue" },
           },
           { status: 200 }
@@ -135,7 +135,7 @@ describe("CONTRACT-014: useBankTheme — bankId depuis la session borne", () => 
         return HttpResponse.json(
           {
             logoUrl: "/mock/bank/logo.svg",
-            appliedColors: { primary: "#003f7f", secondary: "#c79a3a", background: "#ffffff" },
+            appliedColors: { primary: "#003f7f", secondary: "#8ea7ec", background: "#ffffff" },
             welcomeMessages: { fr: "Bienvenue" },
           },
           { status: 200 }
@@ -169,7 +169,7 @@ describe("CONTRACT-014: useBankTheme — bankId depuis la session borne", () => 
         return HttpResponse.json(
           {
             logoUrl: "/mock/bank/logo.svg",
-            appliedColors: { primary: "#003f7f", secondary: "#c79a3a", background: "#ffffff" },
+            appliedColors: { primary: "#003f7f", secondary: "#8ea7ec", background: "#ffffff" },
             welcomeMessages: { fr: "Bienvenue" },
           },
           { status: 200 }

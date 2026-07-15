@@ -24,7 +24,7 @@ vi.mock("@/lib/socket-provider", async (importOriginal) => {
   return { ...actual, useSocket: (): SocketContextValue => mockSocket };
 });
 
-const TENANT: TvTenant = { name: "Banque du Commerce", brand: "#c25a16", locale: "fr" };
+const TENANT: TvTenant = { name: "Banque du Commerce", brand: "#1d4ed8", locale: "fr" };
 
 /** Utterance de test pour la voie vocale par défaut (window.speechSynthesis). */
 class FakeUtterance {

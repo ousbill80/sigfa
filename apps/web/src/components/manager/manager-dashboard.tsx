@@ -2,7 +2,7 @@
  * ManagerDashboard — supervisor dashboard (WEB-003).
  * Z hierarchy: KPIs (top) → queue-by-service + agents grid (mid) → sparklines
  * + alerts (bottom). TMA 40px coloured by SLA ratio (--danger only on breach).
- * v2 « Sérénité Premium » — @sigfa/ui components + tokens only. Realtime
+ * v3 « Neutre Premium » — @sigfa/ui components + tokens only. Realtime
  * simulated (RT-001).
  * @module components/manager/manager-dashboard
  */
@@ -182,7 +182,7 @@ export function ManagerDashboard({
                 marginTop: "var(--space-2)",
                 fontSize: "var(--text-sm)",
                 fontWeight: 500,
-                color: tmaTrend === "up" ? "var(--warning)" : "var(--forest)",
+                color: tmaTrend === "up" ? "var(--warning)" : "var(--success)",
               }}
             >
               {tmaDeltaJ7 <= 0 ? "▼" : "▲"} {Math.abs(tmaDeltaJ7)} {t("manager.vs_j7", locale)}

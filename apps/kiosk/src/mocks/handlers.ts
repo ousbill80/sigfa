@@ -149,7 +149,7 @@ export const handlers = [
         logoUrl: "/mock/bank/logo.svg",
         appliedColors: {
           primary: "#003f7f",
-          secondary: "#c79a3a",
+          secondary: "#8ea7ec",
           background: "#ffffff",
         },
         welcomeMessages: {

@@ -5,7 +5,7 @@
  * layout via {@link TvRealtime}). Le token d'affichage DISPLAY est minté côté
  * client (lecture seule, aucune PII) : aucun cookie ni JWT agent ici.
  *
- * L'habillage premium v2 est porté par {@link TvDisplay} → {@link TvScreen} ;
+ * L'habillage premium v3 est porté par {@link TvDisplay} → {@link TvScreen} ;
  * cette page ne fait que le tenant demo + le rendu.
  *
  * @module app/tv/[agencyId]/page
@@ -23,7 +23,7 @@ import { bankLogoUrl } from "@/lib/bank-branding";
  */
 const DEMO_TENANT: TvTenant = {
   name: "Banque du Commerce",
-  brand: "#c25a16",
+  brand: "#1d4ed8",
   locale: "fr",
   logoUrl: bankLogoUrl(),
 };

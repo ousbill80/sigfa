@@ -1,5 +1,5 @@
 /**
- * /design-preview — the SIGFA Design System v2 « Sérénité Premium » gallery.
+ * /design-preview — the SIGFA Design System v3 « Neutre Premium » gallery.
  *
  * Renders every canonical component in all of its states, plus a full-size
  * kiosk TicketMoment (on `--night`) and a dashboard KpiTile. FR/EN togglable.
@@ -89,7 +89,7 @@ interface Copy {
 
 const COPY: Record<Lang, Copy> = {
   fr: {
-    subtitle: "Système de design v2 · Sérénité Premium",
+    subtitle: "Système de design v3 · Neutre Premium",
     langLabel: "Langue",
     buttons: { title: "Boutons", desc: "Quatre intentions, trois tailles, cinq états (repos, survol, pressé, focus clavier, désactivé)." },
     primary: "Appeler le suivant",
@@ -116,7 +116,7 @@ const COPY: Record<Lang, Copy> = {
       title: "Theming banque — un seul token, zéro effort",
       desc: "Chaque banque se brande avec SA couleur primaire. Le MÊME bloc de composants (Button/Card/Badge/KpiTile) est rendu sous 3 chartes via BankThemeProvider — la structure ne bouge pas, le contraste (--brand-contrast) reste ≥ 4.5:1 (WCAG AA, recalculé en JS).",
     },
-    themeDefault: "Terracotta SIGFA (défaut)",
+    themeDefault: "Bleu SIGFA (défaut)",
     themeCallNext: "Appeler le suivant",
     themeVip: "Client prioritaire",
     themeKpi: "Tickets servis",
@@ -149,7 +149,7 @@ const COPY: Record<Lang, Copy> = {
     deltaNps: "+8 vs J-7",
   },
   en: {
-    subtitle: "Design System v2 · Serene Premium",
+    subtitle: "Design System v3 · Neutral Premium",
     langLabel: "Language",
     buttons: { title: "Buttons", desc: "Four intents, three sizes, five states (rest, hover, pressed, keyboard focus, disabled)." },
     primary: "Call next",
@@ -176,7 +176,7 @@ const COPY: Record<Lang, Copy> = {
       title: "Bank theming — one token, zero effort",
       desc: "Each bank brands with ITS primary colour. The SAME component block (Button/Card/Badge/KpiTile) is rendered under 3 charters via BankThemeProvider — structure never changes and the contrast (--brand-contrast) stays ≥ 4.5:1 (WCAG AA, computed in JS).",
     },
-    themeDefault: "SIGFA terracotta (default)",
+    themeDefault: "SIGFA blue (default)",
     themeCallNext: "Call next",
     themeVip: "Priority client",
     themeKpi: "Tickets served",
@@ -193,7 +193,7 @@ const COPY: Record<Lang, Copy> = {
     confirm: "Close",
     onboarding: { title: "Onboarding", desc: "Guided setup journey." },
     steps: ["Bank", "Agency", "Services", "Done"],
-    kioskTitle: "Kiosk — the Ticket Moment (night background, gold halo)",
+    kioskTitle: "Kiosk — the Ticket Moment (night background, brand halo)",
     ticketEyebrow: "Your ticket",
     ticketMessage: "Make yourself comfortable. We will call you very soon.",
     ticketSms: "Get it by SMS",
@@ -216,8 +216,7 @@ const SWATCHES: ReadonlyArray<{ name: string; token: keyof typeof color }> = [
   { name: "ink", token: "--ink" },
   { name: "brand", token: "--brand" },
   { name: "brand-strong", token: "--brand-strong" },
-  { name: "forest", token: "--forest" },
-  { name: "gold", token: "--gold" },
+  { name: "brand-inv", token: "--brand-inv" },
   { name: "night", token: "--night" },
   { name: "success", token: "--success" },
   { name: "warning", token: "--warning" },
@@ -339,9 +338,9 @@ export default function DesignPreviewPage(): ReactElement {
         <section className="dp-section">
           <div className="dp-section__head">
             <span className="dp-section__eyebrow">Fondation</span>
-            <h2 className="dp-section__title">Palette « Or & Forêt » + typographie</h2>
+            <h2 className="dp-section__title">Palette « Neutre Premium » + typographie</h2>
             <p className="dp-section__desc">
-              Base chaude (papier ivoire), marque terracotta, forêt & or.
+              Chassis neutre, marque bleu product (#1D4ED8), success & brand-inv.
               Titres « Clash Display », texte « General Sans » (auto-hébergés).
             </p>
           </div>
@@ -364,7 +363,7 @@ export default function DesignPreviewPage(): ReactElement {
               <div className="dp-type__row" key={row.tag}>
                 <span className="dp-type__tag">{row.tag}</span>
                 <span className="dp-type__sample" style={{ fontSize: row.size }}>
-                  Sérénité
+                  Neutre
                 </span>
               </div>
             ))}

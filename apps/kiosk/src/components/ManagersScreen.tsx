@@ -536,7 +536,7 @@ export function ManagersScreen({ agencyId }: ManagersScreenProps) {
             fontWeight: 600,
             color: "var(--ink-inverse)",
             backgroundColor: "transparent",
-            border: "2px solid var(--gold)",
+            border: "2px solid var(--brand-inv)",
             borderRadius: "var(--r-md)",
             padding: "var(--space-3) var(--space-8)",
             cursor: "pointer",

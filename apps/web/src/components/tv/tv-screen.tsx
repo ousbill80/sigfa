@@ -49,12 +49,12 @@ export type TvViewState = "nominal" | "loading" | "empty";
  * - `inkSectionOnLight` — titres de section, « MAINTENANT SERVI », guichets :
  *   --ink-soft seul mesure 6.0:1 sur --paper (< 7:1) → renforcé vers --ink :
  *   8.5:1 mesuré sur --paper, 9.0:1 sur --surface-1.
- * - `queueAccentOnLight` — compteur « En attente » : --gold (2.6:1) et
- *   --forest (6.5:1) sont sous le seuil sur fond clair → forêt renforcée vers
+ * - `queueAccentOnLight` — compteur « En attente » : --brand (faible) et
+ *   --success (6.5:1) sont sous le seuil sur fond clair → success renforcé vers
  *   --ink : 7.3:1 mesuré sur --paper.
  */
 const inkSectionOnLight = "color-mix(in srgb, var(--ink-soft) 70%, var(--ink))";
-const queueAccentOnLight = "color-mix(in srgb, var(--forest) 85%, var(--ink))";
+const queueAccentOnLight = "color-mix(in srgb, var(--success) 85%, var(--ink))";
 
 /** Props for {@link TvScreen}. */
 export interface TvScreenProps {
@@ -95,7 +95,7 @@ export interface TvScreenProps {
 }
 
 /**
- * Root screen surface — v2 « Sérénité Premium » projected board.
+ * Root screen surface — v3 « Neutre Premium » projected board.
  * Background sits on --night-2 (max-contrast dark) but keeps a --surface-screen
  * fallback so the token contract (and the "no white flash" guarantee) holds.
  */
@@ -240,7 +240,7 @@ function CurrentCallCard({
         borderRadius: "var(--r-xl)",
         border: "1px solid var(--hairline)",
         backgroundColor: celebration ? "var(--brand-strong)" : "var(--surface-1)",
-        boxShadow: celebration ? "var(--shadow-gold)" : "var(--shadow-1)",
+        boxShadow: celebration ? "var(--shadow-brand)" : "var(--shadow-1)",
         transition: reducedMotion
           ? "none"
           : "background-color var(--duration-celebration) linear, box-shadow var(--tv-slide-duration) var(--tv-slide-ease)",
@@ -272,7 +272,7 @@ function CurrentCallCard({
               fontWeight: 600,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              /* --gold mesure 2.6:1 sur --surface-1 : encre renforcée au repos. */
+              /* Accent brand faible sur --surface-1 : encre renforcée au repos. */
               color: celebration ? "var(--ink-inverse)" : inkSectionOnLight,
             }}
           >
@@ -477,8 +477,8 @@ export function TvScreen({
                   lineHeight: "var(--leading-tight)",
                   fontVariantNumeric: "tabular-nums",
                   letterSpacing: "var(--tracking-numeric)",
-                  /* Accent « En attente » : --gold (2.6:1 sur clair) remplacé
-                     par la forêt renforcée — 7.3:1 mesuré sur --paper. */
+                  /* Accent « En attente » : brand trop faible sur clair →
+                     success renforcé — 7.3:1 mesuré sur --paper. */
                   color: queueAccentOnLight,
                 }}
               >

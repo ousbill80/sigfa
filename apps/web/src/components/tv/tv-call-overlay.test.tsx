@@ -42,8 +42,9 @@ describe("TvCallOverlay — takeover plein centre", () => {
     const style = number.getAttribute("style") ?? "";
     expect(style).toContain("white-space: nowrap");
     expect(style).toContain("clamp(var(--display-tv-counter)");
-    // Halo or digne (token Moment Ticket).
-    expect(style).toContain("--shadow-gold");
+    // Halo brand-inv digne (token Moment Ticket).
+    expect(style).toContain("var(--brand-inv)");
+    expect(style).toContain("color-mix");
   });
 
   it("TV-PUB: annonce visuelle accessible (role status, aria-live assertive)", () => {

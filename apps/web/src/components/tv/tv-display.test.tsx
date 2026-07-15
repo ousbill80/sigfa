@@ -10,7 +10,7 @@ import { TV_SEED_STATE } from "@/lib/tv-fixtures";
 
 const TENANT: TvTenant = {
   name: "Banque du Commerce",
-  brand: "#c25a16",
+  brand: "#1d4ed8",
   locale: "fr",
 };
 

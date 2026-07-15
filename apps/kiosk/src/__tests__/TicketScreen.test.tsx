@@ -150,7 +150,7 @@ describe("KIOSK-005: TicketScreen", () => {
 
   it("KIOSK-005: number rendered as TicketMoment hero (--display or), FR/EN without overflow", () => {
     // Refonte v2 : le numéro est le HÉROS, rendu par le composant TicketMoment
-    // de @sigfa/ui (--display en --gold sur --night, halo doré). Le style vient
+    // de @sigfa/ui (--display en --brand-inv sur --night, halo brand). Le style vient
     // de la classe `.sig-ticket__number` (tokens design system), plus d'inline.
     const locales = [
       { locale: "fr", messages: frMessages },

@@ -30,7 +30,7 @@ export interface AdSlide {
    */
   bg: string;
   /**
-   * Optional accent colour token used for the title (defaults to --gold).
+   * Optional accent colour token used for the title (defaults to --brand-inv).
    * Must be a `var(--token)` reference — no hex literals.
    */
   accent?: string;
@@ -61,16 +61,16 @@ export const DEFAULT_AD_SLIDES: readonly AdSlide[] = [
     id: "credit",
     titleKey: "tv.ad.credit.title",
     subtitleKey: "tv.ad.credit.subtitle",
-    // Dégradé nuit → forêt : fonctionnel fixe (confiance).
-    bg: "radial-gradient(circle at 75% 35%, color-mix(in srgb, var(--forest) 26%, var(--night-2)), var(--night-2) 66%)",
-    accent: "var(--gold)",
+    // Dégradé nuit → success : fonctionnel fixe (confiance).
+    bg: "radial-gradient(circle at 75% 35%, color-mix(in srgb, var(--success) 26%, var(--night-2)), var(--night-2) 66%)",
+    accent: "var(--brand-inv)",
   },
   {
     id: "app",
     titleKey: "tv.ad.app.title",
     subtitleKey: "tv.ad.app.subtitle",
-    // Dégradé nuit → or : premium.
-    bg: "linear-gradient(135deg, color-mix(in srgb, var(--gold) 22%, var(--night-2)), var(--night-2) 70%)",
-    accent: "var(--gold)",
+    // Dégradé nuit → brand-inv : premium.
+    bg: "linear-gradient(135deg, color-mix(in srgb, var(--brand-inv) 22%, var(--night-2)), var(--night-2) 70%)",
+    accent: "var(--brand-inv)",
   },
 ] as const;

@@ -496,7 +496,7 @@ export function ServicesScreen({
                 aria-label={service.name}
                 style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
               >
-                {/* En-tête de famille : trait or + nom (pas d'estimation d'attente
+                {/* En-tête de famille : trait brand-inv + nom (pas d'estimation d'attente
                     affichée — décision PO ; le SLA reste porté jusqu'au ticket). */}
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
                   <span
@@ -505,7 +505,7 @@ export function ServicesScreen({
                       width: "6px",
                       height: "28px",
                       borderRadius: "var(--r-full)",
-                      backgroundColor: "var(--gold)",
+                      backgroundColor: "var(--brand-inv)",
                       flexShrink: 0,
                     }}
                   />
@@ -662,7 +662,7 @@ export function ServicesScreen({
             ))}
 
             {/* Accès « Voir mon conseiller » — carte discrète mais visible en fin
-                de page, style DISTINCT des tuiles d'opération (contour or sur le
+                de page, style DISTINCT des tuiles d'opération (contour brand-soft sur le
                 fond kiosque, pas de carte pleine), navigation vers /managers sans
                 repasser par l'écran choice. */}
             <button
@@ -671,7 +671,7 @@ export function ServicesScreen({
               style={{
                 minHeight: "88px",
                 backgroundColor: "transparent",
-                border: "1px solid var(--gold-soft)",
+                border: "1px solid var(--brand-soft)",
                 borderRadius: "var(--r-lg)",
                 cursor: "pointer",
                 display: "flex",
@@ -689,8 +689,8 @@ export function ServicesScreen({
                   width: "56px",
                   height: "56px",
                   borderRadius: "var(--r-full)",
-                  border: "1px solid var(--gold-soft)",
-                  color: "var(--gold)",
+                  border: "1px solid var(--brand-soft)",
+                  color: "var(--brand-inv)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -723,7 +723,7 @@ export function ServicesScreen({
               </span>
               <span
                 aria-hidden="true"
-                style={{ marginLeft: "auto", color: "var(--gold)", display: "flex" }}
+                style={{ marginLeft: "auto", color: "var(--brand-inv)", display: "flex" }}
               >
                 <ChevronIcon size={28} />
               </span>

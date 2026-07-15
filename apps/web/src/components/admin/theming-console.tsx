@@ -64,7 +64,7 @@ export interface ThemingConsoleProps {
   locale?: Locale;
 }
 
-const DEFAULT_BRAND = "#c25a16";
+const DEFAULT_BRAND = "#1d4ed8";
 
 /**
  * Bank identity theming console.

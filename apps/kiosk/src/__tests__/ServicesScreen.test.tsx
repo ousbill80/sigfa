@@ -254,9 +254,9 @@ describe("KIOSK-BORNE: ServicesScreen — prise de ticket par familles", () => {
       const card = screen.getByTestId("advisor-access-card");
       expect(card).toBeInTheDocument();
       expect(screen.getByTestId("advisor-access-label").textContent).toBe(label);
-      // Style DISTINCT des tuiles d'opération : contour or, fond transparent.
+      // Style DISTINCT des tuiles d'opération : contour brand-soft, fond transparent.
       expect((card as HTMLElement).style.backgroundColor).toBe("transparent");
-      expect((card as HTMLElement).style.border).toContain("var(--gold-soft)");
+      expect((card as HTMLElement).style.border).toContain("var(--brand-soft)");
       // Icône personne (SVG, zéro emoji) dans la pastille.
       expect(
         screen.getByTestId("advisor-access-icon").querySelector("svg")

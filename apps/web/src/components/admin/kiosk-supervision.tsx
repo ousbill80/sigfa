@@ -329,7 +329,7 @@ export function KioskSupervision({
             <div data-testid="network-no-silent">
               <EmptyState
                 icon={
-                  <span style={{ color: "var(--forest)" }}>
+                  <span style={{ color: "var(--success)" }}>
                     <CheckGlyph />
                   </span>
                 }
@@ -369,7 +369,7 @@ export function KioskSupervision({
   );
 }
 
-/** Positive check glyph for the "no silent kiosk" EmptyState (forest tone). */
+/** Positive check glyph for the "no silent kiosk" EmptyState (success tone). */
 function CheckGlyph(): ReactElement {
   return (
     <svg width="28" height="28" viewBox="0 0 16 16" fill="none" aria-hidden="true">

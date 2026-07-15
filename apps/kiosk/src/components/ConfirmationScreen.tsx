@@ -12,7 +12,7 @@
  *   1024×768, y compris « Passer » (chemin majoritaire) et l'erreur système.
  * - F3 : bouton Retour commun (IconRetour + texte, ≥ 72px) → router.back().
  * - F13 (partiel) : bascule honnête « Texte plus grand » (icône appariée,
- *   aria-pressed, fond --gold + badge « Activé »), le texte grandit vraiment
+ *   aria-pressed, fond --brand-inv + badge « Activé »), le texte grandit vraiment
  *   et le timeout d'inactivité est doublé (30 s → 60 s).
  * - F15 : la VALEUR du SMS est annoncée AVANT le clavier (sous-titre
  *   permanent) et le consentement est visible dès le départ (désactivé tant
@@ -364,7 +364,7 @@ export function ConfirmationScreen({
         </button>
 
         {/* AUDIT-F13 — bascule honnête : libellé « Texte plus grand » (pas de
-            fausse « priorité »), état pressé NON ambigu (fond --gold ≥ 7:1 sur
+            fausse « priorité »), état pressé NON ambigu (fond --brand-inv ≥ 7:1 sur
             --night + badge « Activé ») et aria-pressed pour les lecteurs. */}
         <button
           data-testid="accessibility-toggle"
@@ -375,9 +375,9 @@ export function ConfirmationScreen({
             fontSize: bodyFontPx,
             fontWeight: isAccessibilityMode ? 600 : 400,
             color: isAccessibilityMode ? "var(--night)" : "var(--ink-inverse)",
-            backgroundColor: isAccessibilityMode ? "var(--gold)" : "transparent",
+            backgroundColor: isAccessibilityMode ? "var(--brand-inv)" : "transparent",
             border: isAccessibilityMode
-              ? "2px solid var(--gold)"
+              ? "2px solid var(--brand-inv)"
               : "2px solid var(--ink-inverse-soft)",
             borderRadius: "var(--r-md)",
             cursor: "pointer",
@@ -395,7 +395,7 @@ export function ConfirmationScreen({
               data-testid="accessibility-toggle-state"
               style={{
                 backgroundColor: "var(--night)",
-                color: "var(--gold)",
+                color: "var(--brand-inv)",
                 borderRadius: "var(--r-full)",
                 padding: "var(--space-1) var(--space-3)",
                 fontSize: bodyFontPx,

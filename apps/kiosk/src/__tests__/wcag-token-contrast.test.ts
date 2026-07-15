@@ -93,10 +93,10 @@ describe("F1: états vides lisibles sur fond nuit", () => {
   });
 });
 
-describe("Moment Ticket — paires or/nuit inchangées", () => {
-  it("--gold ≥ 7:1 sur --night (numéro de ticket)", () => {
-    // 7.25:1 mesuré — la marge est faible : tout assombrissement de l'or casse ici.
-    expect(contrastRatio(color["--gold"], NIGHT)).toBeGreaterThanOrEqual(7);
+describe("Moment Ticket — paires brand-inv/nuit", () => {
+  it("--brand-inv ≥ 7:1 sur --night (numéro de ticket)", () => {
+    // 8.38:1 mesuré (défaut v3) — assombrissement de brand-inv casse ici.
+    expect(contrastRatio(color["--brand-inv"], NIGHT)).toBeGreaterThanOrEqual(7);
   });
 
   it("--ink-inverse ≥ 7:1 sur --night et --night-2", () => {

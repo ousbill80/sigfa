@@ -104,10 +104,11 @@ describe("TvScreen — TV-V3 split permanent", () => {
     const count = within(queue).getByTestId("tv-queue-count");
     expect(count).toHaveTextContent(String(nominal.queue.length));
     expect(count.getAttribute("style")).toContain("var(--display-tv)");
-    // TV-BLANC : accent forêt renforcé (7.3:1 sur --paper) — --gold (2.6:1)
+    // TV-BLANC : accent success renforcé (7.3:1 sur --paper) — brand trop faible
     // est illisible sur la colonne claire.
     const countStyle = count.getAttribute("style") ?? "";
-    expect(countStyle).toContain("var(--forest)");
+    expect(countStyle).toContain("var(--success)");
+    expect(countStyle).not.toContain("var(--brand-inv)");
     expect(countStyle).not.toContain("var(--gold)");
   });
 });
@@ -394,18 +395,18 @@ describe("TvScreen — TV-002 flash conservé (option « flash dans la colonne �
     const style = hero.getAttribute("style") ?? "";
     // Assombri (7.6:1 avec --ink-inverse) : le flash reste dramatique sur --paper.
     expect(style).toContain("var(--brand-strong)");
-    expect(style).toContain("var(--shadow-gold)");
+    expect(style).toContain("var(--shadow-brand)");
     // La pub n'est JAMAIS interrompue par l'appel.
     expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
   });
 
-  it("TV-002: sans célébration — la carte revient au repos (carte claire --surface-1, sans halo or)", () => {
+  it("TV-002: sans célébration — la carte revient au repos (carte claire --surface-1, sans halo brand)", () => {
     render(<TvScreen state={nominal} celebration={false} />);
     const hero = screen.getByTestId("tv-hero");
     expect(hero).toHaveAttribute("data-celebration", "off");
     const style = hero.getAttribute("style") ?? "";
     expect(style).toContain("var(--surface-1)");
-    expect(style).not.toContain("var(--shadow-gold)");
+    expect(style).not.toContain("var(--shadow-brand)");
   });
 
   it("TV-002: transitions en tokens uniquement (aucune durée en dur)", () => {

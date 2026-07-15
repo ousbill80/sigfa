@@ -1,6 +1,6 @@
 /**
  * AdmOnboardingStepper — chronometered, resumable 5-step agency onboarding
- * (ADM-002b). Design System v2 « Sérénité Premium » — @sigfa/ui + tokens only.
+ * (ADM-002b). Design System v3 « Neutre Premium » — @sigfa/ui + tokens only.
  *
  * Steps: create (clone) → services & SLA → counters → agents (CSV) → kiosk/QR.
  * A global chronometer runs from `startedAt`; each step shows a target time and
@@ -679,12 +679,12 @@ function Recap(props: {
         marginTop: "var(--space-6)",
         padding: "var(--space-8)",
         borderRadius: "var(--r-xl)",
-        borderTop: "3px solid var(--gold)",
-        background: "var(--gold-soft)",
+        borderTop: "3px solid var(--brand)",
+        background: "var(--brand-soft)",
       }}
     >
       <Overline>{tr("admOnboard.recap.title")}</Overline>
-      <Heading size="xl" style={{ margin: "var(--space-1) 0 var(--space-4)", color: "var(--forest)" }}>
+      <Heading size="xl" style={{ margin: "var(--space-1) 0 var(--space-4)", color: "var(--success)" }}>
         {tr("admOnboard.recap.operational")}
       </Heading>
       <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-2) var(--space-4)", margin: 0 }}>

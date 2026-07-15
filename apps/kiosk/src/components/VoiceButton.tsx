@@ -52,7 +52,7 @@ export function VoiceButton({
         fontSize: `${labelFontPx}px`,
         color: "var(--ink-inverse)",
         backgroundColor: "transparent",
-        border: "2px solid var(--gold)",
+        border: "2px solid var(--brand-inv)",
         borderRadius: "var(--r-md)",
         cursor: "pointer",
         padding: "var(--space-2) var(--space-4)",

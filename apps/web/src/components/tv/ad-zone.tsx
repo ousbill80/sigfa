@@ -135,7 +135,7 @@ export function AdZone({
                 width: "var(--space-16)",
                 height: "var(--space-1)",
                 borderRadius: "var(--r-full)",
-                background: current.accent ?? "var(--gold)",
+                background: current.accent ?? "var(--brand-inv)",
                 opacity: 0.9,
               }}
             />
@@ -148,7 +148,7 @@ export function AdZone({
                 fontWeight: 600,
                 lineHeight: 1.05,
                 letterSpacing: "var(--tracking-tight)",
-                color: current.accent ?? "var(--gold)",
+                color: current.accent ?? "var(--brand-inv)",
                 maxWidth: "18ch",
                 textWrap: "balance",
               }}
@@ -192,8 +192,8 @@ export function AdZone({
             width: "var(--space-3)",
             height: "var(--space-3)",
             borderRadius: "var(--r-full)",
-            backgroundColor: "var(--forest)",
-            boxShadow: "0 0 var(--space-4) var(--forest)",
+            backgroundColor: "var(--success)",
+            boxShadow: "0 0 var(--space-4) var(--success)",
           }}
         />
         <span style={{ fontWeight: 600, color: "var(--ink-inverse)" }}>{t("tv.welcome", locale)}</span>

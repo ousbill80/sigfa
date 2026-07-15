@@ -201,7 +201,7 @@ export function FeedbackScreen({
           padding: "var(--space-8)",
         }}
       >
-        <span aria-hidden="true" style={{ color: "var(--gold)", lineHeight: 1 }}>
+        <span aria-hidden="true" style={{ color: "var(--brand-inv)", lineHeight: 1 }}>
           <IconEtoile size={56} />
         </span>
         <p
@@ -281,7 +281,7 @@ export function FeedbackScreen({
         {t("title")}
       </h1>
 
-      {/* Note 1-5 : 5 étoiles OR tactiles ≥ 72 px, espacement ≥ 16 px */}
+      {/* Note 1-5 : 5 étoiles brand-inv tactiles ≥ 72 px, espacement ≥ 16 px */}
       <div
         data-testid="star-rating"
         role="radiogroup"
@@ -306,12 +306,14 @@ export function FeedbackScreen({
                 minWidth: "72px",
                 minHeight: "72px",
                 fontSize: `${labelFontPx}px`,
-                color: active ? "var(--gold)" : "var(--ink-muted-inv)",
+                color: active ? "var(--brand-inv)" : "var(--ink-muted-inv)",
                 backgroundColor: active ? "var(--surface-1)" : "transparent",
                 border: active
-                  ? "2px solid var(--gold)"
+                  ? "2px solid var(--brand-inv)"
                   : "2px solid var(--ink-inverse)",
-                boxShadow: active ? "var(--shadow-gold)" : "none",
+                boxShadow: active
+                  ? "0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent)"
+                  : "none",
                 borderRadius: "var(--r-md)",
                 cursor: "pointer",
               }}

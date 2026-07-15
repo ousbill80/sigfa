@@ -23,8 +23,8 @@ export default function TvPage(): ReactElement {
   /** Tenant theming resolved for the default TV display. */
   const tenant: TvTenant = {
     name: "Banque du Commerce",
-    // Marque du tenant démo alignée sur la palette v2 « Or & Forêt » (terracotta).
-    brand: "#c25a16",
+    // Marque du tenant démo alignée sur la palette v3 « Neutre Premium ».
+    brand: "#1d4ed8",
     locale: "fr",
     logoUrl: bankLogoUrl(),
   };

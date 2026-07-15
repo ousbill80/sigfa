@@ -130,12 +130,12 @@ function GuaranteeNotice({ locale }: { locale: Locale }): ReactElement {
         gap: "var(--space-2)",
         marginTop: "var(--space-3)",
         padding: "var(--space-2) var(--space-3)",
-        background: "var(--forest-soft)",
+        background: "var(--success-soft)",
         borderRadius: "var(--r-full)",
         fontFamily: "var(--font-text)",
         fontSize: "var(--text-sm)",
         fontWeight: 600,
-        color: "var(--forest)",
+        color: "var(--success)",
       }}
     >
       {/* Icône bouclier (SVG token-colored) appariée au texte — zéro emoji. */}

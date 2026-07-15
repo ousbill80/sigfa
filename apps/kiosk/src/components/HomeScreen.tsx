@@ -137,7 +137,7 @@ export function HomeScreen({
           overflow: "hidden",
         }}
       >
-        {/* Halo or discret — signature v2 sur night (décoratif, non interactif). */}
+        {/* Halo brand-inv discret — signature v3 sur night (décoratif, non interactif). */}
         <span
           aria-hidden="true"
           style={{
@@ -149,7 +149,7 @@ export function HomeScreen({
             height: "640px",
             borderRadius: "var(--r-full)",
             background:
-              "radial-gradient(circle, var(--gold-soft) 0%, rgba(199,154,58,0.10) 42%, transparent 70%)",
+              "radial-gradient(circle, var(--brand-soft) 0%, color-mix(in srgb, var(--brand-inv) 10%, transparent) 42%, transparent 70%)",
             opacity: 0.28,
             pointerEvents: "none",
           }}
