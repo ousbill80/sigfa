@@ -62,15 +62,6 @@
   --danger-inv: #fca5a5; /* 10.43:1 / 10.74:1 — erreurs (pictogramme/texte, jamais fond) */
   --info-inv: #38bdf8; /* 9.24:1 / 9.51:1 — offline, information neutre */
 
-  /* ---- Alias v2 ---- */
-  /* DEPRECATED v3 — à supprimer après migration des surfaces (web/kiosk/TV).
-     `--forest`/`--gold` ne font plus partie de l'identite : mappes sur les
-     equivalents v3 pour ne pas casser les apps avant leur migration. */
-  --forest: var(--success); /* DEPRECATED v3 — à supprimer après migration des surfaces */
-  --forest-soft: var(--success-soft); /* DEPRECATED v3 — à supprimer après migration des surfaces */
-  --gold: var(--brand-inv); /* DEPRECATED v3 — à supprimer après migration des surfaces */
-  --gold-soft: var(--brand-soft); /* DEPRECATED v3 — à supprimer après migration des surfaces */
-
   /* ---- Typographie ---- */
   /* Polices swappables : surcharger ces deux tokens suffit à changer la fonte. */
   --font-display: "Clash Display", "General Sans", ui-sans-serif, -apple-system,
@@ -110,9 +101,8 @@
   --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.05);
   /* Bouton primaire = presence — teinte brand a faible alpha, suit le tenant. */
   --shadow-brand: 0 8px 24px color-mix(in srgb, var(--brand) 22%, transparent);
-  /* DEPRECATED v3 — à supprimer après migration des surfaces (halo Moment
-     Ticket : desormais halo brand discret, plus d'or). */
-  --shadow-gold: 0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent);
+  /* Halo Moment Ticket / célébration TV — brand-inv discret, pas d'or. */
+  --shadow-brand-glow: 0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent);
 
   /* ---- Espacement (base 4, généreux) ---- */
   --space-0: 0;

@@ -331,7 +331,7 @@
     transparent 70%
   );
   opacity: 0.5;
-  box-shadow: 0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent);
+  box-shadow: var(--shadow-brand-glow);
 }
 /* Tighten hero paddings + fluid ticket number on narrow phones (<380px). */
 @media (max-width: 380px) {

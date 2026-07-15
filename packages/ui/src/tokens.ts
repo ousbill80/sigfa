@@ -42,12 +42,6 @@ export const brand = {
   brandSoft: "#E8EDFB",
   brandContrast: "#FFFFFF",
   brandInv: "#8EA7EC",
-  /* DEPRECATED v3 — à supprimer après migration des surfaces. Alias of the
-     v3 equivalents (`--forest` -> success, `--gold` -> brand-inv). */
-  forest: "#15803D",
-  forestSoft: "#DCFCE7",
-  gold: "#8EA7EC",
-  goldSoft: "#E8EDFB",
 } as const;
 
 /** Functional semantics — sober, standard hues on the neutral chassis. */
@@ -87,11 +81,6 @@ export const color = {
   "--brand-soft": brand.brandSoft,
   "--brand-contrast": brand.brandContrast,
   "--brand-inv": brand.brandInv,
-  /* DEPRECATED v3 — à supprimer après migration des surfaces. */
-  "--forest": brand.forest,
-  "--forest-soft": brand.forestSoft,
-  "--gold": brand.gold,
-  "--gold-soft": brand.goldSoft,
   "--success": semantic.success,
   "--success-soft": semantic.successSoft,
   "--warning": semantic.warning,
@@ -132,15 +121,14 @@ export const radius = {
 } as const;
 
 /** Neutral, subtle elevation — pure black at low alpha, never tinted.
- * `brand` mirrors the resolved `color-mix(brand 22%, transparent)` and
- * `gold` (DEPRECATED v3 — à supprimer après migration des surfaces) the
- * resolved brand-inv halo, both for the default brand #1D4ED8. */
+ * `brand` / `brandGlow` mirror the resolved `color-mix(...)` for default
+ * brand #1D4ED8 (button presence + Moment Ticket / TV celebration halo). */
 export const shadow = {
   "1": "0 1px 2px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.04)",
   "2": "0 4px 12px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04)",
   "3": "0 12px 32px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.05)",
   brand: "0 8px 24px rgba(29,78,216,.22)",
-  gold: "0 0 48px rgba(142,167,236,.30)",
+  brandGlow: "0 0 48px rgba(142,167,236,.30)",
 } as const;
 
 /** Spacing scale (base 4, generous). Values in px. */

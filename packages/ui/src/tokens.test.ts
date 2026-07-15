@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { tokens, color, fontSize, radius, space, font } from "./tokens.js";
+import {
+  tokens,
+  color,
+  fontSize,
+  radius,
+  shadow,
+  space,
+  font,
+} from "./tokens.js";
 import { contrastRatio } from "./lib/contrast.js";
 
 describe("design tokens", () => {
@@ -38,12 +46,9 @@ describe("design tokens", () => {
     }
   });
 
-  it("keeps the deprecated v2 aliases mapped onto v3 equivalents (migration)", () => {
-    // DEPRECATED v3 — à supprimer après migration des surfaces.
-    expect(color["--forest"]).toBe(color["--success"]);
-    expect(color["--forest-soft"]).toBe(color["--success-soft"]);
-    expect(color["--gold"]).toBe(color["--brand-inv"]);
-    expect(color["--gold-soft"]).toBe(color["--brand-soft"]);
+  it("exposes a brand-glow shadow for Moment Ticket / TV celebration (no gold)", () => {
+    expect(shadow.brandGlow).toMatch(/rgba\(142,\s*167,\s*236/);
+    expect(Object.keys(shadow)).not.toContain("gold");
   });
 
   it("carries the kiosk display size (76px ticket number)", () => {
@@ -209,11 +214,9 @@ describe("token contrast proofs (WCAG)", () => {
     }
   });
 
-  it("deprecated --gold alias (ticket number) stays ≥ 7:1 on --night", () => {
-    // DEPRECATED v3 — filet de sécurité tant que les surfaces TV/kiosk
-    // référencent encore var(--gold) : l'alias pointe sur --brand-inv.
+  it("--brand-inv (ticket number) stays ≥ 7:1 on --night", () => {
     expect(
-      contrastRatio(color["--gold"], color["--night"]),
+      contrastRatio(color["--brand-inv"], color["--night"]),
     ).toBeGreaterThanOrEqual(7);
   });
 });

@@ -1,11 +1,11 @@
 /**
- * KIOSK — design-tokens.css (v2 « Sérénité Premium »).
+ * KIOSK — design-tokens.css (v3 « Neutre Premium »).
  *
- * SOURCE UNIQUE : les valeurs hex vivent désormais dans `@sigfa/ui/tokens.css`
+ * SOURCE UNIQUE : les valeurs hex vivent dans `@sigfa/ui/tokens.css`
  * (design system partagé). Ce fichier n'est plus qu'un PONT : il ré-exporte les
  * tokens `@sigfa/ui` et déclare les ALIAS historiques du kiosque
  * (`--surface-kiosk`, `--action-label`, `--ink-strong`, `--ink-muted-inv`) qui
- * pointent vers les tokens v2. Aucune couleur propre au kiosque n'est inventée.
+ * pointent vers les tokens v3. Aucune couleur propre au kiosque n'est inventée.
  *
  * Deux tokens (`--surface-kiosk`, `--ink-inverse`) sont écrits en hex littéral
  * IDENTIQUE à `--night` / `--ink-inverse` de `@sigfa/ui` : ils constituent la
@@ -15,36 +15,34 @@
 @import "@sigfa/ui/tokens.css";
 
 :root {
-  /* ─── Surfaces kiosque (fond « brun-nuit » v2 qui vibre l'or) ─────────────── */
-  --surface-kiosk: #16110b; /* = --night (@sigfa/ui) — fond plein soleil */
+  /* ─── Surfaces kiosque (nuit neutre pure v3) ─────────────────────────────── */
+  --surface-kiosk: #0a0a0a; /* = --night (@sigfa/ui) — fond plein soleil */
   --surface-screen: var(--night-2);
   --surface-0: var(--paper);
   /* --surface-1 (cartes) : hérité tel quel de @sigfa/ui (#ffffff). */
 
   /* ─── Texte ──────────────────────────────────────────────────────────────── */
-  --ink-inverse: #fbf6ee; /* = --ink-inverse (@sigfa/ui) — blanc chaud ≥ 7:1 sur night */
-  --ink-strong: var(--ink); /* texte sur surface claire — brun-noir chaud */
+  --ink-inverse: #fafafa; /* = --ink-inverse (@sigfa/ui) — ≥ 7:1 sur night */
+  --ink-strong: var(--ink); /* texte sur surface claire */
   --ink-muted-inv: var(--ink-inverse-soft); /* secondaire sur sombre */
-  /* --ink-soft : hérité de @sigfa/ui (taupe chaud, texte sur clair). */
+  /* --ink-soft : hérité de @sigfa/ui. */
 
-  /* Libellé d'action sur carte claire. Contraste MESURÉ : 8.1:1 sur
-     --surface-1 avec le brand par défaut (seuil kiosque ≥ 7:1, garanti pour
-     tout tenant par deriveBankTheme). L'ancien commentaire revendiquait 18:1 —
-     c'était la valeur de --ink sur --surface-1 (18.4:1), jamais celle-ci
-     (audit borne 2026-07-14, F10 : 6.66:1 réel à l'époque). */
+  /* Libellé d'action sur carte claire. Contraste MESURÉ : ≥ 7:1 sur
+     --surface-1 avec le brand par défaut (seuil kiosque, garanti pour
+     tout tenant par deriveBankTheme). */
   --action-label: var(--brand-strong);
 
   /* ─── Marque : héritée de @sigfa/ui (Neutre Premium — brand / brand-inv). ── */
   /* Le theming banque surcharge --brand en amont. */
 
-  /* ─── États sémantiques : hérités de @sigfa/ui (harmonisés palette chaude). ── */
+  /* ─── États sémantiques : hérités de @sigfa/ui. ──────────────────────────── */
   /* Sur fond nuit, TOUJOURS les variantes inverses (--success-inv, etc.) :
-     les sémantiques directs tombent à 3.4–3.5:1 sur --night (F6/F10). */
+     les sémantiques directs tombent sous 7:1 sur --night (F6/F10). */
 
   /* ─── États vides (audit 2026-07-14, F1) ──────────────────────────────────── */
   /* La borne rend TOUS ses états vides sur --night : l'EmptyState @sigfa/ui
-     est routé vers l'encre inverse via ses points d'entrée CSS. Titre 17.4:1,
-     description 8.3:1 sur --night (seuil ≥ 7:1). La description passe au
+     est routé vers l'encre inverse via ses points d'entrée CSS. Titre ≥ 7:1,
+     description ≥ 7:1 sur --night. La description passe au
      plancher borne : --text-xl = 25px (règle « texte ≥ 24px »). */
   --sig-empty-title: var(--ink-inverse);
   --sig-empty-desc: var(--ink-inverse-soft);

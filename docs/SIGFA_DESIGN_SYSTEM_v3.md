@@ -84,15 +84,8 @@ Note d'implémentation : la spec v3 proposait `#16A34A` / `#D97706` comme point 
 --info-inv      #38BDF8    9.24:1 /  9.51:1
 ```
 
-### Alias dépréciés (compatibilité v2 → v3, temporaires)
-```
---forest        var(--success)      /* DEPRECATED v3 — à supprimer après migration des surfaces */
---forest-soft   var(--success-soft) /* DEPRECATED v3 */
---gold          var(--brand-inv)    /* DEPRECATED v3 */
---gold-soft     var(--brand-soft)   /* DEPRECATED v3 */
---shadow-gold   halo brand-inv 30 % /* DEPRECATED v3 */
-```
-`--forest` et `--gold` ne font **plus partie de l'identité**. Les alias existent uniquement pour que les surfaces (web, kiosk, TV) compilent et s'affichent correctement avant leur migration (phase suivante). Toute NOUVELLE surface doit référencer les tokens v3.
+### Alias v2 retirés
+Les anciens `--forest*`, `--gold*` et `--shadow-gold` ont été **supprimés** après migration des surfaces (web, kiosk, TV). Utiliser `--success*`, `--brand-inv` / `--brand-soft`, et `--shadow-brand-glow`.
 
 ---
 
@@ -102,7 +95,8 @@ Note d'implémentation : la spec v3 proposait `#16A34A` / `#D97706` comme point 
 --shadow-1   0 1px 2px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.04)
 --shadow-2   0 4px 12px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04)
 --shadow-3   0 12px 32px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.05)
---shadow-brand   0 8px 24px color-mix(brand 22%, transparent)   (bouton primaire, suit le tenant)
+--shadow-brand        0 8px 24px color-mix(brand 22%, transparent)   (bouton primaire, suit le tenant)
+--shadow-brand-glow   0 0 48px color-mix(brand-inv 30%, transparent) (Moment Ticket / célébration TV)
 ```
 Ombres **neutres** (noir pur à faible alpha) — plus d'ombres brunes ni dorées.
 
@@ -138,4 +132,4 @@ API (props/variants) **inchangée**. Repasse v3 :
 2. **Un seul token tenant** : `--tenant-brand` (via `BankThemeProvider`). La structure ne change jamais.
 3. Seuils de contraste **prouvés par les tests**, jamais déclarés : web ≥ 4.5:1 (texte normal), surfaces sombres kiosk/TV ≥ 7:1.
 4. Aucun emoji (lint `sigfa/no-emoji`) ; icônes = set SIGFA duotone.
-5. Les alias dépréciés (`--forest*`, `--gold*`, `--shadow-gold`) sont interdits dans tout nouveau code et seront supprimés après la migration des surfaces.
+5. Aucun retour des tokens v2 Or & Forêt (`--forest*`, `--gold*`, `--shadow-gold`) — palette Neutre Premium uniquement.
