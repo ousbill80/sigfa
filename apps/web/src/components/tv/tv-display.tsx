@@ -53,6 +53,11 @@ import type { Locale } from "@/lib/i18n";
 export interface TvTenant {
   /** Nom de banque affiché dans l'en-tête. */
   name: string;
+  /**
+   * Nom d'agence affiché sous la banque (design-gate TV v3 : « Banque · Agence »).
+   * `null`/absent → seule la banque est affichée.
+   */
+  agencyName?: string | null;
   /** Couleur de marque du tenant (corrigée WCAG sur fond nuit). */
   brand: string;
   /** Langue d'affichage. */
@@ -161,6 +166,7 @@ export function TvDisplay({ tenant }: TvDisplayProps): ReactElement {
         state={state}
         locale={tenant.locale}
         tenantName={tenant.name}
+        agencyName={tenant.agencyName ?? null}
         clock={clock}
         dateLabel={dateLabel}
         /* La carte « MAINTENANT SERVI » flashe pendant le takeover (real) —

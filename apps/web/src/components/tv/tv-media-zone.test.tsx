@@ -144,4 +144,16 @@ describe("TvMediaZone — fondu, reduced-motion, attributs vidéo", () => {
     expect(style).toContain("overflow: hidden");
     expect(style).not.toContain("z-index");
   });
+
+  it("TV-MEDIA: overlays Neutre Premium — lave brand, vignette nuit, lavette papier + pastilles brand-inv", () => {
+    render(<TvMediaZone items={PLAYLIST} />);
+    expect(screen.getByTestId("tv-media-wash-top")).toBeInTheDocument();
+    expect(screen.getByTestId("tv-media-vignette")).toBeInTheDocument();
+    expect(screen.getByTestId("tv-media-wash-right")).toBeInTheDocument();
+    expect(screen.getByTestId("tv-media-progress")).toBeInTheDocument();
+    const dots = screen.getAllByTestId("tv-media-dot");
+    expect(dots).toHaveLength(3);
+    expect(dots[0]).toHaveAttribute("data-active", "on");
+    expect(dots[0]!.getAttribute("style") ?? "").toContain("var(--brand-inv)");
+  });
 });

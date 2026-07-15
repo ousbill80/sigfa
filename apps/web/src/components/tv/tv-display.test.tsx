@@ -85,6 +85,12 @@ describe("TvDisplay — zone média (manifeste public/tv-media)", () => {
     render(<TvDisplay tenant={TENANT} />);
     expect(screen.getByTestId("tv-brand-mark")).toHaveTextContent("B");
   });
+
+  it("TV-LOGO: tenant.agencyName transmis sous le nom de banque", () => {
+    render(<TvDisplay tenant={{ ...TENANT, agencyName: "Agence Plateau" }} />);
+    expect(screen.getByTestId("tv-brand-name")).toHaveTextContent("Banque du Commerce");
+    expect(screen.getByTestId("tv-agency-name")).toHaveTextContent("Agence Plateau");
+  });
 });
 
 describe("formatTvDate — date complète FR/EN", () => {

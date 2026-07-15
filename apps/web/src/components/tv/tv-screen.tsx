@@ -49,12 +49,12 @@ export type TvViewState = "nominal" | "loading" | "empty";
  * - `inkSectionOnLight` — titres de section, « MAINTENANT SERVI », guichets :
  *   --ink-soft seul mesure 6.0:1 sur --paper (< 7:1) → renforcé vers --ink :
  *   8.5:1 mesuré sur --paper, 9.0:1 sur --surface-1.
- * - `queueAccentOnLight` — compteur « En attente » : --brand (faible) et
- *   --success (6.5:1) sont sous le seuil sur fond clair → success renforcé vers
- *   --ink : 7.3:1 mesuré sur --paper.
+ * - `queueAccentOnLight` — compteur « En attente » : --brand-inv seul est
+ *   sous le seuil sur fond clair → --brand-strong mélangé à --ink pour
+ *   tenir ≥ 7:1 sur --paper.
  */
 const inkSectionOnLight = "color-mix(in srgb, var(--ink-soft) 70%, var(--ink))";
-const queueAccentOnLight = "color-mix(in srgb, var(--success) 85%, var(--ink))";
+const queueAccentOnLight = "color-mix(in srgb, var(--brand-strong) 72%, var(--ink))";
 
 /** Props for {@link TvScreen}. */
 export interface TvScreenProps {
@@ -64,6 +64,8 @@ export interface TvScreenProps {
   locale?: Locale;
   /** Tenant display name shown in the header. */
   tenantName?: string;
+  /** Agency name shown under the bank name (TV v3 : Banque · Agence). */
+  agencyName?: string | null;
   /** Current wall-clock time rendered in the header (kept out of the component for testability). */
   clock?: string;
   /** Full localized date (FR/EN) shown at the center of the top banner. */
@@ -95,7 +97,7 @@ export interface TvScreenProps {
 }
 
 /**
- * Root screen surface — v3 « Neutre Premium » projected board.
+ * Root screen surface — v2 « Sérénité Premium » projected board.
  * Background sits on --night-2 (max-contrast dark) but keeps a --surface-screen
  * fallback so the token contract (and the "no white flash" guarantee) holds.
  */
@@ -127,9 +129,12 @@ const splitStyle: CSSProperties = {
  * jamais, rien ne peut déborder de l'écran.
  */
 const columnStyle: CSSProperties = {
-  backgroundColor: "var(--paper)",
+  /* Mariage Neutre Premium : lave brand discrète en tête → --paper (lisibilité
+     PO conservée). Frontière tiédie vers la zone média sombre. */
+  background:
+    "linear-gradient(180deg, color-mix(in srgb, var(--brand) 10%, var(--paper)) 0%, var(--paper) 36%)",
   color: "var(--ink)",
-  borderLeft: "1px solid var(--hairline)",
+  borderLeft: "1px solid color-mix(in srgb, var(--brand) 18%, var(--hairline))",
   display: "flex",
   flexDirection: "column",
   minHeight: 0,
@@ -238,9 +243,11 @@ function CurrentCallCard({
         gap: "var(--space-2)",
         padding: "var(--space-6) var(--space-4)",
         borderRadius: "var(--r-xl)",
-        border: "1px solid var(--hairline)",
+        border: celebration
+          ? "1px solid color-mix(in srgb, var(--brand-inv) 45%, transparent)"
+          : "1px solid color-mix(in srgb, var(--brand) 16%, var(--hairline))",
         backgroundColor: celebration ? "var(--brand-strong)" : "var(--surface-1)",
-        boxShadow: celebration ? "var(--shadow-brand)" : "var(--shadow-1)",
+        boxShadow: celebration ? "0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent)" : "var(--shadow-1)",
         transition: reducedMotion
           ? "none"
           : "background-color var(--duration-celebration) linear, box-shadow var(--tv-slide-duration) var(--tv-slide-ease)",
@@ -272,7 +279,7 @@ function CurrentCallCard({
               fontWeight: 600,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              /* Accent brand faible sur --surface-1 : encre renforcée au repos. */
+              /* --brand-inv trop clair sur --surface-1 : encre renforcée au repos. */
               color: celebration ? "var(--ink-inverse)" : inkSectionOnLight,
             }}
           >
@@ -316,6 +323,7 @@ export function TvScreen({
   state,
   locale = "fr",
   tenantName = "",
+  agencyName = null,
   clock = "",
   dateLabel = "",
   loading = false,
@@ -343,6 +351,7 @@ export function TvScreen({
     >
       <TvHeader
         tenantName={tenantName}
+        agencyName={agencyName}
         dateLabel={dateLabel}
         clock={clock}
         logoUrl={logoUrl}
@@ -477,8 +486,7 @@ export function TvScreen({
                   lineHeight: "var(--leading-tight)",
                   fontVariantNumeric: "tabular-nums",
                   letterSpacing: "var(--tracking-numeric)",
-                  /* Accent « En attente » : brand trop faible sur clair →
-                     success renforcé — 7.3:1 mesuré sur --paper. */
+                  /* Accent « En attente » : brand-strong + ink pour ≥ 7:1 sur --paper. */
                   color: queueAccentOnLight,
                 }}
               >
@@ -513,9 +521,9 @@ export function TvScreen({
 }
 
 /**
- * Bandeau haut — fond --brand, texte inverse : logo banque (ou pastille
- * --brand-contrast + initiale sans logo provisionné) + nom à gauche, date
- * complète au centre, horloge en bloc contrasté à droite.
+ * Bandeau haut — grille 3 colonnes (logo | date | horloge) pour que la zone
+ * logo ne soit JAMAIS écrasée à 0 px. Dégradé --brand → nuit, pastille / logo
+ * cadré, nom banque toujours lisible (ellipsis en dernier recours).
  *
  * Convention lib/bank-branding (`NEXT_PUBLIC_BANK_LOGO_URL`), composée
  * LOCALEMENT : l'écran TV est public, aucune dépendance à session-header /
@@ -523,74 +531,96 @@ export function TvScreen({
  */
 function TvHeader({
   tenantName,
+  agencyName,
   dateLabel,
   clock,
   logoUrl,
   action,
 }: {
   tenantName: string;
+  agencyName: string | null;
   dateLabel: string;
   clock: string;
   logoUrl: string | null;
   action: ReactNode;
 }): ReactElement {
-  /* Logo bien visible : ~48px dans le bandeau de 64px (marge --space-4). */
-  const markSize = "calc(var(--tv-header-height) - var(--space-4))";
+  const agencyLabel = agencyName?.trim() || null;
+  /* Disque 44 px : --space-4 + --space-1 (= 20 px) de marge dans le bandeau. */
+  const markSize = "calc(var(--tv-header-height) - var(--space-4) - var(--space-1))";
+  const brandSlot: CSSProperties = {
+    width: markSize,
+    height: markSize,
+    borderRadius: "var(--r-full)",
+    backgroundColor: "var(--brand-contrast)",
+    border: "2px solid color-mix(in srgb, var(--brand-inv) 55%, var(--brand-contrast))",
+    boxShadow: "var(--shadow-1)",
+    flexShrink: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    boxSizing: "border-box",
+  };
   return (
     <header
       data-testid="tv-header"
       style={{
         height: "var(--tv-header-height)",
-        display: "flex",
+        display: "grid",
+        /* Gauche un peu plus large pour la zone logo ; minmax(0) → ellipsis OK. */
+        gridTemplateColumns: "minmax(0, 1.25fr) auto minmax(0, 1fr)",
         alignItems: "center",
-        justifyContent: "space-between",
-        gap: "var(--space-6)",
+        columnGap: "var(--space-4)",
         padding: "0 var(--space-6)",
-        backgroundColor: "var(--brand)",
+        background:
+          "linear-gradient(180deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 72%, var(--night-2)) 100%)",
         color: "var(--brand-contrast)",
         fontSize: "var(--text-lg)",
         flexShrink: 0,
+        boxShadow: "inset 0 -1px 0 color-mix(in srgb, var(--brand-inv) 35%, transparent)",
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", minWidth: 0 }}>
+      {/* Zone logo — colonne gauche bornée (overflow hidden) : disque + nom. */}
+      <span
+        data-testid="tv-brand"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflow: "hidden",
+          justifySelf: "stretch",
+        }}
+      >
         {logoUrl !== null ? (
-          /* Logo banque provisionné (NEXT_PUBLIC_BANK_LOGO_URL) — bien
-             visible, ~48px de haut dans le bandeau. Décoratif : le nom de la
-             banque est affiché juste à côté. */
-          // eslint-disable-next-line @next/next/no-img-element -- logo banque provisionné (theming), hors pipeline next/image
-          <img
-            data-testid="tv-brand-logo"
-            src={logoUrl}
-            alt=""
-            aria-hidden="true"
-            style={{
-              height: markSize,
-              width: "auto",
-              maxWidth: "calc(var(--tv-header-height) * 4)",
-              objectFit: "contain",
-              flexShrink: 0,
-            }}
-          />
+          <span data-testid="tv-brand-logo-slot" aria-hidden="true" style={{ ...brandSlot, padding: "var(--space-1)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo banque provisionné (theming), hors pipeline next/image */}
+            <img
+              data-testid="tv-brand-logo"
+              src={logoUrl}
+              alt=""
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                objectPosition: "center",
+                display: "block",
+              }}
+            />
+          </span>
         ) : (
-          /* Repli sans logo : pastille lisible sur le bandeau brand, avec
-             l'initiale de la banque (jamais d'image réseau requise). */
           <span
             data-testid="tv-brand-mark"
             aria-hidden="true"
             style={{
-              width: markSize,
-              height: markSize,
-              borderRadius: "var(--r-full)",
-              backgroundColor: "var(--brand-contrast)",
-              boxShadow: "var(--shadow-1)",
-              flexShrink: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
+              ...brandSlot,
               color: "var(--brand)",
               fontFamily: "var(--font-display)",
               fontWeight: 700,
-              fontSize: "var(--text-2xl)",
+              fontSize: "calc((var(--tv-header-height) - var(--space-4) - var(--space-1)) * 0.42)",
+              lineHeight: 1,
+              letterSpacing: "var(--tracking-tight)",
             }}
           >
             {bankInitial(tenantName)}
@@ -598,19 +628,49 @@ function TvHeader({
         )}
         <span
           style={{
-            fontWeight: 600,
-            color: "var(--brand-contrast)",
-            fontSize: "var(--text-xl)",
-            whiteSpace: "nowrap",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            gap: "2px",
+            minWidth: 0,
             overflow: "hidden",
-            textOverflow: "ellipsis",
           }}
         >
-          {tenantName}
+          <span
+            data-testid="tv-brand-name"
+            style={{
+              fontWeight: 600,
+              color: "var(--brand-contrast)",
+              fontSize: "var(--text-xl)",
+              lineHeight: 1.1,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {tenantName}
+          </span>
+          {agencyLabel !== null && (
+            <span
+              data-testid="tv-agency-name"
+              style={{
+                fontWeight: 500,
+                color: "color-mix(in srgb, var(--brand-contrast) 78%, var(--brand-inv))",
+                fontSize: "var(--text-sm)",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                lineHeight: 1.15,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {agencyLabel}
+            </span>
+          )}
         </span>
       </span>
 
-      {/* Date complète (FR/EN) au centre du bandeau. */}
       <span
         data-testid="tv-date"
         aria-hidden={dateLabel === ""}
@@ -620,20 +680,33 @@ function TvHeader({
           letterSpacing: "0.04em",
           color: "var(--brand-contrast)",
           whiteSpace: "nowrap",
+          justifySelf: "center",
+          textAlign: "center",
+          maxWidth: "100%",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
         {dateLabel}
       </span>
 
-      {/* Horloge (bloc contrasté, chiffres tabulaires) + contrôle discret
-          du coin du bandeau (plein écran) groupés à droite. */}
-      <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexShrink: 0 }}>
+      <span
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: "var(--space-3)",
+          justifySelf: "end",
+          minWidth: 0,
+        }}
+      >
         <span
           data-testid="tv-clock"
           aria-hidden={clock === ""}
           style={{
-            backgroundColor: "var(--night-2, var(--surface-screen))",
+            backgroundColor: "var(--night)",
             color: "var(--ink-inverse)",
+            border: "1px solid color-mix(in srgb, var(--brand-inv) 40%, transparent)",
             fontFamily: "var(--font-display)",
             fontSize: "var(--text-2xl)",
             fontWeight: 600,

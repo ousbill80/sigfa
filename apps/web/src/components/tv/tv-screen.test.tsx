@@ -104,12 +104,11 @@ describe("TvScreen — TV-V3 split permanent", () => {
     const count = within(queue).getByTestId("tv-queue-count");
     expect(count).toHaveTextContent(String(nominal.queue.length));
     expect(count.getAttribute("style")).toContain("var(--display-tv)");
-    // TV-BLANC : accent success renforcé (7.3:1 sur --paper) — brand trop faible
-    // est illisible sur la colonne claire.
+    // TV-BLANC : accent brand-strong mélangé à l'encre (≥ 7:1 sur --paper) —
+    // --brand-inv seul est trop clair sur la colonne.
     const countStyle = count.getAttribute("style") ?? "";
-    expect(countStyle).toContain("var(--success)");
+    expect(countStyle).toContain("var(--brand-strong)");
     expect(countStyle).not.toContain("var(--brand-inv)");
-    expect(countStyle).not.toContain("var(--gold)");
   });
 });
 
@@ -290,30 +289,58 @@ describe("TvScreen — TV-V3 bandeau haut", () => {
     expect(within(header).getByText("Banque du Commerce")).toBeInTheDocument();
   });
 
-  it("TV-LOGO: repli sans logo — pastille bien visible (~48px) avec l'initiale de la banque", () => {
+  it("TV-LOGO: zone logo — pastille cadrée (~44px) + nom banque toujours rendu", () => {
     render(<TvScreen state={nominal} tenantName="Banque du Commerce" />);
-    const mark = screen.getByTestId("tv-brand-mark");
+    const brand = screen.getByTestId("tv-brand");
+    const mark = within(brand).getByTestId("tv-brand-mark");
+    const name = within(brand).getByTestId("tv-brand-name");
     expect(mark).toHaveTextContent("B");
+    expect(name).toHaveTextContent("Banque du Commerce");
     const style = mark.getAttribute("style") ?? "";
-    // Dimensionnée sur le bandeau (--tv-header-height − --space-4 ≈ 48px).
     expect(style).toContain("var(--tv-header-height)");
+    expect(style).toContain("line-height: 1");
+    expect(style).toContain("var(--brand-inv)");
     expect(screen.queryByTestId("tv-brand-logo")).toBeNull();
+    expect(screen.queryByTestId("tv-agency-name")).toBeNull();
   });
 
-  it("TV-LOGO: logoUrl provisionné (NEXT_PUBLIC_BANK_LOGO_URL) — logo affiché à gauche du bandeau", () => {
+  it("TV-LOGO: nom d'agence sous la banque (design-gate Banque · Agence)", () => {
+    render(
+      <TvScreen
+        state={nominal}
+        tenantName="Banque du Commerce"
+        agencyName="Agence Plateau"
+      />
+    );
+    const brand = screen.getByTestId("tv-brand");
+    expect(within(brand).getByTestId("tv-brand-name")).toHaveTextContent("Banque du Commerce");
+    const agency = within(brand).getByTestId("tv-agency-name");
+    expect(agency).toHaveTextContent("Agence Plateau");
+    expect(agency.getAttribute("style") ?? "").toContain("var(--brand-inv)");
+  });
+
+  it("TV-LOGO: logoUrl provisionné — logo cadré dans le disque + nom à côté", () => {
     render(
       <TvScreen state={nominal} tenantName="Banque du Commerce" logoUrl="/tenants/bdc/logo.svg" />
     );
-    const header = screen.getByTestId("tv-header");
-    const logo = within(header).getByTestId("tv-brand-logo");
+    const brand = screen.getByTestId("tv-brand");
+    const slot = within(brand).getByTestId("tv-brand-logo-slot");
+    const logo = within(brand).getByTestId("tv-brand-logo");
     expect(logo).toHaveAttribute("src", "/tenants/bdc/logo.svg");
-    const style = logo.getAttribute("style") ?? "";
-    // Hauteur pilotée par le bandeau (~48px dans un bandeau de 64px).
-    expect(style).toContain("var(--tv-header-height)");
-    expect(style).toContain("object-fit: contain");
-    // Plus de pastille quand le logo est là ; le nom reste affiché à côté.
-    expect(within(header).queryByTestId("tv-brand-mark")).toBeNull();
-    expect(within(header).getByText("Banque du Commerce")).toBeInTheDocument();
+    expect(slot.getAttribute("style") ?? "").toContain("var(--tv-header-height)");
+    expect(logo.getAttribute("style") ?? "").toContain("object-fit: contain");
+    expect(within(brand).queryByTestId("tv-brand-mark")).toBeNull();
+    expect(within(brand).getByTestId("tv-brand-name")).toHaveTextContent("Banque du Commerce");
+  });
+
+  it("TV-LOGO: bandeau en grille 3 colonnes — zone logo bornée (pas de chevauchement)", () => {
+    render(<TvScreen state={nominal} tenantName="Banque du Commerce" />);
+    const header = screen.getByTestId("tv-header");
+    const brand = screen.getByTestId("tv-brand");
+    const style = header.getAttribute("style") ?? "";
+    expect(style).toContain("grid-template-columns");
+    expect(style).toContain("1.25fr");
+    expect(brand.getAttribute("style") ?? "").toContain("overflow: hidden");
   });
 
   it("TV-V3: date complète au centre du bandeau", () => {
@@ -322,12 +349,13 @@ describe("TvScreen — TV-V3 bandeau haut", () => {
     expect(date).toHaveTextContent("Dimanche 13 juillet 2026");
   });
 
-  it("TV-V3: horloge à droite — bloc contrasté (fond nuit), grande, tabular-nums", () => {
+  it("TV-V3: horloge à droite — bloc --night rimé or, grande, tabular-nums", () => {
     render(<TvScreen state={nominal} clock="14:10:22" />);
     const clock = screen.getByTestId("tv-clock");
     expect(clock).toHaveTextContent("14:10:22");
     const style = clock.getAttribute("style") ?? "";
-    expect(style).toContain("var(--night-2");
+    expect(style).toContain("var(--night)");
+    expect(style).toContain("var(--brand-inv)");
     expect(style).toContain("var(--ink-inverse)");
     expect(style).toContain("tabular-nums");
   });
@@ -395,18 +423,18 @@ describe("TvScreen — TV-002 flash conservé (option « flash dans la colonne �
     const style = hero.getAttribute("style") ?? "";
     // Assombri (7.6:1 avec --ink-inverse) : le flash reste dramatique sur --paper.
     expect(style).toContain("var(--brand-strong)");
-    expect(style).toContain("var(--shadow-brand)");
+    expect(style).toContain("0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent)");
     // La pub n'est JAMAIS interrompue par l'appel.
     expect(screen.getByTestId("tv-adzone")).toBeInTheDocument();
   });
 
-  it("TV-002: sans célébration — la carte revient au repos (carte claire --surface-1, sans halo brand)", () => {
+  it("TV-002: sans célébration — la carte revient au repos (carte claire --surface-1, sans halo or)", () => {
     render(<TvScreen state={nominal} celebration={false} />);
     const hero = screen.getByTestId("tv-hero");
     expect(hero).toHaveAttribute("data-celebration", "off");
     const style = hero.getAttribute("style") ?? "";
     expect(style).toContain("var(--surface-1)");
-    expect(style).not.toContain("var(--shadow-brand)");
+    expect(style).not.toContain("0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent)");
   });
 
   it("TV-002: transitions en tokens uniquement (aucune durée en dur)", () => {

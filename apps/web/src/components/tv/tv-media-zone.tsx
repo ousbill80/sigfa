@@ -3,19 +3,14 @@
  * gauche de l'écran TV d'agence.
  *
  * Piloté par la playlist du manifeste {@link TvMediaItem} (lib/tv-media) :
- * - image : affichée `durationMs` (défaut {@link TV_MEDIA_DEFAULT_DURATION_MS})
- *   puis avance ;
- * - vidéo : `muted autoplay playsInline`, avance à la fin (`ended`) ou après
- *   `durationMs` si fourni ;
+ * - image / vidéo : `object-fit: cover` (plein cadre du split ~4:3) ;
  * - fondu croisé {@link TV_MEDIA_FADE_MS} (désactivé en reduced-motion) ;
- * - boucle infinie ; le média suivant est préchargé (couches montées,
- *   `preload` piloté pour les vidéos) ;
- * - un média en échec de chargement est marqué et SAUTÉ proprement ; si tous
- *   échouent, le `fallback` (promo texte AdZone) est rendu — zéro régression.
+ * - overlays Neutre Premium (lave brand haute + vignette nuit + lavette papier
+ *   vers la colonne claire) pour marier le média avec bandeau et colonne ;
+ * - pastilles --brand-inv de progression ;
+ * - boucle infinie ; média suivant préchargé ; échec → skip / fallback AdZone.
  *
- * La zone vit sous le bandeau, dans la cellule gauche de la grille split : elle
- * ne recouvre JAMAIS la colonne d'appels (« MAINTENANT SERVI ») — aucun
- * z-index élevé, overflow caché. Présentation pure : aucun contrat temps réel.
+ * Aucun z-index élevé : la colonne d'appels n'est jamais masquée.
  * @module components/tv/tv-media-zone
  */
 "use client";
@@ -44,7 +39,8 @@ const rootStyle: CSSProperties = {
   height: "100%",
   minWidth: 0,
   overflow: "hidden",
-  backgroundColor: "var(--night-2, var(--surface-screen))",
+  /* Base nuit tiédie brand — jamais un noir froid sous les slides. */
+  backgroundColor: "color-mix(in srgb, var(--brand) 10%, var(--night-2))",
 };
 
 const layerStyle: CSSProperties = {
@@ -58,6 +54,46 @@ const mediaStyle: CSSProperties = {
   width: "100%",
   height: "100%",
   objectFit: "cover",
+  objectPosition: "center",
+  display: "block",
+};
+
+/** Lave brand haute — jointure visuelle avec le bandeau #1d4ed8 (repli produit). */
+const washTopStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  pointerEvents: "none",
+  background:
+    "linear-gradient(180deg, color-mix(in srgb, var(--brand) 28%, transparent) 0%, transparent 28%)",
+};
+
+/** Vignette nuit chaude — cadre le sujet sans le noyer. */
+const vignetteStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  pointerEvents: "none",
+  background:
+    "radial-gradient(ellipse at 48% 42%, transparent 40%, color-mix(in srgb, var(--night-2) 58%, transparent) 100%)",
+};
+
+/** Lavette droite — adoucit le cut noir/crème vers la colonne --paper. */
+const washRightStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  pointerEvents: "none",
+  background:
+    "linear-gradient(90deg, transparent 78%, color-mix(in srgb, var(--paper) 14%, transparent) 100%)",
+};
+
+const progressStyle: CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  bottom: "var(--space-6)",
+  transform: "translateX(-50%)",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  pointerEvents: "none",
 };
 
 /**
@@ -94,20 +130,17 @@ export function TvMediaZone({
   const allFailed = count === 0 || failed.size >= count;
   const current = items[index];
   const nextIndex = nextPlayableIndex(index, Math.max(count, 1), failed);
+  const playableCount = items.reduce((n, _item, i) => (failed.has(i) ? n : n + 1), 0);
 
   const advance = useCallback(() => {
     setIndex((i) => nextPlayableIndex(i, Math.max(count, 1), failed) ?? i);
   }, [count, failed]);
 
-  // Média courant en échec (ou index hors-bornes après rétrécissement) → saute
-  // immédiatement vers le prochain média jouable.
   useEffect(() => {
     if (allFailed) return;
     if (current === undefined || failed.has(index)) advance();
   }, [allFailed, current, failed, index, advance]);
 
-  // Minuterie d'avancement : image = durationMs (défaut 8 s) ; vidéo = fin de
-  // lecture (`ended`), sauf durationMs explicite qui borne l'affichage.
   useEffect(() => {
     if (allFailed || current === undefined || failed.has(index)) return;
     const durationMs =
@@ -119,9 +152,6 @@ export function TvMediaZone({
     return () => clearTimeout(id);
   }, [allFailed, current, failed, index, advance]);
 
-  // Pilotage lecture vidéo : seule la vidéo courante joue (reprise au début),
-  // les autres sont en pause (préchargées). Tolérant aux environnements sans
-  // implémentation média (jsdom) et aux refus d'autoplay.
   useEffect(() => {
     for (const [i, el] of videoRefs.current.entries()) {
       try {
@@ -159,6 +189,7 @@ export function TvMediaZone({
       {items.map((item, i) => {
         if (failed.has(i)) return null;
         const visible = i === index;
+        const imageDurationMs = item.durationMs ?? TV_MEDIA_DEFAULT_DURATION_MS;
         return (
           <div
             key={`${i}-${item.src}`}
@@ -180,7 +211,13 @@ export function TvMediaZone({
                 data-testid="tv-media-image"
                 src={item.src}
                 alt=""
-                style={mediaStyle}
+                style={{
+                  ...mediaStyle,
+                  transform: visible && !reducedMotion ? "scale(1.04)" : "scale(1)",
+                  transition: reducedMotion
+                    ? "none"
+                    : `transform ${imageDurationMs}ms linear`,
+                }}
                 onError={() => markFailed(i)}
               />
             ) : (
@@ -197,8 +234,6 @@ export function TvMediaZone({
                 preload={visible || i === nextIndex ? "auto" : "metadata"}
                 style={mediaStyle}
                 onEnded={() => {
-                  // Avance à la fin naturelle SEULEMENT si aucune durée bornée
-                  // (sinon la minuterie fait foi) et si la vidéo est visible.
                   if (visible && item.durationMs === undefined) advance();
                 }}
                 onError={() => markFailed(i)}
@@ -207,6 +242,39 @@ export function TvMediaZone({
           </div>
         );
       })}
+
+      <div data-testid="tv-media-wash-top" aria-hidden="true" style={washTopStyle} />
+      <div data-testid="tv-media-vignette" aria-hidden="true" style={vignetteStyle} />
+      <div data-testid="tv-media-wash-right" aria-hidden="true" style={washRightStyle} />
+
+      {playableCount > 1 && (
+        <div data-testid="tv-media-progress" aria-hidden="true" style={progressStyle}>
+          {items.map((item, i) => {
+            if (failed.has(i)) return null;
+            const active = i === index;
+            return (
+              <span
+                key={`${i}-${item.src}-dot`}
+                data-testid="tv-media-dot"
+                data-active={active ? "on" : "off"}
+                style={{
+                  display: "block",
+                  width: active ? "var(--space-6)" : "var(--space-2)",
+                  height: "var(--space-2)",
+                  borderRadius: "var(--r-full)",
+                  backgroundColor: active
+                    ? "var(--brand-inv)"
+                    : "color-mix(in srgb, var(--ink-inverse) 32%, transparent)",
+                  boxShadow: active ? "0 0 48px color-mix(in srgb, var(--brand-inv) 30%, transparent)" : undefined,
+                  transition: reducedMotion
+                    ? "none"
+                    : `width var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease)`,
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

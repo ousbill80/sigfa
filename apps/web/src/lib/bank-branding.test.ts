@@ -1,14 +1,16 @@
 /**
- * Tests for bank-branding (WEB-002-HDR) — marque banque du bandeau session,
+ * Tests for bank-branding (WEB-002-HDR) — marque banque / agence du bandeau,
  * même convention que apps/kiosk kiosk-branding.
  * @module lib/bank-branding.test
  */
 import { describe, it, expect } from "vitest";
 import {
   bankName,
+  agencyName,
   bankLogoUrl,
   bankInitial,
   DEFAULT_BANK_NAME,
+  DEFAULT_AGENCY_NAME,
 } from "./bank-branding";
 
 describe("bank-branding — provisionnement env + replis sûrs (WEB-002-HDR)", () => {
@@ -21,6 +23,17 @@ describe("bank-branding — provisionnement env + replis sûrs (WEB-002-HDR)", (
   it("WEB-002-HDR: bankName non provisionné ou vide → repli SIGFA", () => {
     expect(bankName({})).toBe(DEFAULT_BANK_NAME);
     expect(bankName({ NEXT_PUBLIC_BANK_NAME: "" })).toBe(DEFAULT_BANK_NAME);
+  });
+
+  it("TV-LOGO: agencyName lit NEXT_PUBLIC_AGENCY_NAME", () => {
+    expect(agencyName({ NEXT_PUBLIC_AGENCY_NAME: "Agence Cocody" })).toBe(
+      "Agence Cocody"
+    );
+  });
+
+  it("TV-LOGO: agencyName non provisionné ou vide → repli Agence Centrale", () => {
+    expect(agencyName({})).toBe(DEFAULT_AGENCY_NAME);
+    expect(agencyName({ NEXT_PUBLIC_AGENCY_NAME: "" })).toBe(DEFAULT_AGENCY_NAME);
   });
 
   it("WEB-002-HDR: bankLogoUrl lit NEXT_PUBLIC_BANK_LOGO_URL", () => {
